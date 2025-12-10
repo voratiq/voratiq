@@ -1,0 +1,275 @@
+---
+title: CLI Reference
+---
+
+# CLI Reference
+
+Complete reference for all Voratiq commands.
+
+## Global Behavior
+
+- Running `voratiq` without arguments prints help
+- Commands exit with code 1 on operational errors
+- Most commands expect `.voratiq/` to exist (created via `voratiq init`)
+- Transcripts stream to stdout; stderr is reserved for warnings and errors
+
+## `voratiq init`
+
+Bootstrap workspace scaffolding in the current repository.
+
+### Usage
+
+```bash
+voratiq init [-y, --yes]
+```
+
+### Options
+
+- `-y, --yes`: Skip interactive confirmations (useful for CI/scripts)
+
+### Behavior
+
+Creates:
+
+- `.voratiq/` directory
+- `runs/` subdirectory for run artifacts
+- `runs/index.json` for the run index (per-run `record.json` files are created during `voratiq run`)
+- `agents.yaml` with detected agent binaries
+- `evals.yaml` with common eval commands
+- `environment.yaml` with environment settings
+- `sandbox.yaml` with sandbox policies
+
+Detects common agent binaries (`claude`, `codex`, `gemini`, etc.) on `$PATH` and pre-populates `agents.yaml`.
+
+Interactive mode (TTY) prompts for confirmation. Non-TTY environments require the `--yes` flag.
+
+### Examples
+
+```bash
+# Interactive mode (prompts for confirmation)
+voratiq init
+
+# Non-interactive mode (skip prompts)
+voratiq init -y
+```
+
+### Errors
+
+- Repository is not a git repo
+- `.voratiq/` already exists
+- Insufficient permissions to create files
+
+## `voratiq run`
+
+Execute enabled agents against a Markdown spec.
+
+### Usage
+
+```bash
+voratiq run --spec <path> [--max-parallel <count>]
+```
+
+### Options
+
+- `--spec <path>`: Path to the Markdown spec file (required)
+- `--max-parallel <count>`: Maximum number of agents to run concurrently (default: number of enabled agents)
+
+### Behavior
+
+1. Validates clean git tree, spec exists, agent/eval configs are valid
+2. Generates run ID, creates run workspace, initializes run record
+3. Spawns enabled agents in parallel, each in an isolated git worktree
+4. Runs evals in each agent's workspace after the agent completes
+5. Captures diffs, persists records, generates report
+
+Exits with code 1 if:
+
+- Preflight checks fail
+- No agents are enabled
+- Any agent fails or errors
+- Any eval fails
+
+Note: the run itself completes, but the exit code indicates failure.
+
+### Examples
+
+```bash
+# Run all enabled agents against a spec
+voratiq run --spec specs/fix-auth-bug.md
+
+# Limit concurrency to 2 agents at a time
+voratiq run --spec specs/refactor.md --max-parallel 2
+```
+
+### Errors
+
+- Git working tree is not clean
+- Spec file doesn't exist
+- No agents are enabled
+- Agent binary not found or not executable
+- Stale or missing agent credentials
+- Invalid agent/eval configuration
+
+## `voratiq review`
+
+Display a summary of a recorded run.
+
+### Usage
+
+```bash
+voratiq review --run <run-id>
+```
+
+### Options
+
+- `--run <run-id>`: Run ID to review (required)
+
+### Behavior
+
+Loads the run record from `.voratiq/runs/<run-id>/record.json` (via `.voratiq/runs/index.json`) and renders run metadata, agent statuses, eval results, diff summaries, and artifact paths.
+
+### Examples
+
+```bash
+voratiq review --run 20251031-232802-abc123
+```
+
+### Errors
+
+- Run ID not found
+- Run record is malformed
+- Run artifacts are missing (warns but continues)
+
+## `voratiq apply`
+
+Apply a specific agent's diff to the repository using `git apply`.
+
+### Usage
+
+```bash
+voratiq apply --run <run-id> --agent <agent-id> [--ignore-base-mismatch]
+```
+
+### Options
+
+- `--run <run-id>`: Run ID containing the agent (required)
+- `--agent <agent-id>`: Agent ID whose diff to apply (required)
+- `--ignore-base-mismatch`: Skip base revision check (apply even if current HEAD differs from run's base)
+
+### Behavior
+
+1. Validates git working tree is clean
+2. Loads the agent's diff from `.voratiq/runs/<run-id>/<agent-id>/artifacts/diff.patch`
+3. Compares current `HEAD` to the run's base revision; exits with a base mismatch error unless `--ignore-base-mismatch` is provided
+4. Executes `git apply <diff.patch>`
+
+Common `git apply` failures:
+
+- Base mismatch: Current HEAD differs from the run's base (resolve conflicts manually or use `--ignore-base-mismatch`)
+- Conflicts: Diff doesn't apply cleanly (resolve manually)
+- Generic error: Something else went wrong (check git status)
+
+### Examples
+
+```bash
+# Apply agent's diff (with base check)
+voratiq apply --run 20251031-232802-abc123 --agent claude
+
+# Apply diff, ignoring base mismatch
+voratiq apply --run 20251031-232802-abc123 --agent claude --ignore-base-mismatch
+```
+
+### Errors
+
+- Run or agent not found
+- Git working tree is not clean
+- Base revision mismatch (without `--ignore-base-mismatch`)
+- `git apply` fails (conflicts or other errors)
+
+## `voratiq list`
+
+Display recorded runs with optional filtering.
+
+### Usage
+
+```bash
+voratiq list [--limit <n>] [--spec <path>] [--run <run-id>] [--include-pruned]
+```
+
+### Options
+
+- `--limit <n>`: Show only the N most recent runs (default: 10)
+- `--spec <path>`: Filter by spec path
+- `--run <run-id>`: Show only the specified run ID
+- `--include-pruned`: Include runs marked as pruned
+
+### Behavior
+
+Reads `.voratiq/runs/index.json` plus per-run `record.json` files and renders a table with run ID, status, spec path, and creation timestamp.
+
+### Examples
+
+```bash
+# List all runs (excluding pruned)
+voratiq list
+
+# List last 10 runs
+voratiq list --limit 10
+
+# List runs for a specific spec
+voratiq list --spec specs/fix-auth-bug.md
+
+# Show a specific run
+voratiq list --run 20251031-232802-abc123
+
+# Include pruned runs
+voratiq list --include-pruned
+```
+
+### Errors
+
+- `.voratiq/runs/index.json` or a per-run `record.json` is malformed
+
+## `voratiq prune`
+
+Remove run artifacts and mark the run as pruned in records.
+
+### Usage
+
+```bash
+voratiq prune --run <run-id> [--purge] [-y, --yes]
+```
+
+### Options
+
+- `--run <run-id>`: Run ID to prune (required)
+- `--purge`: Delete all associated configs and artifacts
+- `-y, --yes`: Skip interactive confirmations
+
+### Behavior
+
+1. Loads run record from `.voratiq/runs/<run-id>/record.json`
+2. Displays a summary of workspaces, artifacts, and branches slated for deletion and requests confirmation (unless `-y/--yes`)
+3. Deletes run worktrees and, when `--purge` is set, all associated configs and artifacts
+4. Updates run record, marking it as pruned
+
+`--purge` broadens what is removed but still prompts for confirmation; combine with `-y` for non-interactive execution.
+
+### Examples
+
+```bash
+# Interactive pruning
+voratiq prune --run 20251031-232802-abc123
+
+# Non-interactive (skip prompts)
+voratiq prune --run 20251031-232802-abc123 -y
+
+# Fully purge the run directory (non-interactively)
+voratiq prune --run 20251031-232802-abc123 --purge -y
+```
+
+### Errors
+
+- Run ID not found
+- Artifacts already deleted
+- Insufficient permissions to delete files

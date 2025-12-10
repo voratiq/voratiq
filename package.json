@@ -1,0 +1,82 @@
+{
+  "name": "voratiq",
+  "version": "0.1.0-beta.0",
+  "description": "Run multiple AI coding agents in parallel, compare their results, and apply the best solution.",
+  "keywords": [
+    "ai",
+    "cli",
+    "multi-agent",
+    "spec-driven",
+    "code-generation",
+    "evals",
+    "sandboxing"
+  ],
+  "homepage": "https://github.com/voratiq/voratiq#readme",
+  "bugs": {
+    "url": "https://github.com/voratiq/voratiq/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/voratiq/voratiq.git"
+  },
+  "license": "MIT",
+  "author": "Voratiq <support@voratiq.com>",
+  "type": "module",
+  "bin": {
+    "voratiq": "./dist/bin.js"
+  },
+  "main": "./dist/bin.js",
+  "exports": {
+    ".": {
+      "types": "./dist/bin.d.ts",
+      "import": "./dist/bin.js",
+      "require": "./dist/bin.js"
+    }
+  },
+  "types": "./dist/bin.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "prepare": "npm run build",
+    "build": "tsc && node scripts/build-run-agent-shim.mjs",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "./scripts/run-tests.sh",
+    "test:sandbox": "./scripts/run-tests.sh --sandbox-only",
+    "check": "npm run lint && npm run format:check && npm run build && npm test"
+  },
+  "dependencies": {
+    "@voratiq/sandbox-runtime": "^0.7.0-voratiq1",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "js-yaml": "^4.1.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.29.0",
+    "@jest/globals": "^30.2.0",
+    "@types/jest": "^30.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.19.17",
+    "@typescript-eslint/eslint-plugin": "^8.12.1",
+    "@typescript-eslint/parser": "^8.12.1",
+    "depcheck": "^1.4.7",
+    "eslint": "^9.29.0",
+    "eslint-plugin-jest": "^29.0.1",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "globals": "^16.4.0",
+    "jest": "^30.0.0",
+    "jest-resolve": "^30.2.0",
+    "memfs": "^4.48.1",
+    "prettier": "^3.6.2",
+    "ts-jest": "^29.4.2",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

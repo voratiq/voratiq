@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.npm-cache/
+.voratiq/
+specs/
+!tests/docker/*/run.sh
+!scripts/run-tests.sh

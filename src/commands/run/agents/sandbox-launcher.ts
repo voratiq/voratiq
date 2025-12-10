@@ -1,0 +1,348 @@
+import type { ChildProcess } from "node:child_process";
+import {
+  constants as fsConstants,
+  createWriteStream,
+  existsSync,
+} from "node:fs";
+import { access, readFile, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, relative as relativePath } from "node:path";
+
+import type { WatchdogMetadata } from "../../../records/types.js";
+import {
+  getCliAssetPath,
+  resolveCliAssetRoot,
+} from "../../../utils/cli-root.js";
+import { resolvePath } from "../../../utils/path.js";
+import { spawnStreamingProcess } from "../../../utils/process.js";
+import type { AgentWorkspacePaths } from "../../../workspace/layout.js";
+import {
+  ARTIFACTS_DIRNAME,
+  EVALS_DIRNAME,
+} from "../../../workspace/structure.js";
+import { AgentProcessError } from "../errors.js";
+import {
+  generateSandboxSettings,
+  resolveSrtBinary,
+  writeSandboxSettings,
+} from "../sandbox.js";
+import type { AgentManifest } from "../shim/agent-manifest.js";
+import {
+  createWatchdog,
+  WATCHDOG_DEFAULTS,
+  type WatchdogController,
+  type WatchdogTrigger,
+} from "./watchdog.js";
+
+const DEFAULT_SRT_ARGUMENTS = ["--debug"] as const;
+const SRT_BINARY_ENV = "VORATIQ_SRT_BINARY" as const;
+
+let cachedSrtBinaryPath: string | undefined;
+
+export interface AgentProcessOptions {
+  runtimeManifestPath: string;
+  agentRoot: string;
+  stdoutPath: string;
+  stderrPath: string;
+  sandboxSettingsPath: string;
+  resolveRunInvocation?: RunInvocationResolver;
+  /** Provider ID for watchdog fatal pattern matching. */
+  providerId?: string;
+  /** Callback fired immediately when watchdog triggers, before process exits. */
+  onWatchdogTrigger?: (trigger: WatchdogTrigger, reason: string) => void;
+}
+
+export interface AgentProcessResult {
+  exitCode: number;
+  errorMessage?: string;
+  signal?: NodeJS.Signals | null;
+  /** Watchdog metadata showing enforced limits and trigger reason. */
+  watchdog?: WatchdogMetadata;
+}
+
+export interface RunInvocationContext {
+  agentRoot: string;
+  configArg: string;
+  settingsArg: string;
+  shimEntryPath: string;
+}
+
+export interface RunInvocation {
+  command: string;
+  args: string[];
+}
+
+export type RunInvocationResolver = (
+  context: RunInvocationContext,
+) => Promise<RunInvocation> | RunInvocation;
+
+export interface SandboxSettingsInput {
+  workspacePaths: AgentWorkspacePaths;
+  providerId: string;
+  root: string;
+}
+
+export async function configureSandboxSettings(
+  input: SandboxSettingsInput,
+): Promise<void> {
+  const { workspacePaths, providerId, root } = input;
+  const artifactsPath = resolvePath(
+    workspacePaths.agentRoot,
+    ARTIFACTS_DIRNAME,
+  );
+  const evalsPath = resolvePath(workspacePaths.agentRoot, EVALS_DIRNAME);
+  const sandboxSettings = generateSandboxSettings({
+    sandboxHomePath: workspacePaths.sandboxHomePath,
+    workspacePath: workspacePaths.workspacePath,
+    provider: providerId,
+    root,
+    sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
+    runtimePath: workspacePaths.runtimePath,
+    artifactsPath,
+    evalsPath,
+  });
+  await writeSandboxSettings(
+    workspacePaths.sandboxSettingsPath,
+    sandboxSettings,
+  );
+}
+
+export async function getRunCommand(): Promise<string> {
+  const { X_OK } = fsConstants;
+  const binaryPath = resolveSrtBinaryPath();
+  try {
+    await access(binaryPath, X_OK);
+  } catch {
+    throw new Error(
+      `Sandbox Runtime binary not found or not executable at ${binaryPath}. Please reinstall dependencies with 'npm install'.`,
+    );
+  }
+  return binaryPath;
+}
+
+function getRunArgs(options: {
+  settingsArg: string;
+  configArg: string;
+  shimEntryPath: string;
+}): string[] {
+  const { settingsArg, configArg, shimEntryPath } = options;
+  return [
+    ...DEFAULT_SRT_ARGUMENTS,
+    "--settings",
+    settingsArg,
+    "--",
+    process.execPath,
+    shimEntryPath,
+    "--config",
+    configArg,
+  ];
+}
+
+async function defaultResolveRunInvocation(
+  context: RunInvocationContext,
+): Promise<RunInvocation> {
+  const command = await getRunCommand();
+  const args = getRunArgs({
+    settingsArg: context.settingsArg,
+    configArg: context.configArg,
+    shimEntryPath: context.shimEntryPath,
+  });
+  return { command, args };
+}
+
+export async function runAgentProcess(
+  options: AgentProcessOptions,
+): Promise<AgentProcessResult> {
+  const {
+    runtimeManifestPath,
+    agentRoot,
+    stdoutPath,
+    stderrPath,
+    sandboxSettingsPath,
+    resolveRunInvocation,
+    providerId = "",
+    onWatchdogTrigger,
+  } = options;
+
+  const stdoutStream = createWriteStream(stdoutPath, { flags: "w" });
+  const stderrStream = createWriteStream(stderrPath, { flags: "w" });
+
+  const shimEntryPath = resolveShimEntryPath();
+  if (!existsSync(shimEntryPath)) {
+    throw new AgentProcessError({
+      detail: `Shim entry point missing at ${shimEntryPath}`,
+    });
+  }
+
+  const manifestArgPath = await stageManifestForSandbox({
+    runtimeManifestPath,
+  });
+  const relativeConfig = relativePath(agentRoot, manifestArgPath);
+  const configArg = relativeConfig === "" ? manifestArgPath : relativeConfig;
+
+  const relativeSettings = relativePath(agentRoot, sandboxSettingsPath);
+  const settingsArg =
+    relativeSettings === "" ? sandboxSettingsPath : relativeSettings;
+
+  const invocationResolver =
+    resolveRunInvocation ?? defaultResolveRunInvocation;
+  const { command, args } = await invocationResolver({
+    agentRoot,
+    configArg,
+    settingsArg,
+    shimEntryPath,
+  });
+
+  let watchdogController: WatchdogController | undefined;
+  // Track abort signal subscription for cleanup
+  let abortSignalHandler: (() => void) | undefined;
+  // Shared abort controller - watchdog will fire it, spawnStreamingProcess will listen
+  const forceAbortController = new AbortController();
+
+  let exitCode: number;
+  let signal: NodeJS.Signals | null;
+  let aborted = false;
+
+  try {
+    const result = await spawnStreamingProcess({
+      command,
+      args,
+      cwd: agentRoot,
+      stdout: { writable: stdoutStream },
+      stderr: { writable: stderrStream },
+      // Spawn in new process group to enable killing entire process tree
+      detached: true,
+      onSpawn: (child: ChildProcess) => {
+        watchdogController = createWatchdog(child, stderrStream, {
+          providerId,
+          onWatchdogTrigger,
+        });
+        // Bridge watchdog's abort signal to our shared abort controller
+        abortSignalHandler = () => forceAbortController.abort();
+        watchdogController.abortSignal.addEventListener(
+          "abort",
+          abortSignalHandler,
+          { once: true },
+        );
+      },
+      onData: (chunk: Buffer) => {
+        watchdogController?.handleOutput(chunk);
+      },
+      abortSignal: forceAbortController.signal,
+    });
+    exitCode = result.exitCode;
+    signal = result.signal;
+    aborted = result.aborted ?? false;
+  } finally {
+    // Clean up abort signal listener
+    if (abortSignalHandler && watchdogController) {
+      watchdogController.abortSignal.removeEventListener(
+        "abort",
+        abortSignalHandler,
+      );
+    }
+    watchdogController?.cleanup();
+    // Ensure streams are fully closed to prevent hanging on exit
+    if (!stdoutStream.closed) {
+      stdoutStream.end();
+    }
+    if (!stderrStream.closed) {
+      stderrStream.end();
+    }
+  }
+
+  const watchdogState = watchdogController?.getState();
+  const watchdogTrigger = watchdogState?.triggered ?? undefined;
+
+  let errorMessage: string | undefined;
+  if (watchdogTrigger && watchdogState?.triggeredReason) {
+    errorMessage = aborted
+      ? `${watchdogState.triggeredReason} (force-aborted after unresponsive to signals)`
+      : watchdogState.triggeredReason;
+  } else if (signal) {
+    errorMessage = `Agent terminated by signal ${signal}`;
+  } else if (exitCode !== 0) {
+    errorMessage = `Agent exited with code ${exitCode}`;
+  }
+
+  const watchdog: WatchdogMetadata = {
+    silenceTimeoutMs: WATCHDOG_DEFAULTS.silenceTimeoutMs,
+    wallClockCapMs: WATCHDOG_DEFAULTS.wallClockCapMs,
+    trigger: watchdogTrigger,
+  };
+
+  return { exitCode, errorMessage, signal, watchdog };
+}
+
+export async function stageManifestForSandbox(options: {
+  runtimeManifestPath: string;
+}): Promise<string> {
+  const { runtimeManifestPath } = options;
+
+  let rawManifest: string;
+  try {
+    rawManifest = await readFile(runtimeManifestPath, "utf8");
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new AgentProcessError({
+      detail: `Failed to read manifest at "${runtimeManifestPath}": ${detail}`,
+    });
+  }
+
+  let manifest: AgentManifest;
+  try {
+    manifest = JSON.parse(rawManifest) as AgentManifest;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new AgentProcessError({
+      detail: `Manifest JSON at "${runtimeManifestPath}" is invalid: ${detail}`,
+    });
+  }
+
+  const manifestDir = dirname(runtimeManifestPath);
+  const promptAbsolute = isAbsolute(manifest.promptPath)
+    ? manifest.promptPath
+    : resolvePath(manifestDir, manifest.promptPath);
+  const workspaceAbsolute = isAbsolute(manifest.workspace)
+    ? manifest.workspace
+    : resolvePath(manifestDir, manifest.workspace);
+
+  const manifestNeedsUpdate =
+    manifest.promptPath !== promptAbsolute ||
+    manifest.workspace !== workspaceAbsolute;
+  if (manifestNeedsUpdate) {
+    const updatedManifest = {
+      ...manifest,
+      promptPath: promptAbsolute,
+      workspace: workspaceAbsolute,
+    } satisfies AgentManifest;
+    await writeFile(
+      runtimeManifestPath,
+      `${JSON.stringify(updatedManifest, null, 2)}\n`,
+      "utf8",
+    );
+  }
+
+  return runtimeManifestPath;
+}
+
+function resolveSrtBinaryPath(): string {
+  const overridePath = process.env[SRT_BINARY_ENV];
+  if (overridePath && overridePath.length > 0) {
+    return overridePath;
+  }
+  if (!cachedSrtBinaryPath) {
+    const cliRoot = resolveCliAssetRoot();
+    cachedSrtBinaryPath = resolveSrtBinary(cliRoot);
+  }
+  return cachedSrtBinaryPath;
+}
+
+function resolveShimEntryPath(): string {
+  return getCliAssetPath(
+    "dist",
+    "commands",
+    "run",
+    "shim",
+    "run-agent-shim.mjs",
+  );
+}

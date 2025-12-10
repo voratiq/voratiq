@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+staged_files="$(git diff --cached --name-only --diff-filter=ACM || true)"
+
+if [[ -n "$staged_files" ]]; then
+  lint_files=()
+  while IFS= read -r file; do
+    [[ -n "$file" ]] && lint_files+=("$file")
+  done < <(printf "%s\n" "$staged_files" | grep -E '\.(ts|tsx|js|jsx)$' || true)
+
+  if (( ${#lint_files[@]} > 0 )); then
+    npx eslint --fix "${lint_files[@]}"
+  fi
+fi
+
+npm run format --silent -- --log-level warn
+
+if [[ -n "$staged_files" ]]; then
+  while IFS= read -r file; do
+    [[ -n "$file" ]] && git add "$file"
+  done <<< "$staged_files"
+else
+  git add --update
+fi

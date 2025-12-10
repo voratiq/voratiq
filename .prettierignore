@@ -1,0 +1,4 @@
+dist/
+.internal/
+.voratiq/
+.mypy_cache/

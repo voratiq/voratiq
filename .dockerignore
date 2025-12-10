@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.voratiq/
+coverage/
+*.log
+.vscode/
+.DS_Store
