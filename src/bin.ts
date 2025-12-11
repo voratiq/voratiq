@@ -103,7 +103,8 @@ export async function runCli(
     .description("Voratiq CLI")
     .version(getVoratiqVersion(), "-v, --version", "print the Voratiq version")
     .exitOverride()
-    .showHelpAfterError();
+    .showHelpAfterError()
+    .helpCommand(false);
 
   program.addCommand(createInitCommand());
   program.addCommand(createListCommand());
