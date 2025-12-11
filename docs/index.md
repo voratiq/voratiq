@@ -4,7 +4,7 @@ title: Voratiq Documentation
 
 # Voratiq
 
-Voratiq is a CLI tool for multi-agent code generation.
+Voratiq is an open-source CLI that helps you run agents in parallel, compare results, and apply the best solution.
 
 Write a spec in Markdown, run it against any number of agents (Claude, Codex, or Gemini), and let automated evals help determine which output is best.
 

@@ -1,6 +1,6 @@
 # Voratiq
 
-Run multiple AI coding agents in parallel, compare their results, and apply the best solution.
+Run agents in parallel, compare results, and apply the best solution.
 
 ![`voratiq run --spec specs/p1/agent-workspace-guardrails.md`](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/run-demo.png)
 
