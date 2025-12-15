@@ -90,9 +90,10 @@ describe("geminiAuthProvider.stage", () => {
       await expect(
         access(join(sandboxGemini, "GEMINI.md")),
       ).resolves.toBeUndefined();
+      await expect(access(join(sandboxGemini, "tmp"))).resolves.toBeUndefined();
       await expect(
         access(join(sandboxGemini, "tmp", "history.json")),
-      ).resolves.toBeUndefined();
+      ).rejects.toThrow();
 
       const firstRead = await readFile(oauthPath, "utf8");
       const secondRead = await readFile(oauthPath, "utf8");
@@ -182,7 +183,8 @@ describe("geminiAuthProvider optional files", () => {
         access(join(sandboxGemini, "installation_id")),
       ).rejects.toThrow();
       await expect(access(join(sandboxGemini, "GEMINI.md"))).rejects.toThrow();
-      await expect(access(join(sandboxGemini, "tmp"))).rejects.toThrow();
+      // tmp directory is always created (empty) regardless of whether host has one
+      await expect(access(join(sandboxGemini, "tmp"))).resolves.toBeUndefined();
 
       const stagedSecret = await readFile(
         join(sandboxGemini, "oauth_creds.json"),

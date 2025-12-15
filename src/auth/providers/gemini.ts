@@ -20,7 +20,6 @@ import type {
 import {
   assertReadableFileOrThrow,
   composeSandboxEnvResult,
-  copyOptionalDirectoryWithPermissions,
   copyOptionalFileWithPermissions,
   createSandboxPaths,
   ensureDirectories,
@@ -186,7 +185,8 @@ async function stageOptionalFiles(
     });
   }
 
-  const tmpSource = resolveChildPath(geminiHome, "tmp");
+  // Create empty tmp directory (don't copy contents to avoid polluting
+  // chat transcripts with historical sessions from previous runs)
   const sandboxTmpDestination = resolveChildPath(sandboxGeminiDir, "tmp");
   assertSandboxDestination({
     sandboxHome,
@@ -194,12 +194,7 @@ async function stageOptionalFiles(
     providerId: GEMINI_PROVIDER_ID,
     fileLabel: "tmp",
   });
-
-  await copyOptionalDirectoryWithPermissions(
-    tmpSource,
-    sandboxTmpDestination,
-    (cause) => new GeminiAuthProviderError(GEMINI_LOGIN_HINT, { cause }),
-  );
+  await ensureDirectories([sandboxTmpDestination]);
 }
 
 async function validateSettingsFile(settingsPath: string): Promise<void> {
