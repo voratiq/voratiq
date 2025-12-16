@@ -4,10 +4,32 @@ import { dirname, isAbsolute } from "node:path";
 import type { SandboxRuntimeConfig } from "@voratiq/sandbox-runtime";
 
 import { loadSandboxProviderConfig } from "../../configs/sandbox/loader.js";
-import type { SandboxFilesystemConfig } from "../../configs/sandbox/types.js";
+import type {
+  DenialBackoffConfig,
+  SandboxFilesystemConfig,
+} from "../../configs/sandbox/types.js";
 import { resolvePath } from "../../utils/path.js";
 
 export type SandboxSettings = SandboxRuntimeConfig;
+
+export type DenialOperationType =
+  | "network-connect"
+  | "file-read"
+  | "file-write";
+
+export interface SandboxFailFastInfo {
+  operation: DenialOperationType;
+  target: string;
+}
+
+export const DEFAULT_DENIAL_BACKOFF: DenialBackoffConfig = {
+  enabled: true,
+  warningThreshold: 2,
+  delayThreshold: 3,
+  delayMs: 5000,
+  failFastThreshold: 4,
+  windowMs: 120000,
+};
 
 export interface SandboxSettingsOptions {
   sandboxHomePath: string;
@@ -78,6 +100,153 @@ export function generateSandboxSettings(
       denyWrite,
     },
   };
+}
+
+export function resolveDenialBackoffConfig(
+  config: DenialBackoffConfig | undefined,
+): DenialBackoffConfig {
+  if (!config) {
+    return { ...DEFAULT_DENIAL_BACKOFF };
+  }
+  return {
+    enabled:
+      typeof config.enabled === "boolean"
+        ? config.enabled
+        : DEFAULT_DENIAL_BACKOFF.enabled,
+    warningThreshold:
+      typeof config.warningThreshold === "number"
+        ? config.warningThreshold
+        : DEFAULT_DENIAL_BACKOFF.warningThreshold,
+    delayThreshold:
+      typeof config.delayThreshold === "number"
+        ? config.delayThreshold
+        : DEFAULT_DENIAL_BACKOFF.delayThreshold,
+    delayMs:
+      typeof config.delayMs === "number"
+        ? config.delayMs
+        : DEFAULT_DENIAL_BACKOFF.delayMs,
+    failFastThreshold:
+      typeof config.failFastThreshold === "number"
+        ? config.failFastThreshold
+        : DEFAULT_DENIAL_BACKOFF.failFastThreshold,
+    windowMs:
+      typeof config.windowMs === "number"
+        ? config.windowMs
+        : DEFAULT_DENIAL_BACKOFF.windowMs,
+  };
+}
+
+export function parseSandboxDenialLine(
+  line: string,
+): SandboxFailFastInfo | undefined {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  const debugNetworkDeny = trimmed.match(
+    /^\[SandboxDebug\]\s+(?:Denied by config rule|No matching config rule, denying|User denied):\s+([^\s]+)$/u,
+  );
+  if (debugNetworkDeny?.[1]) {
+    return { operation: "network-connect", target: debugNetworkDeny[1] };
+  }
+
+  const macosKernelDeny = trimmed.match(
+    /\bSandbox:\s+deny(?:\(\d+\))?\s+([^\s]+)\s+(.+)$/u,
+  );
+  if (macosKernelDeny?.[1] && macosKernelDeny[2]) {
+    const op = macosKernelDeny[1].toLowerCase();
+    const target = macosKernelDeny[2].trim();
+    if (op.includes("network")) {
+      return { operation: "network-connect", target };
+    }
+    if (op.includes("file-read")) {
+      return { operation: "file-read", target };
+    }
+    if (op.includes("file-write")) {
+      return { operation: "file-write", target };
+    }
+  }
+
+  return undefined;
+}
+
+export type DenialBackoffAction = "none" | "warn" | "delay" | "fail-fast";
+
+export interface DenialBackoffDecision {
+  action: DenialBackoffAction;
+  count: number;
+  info: SandboxFailFastInfo;
+}
+
+export class DenialBackoffTracker {
+  private readonly config: DenialBackoffConfig;
+  private readonly byTarget = new Map<string, number[]>();
+
+  constructor(config: DenialBackoffConfig) {
+    this.config = resolveDenialBackoffConfig(config);
+  }
+
+  public resetAll(): void {
+    this.byTarget.clear();
+  }
+
+  public register(
+    info: SandboxFailFastInfo,
+    now = Date.now(),
+  ): DenialBackoffDecision {
+    const key = `${info.operation}:${info.target}`;
+    const windowMs = this.config.windowMs;
+    const existing = this.byTarget.get(key) ?? [];
+    const last =
+      existing.length > 0 ? existing[existing.length - 1] : undefined;
+    const timestamps =
+      last !== undefined && now - last > windowMs ? [] : [...existing];
+
+    timestamps.push(now);
+    const maxKept = Math.max(1, this.config.failFastThreshold);
+    while (timestamps.length > maxKept) {
+      timestamps.shift();
+    }
+    this.byTarget.set(key, timestamps);
+
+    const countInWindow = countWithinMs(timestamps, now, windowMs);
+    const countIn60 = countWithinMs(timestamps, now, 60_000);
+    const countIn30 = countWithinMs(timestamps, now, 30_000);
+
+    let action: DenialBackoffAction = "none";
+    if (this.config.enabled && countInWindow >= this.config.failFastThreshold) {
+      action = "fail-fast";
+    } else if (
+      this.config.enabled &&
+      countIn60 === this.config.delayThreshold
+    ) {
+      action = "delay";
+    } else if (
+      this.config.enabled &&
+      countIn30 === this.config.warningThreshold
+    ) {
+      action = "warn";
+    }
+
+    return { action, count: countInWindow, info };
+  }
+}
+
+function countWithinMs(
+  timestamps: readonly number[],
+  now: number,
+  windowMs: number,
+): number {
+  let count = 0;
+  for (let i = timestamps.length - 1; i >= 0; i -= 1) {
+    if (now - timestamps[i] <= windowMs) {
+      count += 1;
+    } else {
+      break;
+    }
+  }
+  return count;
 }
 
 function getDefaultSandboxWritePaths(): string[] {

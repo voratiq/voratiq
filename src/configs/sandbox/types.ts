@@ -6,6 +6,15 @@ export interface SandboxNetworkConfig {
   allowAllUnixSockets?: boolean;
 }
 
+export interface DenialBackoffConfig {
+  enabled: boolean;
+  warningThreshold: number;
+  delayThreshold: number;
+  delayMs: number;
+  failFastThreshold: number;
+  windowMs: number;
+}
+
 export interface SandboxFilesystemConfig {
   allowWrite: string[];
   denyRead: string[];
@@ -16,6 +25,7 @@ export interface SandboxProviderConfig {
   providerId: string;
   network: SandboxNetworkConfig;
   filesystem: SandboxFilesystemConfig;
+  denialBackoff: DenialBackoffConfig;
 }
 
 export interface SandboxConfig {

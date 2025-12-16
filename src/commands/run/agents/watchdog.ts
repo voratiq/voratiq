@@ -1,6 +1,14 @@
 import type { ChildProcess } from "node:child_process";
 import type { Writable } from "node:stream";
 
+import type { DenialBackoffConfig } from "../../../configs/sandbox/types.js";
+import {
+  DenialBackoffTracker,
+  parseSandboxDenialLine,
+  resolveDenialBackoffConfig,
+  type SandboxFailFastInfo,
+} from "../sandbox.js";
+
 /**
  * Watchdog types and constants for enforcing per-agent process timeouts.
  *
@@ -8,7 +16,11 @@ import type { Writable } from "node:stream";
  * voratiq run pipeline by enforcing silence, wall-clock, and fatal pattern limits.
  */
 
-export type WatchdogTrigger = "silence" | "wall-clock" | "fatal-pattern";
+export type WatchdogTrigger =
+  | "silence"
+  | "wall-clock"
+  | "fatal-pattern"
+  | "sandbox-denial";
 
 export const WATCHDOG_DEFAULTS = {
   silenceTimeoutMs: 15 * 60 * 1000,
@@ -33,7 +45,12 @@ export interface WatchdogResult {
 
 export interface WatchdogOptions {
   providerId: string;
-  onWatchdogTrigger?: (trigger: WatchdogTrigger, reason: string) => void;
+  denialBackoff?: DenialBackoffConfig;
+  onWatchdogTrigger?: (
+    trigger: WatchdogTrigger,
+    reason: string,
+    failFast?: SandboxFailFastInfo,
+  ) => void;
 }
 
 interface WatchdogState {
@@ -44,6 +61,10 @@ interface WatchdogState {
   fatalPatternFirstSeen: number | null;
   triggered: WatchdogTrigger | null;
   triggeredReason: string | null;
+  sandboxFailFast: SandboxFailFastInfo | null;
+  denialBackoff: DenialBackoffTracker;
+  lineBuffer: string;
+  delayInProgress: boolean;
   abortController: AbortController;
 }
 
@@ -55,6 +76,8 @@ export function createWatchdog(
   const { silenceTimeoutMs, wallClockCapMs, killGraceMs, hardAbortMs } =
     WATCHDOG_DEFAULTS;
 
+  const denialBackoff = resolveDenialBackoffConfig(options.denialBackoff);
+
   const state: WatchdogState = {
     silenceTimer: null,
     wallClockTimer: null,
@@ -63,6 +86,10 @@ export function createWatchdog(
     fatalPatternFirstSeen: null,
     triggered: null,
     triggeredReason: null,
+    sandboxFailFast: null,
+    denialBackoff: new DenialBackoffTracker(denialBackoff),
+    lineBuffer: "",
+    delayInProgress: false,
     abortController: new AbortController(),
   };
 
@@ -104,19 +131,26 @@ export function createWatchdog(
     }
   };
 
-  const triggerWatchdog = (trigger: WatchdogTrigger, reason: string): void => {
+  const triggerWatchdog = (
+    trigger: WatchdogTrigger,
+    reason: string,
+    failFast?: SandboxFailFastInfo,
+  ): void => {
     if (state.triggered) {
       return;
     }
     state.triggered = trigger;
     state.triggeredReason = reason;
+    if (failFast) {
+      state.sandboxFailFast = failFast;
+    }
     clearAllTimers();
 
     const banner = formatWatchdogBanner(trigger, reason);
     stderrStream.write(banner);
 
     if (options.onWatchdogTrigger) {
-      options.onWatchdogTrigger(trigger, reason);
+      options.onWatchdogTrigger(trigger, reason, failFast);
     }
 
     terminateProcess(child, state, { killGraceMs, hardAbortMs });
@@ -150,6 +184,77 @@ export function createWatchdog(
     resetSilenceTimer();
     const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
     checkFatalPattern(text);
+    handleSandboxDenialText(text);
+  };
+
+  const handleSandboxDenialText = (text: string): void => {
+    if (state.triggered) {
+      return;
+    }
+
+    state.lineBuffer += text;
+    const lines = state.lineBuffer.split("\n");
+    state.lineBuffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (state.triggered) {
+        return;
+      }
+
+      if (line.startsWith("Running: ")) {
+        state.denialBackoff.resetAll();
+        continue;
+      }
+
+      const denial = parseSandboxDenialLine(line);
+      if (!denial) {
+        continue;
+      }
+
+      const decision = state.denialBackoff.register(denial);
+      if (decision.action === "warn") {
+        stderrStream.write(
+          `\n[SandboxBackoff: WARN] Repeated denial to ${denial.target} (count=${decision.count}).\n`,
+        );
+      } else if (decision.action === "delay") {
+        stderrStream.write(
+          `\n[SandboxBackoff: ERROR] Repeated denial to ${denial.target} (count=${decision.count}); delaying ${denialBackoff.delayMs}ms.\n`,
+        );
+        void applyBackoffDelay(child, state, denialBackoff);
+      } else if (decision.action === "fail-fast") {
+        triggerWatchdog(
+          "sandbox-denial",
+          `Sandbox: repeated denial to ${denial.target}, aborting to prevent resource exhaustion`,
+          denial,
+        );
+        return;
+      }
+    }
+  };
+
+  const applyBackoffDelay = async (
+    child: ChildProcess,
+    state: WatchdogState,
+    config: DenialBackoffConfig,
+  ): Promise<void> => {
+    if (state.delayInProgress || state.triggered) {
+      return;
+    }
+    const pid = child.pid;
+    if (pid === undefined) {
+      return;
+    }
+    state.delayInProgress = true;
+    const delayMs = config.delayMs;
+    killProcessGroup(pid, "SIGSTOP");
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, delayMs);
+      timer.unref();
+    });
+    if (!state.triggered) {
+      killProcessGroup(pid, "SIGCONT");
+    }
+    state.delayInProgress = false;
   };
 
   resetSilenceTimer();
@@ -181,6 +286,7 @@ export function createWatchdog(
     getState: () => ({
       triggered: state.triggered,
       triggeredReason: state.triggeredReason,
+      sandboxFailFast: state.sandboxFailFast ?? undefined,
     }),
     /** AbortSignal that fires after watchdog triggers and hard abort timeout passes. */
     abortSignal: state.abortController.signal,
@@ -193,6 +299,7 @@ export interface WatchdogController {
   getState: () => {
     triggered: WatchdogTrigger | null;
     triggeredReason: string | null;
+    sandboxFailFast?: SandboxFailFastInfo;
   };
   /** AbortSignal that fires after watchdog triggers and hard abort timeout passes. */
   abortSignal: AbortSignal;

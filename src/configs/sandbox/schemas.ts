@@ -40,6 +40,17 @@ const networkOverrideShape = {
 
 export const networkOverrideSchema = z.object(networkOverrideShape).strict();
 
+export const denialBackoffOverrideSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    warningThreshold: z.number().int().positive().optional(),
+    delayThreshold: z.number().int().positive().optional(),
+    delayMs: z.number().int().nonnegative().optional(),
+    failFastThreshold: z.number().int().positive().optional(),
+    windowMs: z.number().int().positive().optional(),
+  })
+  .strict();
+
 export const filesystemOverrideSchema = z
   .object({
     allowWrite: z
@@ -58,6 +69,7 @@ export const providerOverrideSchema = z
     ...networkOverrideShape,
     network: networkOverrideSchema.optional(),
     filesystem: filesystemOverrideSchema.optional(),
+    denialBackoff: denialBackoffOverrideSchema.optional(),
   })
   .strict();
 
@@ -66,6 +78,7 @@ export const sandboxConfigSchema = z.object({
 });
 
 export type NetworkOverride = z.infer<typeof networkOverrideSchema>;
+export type DenialBackoffOverride = z.infer<typeof denialBackoffOverrideSchema>;
 export type FilesystemOverride = z.infer<typeof filesystemOverrideSchema>;
 export type ProviderOverride = z.infer<typeof providerOverrideSchema>;
 export type SandboxOverrideDocument = z.infer<typeof sandboxConfigSchema>;

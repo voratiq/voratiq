@@ -62,6 +62,33 @@ providers:
     ]);
   });
 
+  test("applies denialBackoff overrides with defaults", () => {
+    const yaml = `
+providers:
+  codex:
+    denialBackoff:
+      enabled: false
+      delayMs: 1234
+`;
+
+    const config = loadSandboxConfiguration({
+      root: ROOT,
+      filePath: FILE_PATH,
+      readFile: () => yaml,
+    });
+
+    expect(config.providers.codex.denialBackoff).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        warningThreshold: 2,
+        delayThreshold: 3,
+        delayMs: 1234,
+        failFastThreshold: 4,
+        windowMs: 120000,
+      }),
+    );
+  });
+
   test("throws when sandbox.yaml is missing", () => {
     expect(() =>
       loadSandboxConfiguration({
