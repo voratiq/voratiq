@@ -28,6 +28,7 @@ import {
 } from "./merge.js";
 import { type ProviderOverride, validateSandboxOverrides } from "./schemas.js";
 import type {
+  DenialBackoffConfig,
   LoadSandboxConfigurationOptions,
   LoadSandboxNetworkConfigOptions,
   LoadSandboxProviderConfigOptions,
@@ -37,6 +38,7 @@ import type {
   SandboxProviderConfig,
 } from "./types.js";
 export type {
+  DenialBackoffConfig,
   LoadSandboxConfigurationOptions,
   LoadSandboxNetworkConfigOptions,
   LoadSandboxProviderConfigOptions,
@@ -52,6 +54,15 @@ const DEFAULT_FILESYSTEM_CONFIG: SandboxFilesystemConfig = {
   allowWrite: [],
   denyRead: [],
   denyWrite: [],
+};
+
+const DEFAULT_DENIAL_BACKOFF: DenialBackoffConfig = {
+  enabled: true,
+  warningThreshold: 2,
+  delayThreshold: 3,
+  delayMs: 5000,
+  failFastThreshold: 4,
+  windowMs: 120000,
 };
 
 const sandboxConfigLoader = createConfigLoader<
@@ -116,6 +127,10 @@ const sandboxConfigLoader = createConfigLoader<
         providerId: canonical.id,
         network: providerNetwork,
         filesystem: providerFilesystem,
+        denialBackoff: mergeDenialBackoffConfig(
+          DEFAULT_DENIAL_BACKOFF,
+          override?.denialBackoff,
+        ),
       };
     }
 
@@ -126,6 +141,35 @@ const sandboxConfigLoader = createConfigLoader<
     };
   },
 });
+
+function mergeDenialBackoffConfig(
+  base: DenialBackoffConfig,
+  override?: Partial<DenialBackoffConfig>,
+): DenialBackoffConfig {
+  if (!override) {
+    return { ...base };
+  }
+  return {
+    enabled:
+      typeof override.enabled === "boolean" ? override.enabled : base.enabled,
+    warningThreshold:
+      typeof override.warningThreshold === "number"
+        ? override.warningThreshold
+        : base.warningThreshold,
+    delayThreshold:
+      typeof override.delayThreshold === "number"
+        ? override.delayThreshold
+        : base.delayThreshold,
+    delayMs:
+      typeof override.delayMs === "number" ? override.delayMs : base.delayMs,
+    failFastThreshold:
+      typeof override.failFastThreshold === "number"
+        ? override.failFastThreshold
+        : base.failFastThreshold,
+    windowMs:
+      typeof override.windowMs === "number" ? override.windowMs : base.windowMs,
+  };
+}
 
 function clearSandboxConfigurationCache(): void {
   configCache.clear();
@@ -195,6 +239,7 @@ export function loadSandboxProviderConfig(
     providerId: providerConfig.providerId,
     network: cloneNetworkConfig(providerConfig.network),
     filesystem: cloneFilesystemConfig(providerConfig.filesystem),
+    denialBackoff: { ...providerConfig.denialBackoff },
   };
 }
 
@@ -300,6 +345,7 @@ function cloneSandboxConfig(config: SandboxConfig): SandboxConfig {
       providerId,
       network: cloneNetworkConfig(providerConfig.network),
       filesystem: cloneFilesystemConfig(providerConfig.filesystem),
+      denialBackoff: { ...providerConfig.denialBackoff },
     };
   }
 

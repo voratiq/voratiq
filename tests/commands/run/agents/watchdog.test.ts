@@ -17,6 +17,7 @@ import {
   WATCHDOG_DEFAULTS,
   type WatchdogTrigger,
 } from "../../../../src/commands/run/agents/watchdog.js";
+import type { SandboxFailFastInfo } from "../../../../src/commands/run/sandbox.js";
 
 describe("watchdog", () => {
   let mockChild: MockChildProcess;
@@ -154,7 +155,13 @@ describe("watchdog", () => {
     describe("silence timeout", () => {
       it("should trigger after silence timeout with no output", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         const controller = createWatchdog(
           mockChild as unknown as ChildProcess,
           stderrStream,
@@ -171,6 +178,7 @@ describe("watchdog", () => {
         expect(onTrigger).toHaveBeenCalledWith(
           "silence",
           expect.stringContaining("no output"),
+          undefined,
         );
         // Verify process group kill was attempted (negative PID), then fallback to single process
         expect(
@@ -187,7 +195,13 @@ describe("watchdog", () => {
 
       it("should reset silence timer on output", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         const controller = createWatchdog(
           mockChild as unknown as ChildProcess,
           stderrStream,
@@ -209,7 +223,13 @@ describe("watchdog", () => {
     describe("wall-clock timeout", () => {
       it("should trigger after wall-clock cap regardless of output", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         const controller = createWatchdog(
           mockChild as unknown as ChildProcess,
           stderrStream,
@@ -233,6 +253,7 @@ describe("watchdog", () => {
         expect(onTrigger).toHaveBeenCalledWith(
           "wall-clock",
           expect.stringContaining("120 minute"),
+          undefined,
         );
       });
     });
@@ -240,7 +261,13 @@ describe("watchdog", () => {
     describe("fatal patterns", () => {
       it("should not trigger on first fatal pattern match (allows retry)", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         const controller = createWatchdog(
           mockChild as unknown as ChildProcess,
           stderrStream,
@@ -260,7 +287,13 @@ describe("watchdog", () => {
 
       it("should trigger on second fatal pattern match within retry window", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         const controller = createWatchdog(
           mockChild as unknown as ChildProcess,
           stderrStream,
@@ -283,6 +316,7 @@ describe("watchdog", () => {
         expect(onTrigger).toHaveBeenCalledWith(
           "fatal-pattern",
           expect.stringContaining("Fatal error"),
+          undefined,
         );
         // Verify process group kill was attempted
         expect(
@@ -294,7 +328,13 @@ describe("watchdog", () => {
 
       it("should not trigger if second match is outside retry window", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         const controller = createWatchdog(
           mockChild as unknown as ChildProcess,
           stderrStream,
@@ -318,7 +358,13 @@ describe("watchdog", () => {
 
       it("should work for codex provider", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         const controller = createWatchdog(
           mockChild as unknown as ChildProcess,
           stderrStream,
@@ -341,7 +387,13 @@ describe("watchdog", () => {
 
       it("should not check fatal patterns for unknown providers", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         const controller = createWatchdog(
           mockChild as unknown as ChildProcess,
           stderrStream,
@@ -380,7 +432,13 @@ describe("watchdog", () => {
 
       it("should clear grace timer when cleanup is called after watchdog triggers", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         const controller = createWatchdog(
           mockChild as unknown as ChildProcess,
           stderrStream,
@@ -414,7 +472,13 @@ describe("watchdog", () => {
 
       it("should clear timers when cleanup is called even without watchdog trigger (simulating rejection path)", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         const controller = createWatchdog(
           mockChild as unknown as ChildProcess,
           stderrStream,
@@ -441,7 +505,13 @@ describe("watchdog", () => {
     describe("SIGKILL grace period", () => {
       it("should send SIGKILL after grace period if process still running", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         createWatchdog(mockChild as unknown as ChildProcess, stderrStream, {
           providerId: "test",
           onWatchdogTrigger: onTrigger,
@@ -462,7 +532,13 @@ describe("watchdog", () => {
 
       it("should clear grace timer early when child emits exit event", () => {
         const onTrigger =
-          jest.fn<(trigger: WatchdogTrigger, reason: string) => void>();
+          jest.fn<
+            (
+              trigger: WatchdogTrigger,
+              reason: string,
+              failFast?: SandboxFailFastInfo,
+            ) => void
+          >();
         createWatchdog(mockChild as unknown as ChildProcess, stderrStream, {
           providerId: "test",
           onWatchdogTrigger: onTrigger,

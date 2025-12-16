@@ -149,6 +149,59 @@ describe("executeAgentLifecycle integration", () => {
     expect(result.record.diffStatistics).toBe(diffStatistics);
     expect(result.report.diffStatistics).toBe(diffStatistics);
   });
+
+  it("records fail-fast metadata and continues running other agents", async () => {
+    const { execution: first } = await createPreparedExecution("agent-1");
+    const { execution: second, progress } =
+      await createPreparedExecution("agent-2");
+
+    runAgentProcessMock
+      .mockResolvedValueOnce({
+        exitCode: 1,
+        signal: null,
+        errorMessage:
+          "Sandbox: repeated denial to registry.npmjs.org:443, aborting to prevent resource exhaustion",
+        watchdog: {
+          silenceTimeoutMs: 1,
+          wallClockCapMs: 1,
+          trigger: "sandbox-denial",
+        },
+        failFast: {
+          operation: "network-connect",
+          target: "registry.npmjs.org:443",
+        },
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        signal: null,
+      });
+
+    runPostProcessingAndEvaluationsMock.mockResolvedValue({
+      artifacts: {
+        summaryCaptured: false,
+        diffAttempted: false,
+        diffCaptured: false,
+      },
+      evaluations: [],
+      warnings: [],
+    });
+
+    const results = await runAgentsWithLimit([first, second], 1);
+    expect(results).toHaveLength(2);
+
+    const failed = results.find(
+      (result) => result.record.agentId === "agent-1",
+    );
+    const succeeded = results.find(
+      (result) => result.record.agentId === "agent-2",
+    );
+    expect(failed?.record.failFastTriggered).toBe(true);
+    expect(failed?.record.failFastTarget).toBe("registry.npmjs.org:443");
+    expect(failed?.record.failFastOperation).toBe("network-connect");
+    expect(succeeded?.record.status).toBe("succeeded");
+
+    expect(progress.onCompleted).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("AgentRunContext", () => {
@@ -175,7 +228,7 @@ describe("AgentRunContext", () => {
   });
 });
 
-async function createPreparedExecution(): Promise<{
+async function createPreparedExecution(agentId = "agent-id"): Promise<{
   execution: PreparedAgentExecution;
   progress: NonNullable<PreparedAgentExecution["progress"]>;
 }> {
@@ -183,7 +236,6 @@ async function createPreparedExecution(): Promise<{
   tempRoots.push(root);
 
   const runId = "run-id";
-  const agentId = "agent-id";
   const workspacePaths = buildAgentWorkspacePaths({ root, runId, agentId });
 
   await mkdir(workspacePaths.agentRoot, { recursive: true });

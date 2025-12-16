@@ -62,7 +62,17 @@ const CHAT_ARTIFACT_FORMATS = [
   "jsonl",
 ] as const satisfies readonly ChatArtifactFormat[];
 
-const WATCHDOG_TRIGGERS = ["silence", "wall-clock", "fatal-pattern"] as const;
+const WATCHDOG_TRIGGERS = [
+  "silence",
+  "wall-clock",
+  "fatal-pattern",
+  "sandbox-denial",
+] as const;
+const FAIL_FAST_OPERATIONS = [
+  "network-connect",
+  "file-read",
+  "file-write",
+] as const;
 
 export const watchdogMetadataSchema = z.object({
   /** Silence timeout in milliseconds that was enforced. */
@@ -114,6 +124,9 @@ export const agentInvocationRecordSchema = z
     warnings: z.array(z.string()).optional(),
     diffStatistics: z.string().optional(),
     watchdog: watchdogMetadataSchema.optional(),
+    failFastTriggered: z.boolean().optional(),
+    failFastTarget: z.string().optional(),
+    failFastOperation: z.enum(FAIL_FAST_OPERATIONS).optional(),
   })
   .superRefine((data, ctx) => {
     if (IN_PROGRESS_AGENT_STATUSES.includes(data.status)) {
@@ -142,6 +155,24 @@ export const agentInvocationRecordSchema = z
           code: z.ZodIssueCode.custom,
           path: ["evals"],
           message: "eval results are required once the agent completes",
+        });
+      }
+    }
+
+    if (data.failFastTriggered) {
+      if (!data.failFastTarget) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["failFastTarget"],
+          message: "failFastTarget is required when failFastTriggered is true",
+        });
+      }
+      if (!data.failFastOperation) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["failFastOperation"],
+          message:
+            "failFastOperation is required when failFastTriggered is true",
         });
       }
     }

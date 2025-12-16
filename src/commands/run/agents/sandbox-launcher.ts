@@ -7,6 +7,7 @@ import {
 import { access, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative as relativePath } from "node:path";
 
+import type { DenialBackoffConfig } from "../../../configs/sandbox/types.js";
 import type { WatchdogMetadata } from "../../../records/types.js";
 import {
   getCliAssetPath,
@@ -23,6 +24,7 @@ import { AgentProcessError } from "../errors.js";
 import {
   generateSandboxSettings,
   resolveSrtBinary,
+  type SandboxFailFastInfo,
   writeSandboxSettings,
 } from "../sandbox.js";
 import type { AgentManifest } from "../shim/agent-manifest.js";
@@ -44,11 +46,16 @@ export interface AgentProcessOptions {
   stdoutPath: string;
   stderrPath: string;
   sandboxSettingsPath: string;
+  denialBackoff?: DenialBackoffConfig;
   resolveRunInvocation?: RunInvocationResolver;
   /** Provider ID for watchdog fatal pattern matching. */
   providerId?: string;
   /** Callback fired immediately when watchdog triggers, before process exits. */
-  onWatchdogTrigger?: (trigger: WatchdogTrigger, reason: string) => void;
+  onWatchdogTrigger?: (
+    trigger: WatchdogTrigger,
+    reason: string,
+    failFast?: SandboxFailFastInfo,
+  ) => void;
 }
 
 export interface AgentProcessResult {
@@ -57,6 +64,8 @@ export interface AgentProcessResult {
   signal?: NodeJS.Signals | null;
   /** Watchdog metadata showing enforced limits and trigger reason. */
   watchdog?: WatchdogMetadata;
+  /** Sandbox fail-fast metadata when repeated denials trigger an abort. */
+  failFast?: SandboxFailFastInfo;
 }
 
 export interface RunInvocationContext {
@@ -158,6 +167,7 @@ export async function runAgentProcess(
     stdoutPath,
     stderrPath,
     sandboxSettingsPath,
+    denialBackoff,
     resolveRunInvocation,
     providerId = "",
     onWatchdogTrigger,
@@ -215,6 +225,7 @@ export async function runAgentProcess(
         watchdogController = createWatchdog(child, stderrStream, {
           providerId,
           onWatchdogTrigger,
+          denialBackoff,
         });
         // Bridge watchdog's abort signal to our shared abort controller
         abortSignalHandler = () => forceAbortController.abort();
@@ -252,6 +263,7 @@ export async function runAgentProcess(
 
   const watchdogState = watchdogController?.getState();
   const watchdogTrigger = watchdogState?.triggered ?? undefined;
+  const failFast = watchdogState?.sandboxFailFast;
 
   let errorMessage: string | undefined;
   if (watchdogTrigger && watchdogState?.triggeredReason) {
@@ -270,7 +282,7 @@ export async function runAgentProcess(
     trigger: watchdogTrigger,
   };
 
-  return { exitCode, errorMessage, signal, watchdog };
+  return { exitCode, errorMessage, signal, watchdog, failFast };
 }
 
 export async function stageManifestForSandbox(options: {

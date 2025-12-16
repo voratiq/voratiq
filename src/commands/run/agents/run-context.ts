@@ -19,6 +19,7 @@ import {
   type AgentExecutionState,
   finalizeAgentResult,
 } from "../reports.js";
+import type { SandboxFailFastInfo } from "../sandbox.js";
 
 export class AgentRunContext {
   public readonly state: AgentExecutionState = {
@@ -32,6 +33,7 @@ export class AgentRunContext {
   public evalResults: AgentEvalResult[];
   public errorMessage: string | undefined;
   public watchdogMetadata: WatchdogMetadata | undefined;
+  private failFast: SandboxFailFastInfo | undefined;
   private completedAt: string | undefined;
   private startedAt: string;
   private readonly evalPlan: readonly EvalDefinition[];
@@ -161,6 +163,10 @@ export class AgentRunContext {
     this.watchdogMetadata = metadata;
   }
 
+  public setFailFastTriggered(info: SandboxFailFastInfo): void {
+    this.failFast = info;
+  }
+
   public finalize(): AgentExecutionResult {
     this.setCompleted();
     const record = buildAgentRecord({
@@ -175,6 +181,7 @@ export class AgentRunContext {
       warnings: this.evalWarnings,
       diffStatistics: this.state.diffStatistics,
       watchdog: this.watchdogMetadata,
+      failFast: this.failFast,
     });
 
     return finalizeAgentResult(this.runId, record, this.state);
@@ -197,6 +204,7 @@ export class AgentRunContext {
       warnings: this.evalWarnings,
       diffStatistics: undefined,
       watchdog: this.watchdogMetadata,
+      failFast: this.failFast,
     });
   }
 }
@@ -223,6 +231,7 @@ function buildAgentRecord(options: {
   warnings: readonly string[];
   diffStatistics?: string;
   watchdog?: WatchdogMetadata;
+  failFast?: SandboxFailFastInfo;
 }): AgentInvocationRecord {
   const {
     agent,
@@ -236,6 +245,7 @@ function buildAgentRecord(options: {
     warnings,
     diffStatistics,
     watchdog,
+    failFast,
   } = options;
 
   const snapshots = toEvalSnapshots(evalResults);
@@ -257,6 +267,13 @@ function buildAgentRecord(options: {
     error: errorMessage,
     warnings: normalizedWarnings,
     watchdog,
+    ...(failFast
+      ? {
+          failFastTriggered: true,
+          failFastTarget: failFast.target,
+          failFastOperation: failFast.operation,
+        }
+      : {}),
   };
 
   if (normalizedDiffStatistics) {

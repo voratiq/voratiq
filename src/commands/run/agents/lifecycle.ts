@@ -1,3 +1,4 @@
+import { loadSandboxProviderConfig } from "../../../configs/sandbox/loader.js";
 import type {
   AgentInvocationRecord,
   WatchdogMetadata,
@@ -10,6 +11,10 @@ import {
   RunCommandError,
 } from "../errors.js";
 import type { AgentExecutionResult } from "../reports.js";
+import {
+  DEFAULT_DENIAL_BACKOFF,
+  type SandboxFailFastInfo,
+} from "../sandbox.js";
 import { teardownRegisteredSandboxContext } from "../sandbox-registry.js";
 import { captureAgentChatTranscripts } from "./chat-preserver.js";
 import { runPostProcessingAndEvaluations } from "./eval-runner.js";
@@ -63,6 +68,7 @@ export async function executeAgentLifecycle(
     const onWatchdogTrigger = (
       trigger: WatchdogTrigger,
       reason: string,
+      failFast?: SandboxFailFastInfo,
     ): void => {
       // Update watchdog metadata with trigger
       agentContext.setWatchdogMetadata({
@@ -70,12 +76,28 @@ export async function executeAgentLifecycle(
         trigger,
       });
 
+      if (failFast) {
+        agentContext.setFailFastTriggered(failFast);
+      }
+
       // Fire early failure callback for immediate UI update
       if (execution.progress?.onEarlyFailure) {
         const earlyRecord = agentContext.buildEarlyFailureRecord(reason);
         void execution.progress.onEarlyFailure(earlyRecord);
       }
     };
+
+    let denialBackoff = DEFAULT_DENIAL_BACKOFF;
+    try {
+      const sandboxProviderConfig = loadSandboxProviderConfig({
+        root,
+        providerId: agent.provider,
+      });
+      denialBackoff = sandboxProviderConfig.denialBackoff;
+    } catch {
+      // If sandbox.yaml is missing or invalid, fall back to defaults rather than
+      // failing the entire agent lifecycle.
+    }
 
     const processResult = await runAgentProcess({
       runtimeManifestPath,
@@ -85,11 +107,15 @@ export async function executeAgentLifecycle(
       sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
       providerId: agent.provider,
       onWatchdogTrigger,
+      denialBackoff,
     });
 
     // Update watchdog metadata from process result (in case trigger came via watchdog)
     if (processResult.watchdog) {
       agentContext.setWatchdogMetadata(processResult.watchdog);
+    }
+    if (processResult.failFast) {
+      agentContext.setFailFastTriggered(processResult.failFast);
     }
 
     if (processResult.exitCode !== 0 || processResult.errorMessage) {
