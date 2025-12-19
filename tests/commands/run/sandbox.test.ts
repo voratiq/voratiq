@@ -57,7 +57,7 @@ describe("sandbox", () => {
         });
 
         expect(settings.network).toEqual({
-          allowedDomains: ["api.openai.com", "chatgpt.com"],
+          allowedDomains: ["api.openai.com", "chatgpt.com", "auth.openai.com"],
           deniedDomains: [],
         });
         expect(settings.filesystem.denyRead).toEqual([
