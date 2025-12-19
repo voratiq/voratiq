@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { configureAgents } from "../../../src/commands/init/agents.js";
+import { getDefaultAgentIdByProvider } from "../../../src/configs/agents/defaults.js";
 import { readAgentsConfig } from "../../../src/configs/agents/loader.js";
 import type { AgentConfigEntry } from "../../../src/configs/agents/types.js";
 import type { ConfirmationOptions } from "../../../src/render/interactions/confirmation.js";
@@ -13,9 +14,9 @@ import {
   serializeAgentsConfigEntries,
 } from "../../../src/workspace/templates.js";
 
-const CLAUDE_DEFAULT_ID = "claude-sonnet-4-5-20250929";
-const CODEX_DEFAULT_ID = "gpt-5-1-codex-max";
-const GEMINI_DEFAULT_ID = "gemini-2-5-pro";
+const CLAUDE_DEFAULT_ID = getDefaultAgentIdByProvider("claude") ?? "claude";
+const CODEX_DEFAULT_ID = getDefaultAgentIdByProvider("codex") ?? "codex";
+const GEMINI_DEFAULT_ID = getDefaultAgentIdByProvider("gemini") ?? "gemini";
 
 jest.mock("node:child_process", () => ({
   spawnSync: jest.fn(),
