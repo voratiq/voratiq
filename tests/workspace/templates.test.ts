@@ -8,7 +8,7 @@ describe("buildDefaultAgentsTemplate", () => {
   it("derives ids from model slugs", () => {
     const yaml = buildDefaultAgentsTemplate();
     expect(yaml).toContain("id: claude-sonnet-4-5-20250929");
-    expect(yaml).toContain("id: gpt-5-1-codex");
+    expect(yaml).toContain("id: gpt-5-2-codex");
     expect(yaml).toContain("id: gemini-2-5-pro");
   });
 });

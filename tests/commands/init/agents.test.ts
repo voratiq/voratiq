@@ -14,7 +14,7 @@ import {
 } from "../../../src/workspace/templates.js";
 
 const CLAUDE_DEFAULT_ID = "claude-sonnet-4-5-20250929";
-const CODEX_DEFAULT_ID = "gpt-5-1-codex-max";
+const CODEX_DEFAULT_ID = "gpt-5-2-codex";
 const GEMINI_DEFAULT_ID = "gemini-2-5-pro";
 
 jest.mock("node:child_process", () => ({
