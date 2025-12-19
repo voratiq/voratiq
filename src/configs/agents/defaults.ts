@@ -34,7 +34,7 @@ export const DEFAULT_AGENT_DEFAULTS: readonly AgentDefault[] = [
   },
   {
     provider: "codex",
-    model: "gpt-5.1-codex-max",
+    model: "gpt-5.2-codex",
     argv: [
       "exec",
       "--model",
