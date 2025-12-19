@@ -58,6 +58,13 @@ const AGENT_DEFAULTS_BY_PROVIDER = new Map(
   ),
 );
 
+export function getDefaultAgentIdByProvider(
+  provider: string,
+): string | undefined {
+  const entry = AGENT_DEFAULTS_BY_PROVIDER.get(provider);
+  return entry ? sanitizeAgentIdFromModel(entry.model) : undefined;
+}
+
 export function getAgentDefault(provider: string): AgentDefault | undefined {
   const agentDefault = AGENT_DEFAULTS_BY_PROVIDER.get(provider);
   return agentDefault ? cloneAgentDefault(agentDefault) : undefined;
