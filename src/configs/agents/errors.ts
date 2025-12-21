@@ -42,6 +42,31 @@ export class DuplicateAgentIdError extends AgentsConfigError {
   }
 }
 
+export class AgentNotFoundError extends AgentsConfigError {
+  constructor(
+    public readonly agentId: string,
+    public readonly enabledAgentIds: readonly string[],
+  ) {
+    const enabledList =
+      enabledAgentIds.length > 0
+        ? enabledAgentIds.slice().sort().join(", ")
+        : "none";
+    super(
+      `${DEFAULT_ERROR_CONTEXT}: Agent "${agentId}" is not defined in agents.yaml. Enabled agents: ${enabledList}.`,
+    );
+    this.name = "AgentNotFoundError";
+  }
+}
+
+export class AgentDisabledError extends AgentsConfigError {
+  constructor(public readonly agentId: string) {
+    super(
+      `${DEFAULT_ERROR_CONTEXT}: Agent "${agentId}" is disabled in agents.yaml.`,
+    );
+    this.name = "AgentDisabledError";
+  }
+}
+
 export class ModelPlaceholderMissingError extends AgentsError {
   constructor(
     public readonly agentId: string,

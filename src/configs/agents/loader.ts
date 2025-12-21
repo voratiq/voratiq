@@ -17,6 +17,8 @@ import {
 import {
   AgentBinaryAccessError,
   AgentBinaryMissingError,
+  AgentDisabledError,
+  AgentNotFoundError,
   AgentsYamlParseError,
   DEFAULT_ERROR_CONTEXT,
   DuplicateAgentIdError,
@@ -56,8 +58,14 @@ export interface LoadAgentCatalogOptions {
   readFile?: (path: string) => string;
 }
 
-const loadAgentCatalogInternal = createConfigLoader<
-  AgentCatalog,
+interface LoadedAgentsConfig {
+  config: AgentsConfig;
+  displayPath: string;
+  enabledAgents: AgentConfigEntry[];
+}
+
+const loadAgentsConfigInternal = createConfigLoader<
+  LoadedAgentsConfig,
   LoadAgentCatalogOptions
 >({
   resolveFilePath: (root, options) =>
@@ -81,17 +89,45 @@ const loadAgentCatalogInternal = createConfigLoader<
       seenAgentIds.add(entry.id);
     }
 
-    const catalog = enabledAgents.map((entry) => buildAgentDefinition(entry));
-    validateAgentBinaries(catalog);
-
-    return catalog;
+    return { config, displayPath, enabledAgents };
   },
 });
+
+function loadAgentsConfig(
+  options: LoadAgentCatalogOptions = {},
+): LoadedAgentsConfig {
+  return loadAgentsConfigInternal(options);
+}
 
 export function loadAgentCatalog(
   options: LoadAgentCatalogOptions = {},
 ): AgentCatalog {
-  return loadAgentCatalogInternal(options);
+  const { enabledAgents } = loadAgentsConfig(options);
+  const catalog = enabledAgents.map((entry) => buildAgentDefinition(entry));
+  validateAgentBinaries(catalog);
+  return catalog;
+}
+
+export function loadAgentById(
+  id: string,
+  options: LoadAgentCatalogOptions = {},
+): AgentDefinition {
+  const { config, enabledAgents } = loadAgentsConfig(options);
+  const entry = config.agents.find((agent) => agent.id === id);
+  if (!entry) {
+    throw new AgentNotFoundError(
+      id,
+      enabledAgents.map((agent) => agent.id),
+    );
+  }
+
+  if (entry.enabled === false) {
+    throw new AgentDisabledError(entry.id);
+  }
+
+  const definition = buildAgentDefinition(entry);
+  assertAgentBinary(definition);
+  return definition;
 }
 
 function validateAgentBinaries(agents: readonly AgentDefinition[]): void {

@@ -5,10 +5,15 @@ import { dirname, join } from "node:path";
 import {
   AgentBinaryAccessError,
   AgentBinaryMissingError,
+  AgentDisabledError,
+  AgentNotFoundError,
   AgentsYamlParseError,
   UnknownAgentProviderTemplateError,
 } from "../../../src/configs/agents/errors.js";
-import { loadAgentCatalog } from "../../../src/configs/agents/loader.js";
+import {
+  loadAgentById,
+  loadAgentCatalog,
+} from "../../../src/configs/agents/loader.js";
 
 type AgentsFileFactory =
   | string
@@ -340,5 +345,92 @@ agents:
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("loadAgentById", () => {
+  it("loads a single enabled agent using shared validations", () => {
+    let codexBinaryPath = "";
+    withTempWorkspace(
+      ({ createBinary }) => {
+        const codexBinary = createBinary("bin/codex");
+        codexBinaryPath = codexBinary;
+        const geminiBinary = createBinary("bin/gemini");
+        return `
+agents:
+  - id: codex
+    provider: codex
+    model: o4-mini
+    binary: ${codexBinary}
+  - id: gemini
+    provider: gemini
+    model: gemini-2.0
+    binary: ${geminiBinary}
+    enabled: false
+`;
+      },
+      (root) => {
+        const agent = loadAgentById("codex", { root });
+
+        expect(agent.id).toBe("codex");
+        expect(agent.model).toBe("o4-mini");
+        expect(agent.binary).toBe(codexBinaryPath);
+        expect(agent.argv).toEqual([
+          "exec",
+          "--model",
+          "o4-mini",
+          "--experimental-json",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "-c",
+          "mcp_servers={}",
+        ]);
+      },
+    );
+  });
+
+  it("throws AgentNotFoundError with available enabled agents when id is missing", () => {
+    withTempWorkspace(
+      ({ createBinary }) => {
+        const betaBinary = createBinary("bin/beta");
+        const alphaBinary = createBinary("bin/alpha");
+        return `
+agents:
+  - id: beta
+    provider: codex
+    model: o4-mini
+    binary: ${betaBinary}
+  - id: alpha
+    provider: codex
+    model: o4-mini
+    binary: ${alphaBinary}
+`;
+      },
+      (root) => {
+        const load = () => loadAgentById("missing", { root });
+        expect(load).toThrow(AgentNotFoundError);
+        expect(load).toThrow(/Enabled agents: alpha, beta/u);
+      },
+    );
+  });
+
+  it("throws AgentDisabledError when the agent is disabled", () => {
+    withTempWorkspace(
+      ({ createBinary }) => {
+        const codexBinary = createBinary("bin/codex");
+        return `
+agents:
+  - id: codex
+    provider: codex
+    model: o4-mini
+    binary: ${codexBinary}
+    enabled: false
+`;
+      },
+      (root) => {
+        expect(() => loadAgentById("codex", { root })).toThrow(
+          AgentDisabledError,
+        );
+      },
+    );
   });
 });
