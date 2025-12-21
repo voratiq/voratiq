@@ -20,34 +20,38 @@ log "Initializing workspace..."
 voratiq init --yes
 
 log "Switching Codex agent to gpt-5.1-codex-mini..."
-python3 - <<'PY'
-from pathlib import Path
-import sys
+node <<'NODE'
+import fs from "node:fs";
+import path from "node:path";
+import yaml from "js-yaml";
+import {
+  sanitizeAgentIdFromModel,
+} from "/app/dist/configs/agents/defaults.js";
 
-config_path = Path(".voratiq/agents.yaml")
-needles = [
-  (
-    "  - id: gpt-5-1-codex-max\n    provider: codex\n    model: gpt-5.1-codex-max",
-    "  - id: gpt-5-1-codex-mini\n    provider: codex\n    model: gpt-5.1-codex-mini",
-  ),
-  (
-    "  - id: gpt-5-1-codex\n    provider: codex\n    model: gpt-5.1-codex",
-    "  - id: gpt-5-1-codex-mini\n    provider: codex\n    model: gpt-5.1-codex-mini",
-  ),
-]
+const configPath = path.resolve(".voratiq/agents.yaml");
+const desiredModel = "gpt-5.1-codex-mini";
+const desiredId = sanitizeAgentIdFromModel(desiredModel);
+const content = fs.readFileSync(configPath, "utf8");
+const doc = yaml.load(content);
 
-try:
-  content = config_path.read_text(encoding="utf-8")
-except FileNotFoundError as exc:
-  raise SystemExit(f"{config_path} missing: {exc}") from exc
+if (!doc || typeof doc !== "object" || !Array.isArray(doc.agents)) {
+  throw new Error("Unexpected .voratiq/agents.yaml shape");
+}
 
-for needle, replacement in needles:
-  if needle in content:
-    config_path.write_text(content.replace(needle, replacement, 1), encoding="utf-8")
-    break
-else:
-  raise SystemExit("Codex default block not found in .voratiq/agents.yaml")
-PY
+const codexAgent = doc.agents.find((agent) => agent?.provider === "codex");
+if (!codexAgent) {
+  throw new Error("Codex provider entry missing from .voratiq/agents.yaml");
+}
+
+codexAgent.id = desiredId;
+codexAgent.model = desiredModel;
+
+fs.writeFileSync(
+  configPath,
+  yaml.dump(doc, { lineWidth: -1, noCompatMode: true }),
+  "utf8",
+);
+NODE
 
 if ! grep -q "provider: codex" .voratiq/agents.yaml; then
   die "Codex provider entry missing from .voratiq/agents.yaml"
