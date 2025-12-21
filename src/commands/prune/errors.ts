@@ -16,15 +16,6 @@ export class RunMetadataMissingError extends PruneError {
   }
 }
 
-export class InteractiveConfirmationRequiredError extends PruneError {
-  constructor() {
-    super(
-      "Interactive confirmation required; re-run with --yes or from a tty.",
-    );
-    this.name = "InteractiveConfirmationRequiredError";
-  }
-}
-
 export class PruneBranchDeletionError extends PruneError {
   constructor(
     public readonly branch: string,

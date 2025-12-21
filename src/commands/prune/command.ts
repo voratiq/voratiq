@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 
+import { NonInteractiveShellError } from "../../cli/errors.js";
 import {
   RunRecordNotFoundError,
   RunRecordParseError,
@@ -34,7 +35,6 @@ import {
 } from "../../workspace/structure.js";
 import { fetchRunSafely } from "../fetch.js";
 import {
-  InteractiveConfirmationRequiredError,
   PruneBranchDeletionError,
   PruneRunDeletedError,
   RunMetadataMissingError,
@@ -60,7 +60,7 @@ export async function executePruneCommand(
   const purge = purgeInput ?? false;
 
   if (!confirm) {
-    throw new InteractiveConfirmationRequiredError();
+    throw new NonInteractiveShellError();
   }
 
   const runRecord = await fetchRunSafely({
