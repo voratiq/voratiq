@@ -1,11 +1,11 @@
 import { Command } from "commander";
 
 import { executePruneCommand } from "../commands/prune/command.js";
-import { InteractiveConfirmationRequiredError } from "../commands/prune/errors.js";
 import type { PruneResult } from "../commands/prune/types.js";
 import { resolveCliContext } from "../preflight/index.js";
 import { renderPruneTranscript } from "../render/transcripts/prune.js";
 import { createConfirmationWorkflow } from "./confirmation.js";
+import { NonInteractiveShellError } from "./errors.js";
 import { writeCommandOutput } from "./output.js";
 
 export interface PruneCommandOptions {
@@ -31,7 +31,7 @@ export async function runPruneCommand(
   const confirmation = createConfirmationWorkflow({
     assumeYes,
     onUnavailable: () => {
-      throw new InteractiveConfirmationRequiredError();
+      throw new NonInteractiveShellError();
     },
   });
 

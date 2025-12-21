@@ -11,6 +11,15 @@ export class CliError extends HintedError {
   }
 }
 
+export class NonInteractiveShellError extends CliError {
+  constructor() {
+    super(
+      "Non-interactive shell detected; re-run with --yes to accept defaults.",
+    );
+    this.name = "NonInteractiveShellError";
+  }
+}
+
 export function toCliError(error: unknown): CliError {
   if (error instanceof CliError) {
     return error;

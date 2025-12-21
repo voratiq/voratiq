@@ -5,6 +5,7 @@ import type { InitCommandResult } from "../commands/init/types.js";
 import { resolveCliContext } from "../preflight/index.js";
 import { renderInitTranscript } from "../render/transcripts/init.js";
 import { createConfirmationWorkflow } from "./confirmation.js";
+import { NonInteractiveShellError } from "./errors.js";
 import { writeCommandOutput } from "./output.js";
 
 export interface RunInitCommandResult extends InitCommandResult {
@@ -24,9 +25,7 @@ export async function runInitCommand(
   const confirmation = createConfirmationWorkflow({
     assumeYes,
     onUnavailable: () => {
-      throw new Error(
-        "Non-interactive shell detected; re-run with --yes to accept defaults.",
-      );
+      throw new NonInteractiveShellError();
     },
   });
 
