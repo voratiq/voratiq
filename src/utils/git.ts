@@ -126,6 +126,7 @@ export interface GitCommitOptions {
   message: string;
   authorName?: string;
   authorEmail?: string;
+  bypassHooks?: boolean;
 }
 
 export async function gitCommitAll(options: GitCommitOptions): Promise<void> {
@@ -134,16 +135,30 @@ export async function gitCommitAll(options: GitCommitOptions): Promise<void> {
     message,
     authorName = GIT_AUTHOR_NAME,
     authorEmail = GIT_AUTHOR_EMAIL,
+    bypassHooks = false,
   } = options;
 
-  await runGitCommand(["commit", "-m", message], {
+  const args = ["commit", "-m", message];
+  if (bypassHooks) {
+    args.push("--no-verify");
+  }
+
+  const env: NodeJS.ProcessEnv = {
+    GIT_AUTHOR_NAME: authorName,
+    GIT_AUTHOR_EMAIL: authorEmail,
+    GIT_COMMITTER_NAME: authorName,
+    GIT_COMMITTER_EMAIL: authorEmail,
+  };
+
+  if (bypassHooks) {
+    env.HUSKY = "0";
+    env.HUSKY_SKIP_HOOKS = "1";
+    env.LEFTHOOK = "0";
+  }
+
+  await runGitCommand(args, {
     cwd,
-    env: {
-      GIT_AUTHOR_NAME: authorName,
-      GIT_AUTHOR_EMAIL: authorEmail,
-      GIT_COMMITTER_NAME: authorName,
-      GIT_COMMITTER_EMAIL: authorEmail,
-    },
+    env,
   });
 }
 

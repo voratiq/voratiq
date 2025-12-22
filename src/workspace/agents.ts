@@ -161,6 +161,7 @@ export async function collectAgentArtifacts(options: {
         message: summary,
         authorName: persona.authorName,
         authorEmail: persona.authorEmail,
+        bypassHooks: true,
       }),
     );
 
