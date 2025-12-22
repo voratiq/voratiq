@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -87,6 +87,51 @@ describe("gitCommitAll", () => {
     });
     expect(logLine).toBe(`${GIT_AUTHOR_NAME} <${GIT_AUTHOR_EMAIL}>`);
   });
+
+  it("bypasses failing hooks when requested", async () => {
+    const repoRoot = await initGitRepository();
+    tempRepos.push(repoRoot);
+
+    await runGitCommand(["config", "core.hooksPath", ".git/hooks"], {
+      cwd: repoRoot,
+    });
+
+    const hookPath = join(repoRoot, ".git", "hooks", "pre-commit");
+    const hookMarker = join(repoRoot, ".git", "hook-ran.txt");
+    await writeFile(
+      hookPath,
+      [
+        "#!/bin/sh",
+        'echo "ran" > "$(dirname "$0")/../hook-ran.txt"',
+        "exit 1",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await chmod(hookPath, 0o755);
+
+    await writeFile(join(repoRoot, "hook.txt"), "hook test", "utf8");
+    await gitAddAll(repoRoot);
+
+    await expect(
+      gitCommitAll({ cwd: repoRoot, message: "blocked by hook" }),
+    ).rejects.toThrow();
+
+    expect(await fileExists(hookMarker)).toBe(true);
+    await rm(hookMarker, { force: true });
+
+    await gitCommitAll({
+      cwd: repoRoot,
+      message: "bypass hook",
+      bypassHooks: true,
+    });
+
+    const head = await runGitCommand(["rev-parse", "HEAD"], {
+      cwd: repoRoot,
+    });
+    expect(head).toMatch(/^[a-f0-9]{40}$/);
+    expect(await fileExists(hookMarker)).toBe(false);
+  });
 });
 
 describe("getHeadRevision", () => {
@@ -141,4 +186,13 @@ async function initGitRepository(): Promise<string> {
   const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-git-"));
   await runGitCommand(["init"], { cwd: repoRoot });
   return repoRoot;
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }

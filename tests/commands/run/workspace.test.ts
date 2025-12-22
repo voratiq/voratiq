@@ -141,6 +141,7 @@ describe("collectAgentArtifacts", () => {
       message: "summary line",
       authorName: persona.authorName,
       authorEmail: persona.authorEmail,
+      bypassHooks: true,
     });
 
     const restoredStats = await lstat(join(workspacePath, "node_modules"));
