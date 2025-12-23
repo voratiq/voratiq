@@ -10,7 +10,7 @@ export class PruneError extends CliError {
 export class RunMetadataMissingError extends PruneError {
   constructor(public readonly runId: string) {
     super(
-      `Run metadata for ${runId} is missing from .voratiq/runs/${runId}/record.json; prune cannot proceed.`,
+      `Run metadata for ${runId} is missing from .voratiq/runs/sessions/${runId}/record.json; prune cannot proceed.`,
     );
     this.name = "RunMetadataMissingError";
   }

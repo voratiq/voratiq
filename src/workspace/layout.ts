@@ -237,12 +237,15 @@ export async function scaffoldAgentWorkspace(
     }
   }
 
+  for (const filePath of filesToInitialize) {
+    directoriesToEnsure.add(dirname(filePath));
+  }
+
   for (const dirPath of directoriesToEnsure) {
     await mkdir(dirPath, { recursive: true });
   }
 
   for (const filePath of filesToInitialize) {
-    await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, "", { encoding: "utf8" });
   }
 }

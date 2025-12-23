@@ -10,6 +10,7 @@ import type { ChatArtifactFormat } from "./chat/types.js";
 export const VORATIQ_DIR = ".voratiq";
 export const VORATIQ_RUNS_DIR = "runs";
 export const VORATIQ_RUNS_FILE = "runs/index.json";
+export const VORATIQ_RUNS_SESSIONS_DIR = "runs/sessions";
 export const VORATIQ_AGENTS_FILE = "agents.yaml";
 export const VORATIQ_EVALS_FILE = "evals.yaml";
 export const VORATIQ_ENVIRONMENT_FILE = "environment.yaml";
@@ -41,7 +42,7 @@ export function formatWorkspacePath(...segments: string[]): string {
   return [VORATIQ_DIR, ...segments].join("/");
 }
 
-const RUNS_SEGMENT = VORATIQ_RUNS_DIR;
+const RUNS_SESSION_SEGMENTS = [VORATIQ_RUNS_DIR, "sessions"] as const;
 
 function assertPathSegment(
   label: "runId" | "agentId" | "segment" | "evalSlug",
@@ -61,7 +62,11 @@ function assertPathSegment(
 
 function formatRunScopedPath(runId: string, ...segments: string[]): string {
   const safeRunId = assertPathSegment("runId", runId);
-  const scoped = formatWorkspacePath(RUNS_SEGMENT, safeRunId, ...segments);
+  const scoped = formatWorkspacePath(
+    ...RUNS_SESSION_SEGMENTS,
+    safeRunId,
+    ...segments,
+  );
   return assertRepoRelativePath(scoped);
 }
 

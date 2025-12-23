@@ -18,6 +18,7 @@ import {
   VORATIQ_EVALS_FILE,
   VORATIQ_RUNS_DIR,
   VORATIQ_RUNS_FILE,
+  VORATIQ_RUNS_SESSIONS_DIR,
   VORATIQ_SANDBOX_FILE,
 } from "./structure.js";
 import {
@@ -46,9 +47,15 @@ export async function createWorkspace(
     createdDirectories.push(relativeToRoot(root, runsDir));
   }
 
+  const sessionsDir = resolveWorkspacePath(root, VORATIQ_RUNS_SESSIONS_DIR);
+  if (!(await pathExists(sessionsDir))) {
+    await mkdir(sessionsDir, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, sessionsDir));
+  }
+
   const runsIndexPath = resolveWorkspacePath(root, VORATIQ_RUNS_FILE);
   if (!(await pathExists(runsIndexPath))) {
-    const initialIndex = JSON.stringify({ version: 1, runs: [] }, null, 2);
+    const initialIndex = JSON.stringify({ version: 2, sessions: [] }, null, 2);
     await writeFile(runsIndexPath, `${initialIndex}\n`, { encoding: "utf8" });
     createdFiles.push(relativeToRoot(root, runsIndexPath));
   }
@@ -94,6 +101,7 @@ export async function createWorkspace(
 export async function validateWorkspace(root: string): Promise<void> {
   const workspaceDir = resolveWorkspacePath(root);
   const runsDir = resolveWorkspacePath(root, VORATIQ_RUNS_DIR);
+  const sessionsDir = resolveWorkspacePath(root, VORATIQ_RUNS_SESSIONS_DIR);
   const runsIndexPath = resolveWorkspacePath(root, VORATIQ_RUNS_FILE);
   const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const evalsConfigPath = resolveWorkspacePath(root, VORATIQ_EVALS_FILE);
@@ -107,6 +115,7 @@ export async function validateWorkspace(root: string): Promise<void> {
     const missingEntries = [
       `${relativeToRoot(root, workspaceDir)}/`,
       `${relativeToRoot(root, runsDir)}/`,
+      `${relativeToRoot(root, sessionsDir)}/`,
       relativeToRoot(root, runsIndexPath),
       relativeToRoot(root, agentsConfigPath),
       relativeToRoot(root, environmentConfigPath),
@@ -118,6 +127,11 @@ export async function validateWorkspace(root: string): Promise<void> {
   await ensureDirectoryExists(
     runsDir,
     () => new WorkspaceMissingEntryError(relativeToRoot(root, runsDir)),
+  );
+
+  await ensureDirectoryExists(
+    sessionsDir,
+    () => new WorkspaceMissingEntryError(relativeToRoot(root, sessionsDir)),
   );
 
   await ensureFileExists(

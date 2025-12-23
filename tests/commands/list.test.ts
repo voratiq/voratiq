@@ -281,7 +281,7 @@ async function writeRunsFile(
   await mkdir(runsDir, { recursive: true });
 
   if (records.length === 0) {
-    const emptyIndex = JSON.stringify({ version: 1, runs: [] }, null, 2);
+    const emptyIndex = JSON.stringify({ version: 2, sessions: [] }, null, 2);
     await writeFile(runsFilePath, `${emptyIndex}\n`, "utf8");
     return;
   }

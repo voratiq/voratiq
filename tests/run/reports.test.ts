@@ -72,7 +72,7 @@ describe("report mapping helpers", () => {
     expect(report.diffCaptured).toBe(true);
     expect(report.evals).toHaveLength(baseEvalResults.length);
     expect(report.evals[0]?.logPath).toBe(
-      `.voratiq/runs/${runId}/claude/evals/${baseEvalResults[0]?.slug}.log`,
+      `.voratiq/runs/sessions/${runId}/claude/evals/${baseEvalResults[0]?.slug}.log`,
     );
   });
 
@@ -106,12 +106,13 @@ describe("report mapping helpers", () => {
     const failingAgent: AgentReport = {
       agentId: "codex",
       status: "failed",
-      runtimeManifestPath: ".voratiq/runs/bad/codex/runtime/manifest.json",
-      baseDirectory: ".voratiq/runs/bad/codex",
+      runtimeManifestPath:
+        ".voratiq/runs/sessions/bad/codex/runtime/manifest.json",
+      baseDirectory: ".voratiq/runs/sessions/bad/codex",
       diffStatistics: undefined,
       assets: {
-        stdoutPath: ".voratiq/runs/bad/codex/artifacts/stdout.log",
-        stderrPath: ".voratiq/runs/bad/codex/artifacts/stderr.log",
+        stdoutPath: ".voratiq/runs/sessions/bad/codex/artifacts/stdout.log",
+        stderrPath: ".voratiq/runs/sessions/bad/codex/artifacts/stderr.log",
       },
       evals: baseEvalResults.map((evaluation) => ({
         ...evaluation,

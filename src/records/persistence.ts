@@ -84,7 +84,7 @@ export type RunIndexEntry = Pick<RunRecord, "runId" | "createdAt" | "status">;
 
 export interface RunIndexPayload {
   version: number;
-  runs: RunIndexEntry[];
+  sessions: RunIndexEntry[];
 }
 
 interface RunRecordBufferEntry {
@@ -102,7 +102,7 @@ interface RunRecordBufferEntry {
   flushPromise?: Promise<void>;
 }
 
-const RUN_INDEX_VERSION = 1;
+const RUN_INDEX_VERSION = 2;
 export const RUN_RECORD_FILENAME = "record.json";
 const HISTORY_LOCK_FILENAME = "history.lock";
 const BUFFER_FLUSH_DELAY_MS = 250;
@@ -124,7 +124,7 @@ const readRunRecordsInternal: ReadRunRecordsFn = async (
     throw new RunOptionValidationError("limit", "must be a positive integer");
   }
 
-  const runsDir = getRunsDirectory(runsFilePath);
+  const sessionsDir = getSessionsDirectory(runsFilePath);
   let index: RunIndexPayload;
   try {
     index = await readRunIndex(runsFilePath);
@@ -137,13 +137,13 @@ const readRunRecordsInternal: ReadRunRecordsFn = async (
   }
   const matches: RunRecord[] = [];
 
-  for (let i = index.runs.length - 1; i >= 0; i -= 1) {
-    const entry = index.runs[i];
+  for (let i = index.sessions.length - 1; i >= 0; i -= 1) {
+    const entry = index.sessions[i];
     if (!entry) {
       continue;
     }
 
-    const recordPath = join(runsDir, entry.runId, RUN_RECORD_FILENAME);
+    const recordPath = join(sessionsDir, entry.runId, RUN_RECORD_FILENAME);
     try {
       const record = await readRunRecordFromDisk(recordPath);
       if (predicate && !predicate(record)) {
@@ -204,11 +204,12 @@ export async function appendRunRecord(
   options: AppendRunRecordOptions,
 ): Promise<void> {
   const { root, runsFilePath, record } = options;
-  const runsDir = getRunsDirectory(runsFilePath);
-  const recordDir = join(runsDir, record.runId);
+  const runsRoot = getRunsDirectory(runsFilePath);
+  const sessionsDir = getSessionsDirectory(runsFilePath);
+  const recordDir = join(sessionsDir, record.runId);
   const recordPath = join(recordDir, RUN_RECORD_FILENAME);
   const displayPath = relativeToRoot(root, recordPath);
-  const lockPath = join(runsDir, HISTORY_LOCK_FILENAME);
+  const lockPath = join(runsRoot, HISTORY_LOCK_FILENAME);
 
   await mkdir(recordDir, { recursive: true });
   const releaseLock = await acquireHistoryLock(lockPath);
@@ -232,7 +233,7 @@ export async function appendRunRecord(
       runId: record.runId,
       recordPath,
       lockPath,
-      runsDir,
+      runsDir: runsRoot,
       runsFilePath,
       root,
       record,
@@ -259,16 +260,17 @@ export async function rewriteRunRecord(
   options: RewriteRunRecordOptions,
 ): Promise<RunRecord> {
   const { root, runsFilePath, runId, mutate } = options;
-  const runsDir = getRunsDirectory(runsFilePath);
-  const recordPath = join(runsDir, runId, RUN_RECORD_FILENAME);
-  const lockPath = join(runsDir, HISTORY_LOCK_FILENAME);
+  const runsRoot = getRunsDirectory(runsFilePath);
+  const sessionsDir = getSessionsDirectory(runsFilePath);
+  const recordPath = join(sessionsDir, runId, RUN_RECORD_FILENAME);
+  const lockPath = join(runsRoot, HISTORY_LOCK_FILENAME);
 
   const entry = await getOrLoadBufferEntry({
     key: recordPath,
     runId,
     recordPath,
     lockPath,
-    runsDir,
+    runsDir: runsRoot,
     runsFilePath,
     root,
   });
@@ -299,8 +301,8 @@ export async function getRunRecordSnapshot(options: {
   runId: string;
 }): Promise<RunRecord | undefined> {
   const { runsFilePath, runId } = options;
-  const runsDir = getRunsDirectory(runsFilePath);
-  const recordPath = join(runsDir, runId, RUN_RECORD_FILENAME);
+  const sessionsDir = getSessionsDirectory(runsFilePath);
+  const recordPath = join(sessionsDir, runId, RUN_RECORD_FILENAME);
 
   const buffered = runRecordBuffers.get(recordPath);
   if (buffered) {
@@ -335,7 +337,7 @@ export async function disposeRunRecordBuffer(options: {
 }): Promise<void> {
   const { runsFilePath, runId } = options;
   const recordPath = join(
-    getRunsDirectory(runsFilePath),
+    getSessionsDirectory(runsFilePath),
     runId,
     RUN_RECORD_FILENAME,
   );
@@ -352,7 +354,7 @@ export async function flushRunRecordBuffer(options: {
 }): Promise<void> {
   const { runsFilePath, runId } = options;
   const recordPath = join(
-    getRunsDirectory(runsFilePath),
+    getSessionsDirectory(runsFilePath),
     runId,
     RUN_RECORD_FILENAME,
   );
@@ -595,21 +597,32 @@ function getRunsDirectory(runsFilePath: string): string {
   return dirname(runsFilePath);
 }
 
+function getSessionsDirectory(runsFilePath: string): string {
+  return join(getRunsDirectory(runsFilePath), "sessions");
+}
+
 async function readRunIndex(path: string): Promise<RunIndexPayload> {
   try {
     const raw = await readFile(path, "utf8");
     const trimmed = raw.trim();
     if (!trimmed) {
-      return { version: RUN_INDEX_VERSION, runs: [] };
+      return { version: RUN_INDEX_VERSION, sessions: [] };
     }
-    const parsed = JSON.parse(trimmed) as RunIndexPayload;
-    if (!Array.isArray(parsed.runs)) {
-      return { version: RUN_INDEX_VERSION, runs: [] };
-    }
-    return parsed;
+    const parsed = JSON.parse(trimmed) as RunIndexPayload & {
+      runs?: RunIndexEntry[];
+    };
+    const sessions = Array.isArray(parsed.sessions)
+      ? parsed.sessions
+      : Array.isArray(parsed.runs)
+        ? parsed.runs
+        : [];
+    return {
+      version: parsed.version ?? RUN_INDEX_VERSION,
+      sessions,
+    };
   } catch (error) {
     if (isFileSystemError(error) && error.code === "ENOENT") {
-      return { version: RUN_INDEX_VERSION, runs: [] };
+      return { version: RUN_INDEX_VERSION, sessions: [] };
     }
     if (error instanceof SyntaxError) {
       throw new RunRecordParseError(path, error.message);
@@ -623,16 +636,16 @@ async function upsertRunIndexEntry(
   entry: RunIndexEntry,
 ): Promise<void> {
   const payload = await readRunIndex(indexPath);
-  const existingIndex = payload.runs.findIndex(
+  const existingIndex = payload.sessions.findIndex(
     (run) => run.runId === entry.runId,
   );
   if (existingIndex >= 0) {
-    payload.runs[existingIndex] = {
-      ...payload.runs[existingIndex],
+    payload.sessions[existingIndex] = {
+      ...payload.sessions[existingIndex],
       ...entry,
     };
   } else {
-    payload.runs.push(entry);
+    payload.sessions.push(entry);
   }
   payload.version = RUN_INDEX_VERSION;
   await atomicWriteJson(indexPath, payload);

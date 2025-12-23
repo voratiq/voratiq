@@ -28,7 +28,7 @@ export class ApplyRunMetadataCorruptedError extends ApplyError {
       "Run history is corrupted; cannot apply.",
       [detail],
       [
-        "Inspect `.voratiq/runs/index.json` and the affected run directory under `.voratiq/runs/<id>` or regenerate the run with `voratiq run`.",
+        "Inspect `.voratiq/runs/index.json` and the affected run directory under `.voratiq/runs/sessions/<id>` or regenerate the run with `voratiq run`.",
       ],
     );
     this.name = "ApplyRunMetadataCorruptedError";

@@ -240,7 +240,7 @@ describe("terminateActiveRun", () => {
   });
 
   it("preserves chat logs for running agents before rewriting abort status", async () => {
-    const agentRoot = "/repo/.voratiq/runs/run-123/agents/alpha";
+    const agentRoot = "/repo/.voratiq/runs/sessions/run-123/agents/alpha";
     registerActiveRun({
       root: "/repo",
       runsFilePath: "/repo/.voratiq/runs/index.json",
@@ -305,7 +305,7 @@ describe("terminateActiveRun", () => {
 
   it("ignores not-found results and logs capture errors without blocking abort", async () => {
     const order: string[] = [];
-    const agentRoot = "/repo/.voratiq/runs/run-123/agents/alpha";
+    const agentRoot = "/repo/.voratiq/runs/sessions/run-123/agents/alpha";
     registerActiveRun({
       root: "/repo",
       runsFilePath: "/repo/.voratiq/runs/index.json",
@@ -319,7 +319,7 @@ describe("terminateActiveRun", () => {
         {
           agentId: "beta",
           providerId: "gpt",
-          agentRoot: "/repo/.voratiq/runs/run-123/agents/beta",
+          agentRoot: "/repo/.voratiq/runs/sessions/run-123/agents/beta",
         },
       ],
     });
@@ -391,7 +391,7 @@ describe("terminateActiveRun", () => {
         {
           agentId: "alpha",
           providerId: "claude",
-          agentRoot: "/repo/.voratiq/runs/run-123/agents/alpha",
+          agentRoot: "/repo/.voratiq/runs/sessions/run-123/agents/alpha",
         },
       ],
     });

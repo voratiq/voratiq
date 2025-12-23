@@ -23,6 +23,7 @@ const ANSI_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 const runningInWorkspace = process.env.VORATIQ_WORKSPACE_TESTS === "1";
 const suite =
   runningInWorkspace || !isSandboxRuntimeSupported() ? describe.skip : describe;
+const RUN_INTEGRATION_TIMEOUT_MS = 60_000;
 
 const AGENT_IDS = ["claude", "codex", "gemini"] as const;
 type AgentId = (typeof AGENT_IDS)[number];
@@ -84,93 +85,101 @@ suite("voratiq run (integration)", () => {
     await workspace?.cleanup();
   });
 
-  it("executes configured agents and records run artifacts", async () => {
-    await createWorkspace(repoRoot);
-    await writeAgentsConfig(workspace, agentScriptPath);
+  it(
+    "executes configured agents and records run artifacts",
+    async () => {
+      await createWorkspace(repoRoot);
+      await writeAgentsConfig(workspace, agentScriptPath);
 
-    const specPath = join(repoRoot, "specs", "sample.md");
-    await mkdir(join(repoRoot, "specs"), { recursive: true });
-    await writeFile(
-      specPath,
-      "# Sample Spec\nUpdate artifact with greeting.\n",
-      "utf8",
-    );
-
-    const runReport = await executeRunCommand({
-      root: repoRoot,
-      runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
-      specAbsolutePath: specPath,
-      specDisplayPath: relative(repoRoot, specPath),
-    });
-
-    expect(runReport.agents).toHaveLength(AGENT_IDS.length);
-    for (const agent of runReport.agents) {
-      const assets = expectDefined(agent.assets, "Agent assets missing");
-      const stdoutPointer = expectDefined(
-        assets.stdoutPath,
-        "Agent stdout pointer missing",
-      );
-      const stderrPointer = expectDefined(
-        assets.stderrPath,
-        "Agent stderr pointer missing",
-      );
-      const stdoutPath = join(repoRoot, ...stdoutPointer.split("/"));
-      const stderrPath = join(repoRoot, ...stderrPointer.split("/"));
-      expect(agent.status).toBe("succeeded");
-      expect(agent.diffAttempted).toBe(true);
-      expect(agent.diffCaptured).toBe(true);
-      expect(agent.evals).toHaveLength(4);
-      expect(
-        agent.evals.every((evaluation) =>
-          ["succeeded", "skipped"].includes(evaluation.status),
-        ),
-      ).toBe(true);
-      expect(agent.baseDirectory).toBe(
-        `.voratiq/runs/${runReport.runId}/${agent.agentId}`,
+      const specPath = join(repoRoot, "specs", "sample.md");
+      await mkdir(join(repoRoot, "specs"), { recursive: true });
+      await writeFile(
+        specPath,
+        "# Sample Spec\nUpdate artifact with greeting.\n",
+        "utf8",
       );
 
-      await expect(readFile(stdoutPath, "utf8")).resolves.toContain("stdout");
-      await expect(readFile(stderrPath, "utf8")).resolves.toContain("stderr");
+      const runReport = await executeRunCommand({
+        root: repoRoot,
+        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        specAbsolutePath: specPath,
+        specDisplayPath: relative(repoRoot, specPath),
+      });
 
-      const workspaceArtifact = join(
+      expect(runReport.agents).toHaveLength(AGENT_IDS.length);
+      for (const agent of runReport.agents) {
+        const assets = expectDefined(agent.assets, "Agent assets missing");
+        const stdoutPointer = expectDefined(
+          assets.stdoutPath,
+          "Agent stdout pointer missing",
+        );
+        const stderrPointer = expectDefined(
+          assets.stderrPath,
+          "Agent stderr pointer missing",
+        );
+        const stdoutPath = join(repoRoot, ...stdoutPointer.split("/"));
+        const stderrPath = join(repoRoot, ...stderrPointer.split("/"));
+        expect(agent.status).toBe("succeeded");
+        expect(agent.diffAttempted).toBe(true);
+        expect(agent.diffCaptured).toBe(true);
+        expect(agent.evals).toHaveLength(4);
+        expect(
+          agent.evals.every((evaluation) =>
+            ["succeeded", "skipped"].includes(evaluation.status),
+          ),
+        ).toBe(true);
+        expect(agent.baseDirectory).toBe(
+          `.voratiq/runs/sessions/${runReport.runId}/${agent.agentId}`,
+        );
+
+        await expect(readFile(stdoutPath, "utf8")).resolves.toContain("stdout");
+        await expect(readFile(stderrPath, "utf8")).resolves.toContain("stderr");
+
+        const workspaceArtifact = join(
+          repoRoot,
+          ".voratiq",
+          "runs",
+          "sessions",
+          runReport.runId,
+          agent.agentId,
+          "workspace",
+          "artifact.txt",
+        );
+        const artifactContent = await readFile(workspaceArtifact, "utf8");
+        expect(artifactContent).toContain("Implement the following task:");
+      }
+
+      const indexPath = join(repoRoot, ".voratiq", "runs", "index.json");
+      const indexPayload = JSON.parse(
+        await readFile(indexPath, "utf8"),
+      ) as RunIndexPayload;
+      const indexEntry = indexPayload.sessions.find(
+        (entry) => entry.runId === runReport.runId,
+      );
+      expect(indexEntry).toBeDefined();
+
+      const recordPath = join(
         repoRoot,
         ".voratiq",
         "runs",
+        "sessions",
         runReport.runId,
-        agent.agentId,
-        "workspace",
-        "artifact.txt",
+        "record.json",
       );
-      const artifactContent = await readFile(workspaceArtifact, "utf8");
-      expect(artifactContent).toContain("Implement the following task:");
-    }
-
-    const indexPath = join(repoRoot, ".voratiq", "runs", "index.json");
-    const indexPayload = JSON.parse(
-      await readFile(indexPath, "utf8"),
-    ) as RunIndexPayload;
-    const indexEntry = indexPayload.runs.find(
-      (entry) => entry.runId === runReport.runId,
-    );
-    expect(indexEntry).toBeDefined();
-
-    const recordPath = join(
-      repoRoot,
-      ".voratiq",
-      "runs",
-      runReport.runId,
-      "record.json",
-    );
-    const record = JSON.parse(await readFile(recordPath, "utf8")) as RunRecord;
-    expect(record.runId).toBe(runReport.runId);
-    expect(record.rootPath).toBe(".");
-    const enhancedRecord = buildRunRecordEnhanced(record);
-    expect(enhancedRecord).toBeDefined();
-    const promptAbsolute = join(repoRoot, enhancedRecord.promptPath);
-    const promptContent = await readFile(promptAbsolute, "utf8");
-    expect(promptContent).toContain("# Sample Spec");
-    expect(promptContent).toContain("Implement the following task:");
-  });
+      const record = JSON.parse(
+        await readFile(recordPath, "utf8"),
+      ) as RunRecord;
+      expect(record.runId).toBe(runReport.runId);
+      expect(record.rootPath).toBe(".");
+      const enhancedRecord = buildRunRecordEnhanced(record);
+      expect(enhancedRecord).toBeDefined();
+      const promptAbsolute = join(repoRoot, enhancedRecord.promptPath);
+      const promptContent = await readFile(promptAbsolute, "utf8");
+      expect(promptContent).toContain("# Sample Spec");
+      expect(promptContent).toContain("Implement the following task:");
+    },
+    RUN_INTEGRATION_TIMEOUT_MS,
+  );
 
   it("records an in-progress run before agents execute", async () => {
     await createWorkspace(repoRoot);
@@ -291,17 +300,19 @@ suite("voratiq run (integration)", () => {
     expect(dirtyError.detailLines.join("\n")).toContain("README.md");
 
     const runDirectories = await readdir(join(repoRoot, ".voratiq", "runs"));
-    const nonIndexEntries = runDirectories.filter(
-      (entry) => entry !== "index.json",
+    expect(runDirectories).toContain("sessions");
+    expect(runDirectories).toContain("index.json");
+    const sessionEntries = await readdir(
+      join(repoRoot, ".voratiq", "runs", "sessions"),
     );
-    expect(nonIndexEntries).toHaveLength(0);
+    expect(sessionEntries).toHaveLength(0);
 
     const runsLog = await readFile(
       join(repoRoot, ".voratiq", "runs", "index.json"),
       "utf8",
     );
     const indexPayload = JSON.parse(runsLog) as RunIndexPayload;
-    expect(indexPayload.runs).toHaveLength(0);
+    expect(indexPayload.sessions).toHaveLength(0);
   });
 
   it("fails fast when all agents are disabled", async () => {
@@ -328,67 +339,74 @@ suite("voratiq run (integration)", () => {
     );
   });
 
-  it("respects --max-parallel limit and preserves deterministic ordering", async () => {
-    await createWorkspace(repoRoot);
-    await writeAgentsConfig(workspace, agentScriptPath);
+  it(
+    "respects --max-parallel limit and preserves deterministic ordering",
+    async () => {
+      await createWorkspace(repoRoot);
+      await writeAgentsConfig(workspace, agentScriptPath);
 
-    const specRelativePath = "specs/parallel.md";
-    const specPath = join(repoRoot, specRelativePath);
-    await mkdir(join(repoRoot, "specs"), { recursive: true });
-    await writeFile(
-      specPath,
-      "# Parallel\nCheck deterministic ordering.\n",
-      "utf8",
-    );
+      const specRelativePath = "specs/parallel.md";
+      const specPath = join(repoRoot, specRelativePath);
+      await mkdir(join(repoRoot, "specs"), { recursive: true });
+      await writeFile(
+        specPath,
+        "# Parallel\nCheck deterministic ordering.\n",
+        "utf8",
+      );
 
-    const originalCwd = process.cwd();
-    process.chdir(repoRoot);
-    let body = "";
-    try {
-      const result = await runRunCommand({
-        specPath: specRelativePath,
-        maxParallel: 2,
-      });
-      body = result.body;
-    } finally {
-      process.chdir(originalCwd);
-    }
-    const normalizedBody = body.replace(ANSI_PATTERN, "");
-    const claudeIndex = normalizedBody.indexOf("  claude SUCCEEDED");
-    const codexIndex = normalizedBody.indexOf("  codex SUCCEEDED");
-    const geminiIndex = normalizedBody.indexOf("  gemini SUCCEEDED");
+      const originalCwd = process.cwd();
+      process.chdir(repoRoot);
+      let body = "";
+      try {
+        const result = await runRunCommand({
+          specPath: specRelativePath,
+          maxParallel: 2,
+        });
+        body = result.body;
+      } finally {
+        process.chdir(originalCwd);
+      }
+      const normalizedBody = body.replace(ANSI_PATTERN, "");
+      const claudeIndex = normalizedBody.indexOf("  claude SUCCEEDED");
+      const codexIndex = normalizedBody.indexOf("  codex SUCCEEDED");
+      const geminiIndex = normalizedBody.indexOf("  gemini SUCCEEDED");
 
-    expect(claudeIndex).toBeGreaterThanOrEqual(0);
-    expect(codexIndex).toBeGreaterThanOrEqual(0);
-    expect(geminiIndex).toBeGreaterThanOrEqual(0);
-    expect(codexIndex).toBeGreaterThan(claudeIndex);
-    expect(geminiIndex).toBeGreaterThan(codexIndex);
+      expect(claudeIndex).toBeGreaterThanOrEqual(0);
+      expect(codexIndex).toBeGreaterThanOrEqual(0);
+      expect(geminiIndex).toBeGreaterThanOrEqual(0);
+      expect(codexIndex).toBeGreaterThan(claudeIndex);
+      expect(geminiIndex).toBeGreaterThan(codexIndex);
 
-    const indexPath = join(repoRoot, ".voratiq", "runs", "index.json");
-    const indexPayload = JSON.parse(
-      await readFile(indexPath, "utf8"),
-    ) as RunIndexPayload;
-    const latestEntry =
-      indexPayload.runs[indexPayload.runs.length - 1] ?? undefined;
-    const recordId = latestEntry?.runId;
-    expect(recordId).toBeDefined();
-    if (!recordId) {
-      throw new Error("Missing run record id");
-    }
+      const indexPath = join(repoRoot, ".voratiq", "runs", "index.json");
+      const indexPayload = JSON.parse(
+        await readFile(indexPath, "utf8"),
+      ) as RunIndexPayload;
+      const latestEntry =
+        indexPayload.sessions[indexPayload.sessions.length - 1] ?? undefined;
+      const recordId = latestEntry?.runId;
+      expect(recordId).toBeDefined();
+      if (!recordId) {
+        throw new Error("Missing run record id");
+      }
 
-    const recordPath = join(
-      repoRoot,
-      ".voratiq",
-      "runs",
-      recordId,
-      "record.json",
-    );
-    const record = JSON.parse(await readFile(recordPath, "utf8")) as RunRecord;
+      const recordPath = join(
+        repoRoot,
+        ".voratiq",
+        "runs",
+        "sessions",
+        recordId,
+        "record.json",
+      );
+      const record = JSON.parse(
+        await readFile(recordPath, "utf8"),
+      ) as RunRecord;
 
-    const agentIds = record.agents.map((agent) => agent.agentId);
-    const expectedOrder = Array.from(AGENT_IDS).sort();
-    expect(agentIds).toEqual(expectedOrder);
-  });
+      const agentIds = record.agents.map((agent) => agent.agentId);
+      const expectedOrder = Array.from(AGENT_IDS).sort();
+      expect(agentIds).toEqual(expectedOrder);
+    },
+    RUN_INTEGRATION_TIMEOUT_MS,
+  );
 
   it("surfaces summary violations with clear messaging", async () => {
     await createWorkspace(repoRoot);

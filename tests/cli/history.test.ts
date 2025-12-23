@@ -37,6 +37,7 @@ function stripAnsi(value: string): string {
 describe("voratiq prune (integration)", () => {
   let repoRoot: string;
   let runsDir: string;
+  let sessionsDir: string;
   let runsFilePath: string;
 
   beforeEach(async () => {
@@ -45,7 +46,8 @@ describe("voratiq prune (integration)", () => {
 
     runsDir = join(repoRoot, ".voratiq", "runs");
     runsFilePath = join(runsDir, "index.json");
-    await mkdir(runsDir, { recursive: true });
+    sessionsDir = join(runsDir, "sessions");
+    await mkdir(sessionsDir, { recursive: true });
   });
 
   afterEach(async () => {
@@ -56,7 +58,7 @@ describe("voratiq prune (integration)", () => {
     const runId = "run-123";
     const agentId = "claude";
     const branchName = `voratiq/run/${runId}/${agentId}`;
-    const runPath = join(runsDir, runId);
+    const runPath = join(sessionsDir, runId);
     const agentPath = join(runPath, agentId);
     const workspacePath = join(agentPath, "workspace");
     const artifactsPath = join(agentPath, "artifacts");
@@ -107,7 +109,7 @@ describe("voratiq prune (integration)", () => {
     }
     const success: PruneSuccessResult = result;
     expect(success.workspaces.removed).toEqual([
-      `${formatWorkspacePath("runs", runId)}/${agentId}/workspace`,
+      `${formatWorkspacePath("runs", "sessions", runId)}/${agentId}/workspace`,
     ]);
     expect(success.workspaces.missing).toEqual([]);
     expect(success.artifacts.purged).toBe(false);
@@ -159,10 +161,10 @@ describe("voratiq prune (integration)", () => {
       "",
       "Created    2025-10-15 03:00",
       "Spec       specs/sample.md",
-      `Workspace  ${formatWorkspacePath("runs", runId)}`,
+      `Workspace  ${formatWorkspacePath("runs", "sessions", runId)}`,
       "",
       "Workspaces to be removed:",
-      `  - ${formatWorkspacePath("runs", runId)}/${agentId}/workspace`,
+      `  - ${formatWorkspacePath("runs", "sessions", runId)}/${agentId}/workspace`,
       "",
       "Branches to be deleted:",
       `  - ${branchName}`,
@@ -175,7 +177,7 @@ describe("voratiq prune (integration)", () => {
     const runId = "run-321";
     const agentId = "codex";
     const branchName = `voratiq/run/${runId}/${agentId}`;
-    const runPath = join(runsDir, runId);
+    const runPath = join(sessionsDir, runId);
     const agentPath = join(runPath, agentId);
     const workspacePath = join(agentPath, "workspace");
     const artifactsPath = join(agentPath, "artifacts");
@@ -232,7 +234,7 @@ describe("voratiq prune (integration)", () => {
     const runId = "run-999";
     const agentId = "gemini";
     const branchName = `voratiq/run/${runId}/${agentId}`;
-    const runPath = join(runsDir, runId);
+    const runPath = join(sessionsDir, runId);
     const agentPath = join(runPath, agentId);
     const workspacePath = join(agentPath, "workspace");
     const artifactsPath = join(agentPath, "artifacts");
@@ -284,16 +286,16 @@ describe("voratiq prune (integration)", () => {
     const success: PruneSuccessResult = result;
 
     expect(success.workspaces.removed).toEqual([
-      `${formatWorkspacePath("runs", runId)}/${agentId}/workspace`,
+      `${formatWorkspacePath("runs", "sessions", runId)}/${agentId}/workspace`,
     ]);
     expect(success.artifacts.purged).toBe(true);
     expect(success.artifacts.removed).toEqual(
       expect.arrayContaining([
-        `${formatWorkspacePath("runs", runId)}/${agentId}/artifacts/stdout.log`,
-        `${formatWorkspacePath("runs", runId)}/${agentId}/artifacts/stderr.log`,
-        `${formatWorkspacePath("runs", runId)}/${agentId}/artifacts/diff.patch`,
-        `${formatWorkspacePath("runs", runId)}/${agentId}/artifacts/summary.txt`,
-        `${formatWorkspacePath("runs", runId)}/${agentId}/evals`,
+        `${formatWorkspacePath("runs", "sessions", runId)}/${agentId}/artifacts/stdout.log`,
+        `${formatWorkspacePath("runs", "sessions", runId)}/${agentId}/artifacts/stderr.log`,
+        `${formatWorkspacePath("runs", "sessions", runId)}/${agentId}/artifacts/diff.patch`,
+        `${formatWorkspacePath("runs", "sessions", runId)}/${agentId}/artifacts/summary.txt`,
+        `${formatWorkspacePath("runs", "sessions", runId)}/${agentId}/evals`,
       ]),
     );
     expect(success.artifacts.missing).toEqual([]);
@@ -333,10 +335,10 @@ describe("voratiq prune (integration)", () => {
       "",
       "Created    2025-10-15 04:00",
       "Spec       specs/purge.md",
-      `Workspace  ${formatWorkspacePath("runs", runId)}`,
+      `Workspace  ${formatWorkspacePath("runs", "sessions", runId)}`,
       "",
       "Directories to be deleted:",
-      `  - ${formatWorkspacePath("runs", runId)}/${agentId}`,
+      `  - ${formatWorkspacePath("runs", "sessions", runId)}/${agentId}`,
       "",
       "Branches to be deleted:",
       `  - ${branchName}`,
@@ -460,14 +462,15 @@ async function readRunRecords(
   runsFilePath: string,
 ): Promise<RunRecord[]> {
   const runsDir = dirname(runsFilePath);
+  const sessionsDir = join(runsDir, "sessions");
   const indexRaw = await readFile(runsFilePath, "utf8");
   const parsed = indexRaw.trim()
-    ? (JSON.parse(indexRaw) as { runs?: { runId: string }[] })
-    : { runs: [] };
-  const entries = parsed.runs ?? [];
+    ? (JSON.parse(indexRaw) as { sessions?: { runId: string }[] })
+    : { sessions: [] };
+  const entries = parsed.sessions ?? [];
   const records: RunRecord[] = [];
   for (const entry of entries) {
-    const recordPath = join(runsDir, entry.runId, "record.json");
+    const recordPath = join(sessionsDir, entry.runId, "record.json");
     const raw = await readFile(recordPath, "utf8");
     records.push(JSON.parse(raw) as RunRecord);
   }

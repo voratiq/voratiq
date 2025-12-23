@@ -48,7 +48,7 @@ describe("CLI entrypoint error handling", () => {
     const cliError = toCliError(
       new WorkspaceNotInitializedError([
         ".voratiq/",
-        ".voratiq/runs/",
+        ".voratiq/runs/sessions/",
         ".voratiq/runs/index.json",
       ]),
     );
@@ -56,7 +56,7 @@ describe("CLI entrypoint error handling", () => {
     expect(cliError.detailLines).toEqual([
       "Missing workspace entries:",
       "  - .voratiq/",
-      "  - .voratiq/runs/",
+      "  - .voratiq/runs/sessions/",
       "  - .voratiq/runs/index.json",
     ]);
     expect(cliError.hintLines).toEqual([

@@ -109,10 +109,10 @@ describe("voratiq review", () => {
       expect(body).toContain(expectedRunHeader);
       expect(normalizedBody).toContain("Spec specs/hello-world.md");
       expect(normalizedBody).toContain(
-        "Workspace .voratiq/runs/20251007-184454-vmtyf",
+        "Workspace .voratiq/runs/sessions/20251007-184454-vmtyf",
       );
       expect(normalizedBody).toContain(
-        "Root .voratiq/runs/20251007-184454-vmtyf/claude",
+        "Root .voratiq/runs/sessions/20251007-184454-vmtyf/claude",
       );
       expect(normalizedBody).toContain("RUNTIME PATH");
       expect(normalizedBody).toContain("manifest runtime/manifest.json");
@@ -126,7 +126,7 @@ describe("voratiq review", () => {
       expect(body).toContain(expectedHeader);
       expect(normalizedBody).toContain("Duration 1m");
       expect(normalizedBody).toContain(
-        "Root .voratiq/runs/20251007-184454-vmtyf/claude",
+        "Root .voratiq/runs/sessions/20251007-184454-vmtyf/claude",
       );
       expect(normalizedBody).toContain("EVAL STATUS LOG");
       expect(normalizedBody).toContain("format SUCCEEDED evals/format.log");
@@ -170,7 +170,7 @@ describe("voratiq review", () => {
       expect(normalizedBody).toContain("20251007-184454-deleted PRUNED");
       expect(normalizedBody).toContain("Spec specs/hello-world.md");
       expect(normalizedBody).toContain(
-        "Root .voratiq/runs/20251007-184454-deleted/claude",
+        "Root .voratiq/runs/sessions/20251007-184454-deleted/claude",
       );
       expect(normalizedBody).toContain("Note: Run was pruned");
     });

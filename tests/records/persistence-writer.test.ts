@@ -27,7 +27,14 @@ describe("run history writer", () => {
     await mkdir(join(root, ".voratiq", "runs"), { recursive: true });
     const record = createRunRecord({ runId, status: "running", agents: [] });
     await appendRunRecord({ root, runsFilePath, record });
-    recordPath = join(root, ".voratiq", "runs", runId, "record.json");
+    recordPath = join(
+      root,
+      ".voratiq",
+      "runs",
+      "sessions",
+      runId,
+      "record.json",
+    );
   });
 
   afterEach(async () => {
