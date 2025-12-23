@@ -43,10 +43,17 @@ describe("prepareRunWorkspace", () => {
     });
 
     expect(runWorkspace.absolute).toBe(
-      join(root, ".voratiq", "runs", "2025-11-10-test"),
+      join(root, ".voratiq", "runs", "sessions", "2025-11-10-test"),
     );
     const savedPrompt = await readFile(
-      join(root, ".voratiq", "runs", "2025-11-10-test", "prompt.txt"),
+      join(
+        root,
+        ".voratiq",
+        "runs",
+        "sessions",
+        "2025-11-10-test",
+        "prompt.txt",
+      ),
       "utf8",
     );
     expect(savedPrompt).toBe(prompt);
@@ -54,7 +61,7 @@ describe("prepareRunWorkspace", () => {
 
   it("throws when the run directory already exists", async () => {
     const root = await createTempRoot("voratiq-run-");
-    const runDir = join(root, ".voratiq", "runs", "existing-run");
+    const runDir = join(root, ".voratiq", "runs", "sessions", "existing-run");
     await fs.mkdir(runDir, { recursive: true });
 
     await expect(
@@ -80,7 +87,7 @@ describe("prepareRunWorkspace", () => {
     ).rejects.toThrow("disk full");
 
     await expect(
-      fs.access(join(root, ".voratiq", "runs", "cleanup-run")),
+      fs.access(join(root, ".voratiq", "runs", "sessions", "cleanup-run")),
     ).rejects.toThrow();
   });
 });

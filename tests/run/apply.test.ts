@@ -74,7 +74,7 @@ describe("runApplyCommand", () => {
       baseRevisionSha: "abc123",
       headRevision: "abc123",
       agent: applyAgent,
-      diffPath: ".voratiq/runs/run-123/claude/artifacts/diff.patch",
+      diffPath: ".voratiq/runs/sessions/run-123/claude/artifacts/diff.patch",
       ignoredBaseMismatch: false,
     };
 

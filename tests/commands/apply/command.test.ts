@@ -67,6 +67,7 @@ describe("executeApplyCommand", () => {
         repoRoot,
         ".voratiq",
         "runs",
+        "sessions",
         runId,
         "record.json",
       );
@@ -257,6 +258,7 @@ describe("executeApplyCommand", () => {
         repoRoot,
         ".voratiq",
         "runs",
+        "sessions",
         runId,
         "record.json",
       );
@@ -329,7 +331,7 @@ async function writeRunRecord(options: {
   } = options;
   void diffStatistics;
 
-  const runDir = join(repoRoot, ".voratiq", "runs", runId);
+  const runDir = join(repoRoot, ".voratiq", "runs", "sessions", runId);
   const agentDir = join(runDir, agentId);
   const workspaceDir = join(agentDir, "workspace");
   const artifactsDir = join(agentDir, "artifacts");
@@ -346,7 +348,7 @@ async function writeRunRecord(options: {
   await writeFile(summaryPath, "summary\n", "utf8");
   await writeFile(diffPath, diffContent, "utf8");
 
-  const diffRelative = `.voratiq/runs/${runId}/${agentId}/artifacts/diff.patch`;
+  const diffRelative = `.voratiq/runs/sessions/${runId}/${agentId}/artifacts/diff.patch`;
   const now = new Date().toISOString();
 
   const agentRecord = createAgentInvocationRecord({

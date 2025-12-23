@@ -26,12 +26,12 @@ import {
 } from "../../workspace/prune.js";
 import {
   buildAgentArtifactPaths,
-  formatWorkspacePath,
   getAgentDirectoryPath,
   getAgentEvalsDirectoryPath,
   getAgentWorkspaceDirectoryPath,
+  getRunDirectoryPath,
   resolveWorkspacePath,
-  VORATIQ_RUNS_DIR,
+  VORATIQ_RUNS_SESSIONS_DIR,
 } from "../../workspace/structure.js";
 import { fetchRunSafely } from "../fetch.js";
 import {
@@ -70,7 +70,7 @@ export async function executePruneCommand(
     onDeleted: (record) => new PruneRunDeletedError(record.runId),
   });
 
-  const runPathDisplay = formatWorkspacePath(VORATIQ_RUNS_DIR, runRecord.runId);
+  const runPathDisplay = getRunDirectoryPath(runRecord.runId);
   const branches = deriveAgentBranches(runRecord);
   const workspaceTargets = buildWorkspaceTargets({
     root,
@@ -392,7 +392,11 @@ async function purgeRunDirectoryExceptRecord(options: {
   runRecord: RunRecord;
 }): Promise<void> {
   const { root, runRecord } = options;
-  const runDir = resolveWorkspacePath(root, VORATIQ_RUNS_DIR, runRecord.runId);
+  const runDir = resolveWorkspacePath(
+    root,
+    VORATIQ_RUNS_SESSIONS_DIR,
+    runRecord.runId,
+  );
   if (!(await pathExists(runDir))) {
     return;
   }

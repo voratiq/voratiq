@@ -105,7 +105,7 @@ describe("executeRunCommand integration", () => {
 
     const runWorkspace = {
       absolute: "/tmp/run-workspace",
-      relative: ".voratiq/runs/run-xyz",
+      relative: ".voratiq/runs/sessions/run-xyz",
     };
     prepareRunWorkspaceMock.mockResolvedValue({
       runWorkspace,
@@ -225,7 +225,7 @@ describe("executeRunCommand integration", () => {
         {
           agentId: "alpha",
           providerId: "claude",
-          agentRoot: "/repo/.voratiq/runs/run-xyz/alpha",
+          agentRoot: "/repo/.voratiq/runs/sessions/run-xyz/alpha",
         },
       ],
     });
@@ -264,7 +264,7 @@ describe("executeRunCommand integration", () => {
 
     const runWorkspace = {
       absolute: "/tmp/run-workspace",
-      relative: ".voratiq/runs/run-aborted",
+      relative: ".voratiq/runs/sessions/run-aborted",
     };
     prepareRunWorkspaceMock.mockResolvedValue({
       runWorkspace,

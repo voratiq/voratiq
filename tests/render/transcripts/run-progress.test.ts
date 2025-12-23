@@ -132,7 +132,7 @@ describe("createRunRenderer", () => {
         runId: "20251105-test-12345",
         status: "running",
         specPath: "specs/test.md",
-        workspacePath: ".voratiq/runs/20251105-test-12345",
+        workspacePath: ".voratiq/runs/sessions/20251105-test-12345",
         createdAt: "2025-11-05T12:00:00.000Z",
         baseRevisionSha: "abc123",
       });
@@ -175,7 +175,7 @@ describe("createRunRenderer", () => {
         runId: "20251105-test-12345",
         status: "running",
         specPath: "specs/test.md",
-        workspacePath: ".voratiq/runs/20251105-test-12345",
+        workspacePath: ".voratiq/runs/sessions/20251105-test-12345",
         createdAt: "2025-11-05T12:00:00.000Z",
         baseRevisionSha: "abc123",
       });
@@ -218,7 +218,7 @@ describe("createRunRenderer", () => {
         runId: "20251105-test-12345",
         status: "running",
         specPath: "specs/test.md",
-        workspacePath: ".voratiq/runs/20251105-test-12345",
+        workspacePath: ".voratiq/runs/sessions/20251105-test-12345",
         createdAt: "2025-11-05T12:00:00.000Z",
         baseRevisionSha: "abc123",
       });
@@ -249,7 +249,7 @@ describe("createRunRenderer", () => {
         runId: "20251105-test-12345",
         status: "running",
         specPath: "specs/test.md",
-        workspacePath: ".voratiq/runs/20251105-test-12345",
+        workspacePath: ".voratiq/runs/sessions/20251105-test-12345",
         createdAt: "2025-11-05T12:00:00.000Z",
         baseRevisionSha: "abc123",
       });
@@ -283,7 +283,7 @@ describe("createRunRenderer", () => {
         runId: "20251105-test-12345",
         status: "running" as const,
         specPath: "specs/test.md",
-        workspacePath: ".voratiq/runs/20251105-test-12345",
+        workspacePath: ".voratiq/runs/sessions/20251105-test-12345",
         createdAt: "2025-11-05T12:00:00.000Z",
         baseRevisionSha: "abc123",
       };
@@ -308,13 +308,15 @@ describe("createRunRenderer", () => {
         runId: "20251105-test-12345",
         status: "running",
         specPath: "specs/test.md",
-        workspacePath: ".voratiq/runs/20251105-test-12345",
+        workspacePath: ".voratiq/runs/sessions/20251105-test-12345",
         createdAt: "2025-11-05T12:00:00.000Z",
         baseRevisionSha: "abc123",
       });
 
       const firstSnapshot = tty.snapshot();
-      expect(firstSnapshot).toContain(".voratiq/runs/20251105-test-12345");
+      expect(firstSnapshot).toContain(
+        ".voratiq/runs/sessions/20251105-test-12345",
+      );
 
       renderer.begin({
         runId: "20251105-test-12345",
@@ -326,7 +328,9 @@ describe("createRunRenderer", () => {
       });
 
       const secondSnapshot = tty.snapshot();
-      expect(secondSnapshot).not.toContain(".voratiq/runs/20251105-test-12345");
+      expect(secondSnapshot).not.toContain(
+        ".voratiq/runs/sessions/20251105-test-12345",
+      );
     });
 
     it("stops redrawing on completion and returns the review hint", () => {
@@ -337,7 +341,7 @@ describe("createRunRenderer", () => {
         runId: "20251105-test-12345",
         status: "running" as const,
         specPath: "specs/test.md",
-        workspacePath: ".voratiq/runs/20251105-test-12345",
+        workspacePath: ".voratiq/runs/sessions/20251105-test-12345",
         createdAt: "2025-11-05T12:00:00.000Z",
         baseRevisionSha: "abc123",
       };
@@ -408,7 +412,7 @@ describe("createRunRenderer", () => {
         runId: "20251105-test-12345",
         status: "running",
         specPath: "specs/test.md",
-        workspacePath: ".voratiq/runs/20251105-test-12345",
+        workspacePath: ".voratiq/runs/sessions/20251105-test-12345",
         createdAt: "2025-11-05T12:00:00.000Z",
         baseRevisionSha: "abc123",
       });
@@ -447,7 +451,7 @@ describe("createRunRenderer", () => {
         runId: "20251105-test-12345",
         status: "running",
         specPath: "specs/test.md",
-        workspacePath: ".voratiq/runs/20251105-test-12345",
+        workspacePath: ".voratiq/runs/sessions/20251105-test-12345",
         createdAt: "2025-11-05T12:00:00.000Z",
         baseRevisionSha: "abc123",
       });
@@ -481,7 +485,7 @@ describe("createRunRenderer", () => {
         runId: "20251105-test-12345",
         status: "running",
         specPath: "specs/test.md",
-        workspacePath: ".voratiq/runs/20251105-test-12345",
+        workspacePath: ".voratiq/runs/sessions/20251105-test-12345",
         createdAt: "2025-11-05T12:00:00.000Z",
         baseRevisionSha: "abc123",
       });

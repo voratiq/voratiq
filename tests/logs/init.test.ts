@@ -11,7 +11,7 @@ import type { CreateWorkspaceResult } from "../../src/workspace/types.js";
 
 describe("renderInitTranscript", () => {
   const resultCreated: CreateWorkspaceResult = {
-    createdDirectories: [".voratiq"],
+    createdDirectories: [".voratiq", ".voratiq/runs", ".voratiq/runs/sessions"],
     createdFiles: [".voratiq/runs/index.json"],
   };
 

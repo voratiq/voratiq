@@ -47,6 +47,7 @@ describe("workspace bootstrap", () => {
       expect.arrayContaining([
         normalizeForAssertion(".voratiq"),
         normalizeForAssertion(join(".voratiq", "runs")),
+        normalizeForAssertion(join(".voratiq", "runs", "sessions")),
       ]),
     );
     expect(createdFiles).toEqual(

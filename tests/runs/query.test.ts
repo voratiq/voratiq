@@ -191,8 +191,8 @@ describe("fetchRuns", () => {
     const warning: RunRecordWarning = {
       kind: "parse-error",
       runId: "run-2",
-      recordPath: "/root/.voratiq/runs/run-2/record.json",
-      displayPath: ".voratiq/runs/run-2/record.json",
+      recordPath: "/root/.voratiq/runs/sessions/run-2/record.json",
+      displayPath: ".voratiq/runs/sessions/run-2/record.json",
       details: "invalid json",
     };
     mockedReadRunRecords.mockImplementation((options) => {
@@ -287,8 +287,8 @@ describe("fetchRunsSafely", () => {
       options.onWarning?.({
         kind: "parse-error",
         runId: "run-parse",
-        recordPath: "/root/.voratiq/runs/run-parse/record.json",
-        displayPath: ".voratiq/runs/run-parse/record.json",
+        recordPath: "/root/.voratiq/runs/sessions/run-parse/record.json",
+        displayPath: ".voratiq/runs/sessions/run-parse/record.json",
         details: "bad json",
       });
       return Promise.resolve([]);

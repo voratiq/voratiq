@@ -93,6 +93,7 @@ describe("CLI Context", () => {
         "/app/voratiq/.git": "",
         "/app/voratiq/.voratiq/runs/index.json": "",
         "/app/voratiq/.voratiq/runs": null,
+        "/app/voratiq/.voratiq/runs/sessions": null,
         "/app/voratiq/.voratiq/agents.yaml": "",
         "/app/voratiq/.voratiq/evals.yaml": "",
         "/app/voratiq/.voratiq/environment.yaml": "",
