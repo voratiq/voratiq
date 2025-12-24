@@ -157,7 +157,6 @@ describe("executePruneCommand", () => {
 
     const existingPaths = new Set<string>([
       "/repo/.voratiq/runs/sessions/20251110-abc123",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/prompt.txt",
       "/repo/.voratiq/runs/sessions/20251110-abc123/claude/workspace",
       "/repo/.voratiq/runs/sessions/20251110-abc123/codex/workspace",
       "/repo/.voratiq/runs/sessions/20251110-abc123/claude/artifacts/stdout.log",
@@ -193,7 +192,6 @@ describe("executePruneCommand", () => {
     getReaddirMock().mockResolvedValue([
       buildDirent("claude", true),
       buildDirent("codex", true),
-      buildDirent("prompt.txt", false),
       buildDirent("record.json", false),
     ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
 
@@ -236,11 +234,6 @@ describe("executePruneCommand", () => {
       path: "/repo/.voratiq/runs/sessions/20251110-abc123/codex",
       root: "/repo",
       recursive: true,
-    });
-    expect(removeWorkspaceEntryMock).toHaveBeenCalledWith({
-      path: "/repo/.voratiq/runs/sessions/20251110-abc123/prompt.txt",
-      root: "/repo",
-      recursive: false,
     });
   });
 

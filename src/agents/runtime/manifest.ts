@@ -1,20 +1,22 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { delimiter, dirname, relative as relativePath } from "node:path";
 
-import type { AgentDefinition } from "../../../configs/agents/types.js";
+import type { AgentManifest } from "../../commands/run/shim/agent-manifest.js";
+import type { AgentDefinition } from "../../configs/agents/types.js";
 import {
   type EnvironmentConfig,
   getNodeDependencyRoots,
   getPythonEnvironmentPath,
-} from "../../../configs/environment/types.js";
-import { pathExists } from "../../../utils/fs.js";
-import { resolvePath } from "../../../utils/path.js";
-import type { AgentWorkspacePaths } from "../../../workspace/layout.js";
-import type { AgentManifest } from "../shim/agent-manifest.js";
+} from "../../configs/environment/types.js";
+import { pathExists } from "../../utils/fs.js";
+import { resolvePath } from "../../utils/path.js";
+import { AgentRuntimeManifestError } from "./errors.js";
 
 export interface ManifestWriteOptions {
   agent: AgentDefinition;
-  workspacePaths: AgentWorkspacePaths;
+  runtimeManifestPath: string;
+  promptPath: string;
+  workspacePath: string;
   env?: Record<string, string>;
   environment: EnvironmentConfig;
 }
@@ -22,8 +24,14 @@ export interface ManifestWriteOptions {
 export async function writeAgentManifest(
   options: ManifestWriteOptions,
 ): Promise<Record<string, string>> {
-  const { agent, workspacePaths, env = {}, environment } = options;
-  const { promptPath, runtimeManifestPath, workspacePath } = workspacePaths;
+  const {
+    agent,
+    runtimeManifestPath,
+    promptPath,
+    workspacePath,
+    env = {},
+    environment,
+  } = options;
   const manifestDir = dirname(runtimeManifestPath);
 
   const manifestEnv = await composeManifestEnvironment({
@@ -35,15 +43,22 @@ export async function writeAgentManifest(
   const manifest = {
     binary: agent.binary,
     argv: [...agent.argv],
+    // Keep relative paths for readability; the launcher will normalize to absolutes.
     promptPath: normalizeRelative(manifestDir, promptPath),
     workspace: normalizeRelative(manifestDir, workspacePath),
     env: manifestEnv,
   } satisfies AgentManifest;
 
-  const manifestJson = `${JSON.stringify(manifest, null, 2)}\n`;
-  await mkdir(dirname(runtimeManifestPath), { recursive: true });
-  await writeFile(runtimeManifestPath, manifestJson, { encoding: "utf8" });
-  return manifestEnv;
+  try {
+    const manifestJson = `${JSON.stringify(manifest, null, 2)}\n`;
+    await mkdir(dirname(runtimeManifestPath), { recursive: true });
+    await writeFile(runtimeManifestPath, manifestJson, { encoding: "utf8" });
+    return manifestEnv;
+  } catch (error) {
+    throw new AgentRuntimeManifestError(
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 }
 
 export async function composeManifestEnvironment(options: {

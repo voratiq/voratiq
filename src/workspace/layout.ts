@@ -4,10 +4,12 @@ import { dirname } from "node:path";
 import type { AgentId } from "../configs/agents/types.js";
 import { normalizePathForDisplay, resolvePath } from "../utils/path.js";
 import {
+  getAgentArtifactsDirectoryPath,
   getAgentDiffPath,
   getAgentDirectoryPath,
   getAgentEvalsDirectoryPath,
   getAgentManifestPath,
+  getAgentReviewPath,
   getAgentRuntimeDirectoryPath,
   getAgentSandboxDirectoryPath,
   getAgentSandboxHomePath,
@@ -17,7 +19,6 @@ import {
   getAgentSummaryPath,
   getAgentWorkspaceDirectoryPath,
   getRunDirectoryPath,
-  getRunPromptPath,
 } from "./structure.js";
 
 export interface RunWorkspacePaths {
@@ -42,13 +43,14 @@ export const WORKSPACE_SUMMARY_FILENAME = ".summary.txt" as const;
 
 export interface AgentWorkspacePaths {
   agentRoot: string;
+  artifactsPath: string;
   stdoutPath: string;
   stderrPath: string;
   diffPath: string;
   summaryPath: string;
+  reviewPath: string;
   workspacePath: string;
   evalsDirPath: string;
-  promptPath: string;
   runtimeManifestPath: string;
   sandboxPath: string;
   sandboxHomePath: string;
@@ -97,6 +99,11 @@ type AgentWorkspaceArtifactAbsoluteMap = Record<
 >;
 
 const AGENT_WORKSPACE_ARTIFACTS = {
+  artifactsPath: {
+    getRelativePath: ({ runId, agentId }) =>
+      getAgentArtifactsDirectoryPath(runId, agentId),
+    ensureDir: true,
+  },
   stdoutPath: {
     getRelativePath: ({ runId, agentId }) => getAgentStdoutPath(runId, agentId),
     initializeEmptyFile: true,
@@ -114,6 +121,10 @@ const AGENT_WORKSPACE_ARTIFACTS = {
       getAgentSummaryPath(runId, agentId),
     initializeEmptyFile: true,
   },
+  reviewPath: {
+    getRelativePath: ({ runId, agentId }) => getAgentReviewPath(runId, agentId),
+    initializeEmptyFile: true,
+  },
   workspacePath: {
     getRelativePath: ({ runId, agentId }) =>
       getAgentWorkspaceDirectoryPath(runId, agentId),
@@ -123,9 +134,6 @@ const AGENT_WORKSPACE_ARTIFACTS = {
     getRelativePath: ({ runId, agentId }) =>
       getAgentEvalsDirectoryPath(runId, agentId),
     ensureDir: true,
-  },
-  promptPath: {
-    getRelativePath: ({ runId }) => getRunPromptPath(runId),
   },
   runtimeManifestPath: {
     getRelativePath: ({ runId, agentId }) =>
@@ -211,11 +219,6 @@ export function buildAgentWorkspacePaths(options: {
     agentRoot,
     ...absoluteArtifacts,
   };
-}
-
-export function resolveRunPromptPath(root: string, runId: string): string {
-  const promptRelative = normalizePathForDisplay(getRunPromptPath(runId));
-  return resolvePath(root, promptRelative);
 }
 
 export async function scaffoldAgentWorkspace(

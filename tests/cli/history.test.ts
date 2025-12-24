@@ -73,7 +73,6 @@ describe("voratiq prune (integration)", () => {
     await writeFile(join(artifactsPath, "summary.txt"), "summary", "utf8");
     await mkdir(evalsPath, { recursive: true });
     await writeFile(join(evalsPath, "report.json"), "{}", "utf8");
-    await writeFile(join(runPath, "prompt.txt"), "Summarize spec", "utf8");
 
     const headRevision = await gitHeadRevision(repoRoot);
     const agentRecord = buildAgentRecord(runId, agentId);
@@ -185,7 +184,6 @@ describe("voratiq prune (integration)", () => {
     await mkdir(workspacePath, { recursive: true });
     await mkdir(artifactsPath, { recursive: true });
     await writeFile(join(artifactsPath, "stdout.log"), "stdout", "utf8");
-    await writeFile(join(runPath, "prompt.txt"), "Summarize spec", "utf8");
 
     const headRevision = await gitHeadRevision(repoRoot);
     const runRecord = createRunRecord({
@@ -249,7 +247,6 @@ describe("voratiq prune (integration)", () => {
     await writeFile(join(artifactsPath, "summary.txt"), "summary", "utf8");
     await mkdir(evalsPath, { recursive: true });
     await writeFile(join(evalsPath, "result.json"), "{}", "utf8");
-    await writeFile(join(runPath, "prompt.txt"), "Summarize spec", "utf8");
 
     const headRevision = await gitHeadRevision(repoRoot);
     const runRecord = createRunRecord({

@@ -1,3 +1,4 @@
+import { teardownSessionAuth } from "../../agents/runtime/registry.js";
 import {
   disposeRunRecordBuffer,
   getRunRecordSnapshot,
@@ -8,7 +9,6 @@ import type { RunStatus } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { preserveProviderChatTranscripts } from "../../workspace/chat/artifacts.js";
 import type { ChatArtifactFormat } from "../../workspace/chat/types.js";
-import { teardownRunSandboxes } from "./sandbox-registry.js";
 
 export const RUN_ABORT_WARNING = "Run aborted before agent completed.";
 
@@ -168,7 +168,7 @@ export async function terminateActiveRun(
   }
 
   try {
-    await teardownRunSandboxes(context.runId);
+    await teardownSessionAuth(context.runId);
   } finally {
     terminationInFlight = false;
     activeTerminationStatus = undefined;

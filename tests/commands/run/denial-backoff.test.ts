@@ -4,13 +4,13 @@ import { PassThrough } from "node:stream";
 
 import { describe, expect, it, jest } from "@jest/globals";
 
-import { createWatchdog } from "../../../src/commands/run/agents/watchdog.js";
 import {
   DEFAULT_DENIAL_BACKOFF,
   DenialBackoffTracker,
   parseSandboxDenialLine,
   type SandboxFailFastInfo,
-} from "../../../src/commands/run/sandbox.js";
+} from "../../../src/agents/runtime/sandbox.js";
+import { createWatchdog } from "../../../src/agents/runtime/watchdog.js";
 
 describe("sandbox denial backoff", () => {
   it("parses sandbox-runtime debug network denials", () => {

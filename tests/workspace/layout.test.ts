@@ -12,9 +12,11 @@ import {
   scaffoldAgentWorkspace,
 } from "../../src/workspace/layout.js";
 import {
+  getAgentArtifactsDirectoryPath,
   getAgentDiffPath,
   getAgentEvalsDirectoryPath,
   getAgentManifestPath,
+  getAgentReviewPath,
   getAgentRuntimeDirectoryPath,
   getAgentSandboxDirectoryPath,
   getAgentSandboxHomePath,
@@ -23,7 +25,6 @@ import {
   getAgentStdoutPath,
   getAgentSummaryPath,
   getAgentWorkspaceDirectoryPath,
-  getRunPromptPath,
   WORKSPACE_DIRNAME,
 } from "../../src/workspace/structure.js";
 
@@ -36,17 +37,16 @@ const ARTIFACT_BUILDERS: Record<
   ArtifactKey,
   (runId: string, agentId: string) => string
 > = {
+  artifactsPath: (runId, agentId) =>
+    getAgentArtifactsDirectoryPath(runId, agentId),
   stdoutPath: (runId, agentId) => getAgentStdoutPath(runId, agentId),
   stderrPath: (runId, agentId) => getAgentStderrPath(runId, agentId),
   diffPath: (runId, agentId) => getAgentDiffPath(runId, agentId),
   summaryPath: (runId, agentId) => getAgentSummaryPath(runId, agentId),
+  reviewPath: (runId, agentId) => getAgentReviewPath(runId, agentId),
   workspacePath: (runId, agentId) =>
     getAgentWorkspaceDirectoryPath(runId, agentId),
   evalsDirPath: (runId, agentId) => getAgentEvalsDirectoryPath(runId, agentId),
-  promptPath: (runId, agentId) => {
-    void agentId;
-    return getRunPromptPath(runId);
-  },
   runtimeManifestPath: (runId, agentId) => getAgentManifestPath(runId, agentId),
   runtimePath: (runId, agentId) => getAgentRuntimeDirectoryPath(runId, agentId),
   sandboxPath: (runId, agentId) => getAgentSandboxDirectoryPath(runId, agentId),
@@ -60,9 +60,11 @@ const SCAFFOLD_FILE_KEYS: ArtifactKey[] = [
   "stderrPath",
   "diffPath",
   "summaryPath",
+  "reviewPath",
 ];
 
 const SCAFFOLD_DIR_KEYS: ArtifactKey[] = [
+  "artifactsPath",
   "workspacePath",
   "evalsDirPath",
   "runtimePath",

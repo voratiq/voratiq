@@ -11,13 +11,13 @@ import {
   jest,
 } from "@jest/globals";
 
+import type { SandboxFailFastInfo } from "../../../../src/agents/runtime/sandbox.js";
 import {
   createWatchdog,
   FATAL_PATTERNS,
   WATCHDOG_DEFAULTS,
   type WatchdogTrigger,
-} from "../../../../src/commands/run/agents/watchdog.js";
-import type { SandboxFailFastInfo } from "../../../../src/commands/run/sandbox.js";
+} from "../../../../src/agents/runtime/watchdog.js";
 
 describe("watchdog", () => {
   let mockChild: MockChildProcess;

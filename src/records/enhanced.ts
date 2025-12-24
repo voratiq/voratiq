@@ -9,7 +9,6 @@ import {
   buildAgentEvalViews,
   getAgentDirectoryPath,
   getAgentManifestPath,
-  getRunPromptPath,
 } from "../workspace/structure.js";
 import type {
   AgentEvalSnapshot,
@@ -46,7 +45,6 @@ export interface RunRecordEnhanced {
   baseRevisionSha: string;
   rootPath: string;
   spec: RunSpecDescriptor;
-  promptPath: string;
   agents: AgentInvocationEnhanced[];
   deletedAt?: string | null;
   applyStatus?: RunApplyStatus;
@@ -58,8 +56,6 @@ export interface BuildRunRecordViewOptions {
 }
 
 export function buildRunRecordEnhanced(record: RunRecord): RunRecordEnhanced {
-  const promptPath = getRunPromptPath(record.runId);
-
   const agents: AgentInvocationEnhanced[] = (record.agents ?? []).map(
     (agent) => {
       const baseDirectory = getAgentDirectoryPath(record.runId, agent.agentId);
@@ -121,7 +117,6 @@ export function buildRunRecordEnhanced(record: RunRecord): RunRecordEnhanced {
     baseRevisionSha: record.baseRevisionSha,
     rootPath: record.rootPath,
     spec: record.spec,
-    promptPath,
     agents,
   };
 

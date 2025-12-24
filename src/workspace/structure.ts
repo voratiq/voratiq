@@ -24,7 +24,7 @@ export const DIFF_FILENAME = "diff.patch";
 export const SUMMARY_FILENAME = "summary.txt";
 export const CHAT_JSON_FILENAME = "chat.json";
 export const CHAT_JSONL_FILENAME = "chat.jsonl";
-export const PROMPT_FILENAME = "prompt.txt";
+export const REVIEW_FILENAME = "review.md";
 export const RUNTIME_DIRNAME = "runtime";
 export const ARTIFACTS_DIRNAME = "artifacts";
 export const MANIFEST_FILENAME = "manifest.json";
@@ -87,10 +87,6 @@ export function getRunDirectoryPath(runId: string): string {
   return formatRunScopedPath(runId);
 }
 
-export function getRunPromptPath(runId: string): string {
-  return formatRunScopedPath(runId, PROMPT_FILENAME);
-}
-
 export function getAgentDirectoryPath(runId: string, agentId: string): string {
   return formatAgentScopedPath(runId, agentId);
 }
@@ -116,6 +112,13 @@ export function getAgentWorkspaceDirectoryPath(
   agentId: string,
 ): string {
   return formatAgentScopedPath(runId, agentId, WORKSPACE_DIRNAME);
+}
+
+export function getAgentArtifactsDirectoryPath(
+  runId: string,
+  agentId: string,
+): string {
+  return formatAgentScopedPath(runId, agentId, ARTIFACTS_DIRNAME);
 }
 
 export function getAgentStdoutPath(runId: string, agentId: string): string {
@@ -151,6 +154,15 @@ export function getAgentSummaryPath(runId: string, agentId: string): string {
     agentId,
     ARTIFACTS_DIRNAME,
     SUMMARY_FILENAME,
+  );
+}
+
+export function getAgentReviewPath(runId: string, agentId: string): string {
+  return formatAgentScopedPath(
+    runId,
+    agentId,
+    ARTIFACTS_DIRNAME,
+    REVIEW_FILENAME,
   );
 }
 

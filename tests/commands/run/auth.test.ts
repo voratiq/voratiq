@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import { join } from "node:path";
 
+import { verifyAgentProviders } from "../../../src/agents/runtime/auth.js";
 import * as authRuntime from "../../../src/auth/runtime.js";
-import { verifyAgentProviders } from "../../../src/commands/run/agents/auth-stage.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 
 const BASE_AGENT: AgentDefinition = {

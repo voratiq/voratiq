@@ -1,5 +1,5 @@
 import * as fs from "node:fs/promises";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -34,29 +34,28 @@ async function createTempRoot(prefix: string): Promise<string> {
 }
 
 describe("prepareRunWorkspace", () => {
-  it("creates a workspace and writes the prompt", async () => {
+  it("creates a workspace directory without persisting a prompt file", async () => {
     const root = await createTempRoot("voratiq-run-");
-    const { runWorkspace, prompt } = await prepareRunWorkspace({
+    const { runWorkspace } = await prepareRunWorkspace({
       root,
       runId: "2025-11-10-test",
-      prompt: "summarize spec",
     });
 
     expect(runWorkspace.absolute).toBe(
       join(root, ".voratiq", "runs", "sessions", "2025-11-10-test"),
     );
-    const savedPrompt = await readFile(
-      join(
-        root,
-        ".voratiq",
-        "runs",
-        "sessions",
-        "2025-11-10-test",
-        "prompt.txt",
+    await expect(
+      fs.access(
+        join(
+          root,
+          ".voratiq",
+          "runs",
+          "sessions",
+          "2025-11-10-test",
+          "prompt.txt",
+        ),
       ),
-      "utf8",
-    );
-    expect(savedPrompt).toBe(prompt);
+    ).rejects.toThrow();
   });
 
   it("throws when the run directory already exists", async () => {
@@ -68,27 +67,8 @@ describe("prepareRunWorkspace", () => {
       prepareRunWorkspace({
         root,
         runId: "existing-run",
-        prompt: "noop",
       }),
     ).rejects.toThrow(RunDirectoryExistsError);
-  });
-
-  it("cleans up the workspace when writing the prompt fails", async () => {
-    const root = await createTempRoot("voratiq-run-");
-    const writeSpy = jest.mocked(fs.writeFile);
-    writeSpy.mockRejectedValueOnce(new Error("disk full"));
-
-    await expect(
-      prepareRunWorkspace({
-        root,
-        runId: "cleanup-run",
-        prompt: "noop",
-      }),
-    ).rejects.toThrow("disk full");
-
-    await expect(
-      fs.access(join(root, ".voratiq", "runs", "sessions", "cleanup-run")),
-    ).rejects.toThrow();
   });
 });
 

@@ -11,13 +11,13 @@ import {
   jest,
 } from "@jest/globals";
 
-import type { StagedAuthContext } from "../../../src/commands/run/agents/auth-stage.js";
+import type { StagedAuthContext } from "../../../src/agents/runtime/auth.js";
+import * as sandboxRegistry from "../../../src/agents/runtime/registry.js";
 import {
   clearActiveRun,
   registerActiveRun,
   terminateActiveRun,
 } from "../../../src/commands/run/lifecycle.js";
-import * as sandboxRegistry from "../../../src/commands/run/sandbox-registry.js";
 import {
   disposeRunRecordBuffer,
   getRunRecordSnapshot,
@@ -66,7 +66,7 @@ afterEach(async () => {
       .splice(0)
       .map((root) => rm(root, { recursive: true, force: true })),
   );
-  await sandboxRegistry.teardownRunSandboxes(RUN_ID).catch(() => {});
+  await sandboxRegistry.teardownSessionAuth(RUN_ID).catch(() => {});
 });
 
 describe("terminateActiveRun", () => {
@@ -229,9 +229,8 @@ describe("terminateActiveRun", () => {
         username: "tester",
       },
       agentId: "alpha",
-      runId: RUN_ID,
     };
-    sandboxRegistry.registerStagedSandboxContext(context);
+    sandboxRegistry.registerStagedAuthContext(RUN_ID, context);
 
     await terminateActiveRun("aborted");
 
@@ -363,9 +362,9 @@ describe("terminateActiveRun", () => {
       Promise.resolve(mutate(existingRecord)),
     );
 
-    const originalTeardown = sandboxRegistry.teardownRunSandboxes;
+    const originalTeardown = sandboxRegistry.teardownSessionAuth;
     const teardownSpy = jest
-      .spyOn(sandboxRegistry, "teardownRunSandboxes")
+      .spyOn(sandboxRegistry, "teardownSessionAuth")
       .mockImplementation(async (runId) => {
         order.push("teardown");
         return originalTeardown(runId);
@@ -422,9 +421,9 @@ describe("terminateActiveRun", () => {
       return Promise.resolve({ status: "already-exists", format: "jsonl" });
     });
 
-    const originalTeardown = sandboxRegistry.teardownRunSandboxes;
+    const originalTeardown = sandboxRegistry.teardownSessionAuth;
     const teardownSpy = jest
-      .spyOn(sandboxRegistry, "teardownRunSandboxes")
+      .spyOn(sandboxRegistry, "teardownSessionAuth")
       .mockImplementation(async (runId) => {
         callOrder.push("teardown");
         return originalTeardown(runId);
@@ -448,7 +447,7 @@ describe("terminateActiveRun", () => {
     rewriteRunRecordMock.mockRejectedValue(new Error("rewrite failed"));
 
     const teardownSpy = jest
-      .spyOn(sandboxRegistry, "teardownRunSandboxes")
+      .spyOn(sandboxRegistry, "teardownSessionAuth")
       .mockResolvedValue();
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 

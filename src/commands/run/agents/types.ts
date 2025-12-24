@@ -4,7 +4,6 @@ import type { EvalDefinition } from "../../../configs/evals/types.js";
 import type { AgentInvocationRecord } from "../../../records/types.js";
 import type { AgentWorkspacePaths } from "../../../workspace/layout.js";
 import type { AgentExecutionResult } from "../reports.js";
-import type { StagedAuthContext } from "./auth-stage.js";
 import { AgentRunContext } from "./run-context.js";
 
 export interface AgentExecutionContext {
@@ -12,6 +11,7 @@ export interface AgentExecutionContext {
   baseRevisionSha: string;
   runId: string;
   root: string;
+  prompt: string;
   evalPlan: readonly EvalDefinition[];
   environment: EnvironmentConfig;
 }
@@ -27,15 +27,13 @@ export interface PreparedAgentExecution {
   agent: AgentDefinition;
   agentContext: AgentRunContext;
   workspacePaths: AgentWorkspacePaths;
-  runtimeManifestPath: string;
   baseRevisionSha: string;
   root: string;
   runId: string;
+  prompt: string;
   evalPlan: readonly EvalDefinition[];
   environment: EnvironmentConfig;
-  manifestEnv: Record<string, string>;
   progress?: AgentProgressCallbacks;
-  authContext?: StagedAuthContext;
 }
 
 export type AgentPreparationOutcome =

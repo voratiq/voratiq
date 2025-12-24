@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import { stageManifestForSandbox } from "../../../../src/commands/run/agents/sandbox-launcher.js";
-import * as watchdogModule from "../../../../src/commands/run/agents/watchdog.js";
-import { AgentProcessError } from "../../../../src/commands/run/errors.js";
+import { AgentRuntimeProcessError } from "../../../../src/agents/runtime/errors.js";
+import { stageManifestForSandbox } from "../../../../src/agents/runtime/launcher.js";
+import * as watchdogModule from "../../../../src/agents/runtime/watchdog.js";
 
 const TEMP_DIR_PREFIX = "sandbox-launcher-test-";
 
@@ -14,7 +14,7 @@ const TEMP_DIR_PREFIX = "sandbox-launcher-test-";
 type CleanupSpy = jest.Mock<() => void>;
 
 describe("stageManifestForSandbox", () => {
-  it("throws an AgentProcessError when the manifest JSON is invalid", async () => {
+  it("throws when the manifest JSON is invalid", async () => {
     const dir = await mkdtemp(join(tmpdir(), TEMP_DIR_PREFIX));
     const runtimeManifestPath = join(dir, "agent.json");
     await writeFile(runtimeManifestPath, "{ invalid json", "utf8");
@@ -23,7 +23,7 @@ describe("stageManifestForSandbox", () => {
       stageManifestForSandbox({
         runtimeManifestPath,
       }),
-    ).rejects.toBeInstanceOf(AgentProcessError);
+    ).rejects.toBeInstanceOf(AgentRuntimeProcessError);
   });
 
   it("resolves manifest paths in place without creating a sandbox copy", async () => {

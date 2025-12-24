@@ -14,11 +14,19 @@ export async function prepareAgents(options: {
   baseRevisionSha: string;
   runId: string;
   root: string;
+  prompt: string;
   evalPlan: readonly EvalDefinition[];
   environment: EnvironmentConfig;
 }): Promise<AgentPreparationResult> {
-  const { agents, baseRevisionSha, runId, root, evalPlan, environment } =
-    options;
+  const {
+    agents,
+    baseRevisionSha,
+    runId,
+    root,
+    prompt,
+    evalPlan,
+    environment,
+  } = options;
 
   const ready: PreparedAgentExecution[] = [];
   const failures: AgentExecutionResult[] = [];
@@ -29,6 +37,7 @@ export async function prepareAgents(options: {
       baseRevisionSha,
       runId,
       root,
+      prompt,
       evalPlan,
       environment,
     });

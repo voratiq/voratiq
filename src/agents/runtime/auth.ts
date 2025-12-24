@@ -1,36 +1,35 @@
 import { rm } from "node:fs/promises";
 
-import { resolveAuthProvider } from "../../../auth/providers/index.js";
+import { resolveAuthProvider } from "../../auth/providers/index.js";
 import type {
   AuthProvider,
   AuthRuntimeContext,
-} from "../../../auth/providers/types.js";
-import { buildAuthRuntimeContext } from "../../../auth/runtime.js";
-import type { AgentDefinition } from "../../../configs/agents/types.js";
-import { toErrorMessage } from "../../../utils/errors.js";
-import { isFileSystemError } from "../../../utils/fs.js";
+} from "../../auth/providers/types.js";
+import { buildAuthRuntimeContext } from "../../auth/runtime.js";
+import type { AgentDefinition } from "../../configs/agents/types.js";
+import { toErrorMessage } from "../../utils/errors.js";
+import { isFileSystemError } from "../../utils/fs.js";
 import {
   AuthProviderStageError,
   AuthProviderVerificationError,
   MissingAgentProviderError,
-  RunCommandError,
   UnknownAuthProviderError,
-} from "../errors.js";
-import { getRunCommand } from "./sandbox-launcher.js";
+} from "./errors.js";
+import { getRunCommand } from "./launcher.js";
+import { checkPlatformSupport } from "./sandbox.js";
 
 export interface StagedAuthContext {
   provider: AuthProvider;
   sandboxPath: string;
   runtime: AuthRuntimeContext;
   agentId: string;
-  runId: string;
 }
 
 export interface StageAuthOptions {
   agent: AgentDefinition;
   agentRoot: string;
-  runId: string;
   root: string;
+  runId?: string;
   runtime?: AuthRuntimeContext;
 }
 
@@ -46,7 +45,10 @@ export async function verifyAgentProviders(
     return;
   }
 
+  // Ensure platform and runtime dependencies are present.
+  checkPlatformSupport();
   await getRunCommand();
+
   const runtime = buildAuthRuntimeContext();
 
   for (const agent of agents) {
@@ -67,7 +69,7 @@ export async function verifyAgentProviders(
 export async function stageAgentAuth(
   options: StageAuthOptions,
 ): Promise<StageAuthResult> {
-  const { agent, agentRoot, runId } = options;
+  const { agent, agentRoot, runId, root } = options;
   const provider = resolveAgentProvider(agent);
   const runtime = options.runtime ?? buildAuthRuntimeContext();
 
@@ -76,8 +78,8 @@ export async function stageAgentAuth(
       agentId: agent.id,
       agentRoot,
       runtime,
-      runId,
-      root: options.root,
+      runId: runId ?? "runtime",
+      root,
     });
     return {
       env: stageResult.env,
@@ -86,7 +88,6 @@ export async function stageAgentAuth(
         sandboxPath: stageResult.sandboxPath,
         runtime,
         agentId: agent.id,
-        runId,
       },
     };
   } catch (error) {
@@ -149,9 +150,6 @@ function resolveAgentProvider(agent: AgentDefinition): AuthProvider {
 }
 
 function extractAuthProviderMessage(error: unknown): string {
-  if (error instanceof RunCommandError) {
-    return error.messageForDisplay();
-  }
   if (error instanceof Error && error.message) {
     return error.message;
   }

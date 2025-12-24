@@ -109,7 +109,6 @@ describe("executeRunCommand integration", () => {
     };
     prepareRunWorkspaceMock.mockResolvedValue({
       runWorkspace,
-      prompt: validationResult.prompt,
     });
 
     const initialRecord: RunRecord = {
@@ -268,7 +267,6 @@ describe("executeRunCommand integration", () => {
     };
     prepareRunWorkspaceMock.mockResolvedValue({
       runWorkspace,
-      prompt: validationResult.prompt,
     });
 
     const initialRecord: RunRecord = {

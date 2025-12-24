@@ -4,8 +4,8 @@ import { dirname, join } from "node:path";
 
 import { expect, test } from "@jest/globals";
 
-import { runAgentProcess } from "../../src/commands/run/agents/sandbox-launcher.js";
-import { DEFAULT_DENIAL_BACKOFF } from "../../src/commands/run/sandbox.js";
+import { runAgentProcess } from "../../src/agents/runtime/launcher.js";
+import { DEFAULT_DENIAL_BACKOFF } from "../../src/agents/runtime/sandbox.js";
 import { buildAgentWorkspacePaths } from "../../src/workspace/layout.js";
 
 const TEMP_PREFIX = "voratiq-denial-backoff-";
@@ -27,17 +27,19 @@ test("simulates an npm-hammer denial pattern and fail-fasts", async () => {
     await mkdir(dirname(workspacePaths.runtimeManifestPath), {
       recursive: true,
     });
-    await mkdir(dirname(workspacePaths.promptPath), { recursive: true });
     await mkdir(dirname(workspacePaths.stdoutPath), { recursive: true });
     await mkdir(dirname(workspacePaths.stderrPath), { recursive: true });
     await mkdir(dirname(workspacePaths.sandboxSettingsPath), {
       recursive: true,
     });
 
+    const promptPath = join(workspacePaths.runtimePath, "prompt.txt");
+    await mkdir(dirname(promptPath), { recursive: true });
+
     const manifest = {
       binary: process.execPath,
       argv: ["-e", "process.exit(0)"],
-      promptPath: workspacePaths.promptPath,
+      promptPath,
       workspace: workspacePaths.workspacePath,
       env: {},
     };
@@ -46,11 +48,7 @@ test("simulates an npm-hammer denial pattern and fail-fasts", async () => {
       `${JSON.stringify(manifest, null, 2)}\n`,
       "utf8",
     );
-    await writeFile(
-      workspacePaths.promptPath,
-      "# denial backoff test\n",
-      "utf8",
-    );
+    await writeFile(promptPath, "# denial backoff test\n", "utf8");
 
     setupComplete = true;
 

@@ -1,7 +1,7 @@
 import { Command } from "commander";
 
+import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
 import { executeRunCommand } from "../commands/run/command.js";
-import { checkPlatformSupport } from "../commands/run/sandbox.js";
 import {
   ensureCleanWorkingTree,
   ensureSandboxDependencies,

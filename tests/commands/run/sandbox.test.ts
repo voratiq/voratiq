@@ -10,7 +10,7 @@ import {
   resolveSrtBinary,
   type SandboxSettings,
   writeSandboxSettings,
-} from "../../../src/commands/run/sandbox.js";
+} from "../../../src/agents/runtime/sandbox.js";
 import { clearSandboxConfigurationCache } from "../../support/hooks/sandbox-loader.js";
 
 const DEFAULT_ALLOWED_DOMAINS = ["*"];
@@ -48,12 +48,13 @@ describe("sandbox", () => {
         const settings = generateSandboxSettings({
           sandboxHomePath,
           workspacePath,
-          provider: "codex",
+          providerId: "codex",
           root,
           sandboxSettingsPath,
           runtimePath,
           artifactsPath,
-          evalsPath,
+          extraWriteProtectedPaths: [evalsPath],
+          extraReadProtectedPaths: [evalsPath],
         });
 
         expect(settings.network).toEqual({
@@ -86,12 +87,13 @@ describe("sandbox", () => {
           generateSandboxSettings({
             sandboxHomePath,
             workspacePath,
-            provider: "claude",
+            providerId: "claude",
             root,
             sandboxSettingsPath,
             runtimePath,
             artifactsPath,
-            evalsPath,
+            extraWriteProtectedPaths: [evalsPath],
+            extraReadProtectedPaths: [evalsPath],
           }),
         ).toThrow(/Invalid `\.voratiq\/sandbox\.yaml`/u);
       } finally {
@@ -107,12 +109,13 @@ describe("sandbox", () => {
         const settings = generateSandboxSettings({
           sandboxHomePath,
           workspacePath,
-          provider: "claude",
+          providerId: "claude",
           root,
           sandboxSettingsPath,
           runtimePath,
           artifactsPath,
-          evalsPath,
+          extraWriteProtectedPaths: [evalsPath],
+          extraReadProtectedPaths: [evalsPath],
         });
 
         expect(settings.network.allowedDomains).toEqual([
@@ -134,12 +137,13 @@ describe("sandbox", () => {
         const settings = generateSandboxSettings({
           sandboxHomePath,
           workspacePath,
-          provider: "codex",
+          providerId: "codex",
           root,
           sandboxSettingsPath,
           runtimePath,
           artifactsPath,
-          evalsPath,
+          extraWriteProtectedPaths: [evalsPath],
+          extraReadProtectedPaths: [evalsPath],
         });
 
         expect(settings.network.allowUnixSockets).toEqual([
@@ -162,12 +166,13 @@ describe("sandbox", () => {
         const settings = generateSandboxSettings({
           sandboxHomePath,
           workspacePath,
-          provider: "claude",
+          providerId: "claude",
           root,
           sandboxSettingsPath,
           runtimePath,
           artifactsPath,
-          evalsPath,
+          extraWriteProtectedPaths: [evalsPath],
+          extraReadProtectedPaths: [evalsPath],
         });
 
         expect(settings.network.allowedDomains).toEqual([
@@ -209,12 +214,13 @@ describe("sandbox", () => {
         const settings = generateSandboxSettings({
           sandboxHomePath,
           workspacePath,
-          provider: "codex",
+          providerId: "codex",
           root,
           sandboxSettingsPath,
           runtimePath,
           artifactsPath,
-          evalsPath,
+          extraWriteProtectedPaths: [evalsPath],
+          extraReadProtectedPaths: [evalsPath],
         });
 
         expect(settings.filesystem.denyWrite).toEqual([

@@ -8,7 +8,7 @@ import {
   realpath,
   writeFile,
 } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative } from "node:path";
 
 import { runRunCommand } from "../../src/cli/run.js";
 import { loadAgentCatalog } from "../../src/configs/agents/loader.js";
@@ -287,10 +287,6 @@ suite("agent integrations", () => {
     const record = JSON.parse(await readFile(recordPath, "utf8")) as RunRecord;
     const enhancedRecord = buildRunRecordEnhanced(record);
 
-    const promptAbsolute = join(repoRoot, enhancedRecord.promptPath);
-    const promptContent = await readFile(promptAbsolute, "utf8");
-    expect(promptContent).toContain(`# ${scenario.specHeading}`);
-
     const agentEnhanced = enhancedRecord.agents.find(
       (agent) => agent.agentId === scenario.agentId,
     );
@@ -298,10 +294,25 @@ suite("agent integrations", () => {
 
     const manifest = await loadAgentManifest(agentEnhanced!, repoRoot);
     expect(manifest.binary).toBe(agentScriptPath);
-    const expectedPromptPath = join(repoRoot, enhancedRecord.promptPath);
-    const resolvedPromptPath = await realpath(expectedPromptPath);
-    const manifestPromptPath = await realpath(manifest.promptPath);
-    expect(manifestPromptPath).toBe(resolvedPromptPath);
+    const manifestDirPath = dirname(
+      join(repoRoot, agentEnhanced!.runtimeManifestPath),
+    );
+    const promptPath = isAbsolute(manifest.promptPath)
+      ? manifest.promptPath
+      : join(manifestDirPath, manifest.promptPath);
+    const expectedPromptPrefix = join(
+      repoRoot,
+      ".voratiq",
+      "runs",
+      "sessions",
+      runReport.runId,
+    );
+    expect(
+      normalizePathForCompare(promptPath).startsWith(
+        normalizePathForCompare(expectedPromptPrefix),
+      ),
+    ).toBe(true);
+    await expect(access(promptPath)).rejects.toThrow();
     const expectedWorkspacePath = join(
       repoRoot,
       agentEnhanced!.baseDirectory,
@@ -398,6 +409,13 @@ function isAgentManifest(value: unknown): value is AgentManifestSnapshot {
   return Object.values(envRecord).every(
     (valueItem) => typeof valueItem === "string",
   );
+}
+
+function normalizePathForCompare(path: string): string {
+  const normalized = path.replaceAll("\\", "/");
+  return normalized.startsWith("/private/")
+    ? normalized.slice("/private".length)
+    : normalized;
 }
 
 async function expectNoRegularSecrets(secretPath: string): Promise<void> {

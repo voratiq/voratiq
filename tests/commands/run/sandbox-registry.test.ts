@@ -4,13 +4,13 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 
-import type { AuthProvider } from "../../../src/auth/providers/types.js";
-import type { StagedAuthContext } from "../../../src/commands/run/agents/auth-stage.js";
+import type { StagedAuthContext } from "../../../src/agents/runtime/auth.js";
 import {
-  registerStagedSandboxContext,
-  teardownRegisteredSandboxContext,
-  teardownRunSandboxes,
-} from "../../../src/commands/run/sandbox-registry.js";
+  registerStagedAuthContext,
+  teardownRegisteredAuthContext,
+  teardownSessionAuth,
+} from "../../../src/agents/runtime/registry.js";
+import type { AuthProvider } from "../../../src/auth/providers/types.js";
 import { pathExists } from "../../../src/utils/fs.js";
 
 const tempRoots: string[] = [];
@@ -27,37 +27,37 @@ afterEach(async () => {
   registeredRuns.clear();
 
   await Promise.all(
-    pendingRuns.map((runId) => teardownRunSandboxes(runId).catch(() => {})),
+    pendingRuns.map((runId) => teardownSessionAuth(runId).catch(() => {})),
   );
 });
 
-describe("sandbox registry", () => {
+describe("auth registry", () => {
   it("removes sandbox directories after normal completion", async () => {
     const { context, sandboxPath, providerTeardown } =
-      await createSandboxContext("run-normal", "alpha");
-    registeredRuns.add(context.runId);
-    registerStagedSandboxContext(context);
+      await createSandboxContext("alpha");
+    registeredRuns.add("run-normal");
+    registerStagedAuthContext("run-normal", context);
 
-    await teardownRegisteredSandboxContext(context);
+    await teardownRegisteredAuthContext("run-normal", context);
 
     expect(providerTeardown).toHaveBeenCalledTimes(1);
     await expect(pathExists(sandboxPath)).resolves.toBe(false);
 
-    await expect(teardownRunSandboxes(context.runId)).resolves.toBeUndefined();
+    await expect(teardownSessionAuth("run-normal")).resolves.toBeUndefined();
   });
 
   it("tears down every registered sandbox when flushing a run", async () => {
     const contexts = await Promise.all([
-      createSandboxContext("run-pending", "alpha"),
-      createSandboxContext("run-pending", "beta"),
+      createSandboxContext("alpha"),
+      createSandboxContext("beta"),
     ]);
 
     for (const { context } of contexts) {
-      registeredRuns.add(context.runId);
-      registerStagedSandboxContext(context);
+      registeredRuns.add("run-pending");
+      registerStagedAuthContext("run-pending", context);
     }
 
-    await teardownRunSandboxes("run-pending");
+    await teardownSessionAuth("run-pending");
 
     for (const { sandboxPath, providerTeardown } of contexts) {
       expect(providerTeardown).toHaveBeenCalledTimes(1);
@@ -66,10 +66,7 @@ describe("sandbox registry", () => {
   });
 });
 
-async function createSandboxContext(
-  runId: string,
-  agentId: string,
-): Promise<{
+async function createSandboxContext(agentId: string): Promise<{
   context: StagedAuthContext;
   sandboxPath: string;
   providerTeardown: jest.MockedFunction<NonNullable<AuthProvider["teardown"]>>;
@@ -107,7 +104,6 @@ async function createSandboxContext(
       username: "tester",
     },
     agentId,
-    runId,
   };
 
   return {
