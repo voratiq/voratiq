@@ -82,6 +82,7 @@ export interface SandboxSettingsInput {
   workspacePath: string;
   providerId: string;
   root: string;
+  repoRootPath?: string;
   sandboxSettingsPath: string;
   runtimePath: string;
   artifactsPath: string;
@@ -93,7 +94,10 @@ export interface SandboxSettingsInput {
 export async function configureSandboxSettings(
   input: SandboxSettingsInput,
 ): Promise<{ sandboxSettings: ReturnType<typeof generateSandboxSettings> }> {
-  const sandboxSettings = generateSandboxSettings(input);
+  const sandboxSettings = generateSandboxSettings({
+    ...input,
+    repoRootPath: input.repoRootPath ?? input.root,
+  });
   await writeSandboxSettings(input.sandboxSettingsPath, sandboxSettings);
   return { sandboxSettings };
 }

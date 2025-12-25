@@ -37,6 +37,7 @@ export interface SandboxSettingsOptions {
   workspacePath: string;
   providerId: string;
   root: string;
+  repoRootPath?: string;
   sandboxSettingsPath: string;
   runtimePath: string;
   artifactsPath: string;
@@ -53,6 +54,7 @@ export function generateSandboxSettings(
     workspacePath,
     providerId,
     root,
+    repoRootPath,
     sandboxSettingsPath,
     runtimePath,
     artifactsPath,
@@ -83,11 +85,17 @@ export function generateSandboxSettings(
     ...extraReadProtectedPaths,
   ]);
 
+  const allowListBlockers = dedupePaths([
+    sandboxSettingsPath,
+    ...runtimeWriteProtectedPaths,
+    ...(repoRootPath ? [repoRootPath] : []),
+  ]);
+
   const allowWrite = buildAllowWriteSet(
     resolvedFilesystem,
     sandboxHomePath,
     workspacePath,
-    [sandboxSettingsPath, ...runtimeWriteProtectedPaths],
+    allowListBlockers,
     overridesResolved.allowWrite,
   );
 

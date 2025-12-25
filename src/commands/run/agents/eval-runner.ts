@@ -43,6 +43,7 @@ export async function runPostProcessingAndEvaluations(
   const artifacts = await collectAgentArtifacts({
     baseRevisionSha,
     workspacePath: workspacePaths.workspacePath,
+    artifactsPath: workspacePaths.artifactsPath,
     summaryPath: workspacePaths.summaryPath,
     diffPath: workspacePaths.diffPath,
     root,
