@@ -129,7 +129,6 @@ const AGENT_WORKSPACE_ARTIFACTS = {
   reviewPath: {
     getRelativePath: ({ domain, sessionId, agentId }) =>
       getAgentSessionReviewPath(domain, sessionId, agentId),
-    initializeEmptyFile: true,
   },
   workspacePath: {
     getRelativePath: ({ domain, sessionId, agentId }) =>

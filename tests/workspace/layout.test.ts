@@ -63,7 +63,6 @@ const SCAFFOLD_FILE_KEYS: ArtifactKey[] = [
   "stderrPath",
   "diffPath",
   "summaryPath",
-  "reviewPath",
 ];
 
 const SCAFFOLD_DIR_KEYS: ArtifactKey[] = [
