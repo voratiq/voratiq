@@ -135,17 +135,8 @@ const runPersistence = createSessionPersistence<
   getRecordId: (record) => record.runId,
   getRecordStatus: (record) => record.status,
   readIndexEntries: (parsed) => {
-    const payload = parsed as {
-      sessions?: RunIndexEntry[];
-      runs?: RunIndexEntry[];
-    };
-    if (Array.isArray(payload.sessions)) {
-      return payload.sessions;
-    }
-    if (Array.isArray(payload.runs)) {
-      return payload.runs;
-    }
-    return [];
+    const payload = parsed as { sessions?: RunIndexEntry[] };
+    return Array.isArray(payload.sessions) ? payload.sessions : [];
   },
 });
 
