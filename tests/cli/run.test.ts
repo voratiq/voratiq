@@ -1,4 +1,11 @@
-import { chmod, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  mkdir,
+  readdir,
+  readFile,
+  writeFile,
+} from "node:fs/promises";
 import { join, relative } from "node:path";
 
 import * as authRuntime from "../../src/auth/runtime.js";
@@ -6,9 +13,9 @@ import { runRunCommand } from "../../src/cli/run.js";
 import * as runAgentsModule from "../../src/commands/run/agents.js";
 import { executeRunCommand } from "../../src/commands/run/command.js";
 import { DirtyWorkingTreeError } from "../../src/preflight/errors.js";
-import { buildRunRecordEnhanced } from "../../src/records/enhanced.js";
-import * as persistence from "../../src/records/persistence.js";
-import type { RunRecord } from "../../src/records/types.js";
+import { buildRunRecordEnhanced } from "../../src/runs/records/enhanced.js";
+import * as persistence from "../../src/runs/records/persistence.js";
+import type { RunRecord } from "../../src/runs/records/types.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
 import {
   createRunTestWorkspace,
@@ -173,10 +180,15 @@ suite("voratiq run (integration)", () => {
       expect(record.rootPath).toBe(".");
       const enhancedRecord = buildRunRecordEnhanced(record);
       expect(enhancedRecord).toBeDefined();
-      const promptAbsolute = join(repoRoot, enhancedRecord.promptPath);
-      const promptContent = await readFile(promptAbsolute, "utf8");
-      expect(promptContent).toContain("# Sample Spec");
-      expect(promptContent).toContain("Implement the following task:");
+      const legacyPromptPath = join(
+        repoRoot,
+        ".voratiq",
+        "runs",
+        "sessions",
+        runReport.runId,
+        "prompt.txt",
+      );
+      await expect(access(legacyPromptPath)).rejects.toThrow();
     },
     RUN_INTEGRATION_TIMEOUT_MS,
   );

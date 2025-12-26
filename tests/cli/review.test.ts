@@ -13,12 +13,15 @@ import {
   runReviewCommand,
 } from "../../src/cli/review.js";
 import type { EvalSlug } from "../../src/configs/evals/types.js";
-import { appendRunRecord } from "../../src/records/persistence.js";
-import type { AgentEvalSnapshot, RunRecord } from "../../src/records/types.js";
 import {
   formatAgentBadge,
   formatRunBadge,
 } from "../../src/render/utils/badges.js";
+import { appendRunRecord } from "../../src/runs/records/persistence.js";
+import type {
+  AgentEvalSnapshot,
+  RunRecord,
+} from "../../src/runs/records/types.js";
 import { colorize } from "../../src/utils/colors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
 import { silenceCommander } from "../support/commander.js";

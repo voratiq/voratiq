@@ -1,7 +1,7 @@
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
 import type { EvalDefinition } from "../../configs/evals/types.js";
-import type { AgentRecordMutators } from "../../records/mutators.js";
+import type { AgentRecordMutators } from "../../runs/records/mutators.js";
 import { toError } from "../../utils/errors.js";
 import { prepareAgents, runAgentsWithLimit } from "./agents.js";
 import type { AgentExecutionPhaseResult } from "./phases.js";
@@ -12,6 +12,7 @@ export interface AgentExecutionInput {
   readonly baseRevisionSha: string;
   readonly runId: string;
   readonly root: string;
+  readonly prompt: string;
   readonly evalPlan: readonly EvalDefinition[];
   readonly effectiveMaxParallel: number;
   readonly mutators: AgentRecordMutators;
@@ -29,6 +30,7 @@ export async function executeAgents(
     baseRevisionSha,
     runId,
     root,
+    prompt,
     evalPlan,
     effectiveMaxParallel,
     mutators,
@@ -49,6 +51,7 @@ export async function executeAgents(
         baseRevisionSha,
         runId,
         root,
+        prompt,
         evalPlan,
         environment,
       });

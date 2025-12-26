@@ -7,27 +7,20 @@ import {
 import { access, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative as relativePath } from "node:path";
 
-import type { DenialBackoffConfig } from "../../../configs/sandbox/types.js";
-import type { WatchdogMetadata } from "../../../records/types.js";
-import {
-  getCliAssetPath,
-  resolveCliAssetRoot,
-} from "../../../utils/cli-root.js";
-import { resolvePath } from "../../../utils/path.js";
-import { spawnStreamingProcess } from "../../../utils/process.js";
-import type { AgentWorkspacePaths } from "../../../workspace/layout.js";
-import {
-  ARTIFACTS_DIRNAME,
-  EVALS_DIRNAME,
-} from "../../../workspace/structure.js";
-import { AgentProcessError } from "../errors.js";
+import type { AgentManifest } from "../../commands/run/shim/agent-manifest.js";
+import type { DenialBackoffConfig } from "../../configs/sandbox/types.js";
+import type { WatchdogMetadata } from "../../runs/records/types.js";
+import { getCliAssetPath, resolveCliAssetRoot } from "../../utils/cli-root.js";
+import { resolvePath } from "../../utils/path.js";
+import { spawnStreamingProcess } from "../../utils/process.js";
+import { AgentRuntimeProcessError } from "./errors.js";
 import {
   generateSandboxSettings,
   resolveSrtBinary,
   type SandboxFailFastInfo,
   writeSandboxSettings,
-} from "../sandbox.js";
-import type { AgentManifest } from "../shim/agent-manifest.js";
+} from "./sandbox.js";
+import type { SandboxPolicyOverrides } from "./types.js";
 import {
   createWatchdog,
   WATCHDOG_DEFAULTS,
@@ -85,34 +78,28 @@ export type RunInvocationResolver = (
 ) => Promise<RunInvocation> | RunInvocation;
 
 export interface SandboxSettingsInput {
-  workspacePaths: AgentWorkspacePaths;
+  sandboxHomePath: string;
+  workspacePath: string;
   providerId: string;
   root: string;
+  repoRootPath?: string;
+  sandboxSettingsPath: string;
+  runtimePath: string;
+  artifactsPath: string;
+  policyOverrides?: SandboxPolicyOverrides;
+  extraWriteProtectedPaths?: readonly string[];
+  extraReadProtectedPaths?: readonly string[];
 }
 
 export async function configureSandboxSettings(
   input: SandboxSettingsInput,
-): Promise<void> {
-  const { workspacePaths, providerId, root } = input;
-  const artifactsPath = resolvePath(
-    workspacePaths.agentRoot,
-    ARTIFACTS_DIRNAME,
-  );
-  const evalsPath = resolvePath(workspacePaths.agentRoot, EVALS_DIRNAME);
+): Promise<{ sandboxSettings: ReturnType<typeof generateSandboxSettings> }> {
   const sandboxSettings = generateSandboxSettings({
-    sandboxHomePath: workspacePaths.sandboxHomePath,
-    workspacePath: workspacePaths.workspacePath,
-    provider: providerId,
-    root,
-    sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
-    runtimePath: workspacePaths.runtimePath,
-    artifactsPath,
-    evalsPath,
+    ...input,
+    repoRootPath: input.repoRootPath ?? input.root,
   });
-  await writeSandboxSettings(
-    workspacePaths.sandboxSettingsPath,
-    sandboxSettings,
-  );
+  await writeSandboxSettings(input.sandboxSettingsPath, sandboxSettings);
+  return { sandboxSettings };
 }
 
 export async function getRunCommand(): Promise<string> {
@@ -178,9 +165,9 @@ export async function runAgentProcess(
 
   const shimEntryPath = resolveShimEntryPath();
   if (!existsSync(shimEntryPath)) {
-    throw new AgentProcessError({
-      detail: `Shim entry point missing at ${shimEntryPath}`,
-    });
+    throw new AgentRuntimeProcessError(
+      `Shim entry point missing at ${shimEntryPath}`,
+    );
   }
 
   const manifestArgPath = await stageManifestForSandbox({
@@ -203,9 +190,7 @@ export async function runAgentProcess(
   });
 
   let watchdogController: WatchdogController | undefined;
-  // Track abort signal subscription for cleanup
   let abortSignalHandler: (() => void) | undefined;
-  // Shared abort controller - watchdog will fire it, spawnStreamingProcess will listen
   const forceAbortController = new AbortController();
 
   let exitCode: number;
@@ -219,7 +204,6 @@ export async function runAgentProcess(
       cwd: agentRoot,
       stdout: { writable: stdoutStream },
       stderr: { writable: stderrStream },
-      // Spawn in new process group to enable killing entire process tree
       detached: true,
       onSpawn: (child: ChildProcess) => {
         watchdogController = createWatchdog(child, stderrStream, {
@@ -227,7 +211,6 @@ export async function runAgentProcess(
           onWatchdogTrigger,
           denialBackoff,
         });
-        // Bridge watchdog's abort signal to our shared abort controller
         abortSignalHandler = () => forceAbortController.abort();
         watchdogController.abortSignal.addEventListener(
           "abort",
@@ -244,7 +227,6 @@ export async function runAgentProcess(
     signal = result.signal;
     aborted = result.aborted ?? false;
   } finally {
-    // Clean up abort signal listener
     if (abortSignalHandler && watchdogController) {
       watchdogController.abortSignal.removeEventListener(
         "abort",
@@ -252,7 +234,6 @@ export async function runAgentProcess(
       );
     }
     watchdogController?.cleanup();
-    // Ensure streams are fully closed to prevent hanging on exit
     if (!stdoutStream.closed) {
       stdoutStream.end();
     }
@@ -279,7 +260,7 @@ export async function runAgentProcess(
   const watchdog: WatchdogMetadata = {
     silenceTimeoutMs: WATCHDOG_DEFAULTS.silenceTimeoutMs,
     wallClockCapMs: WATCHDOG_DEFAULTS.wallClockCapMs,
-    trigger: watchdogTrigger,
+    ...(watchdogTrigger ? { trigger: watchdogTrigger } : {}),
   };
 
   return { exitCode, errorMessage, signal, watchdog, failFast };
@@ -295,9 +276,9 @@ export async function stageManifestForSandbox(options: {
     rawManifest = await readFile(runtimeManifestPath, "utf8");
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new AgentProcessError({
-      detail: `Failed to read manifest at "${runtimeManifestPath}": ${detail}`,
-    });
+    throw new AgentRuntimeProcessError(
+      `Failed to read manifest at "${runtimeManifestPath}": ${detail}`,
+    );
   }
 
   let manifest: AgentManifest;
@@ -305,9 +286,9 @@ export async function stageManifestForSandbox(options: {
     manifest = JSON.parse(rawManifest) as AgentManifest;
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new AgentProcessError({
-      detail: `Manifest JSON at "${runtimeManifestPath}" is invalid: ${detail}`,
-    });
+    throw new AgentRuntimeProcessError(
+      `Manifest JSON at "${runtimeManifestPath}" is invalid: ${detail}`,
+    );
   }
 
   const manifestDir = dirname(runtimeManifestPath);

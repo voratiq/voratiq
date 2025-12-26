@@ -1,5 +1,5 @@
-import { appendRunRecord } from "../../records/persistence.js";
-import type { RunRecord } from "../../records/types.js";
+import { appendRunRecord } from "../../runs/records/persistence.js";
+import type { RunRecord } from "../../runs/records/types.js";
 import { normalizePathForDisplay } from "../../utils/path.js";
 import { cleanupRunWorkspace } from "../../workspace/cleanup.js";
 import type { RunRecordInitResult } from "./phases.js";

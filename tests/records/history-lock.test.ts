@@ -10,8 +10,8 @@ import {
   createHistoryLockMetadata,
   detectStaleHistoryLock,
   type HistoryLockMetadata,
-} from "../../src/records/history-lock.js";
-import { HISTORY_LOCK_STALE_GRACE_MS } from "../../src/records/persistence.js";
+} from "../../src/runs/records/history-lock.js";
+import { HISTORY_LOCK_STALE_GRACE_MS } from "../../src/runs/records/persistence.js";
 
 describe("history locks", () => {
   let tempDir: string;

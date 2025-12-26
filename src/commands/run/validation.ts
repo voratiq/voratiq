@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 
+import { verifyAgentProviders } from "../../agents/runtime/auth.js";
 import { loadAgentCatalog } from "../../configs/agents/loader.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import {
@@ -16,10 +17,9 @@ import {
   loadEvalConfig,
 } from "../../configs/evals/loader.js";
 import type { EvalDefinition } from "../../configs/evals/types.js";
-import { RunOptionValidationError } from "../../records/errors.js";
+import { RunOptionValidationError } from "../../runs/records/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { WorkspaceMissingEntryError } from "../../workspace/errors.js";
-import { verifyAgentProviders } from "./agents/auth-stage.js";
 import { NoAgentsEnabledError } from "./errors.js";
 import { buildAgentPrompt } from "./prompts.js";
 

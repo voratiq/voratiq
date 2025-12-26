@@ -1,4 +1,7 @@
-import type { AgentInvocationRecord, RunReport } from "../../records/types.js";
+import type {
+  AgentInvocationRecord,
+  RunReport,
+} from "../../runs/records/types.js";
 import { getEvalStatusStyle } from "../../status/colors.js";
 import { colorize } from "../../utils/colors.js";
 import { formatCompactDiffStatistics } from "../../utils/diff.js";

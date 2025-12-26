@@ -1,4 +1,5 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
+import { relative } from "node:path";
 
 import {
   AgentProcessError,
@@ -31,6 +32,7 @@ import {
   scaffoldAgentWorkspace,
   WORKSPACE_SUMMARY_FILENAME,
 } from "./layout.js";
+import { promoteWorkspaceFile } from "./promotion.js";
 import { ensureWorkspaceShim } from "./shim.js";
 
 export interface ArtifactCollectionResult {
@@ -89,6 +91,7 @@ export async function prepareAgentWorkspace(options: {
 export async function collectAgentArtifacts(options: {
   baseRevisionSha: string;
   workspacePath: string;
+  artifactsPath: string;
   summaryPath: string;
   diffPath: string;
   root: string;
@@ -98,6 +101,7 @@ export async function collectAgentArtifacts(options: {
   const {
     baseRevisionSha,
     workspacePath,
+    artifactsPath,
     summaryPath,
     diffPath,
     root,
@@ -139,6 +143,7 @@ export async function collectAgentArtifacts(options: {
 
     const { summary } = await harvestSummary({
       workspacePath,
+      artifactsPath,
       summaryPath,
     });
 
@@ -244,6 +249,7 @@ export function ensureWorkspaceError(error: unknown): WorkspaceSetupRunError {
 
 interface HarvestSummaryOptions {
   workspacePath: string;
+  artifactsPath: string;
   summaryPath: string;
 }
 
@@ -254,31 +260,49 @@ interface HarvestSummaryResult {
 async function harvestSummary(
   options: HarvestSummaryOptions,
 ): Promise<HarvestSummaryResult> {
-  const { workspacePath, summaryPath } = options;
-  const workspaceSummaryPath = resolvePath(
-    workspacePath,
-    WORKSPACE_SUMMARY_FILENAME,
-  );
-
-  let raw: string;
+  const { workspacePath, artifactsPath, summaryPath } = options;
   try {
-    raw = await readFile(workspaceSummaryPath, "utf8");
+    const { summary } = await promoteSummary({
+      workspacePath,
+      artifactsPath,
+      summaryPath,
+    });
+    return { summary };
   } catch (error) {
+    if (error instanceof AgentProcessError) {
+      throw error;
+    }
     throw new AgentProcessError({ detail: toErrorMessage(error) });
   }
+}
 
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    throw new AgentProcessError({
-      detail: "Agent process failed. Summary is empty.",
-    });
-  }
-
-  await writeFile(summaryPath, `${trimmed}\n`, { encoding: "utf8" });
-  await rm(workspaceSummaryPath, { force: true });
+async function promoteSummary(options: {
+  workspacePath: string;
+  artifactsPath: string;
+  summaryPath: string;
+}): Promise<{ summary: string }> {
+  const { workspacePath, artifactsPath, summaryPath } = options;
+  let trimmed: string | undefined;
+  const promoteResult = await promoteWorkspaceFile({
+    workspacePath,
+    artifactsPath,
+    stagedRelativePath: WORKSPACE_SUMMARY_FILENAME,
+    artifactRelativePath: relative(artifactsPath, summaryPath),
+    transform: (raw) => {
+      const candidate = raw.toString("utf8").trim();
+      if (!candidate) {
+        throw new AgentProcessError({
+          detail: "Agent process failed. Summary is empty.",
+        });
+      }
+      trimmed = candidate;
+      return `${candidate}\n`;
+    },
+  });
 
   return {
-    summary: trimmed,
+    summary:
+      trimmed ?? (await readFile(promoteResult.artifactPath, "utf8")).trim(),
   };
 }
 

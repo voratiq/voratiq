@@ -14,12 +14,12 @@ import { promisify } from "node:util";
 
 import { executePruneCommand } from "../../src/commands/prune/command.js";
 import type { PruneSuccessResult } from "../../src/commands/prune/types.js";
-import { appendRunRecord } from "../../src/records/persistence.js";
+import type { ConfirmationOptions } from "../../src/render/interactions/confirmation.js";
+import { appendRunRecord } from "../../src/runs/records/persistence.js";
 import type {
   AgentInvocationRecord,
   RunRecord,
-} from "../../src/records/types.js";
-import type { ConfirmationOptions } from "../../src/render/interactions/confirmation.js";
+} from "../../src/runs/records/types.js";
 import { formatWorkspacePath } from "../../src/workspace/structure.js";
 import {
   createAgentInvocationRecord,
@@ -73,7 +73,6 @@ describe("voratiq prune (integration)", () => {
     await writeFile(join(artifactsPath, "summary.txt"), "summary", "utf8");
     await mkdir(evalsPath, { recursive: true });
     await writeFile(join(evalsPath, "report.json"), "{}", "utf8");
-    await writeFile(join(runPath, "prompt.txt"), "Summarize spec", "utf8");
 
     const headRevision = await gitHeadRevision(repoRoot);
     const agentRecord = buildAgentRecord(runId, agentId);
@@ -185,7 +184,6 @@ describe("voratiq prune (integration)", () => {
     await mkdir(workspacePath, { recursive: true });
     await mkdir(artifactsPath, { recursive: true });
     await writeFile(join(artifactsPath, "stdout.log"), "stdout", "utf8");
-    await writeFile(join(runPath, "prompt.txt"), "Summarize spec", "utf8");
 
     const headRevision = await gitHeadRevision(repoRoot);
     const runRecord = createRunRecord({
@@ -249,7 +247,6 @@ describe("voratiq prune (integration)", () => {
     await writeFile(join(artifactsPath, "summary.txt"), "summary", "utf8");
     await mkdir(evalsPath, { recursive: true });
     await writeFile(join(evalsPath, "result.json"), "{}", "utf8");
-    await writeFile(join(runPath, "prompt.txt"), "Summarize spec", "utf8");
 
     const headRevision = await gitHeadRevision(repoRoot);
     const runRecord = createRunRecord({

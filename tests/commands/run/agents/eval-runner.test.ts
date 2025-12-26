@@ -61,7 +61,10 @@ describe("runPostProcessingAndEvaluations", () => {
     expect(result.warnings).toEqual(["lint logs unavailable"]);
     expect(collectAgentArtifactsMock).toHaveBeenCalledTimes(1);
     expect(collectAgentArtifactsMock).toHaveBeenCalledWith(
-      expect.objectContaining({ persona }),
+      expect.objectContaining({
+        persona,
+        artifactsPath: workspacePaths.artifactsPath,
+      }),
     );
     expect(executeEvaluationsMock).toHaveBeenCalledTimes(1);
   });

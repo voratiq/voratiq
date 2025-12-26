@@ -54,19 +54,7 @@ function createProject(displayName, testRegex, overrides = {}) {
 
 const unitProject = createProject(
   "unit",
-  buildTestRegex([
-    "configs",
-    "evals",
-    "logs",
-    "records",
-    "render",
-    "run",
-    "runs",
-    "status",
-    "utils",
-    "workspace",
-    "preflight",
-  ]),
+  String.raw`tests/(?!commands|cli)[^/]+/.+\.test\.ts$`,
 );
 
 const commandsProject = createProject(

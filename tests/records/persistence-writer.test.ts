@@ -7,8 +7,8 @@ import {
   disposeRunRecordBuffer,
   flushAllRunRecordBuffers,
   rewriteRunRecord,
-} from "../../src/records/persistence.js";
-import type { RunRecord } from "../../src/records/types.js";
+} from "../../src/runs/records/persistence.js";
+import type { RunRecord } from "../../src/runs/records/types.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,

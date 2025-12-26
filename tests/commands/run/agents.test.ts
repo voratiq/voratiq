@@ -11,46 +11,27 @@ import {
   jest,
 } from "@jest/globals";
 
+import { runSandboxedAgent } from "../../../src/agents/runtime/harness.js";
 import { runAgentsWithLimit } from "../../../src/commands/run/agents.js";
 import { runPostProcessingAndEvaluations } from "../../../src/commands/run/agents/eval-runner.js";
 import { AgentRunContext } from "../../../src/commands/run/agents/run-context.js";
-import { runAgentProcess } from "../../../src/commands/run/agents/sandbox-launcher.js";
 import type { PreparedAgentExecution } from "../../../src/commands/run/agents/types.js";
 import type { AgentExecutionResult } from "../../../src/commands/run/reports.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
 import type { EvalDefinition } from "../../../src/configs/evals/types.js";
-import type { AgentInvocationRecord } from "../../../src/records/types.js";
+import type { AgentInvocationRecord } from "../../../src/runs/records/types.js";
 import { buildAgentWorkspacePaths } from "../../../src/workspace/layout.js";
 
-jest.mock("../../../src/commands/run/agents/sandbox-launcher.js", () => {
-  const actual: typeof import("../../../src/commands/run/agents/sandbox-launcher.js") =
-    jest.requireActual("../../../src/commands/run/agents/sandbox-launcher.js");
-  return {
-    ...actual,
-    runAgentProcess: jest.fn(),
-  };
-});
+jest.mock("../../../src/agents/runtime/harness.js", () => ({
+  runSandboxedAgent: jest.fn(),
+}));
 
 jest.mock("../../../src/commands/run/agents/eval-runner.js", () => ({
   runPostProcessingAndEvaluations: jest.fn(),
 }));
 
-jest.mock("../../../src/commands/run/agents/auth-stage.js", () => {
-  const actual: typeof import("../../../src/commands/run/agents/auth-stage.js") =
-    jest.requireActual("../../../src/commands/run/agents/auth-stage.js");
-  const stageAgentAuth = jest.fn<typeof actual.stageAgentAuth>();
-  const teardownAuthContext = jest
-    .fn<typeof actual.teardownAuthContext>()
-    .mockResolvedValue(undefined);
-  return {
-    ...actual,
-    stageAgentAuth,
-    teardownAuthContext,
-  };
-});
-
-const runAgentProcessMock = jest.mocked(runAgentProcess);
+const runSandboxedAgentMock = jest.mocked(runSandboxedAgent);
 const runPostProcessingAndEvaluationsMock = jest.mocked(
   runPostProcessingAndEvaluations,
 );
@@ -81,9 +62,11 @@ afterEach(async () => {
 describe("executeAgentLifecycle integration", () => {
   it("records a failed snapshot when the agent process exits with an error", async () => {
     const { execution, progress } = await createPreparedExecution();
-    runAgentProcessMock.mockResolvedValue({
+    runSandboxedAgentMock.mockResolvedValue({
       exitCode: 1,
       signal: null,
+      sandboxSettings: minimalSandboxSettings(),
+      manifestEnv: {},
     });
 
     const [result] = await runAgentsWithLimit([execution], 1);
@@ -97,9 +80,11 @@ describe("executeAgentLifecycle integration", () => {
 
   it("invokes onCompleted exactly once for successful agents", async () => {
     const { execution, progress } = await createPreparedExecution();
-    runAgentProcessMock.mockResolvedValue({
+    runSandboxedAgentMock.mockResolvedValue({
       exitCode: 0,
       signal: null,
+      sandboxSettings: minimalSandboxSettings(),
+      manifestEnv: {},
     });
     runPostProcessingAndEvaluationsMock.mockResolvedValue({
       artifacts: {
@@ -122,9 +107,11 @@ describe("executeAgentLifecycle integration", () => {
 
   it("propagates diff statistics from artifact collection into agent records", async () => {
     const { execution } = await createPreparedExecution();
-    runAgentProcessMock.mockResolvedValue({
+    runSandboxedAgentMock.mockResolvedValue({
       exitCode: 0,
       signal: null,
+      sandboxSettings: minimalSandboxSettings(),
+      manifestEnv: {},
     });
 
     const diffStatistics = "3 files changed, 4 insertions(+), 1 deletion(-)";
@@ -155,12 +142,14 @@ describe("executeAgentLifecycle integration", () => {
     const { execution: second, progress } =
       await createPreparedExecution("agent-2");
 
-    runAgentProcessMock
+    runSandboxedAgentMock
       .mockResolvedValueOnce({
         exitCode: 1,
         signal: null,
         errorMessage:
           "Sandbox: repeated denial to registry.npmjs.org:443, aborting to prevent resource exhaustion",
+        sandboxSettings: minimalSandboxSettings(),
+        manifestEnv: {},
         watchdog: {
           silenceTimeoutMs: 1,
           wallClockCapMs: 1,
@@ -174,6 +163,8 @@ describe("executeAgentLifecycle integration", () => {
       .mockResolvedValueOnce({
         exitCode: 0,
         signal: null,
+        sandboxSettings: minimalSandboxSettings(),
+        manifestEnv: {},
       });
 
     runPostProcessingAndEvaluationsMock.mockResolvedValue({
@@ -250,19 +241,8 @@ async function createPreparedExecution(agentId = "agent-id"): Promise<{
   await ensureParentDirectory(workspacePaths.summaryPath);
   await ensureParentDirectory(workspacePaths.runtimeManifestPath);
   await ensureParentDirectory(workspacePaths.sandboxSettingsPath);
-
-  const manifestContent = {
-    binary: "/bin/echo",
-    argv: [],
-    promptPath: "../prompt.txt",
-    workspace: workspacePaths.workspacePath,
-    env: {},
-  };
-  await writeFile(
-    workspacePaths.runtimeManifestPath,
-    `${JSON.stringify(manifestContent)}\n`,
-    "utf8",
-  );
+  await writeFile(workspacePaths.stdoutPath, "", "utf8");
+  await writeFile(workspacePaths.stderrPath, "", "utf8");
 
   const agent: AgentDefinition = {
     id: agentId,
@@ -294,13 +274,12 @@ async function createPreparedExecution(agentId = "agent-id"): Promise<{
     agent,
     agentContext,
     workspacePaths,
-    runtimeManifestPath: workspacePaths.runtimeManifestPath,
     baseRevisionSha: "base-sha",
     root,
     runId,
+    prompt: "# test prompt\n",
     evalPlan,
     environment,
-    manifestEnv: {},
     progress,
   };
 
@@ -309,4 +288,14 @@ async function createPreparedExecution(agentId = "agent-id"): Promise<{
 
 async function ensureParentDirectory(path: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
+}
+
+function minimalSandboxSettings(): {
+  network: { allowedDomains: string[]; deniedDomains: string[] };
+  filesystem: { denyRead: string[]; allowWrite: string[]; denyWrite: string[] };
+} {
+  return {
+    network: { allowedDomains: [], deniedDomains: [] },
+    filesystem: { denyRead: [], allowWrite: [], denyWrite: [] },
+  };
 }

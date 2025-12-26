@@ -1,7 +1,7 @@
-import type { RunRecordEnhanced } from "../../records/enhanced.js";
-import { buildRunRecordView } from "../../records/enhanced.js";
-import { RunRecordNotFoundError } from "../../records/errors.js";
-import { fetchRunsSafely } from "../../records/persistence.js";
+import type { RunRecordEnhanced } from "../../runs/records/enhanced.js";
+import { buildRunRecordView } from "../../runs/records/enhanced.js";
+import { RunRecordNotFoundError } from "../../runs/records/errors.js";
+import { fetchRunsSafely } from "../../runs/records/persistence.js";
 import { RunNotFoundCliError } from "../errors.js";
 
 export interface ReviewCommandInput {

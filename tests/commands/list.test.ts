@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { executeListCommand } from "../../src/commands/list/command.js";
-import { appendRunRecord } from "../../src/records/persistence.js";
-import type { RunRecord } from "../../src/records/types.js";
+import { appendRunRecord } from "../../src/runs/records/persistence.js";
+import type { RunRecord } from "../../src/runs/records/types.js";
 import { createRunRecord } from "../support/factories/run-records.js";
 
 describe("executeListCommand", () => {

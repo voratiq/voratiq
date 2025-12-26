@@ -1,8 +1,13 @@
-import { loadSandboxProviderConfig } from "../../../configs/sandbox/loader.js";
+import { runSandboxedAgent } from "../../../agents/runtime/harness.js";
+import type { SandboxFailFastInfo } from "../../../agents/runtime/sandbox.js";
+import {
+  WATCHDOG_DEFAULTS,
+  type WatchdogTrigger,
+} from "../../../agents/runtime/watchdog.js";
 import type {
   AgentInvocationRecord,
   WatchdogMetadata,
-} from "../../../records/types.js";
+} from "../../../runs/records/types.js";
 import { toErrorMessage } from "../../../utils/errors.js";
 import { GIT_AUTHOR_EMAIL, GIT_AUTHOR_NAME } from "../../../utils/git.js";
 import {
@@ -11,27 +16,15 @@ import {
   RunCommandError,
 } from "../errors.js";
 import type { AgentExecutionResult } from "../reports.js";
-import {
-  DEFAULT_DENIAL_BACKOFF,
-  type SandboxFailFastInfo,
-} from "../sandbox.js";
-import { teardownRegisteredSandboxContext } from "../sandbox-registry.js";
-import { captureAgentChatTranscripts } from "./chat-preserver.js";
 import { runPostProcessingAndEvaluations } from "./eval-runner.js";
 import { detectAgentProcessFailureDetail } from "./failures.js";
 import { AgentRunContext } from "./run-context.js";
-import { runAgentProcess } from "./sandbox-launcher.js";
 import type { PreparedAgentExecution } from "./types.js";
-import { WATCHDOG_DEFAULTS, type WatchdogTrigger } from "./watchdog.js";
 
 export async function runPreparedAgent(
   execution: PreparedAgentExecution,
 ): Promise<AgentExecutionResult> {
-  try {
-    return await executeAgentLifecycle(execution);
-  } finally {
-    await teardownRegisteredSandboxContext(execution.authContext);
-  }
+  return await executeAgentLifecycle(execution);
 }
 
 export async function executeAgentLifecycle(
@@ -43,11 +36,11 @@ export async function executeAgentLifecycle(
     workspacePaths,
     baseRevisionSha,
     root,
+    prompt,
     evalPlan,
-    runtimeManifestPath,
     environment,
-    manifestEnv,
   } = execution;
+  let manifestEnv: Record<string, string> = {};
 
   // Set initial watchdog metadata (will be updated with trigger if fired)
   const initialWatchdog: WatchdogMetadata = {
@@ -87,28 +80,30 @@ export async function executeAgentLifecycle(
       }
     };
 
-    let denialBackoff = DEFAULT_DENIAL_BACKOFF;
-    try {
-      const sandboxProviderConfig = loadSandboxProviderConfig({
-        root,
-        providerId: agent.provider,
-      });
-      denialBackoff = sandboxProviderConfig.denialBackoff;
-    } catch {
-      // If sandbox.yaml is missing or invalid, fall back to defaults rather than
-      // failing the entire agent lifecycle.
-    }
-
-    const processResult = await runAgentProcess({
-      runtimeManifestPath,
-      agentRoot: workspacePaths.agentRoot,
-      stdoutPath: workspacePaths.stdoutPath,
-      stderrPath: workspacePaths.stderrPath,
-      sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
-      providerId: agent.provider,
+    const processResult = await runSandboxedAgent({
+      root,
+      sessionId: execution.runId,
+      agent,
+      prompt,
+      environment,
+      paths: {
+        agentRoot: workspacePaths.agentRoot,
+        workspacePath: workspacePaths.workspacePath,
+        sandboxHomePath: workspacePaths.sandboxHomePath,
+        runtimeManifestPath: workspacePaths.runtimeManifestPath,
+        sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
+        runtimePath: workspacePaths.runtimePath,
+        artifactsPath: workspacePaths.artifactsPath,
+        stdoutPath: workspacePaths.stdoutPath,
+        stderrPath: workspacePaths.stderrPath,
+      },
+      captureChat: true,
+      extraWriteProtectedPaths: [workspacePaths.evalsDirPath],
+      extraReadProtectedPaths: [workspacePaths.evalsDirPath],
       onWatchdogTrigger,
-      denialBackoff,
     });
+
+    manifestEnv = processResult.manifestEnv;
 
     // Update watchdog metadata from process result (in case trigger came via watchdog)
     if (processResult.watchdog) {
@@ -136,6 +131,10 @@ export async function executeAgentLifecycle(
       });
       agentContext.markFailure(failure);
     }
+
+    if (processResult.chat?.captured && processResult.chat.format) {
+      agentContext.markChatArtifact(processResult.chat.format);
+    }
   } catch (rawError) {
     const failure =
       rawError instanceof RunCommandError
@@ -145,13 +144,6 @@ export async function executeAgentLifecycle(
           });
     agentContext.markFailure(failure);
   }
-
-  await captureAgentChatTranscripts({
-    agent,
-    agentContext,
-    agentRoot: workspacePaths.agentRoot,
-    reason: "post-run",
-  });
 
   if (agentContext.isFailed()) {
     agentContext.setCompleted();

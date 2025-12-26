@@ -9,6 +9,7 @@ import type {
   SandboxFilesystemConfig,
 } from "../../configs/sandbox/types.js";
 import { resolvePath } from "../../utils/path.js";
+import type { SandboxPolicyOverrides } from "./types.js";
 
 export type SandboxSettings = SandboxRuntimeConfig;
 
@@ -34,12 +35,15 @@ export const DEFAULT_DENIAL_BACKOFF: DenialBackoffConfig = {
 export interface SandboxSettingsOptions {
   sandboxHomePath: string;
   workspacePath: string;
-  provider: string;
+  providerId: string;
   root: string;
+  repoRootPath?: string;
   sandboxSettingsPath: string;
   runtimePath: string;
   artifactsPath: string;
-  evalsPath: string;
+  policyOverrides?: SandboxPolicyOverrides;
+  extraWriteProtectedPaths?: readonly string[];
+  extraReadProtectedPaths?: readonly string[];
 }
 
 export function generateSandboxSettings(
@@ -48,37 +52,62 @@ export function generateSandboxSettings(
   const {
     sandboxHomePath,
     workspacePath,
-    provider,
+    providerId,
     root,
+    repoRootPath,
     sandboxSettingsPath,
     runtimePath,
     artifactsPath,
-    evalsPath,
+    policyOverrides,
+    extraWriteProtectedPaths = [],
+    extraReadProtectedPaths = [],
   } = options;
 
   const providerConfig = loadSandboxProviderConfig({
     root,
-    providerId: provider,
+    providerId,
   });
   const { network: networkSettings, filesystem } = providerConfig;
 
   const resolvedFilesystem = resolveFilesystemPaths(filesystem, workspacePath);
+  const overridesResolved = resolveFilesystemOverrides(
+    policyOverrides,
+    workspacePath,
+  );
 
-  const runtimeWriteProtectedPaths = [runtimePath, artifactsPath, evalsPath];
-  const runtimeReadProtectedPaths = [artifactsPath, evalsPath];
+  const runtimeWriteProtectedPaths = dedupePaths([
+    runtimePath,
+    artifactsPath,
+    ...extraWriteProtectedPaths,
+  ]);
+  const runtimeReadProtectedPaths = dedupePaths([
+    artifactsPath,
+    ...extraReadProtectedPaths,
+  ]);
+
+  const allowListBlockers = dedupePaths([
+    sandboxSettingsPath,
+    ...runtimeWriteProtectedPaths,
+    ...(repoRootPath ? [repoRootPath] : []),
+  ]);
+
   const allowWrite = buildAllowWriteSet(
     resolvedFilesystem,
     sandboxHomePath,
     workspacePath,
-    [sandboxSettingsPath, ...runtimeWriteProtectedPaths],
+    allowListBlockers,
+    overridesResolved.allowWrite,
   );
+
   const denyRead = dedupePaths([
     ...resolvedFilesystem.denyRead,
     ...runtimeReadProtectedPaths,
+    ...overridesResolved.denyRead,
   ]);
   const denyWrite = dedupePaths([
     ...resolvedFilesystem.denyWrite,
     ...runtimeWriteProtectedPaths,
+    ...overridesResolved.denyWrite,
   ]);
 
   return {
@@ -99,6 +128,17 @@ export function generateSandboxSettings(
       allowWrite: Array.from(allowWrite),
       denyWrite,
     },
+  };
+}
+
+function resolveFilesystemOverrides(
+  overrides: SandboxPolicyOverrides | undefined,
+  workspacePath: string,
+): SandboxFilesystemConfig {
+  return {
+    allowWrite: resolvePaths(overrides?.allowWrite ?? [], workspacePath),
+    denyRead: resolvePaths(overrides?.denyRead ?? [], workspacePath),
+    denyWrite: resolvePaths(overrides?.denyWrite ?? [], workspacePath),
   };
 }
 
@@ -258,12 +298,12 @@ function buildAllowWriteSet(
   sandboxHomePath: string,
   workspacePath: string,
   blockedPaths: readonly string[],
+  overridesAllowWrite: readonly string[],
 ): Set<string> {
   const allowWrite = new Set<string>([
-    // Auth providers copy credentials/configs into the sandbox directory;
-    // we only need to allow writes within the sandbox plus the runtime defaults.
     ...getDefaultSandboxWritePaths(),
     ...filesystem.allowWrite,
+    ...overridesAllowWrite,
   ]);
   allowWrite.add(sandboxHomePath);
   allowWrite.add(workspacePath);

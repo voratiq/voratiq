@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+import { stageAgentAuth } from "../../../../src/agents/runtime/auth.js";
 import { resolveAuthProvider } from "../../../../src/auth/providers/index.js";
 import type {
   AuthProvider,
   AuthRuntimeContext,
 } from "../../../../src/auth/providers/types.js";
 import { buildAuthRuntimeContext } from "../../../../src/auth/runtime.js";
-import { stageAgentAuth } from "../../../../src/commands/run/agents/auth-stage.js";
 import type { AgentDefinition } from "../../../../src/configs/agents/types.js";
 
 jest.mock("../../../../src/auth/providers/index.js", () => ({
@@ -73,6 +73,6 @@ describe("stageAgentAuth", () => {
     expect(result.env).toEqual({ CLAUDE_SESSION: "session-token" });
     expect(result.context.provider).toBe(provider);
     expect(result.context.sandboxPath).toBe("/tmp/sbx");
-    expect(result.context.runId).toBe("run-123");
+    expect(result.context.agentId).toBe("alpha");
   });
 });

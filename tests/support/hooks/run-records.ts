@@ -10,7 +10,8 @@ import type {
 } from "../types/persistence.js";
 import { RUN_RECORDS_TEST_HOOKS } from "../types/persistence.js";
 
-type PersistenceModule = typeof import("../../../src/records/persistence.js");
+type PersistenceModule =
+  typeof import("../../../src/runs/records/persistence.js");
 type TestHookControllerModule =
   typeof import("../../../src/testing/test-hooks.js");
 
@@ -35,7 +36,7 @@ function ensureRunRecordHooksRegistered(): void {
     return;
   }
   const persistenceModule: PersistenceModule = jest.requireActual(
-    "../../../src/records/persistence.js",
+    "../../../src/runs/records/persistence.js",
   );
   if (typeof persistenceModule.enableRunRecordsTestHooks !== "function") {
     throw new Error(

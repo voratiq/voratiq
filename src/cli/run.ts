@@ -1,15 +1,15 @@
 import { Command } from "commander";
 
+import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
 import { executeRunCommand } from "../commands/run/command.js";
-import { checkPlatformSupport } from "../commands/run/sandbox.js";
 import {
   ensureCleanWorkingTree,
   ensureSandboxDependencies,
   ensureSpecPath,
   resolveCliContext,
 } from "../preflight/index.js";
-import type { RunReport } from "../records/types.js";
 import { createRunRenderer } from "../render/transcripts/run.js";
+import type { RunReport } from "../runs/records/types.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import { writeCommandOutput } from "./output.js";
 

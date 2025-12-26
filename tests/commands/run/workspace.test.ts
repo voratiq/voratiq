@@ -120,6 +120,7 @@ describe("collectAgentArtifacts", () => {
     const result = await collectAgentArtifacts({
       baseRevisionSha: "base-sha",
       workspacePath,
+      artifactsPath,
       summaryPath,
       diffPath,
       root: repoRoot,
@@ -159,6 +160,7 @@ describe("collectAgentArtifacts", () => {
       collectAgentArtifacts({
         baseRevisionSha: "base-sha",
         workspacePath,
+        artifactsPath,
         summaryPath,
         diffPath,
         root: repoRoot,
@@ -176,6 +178,7 @@ describe("collectAgentArtifacts", () => {
       collectAgentArtifacts({
         baseRevisionSha: "base-sha",
         workspacePath,
+        artifactsPath,
         summaryPath,
         diffPath,
         root: repoRoot,
@@ -194,6 +197,7 @@ describe("collectAgentArtifacts", () => {
       collectAgentArtifacts({
         baseRevisionSha: "base-sha",
         workspacePath,
+        artifactsPath,
         summaryPath,
         diffPath,
         root: repoRoot,
@@ -212,6 +216,7 @@ describe("collectAgentArtifacts", () => {
       collectAgentArtifacts({
         baseRevisionSha: "base-sha",
         workspacePath,
+        artifactsPath,
         summaryPath,
         diffPath,
         root: repoRoot,
@@ -249,6 +254,7 @@ describe("collectAgentArtifacts", () => {
       const result = await collectAgentArtifacts({
         baseRevisionSha: "base-sha",
         workspacePath,
+        artifactsPath,
         summaryPath,
         diffPath,
         root: repoRoot,
@@ -276,6 +282,7 @@ describe("collectAgentArtifacts", () => {
         collectAgentArtifacts({
           baseRevisionSha: "base-sha",
           workspacePath,
+          artifactsPath,
           summaryPath,
           diffPath,
           root: repoRoot,

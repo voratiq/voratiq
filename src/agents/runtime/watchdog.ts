@@ -1,13 +1,13 @@
 import type { ChildProcess } from "node:child_process";
 import type { Writable } from "node:stream";
 
-import type { DenialBackoffConfig } from "../../../configs/sandbox/types.js";
+import type { DenialBackoffConfig } from "../../configs/sandbox/types.js";
 import {
   DenialBackoffTracker,
   parseSandboxDenialLine,
   resolveDenialBackoffConfig,
   type SandboxFailFastInfo,
-} from "../sandbox.js";
+} from "./sandbox.js";
 
 /**
  * Watchdog types and constants for enforcing per-agent process timeouts.

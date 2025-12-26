@@ -1,14 +1,15 @@
-import { createAgentRecordMutators } from "../../records/mutators.js";
+import { teardownSessionAuth } from "../../agents/runtime/registry.js";
+import type { RunProgressRenderer } from "../../render/transcripts/run.js";
+import { createAgentRecordMutators } from "../../runs/records/mutators.js";
 import {
   flushRunRecordBuffer,
   rewriteRunRecord,
-} from "../../records/persistence.js";
+} from "../../runs/records/persistence.js";
 import type {
   AgentInvocationRecord,
   RunRecord,
   RunReport,
-} from "../../records/types.js";
-import type { RunProgressRenderer } from "../../render/transcripts/run.js";
+} from "../../runs/records/types.js";
 import { toError } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
 import {
@@ -21,7 +22,6 @@ import { generateRunId } from "./id.js";
 import { clearActiveRun, registerActiveRun } from "./lifecycle.js";
 import { initializeRunRecord } from "./record-init.js";
 import { toRunReport } from "./reports.js";
-import { teardownRunSandboxes } from "./sandbox-registry.js";
 import { validateAndPrepare } from "./validation.js";
 
 export interface RunCommandInput {
@@ -61,7 +61,6 @@ export async function executeRunCommand(
   const { runWorkspace } = await prepareRunWorkspace({
     root,
     runId,
-    prompt: validation.prompt,
   });
 
   const runRoot = runWorkspace.absolute;
@@ -127,6 +126,7 @@ export async function executeRunCommand(
       baseRevisionSha: validation.baseRevisionSha,
       runId,
       root,
+      prompt: validation.prompt,
       evalPlan: validation.evalPlan,
       effectiveMaxParallel: validation.effectiveMaxParallel,
       environment: validation.environment,
@@ -195,7 +195,7 @@ export async function executeRunCommand(
     }
   } finally {
     try {
-      await teardownRunSandboxes(runId);
+      await teardownSessionAuth(runId);
     } catch (error) {
       cleanupError = error;
     } finally {

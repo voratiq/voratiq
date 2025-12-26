@@ -1,3 +1,4 @@
+import type { SandboxFailFastInfo } from "../../../agents/runtime/sandbox.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type {
   AgentEvalResult,
@@ -9,7 +10,7 @@ import type {
   AgentInvocationRecord,
   AgentStatus,
   WatchdogMetadata,
-} from "../../../records/types.js";
+} from "../../../runs/records/types.js";
 import { normalizeDiffStatistics } from "../../../utils/diff.js";
 import type { ArtifactCollectionResult } from "../../../workspace/agents.js";
 import type { ChatArtifactFormat } from "../../../workspace/chat/types.js";
@@ -19,7 +20,6 @@ import {
   type AgentExecutionState,
   finalizeAgentResult,
 } from "../reports.js";
-import type { SandboxFailFastInfo } from "../sandbox.js";
 
 export class AgentRunContext {
   public readonly state: AgentExecutionState = {

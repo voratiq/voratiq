@@ -1,9 +1,13 @@
 import { rm } from "node:fs/promises";
 
-import type { RunRecord } from "../records/types.js";
+import type { RunRecord } from "../runs/records/types.js";
 import { formatErrorMessage } from "../utils/output.js";
-import { relativeToRoot } from "../utils/path.js";
+import { relativeToRoot, resolvePath } from "../utils/path.js";
 import { WorkspaceSetupError } from "./errors.js";
+import {
+  getAgentSessionWorkspaceDirectoryPath,
+  getSessionDirectoryPath,
+} from "./structure.js";
 
 export async function removeWorkspaceEntry(options: {
   path: string;
@@ -29,6 +33,33 @@ export async function removeRunDirectory(
   root: string,
 ): Promise<void> {
   await removeWorkspaceEntry({ path, root, recursive: true });
+}
+
+export async function removeSessionDirectory(options: {
+  root: string;
+  domain: string;
+  sessionId: string;
+}): Promise<void> {
+  const { root, domain, sessionId } = options;
+  const relativePath = getSessionDirectoryPath(domain, sessionId);
+  const absolutePath = resolvePath(root, relativePath);
+  await removeWorkspaceEntry({ path: absolutePath, root, recursive: true });
+}
+
+export async function removeAgentWorkspaceDirectory(options: {
+  root: string;
+  domain: string;
+  sessionId: string;
+  agentId: string;
+}): Promise<void> {
+  const { root, domain, sessionId, agentId } = options;
+  const relativePath = getAgentSessionWorkspaceDirectoryPath(
+    domain,
+    sessionId,
+    agentId,
+  );
+  const absolutePath = resolvePath(root, relativePath);
+  await removeWorkspaceEntry({ path: absolutePath, root, recursive: true });
 }
 
 export function deriveAgentBranches(runRecord: RunRecord): string[] {

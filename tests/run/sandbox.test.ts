@@ -17,7 +17,7 @@ import {
   configureSandboxSettings,
   getRunCommand,
   runAgentProcess,
-} from "../../src/commands/run/agents/sandbox-launcher.js";
+} from "../../src/agents/runtime/launcher.js";
 import type { AgentId } from "../../src/configs/agents/types.js";
 import {
   buildAgentWorkspacePaths,
@@ -84,7 +84,8 @@ async function setupSandboxProbe(options: {
     await mkdir(dirname(workspacePaths.runtimeManifestPath), {
       recursive: true,
     });
-    await mkdir(dirname(workspacePaths.promptPath), { recursive: true });
+    const promptPath = join(workspacePaths.runtimePath, "prompt.txt");
+    await mkdir(dirname(promptPath), { recursive: true });
 
     const targetPath = join(
       workspacePaths.workspacePath,
@@ -101,7 +102,7 @@ async function setupSandboxProbe(options: {
     const manifest = {
       binary: process.execPath,
       argv: ["-e", "process.exit(0)"],
-      promptPath: workspacePaths.promptPath,
+      promptPath,
       workspace: workspacePaths.workspacePath,
       env: {},
     };
@@ -110,12 +111,18 @@ async function setupSandboxProbe(options: {
       `${JSON.stringify(manifest, null, 2)}\n`,
       "utf8",
     );
-    await writeFile(workspacePaths.promptPath, "# sandbox test\n", "utf8");
+    await writeFile(promptPath, "# sandbox test\n", "utf8");
 
     await configureSandboxSettings({
-      workspacePaths,
+      sandboxHomePath: workspacePaths.sandboxHomePath,
+      workspacePath: workspacePaths.workspacePath,
       providerId: TEST_AGENT_ID,
       root,
+      sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
+      runtimePath: workspacePaths.runtimePath,
+      artifactsPath: workspacePaths.artifactsPath,
+      extraWriteProtectedPaths: [workspacePaths.evalsDirPath],
+      extraReadProtectedPaths: [workspacePaths.evalsDirPath],
     });
 
     setupComplete = true;
@@ -137,7 +144,11 @@ async function runWriteProbe(
 ): Promise<{ result: RunAgentResult; stderr: string }> {
   const { workspacePaths, targetPath } = context;
   const result = await runAgentProcess({
-    ...workspacePaths,
+    runtimeManifestPath: workspacePaths.runtimeManifestPath,
+    agentRoot: workspacePaths.agentRoot,
+    stdoutPath: workspacePaths.stdoutPath,
+    stderrPath: workspacePaths.stderrPath,
+    sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
     resolveRunInvocation: async ({ settingsArg }) => {
       const command = await getRunCommand();
       return {
