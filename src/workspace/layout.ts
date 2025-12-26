@@ -4,21 +4,22 @@ import { dirname } from "node:path";
 import type { AgentId } from "../configs/agents/types.js";
 import { normalizePathForDisplay, resolvePath } from "../utils/path.js";
 import {
-  getAgentArtifactsDirectoryPath,
-  getAgentDiffPath,
-  getAgentDirectoryPath,
-  getAgentEvalsDirectoryPath,
-  getAgentManifestPath,
-  getAgentReviewPath,
-  getAgentRuntimeDirectoryPath,
-  getAgentSandboxDirectoryPath,
-  getAgentSandboxHomePath,
-  getAgentSandboxSettingsPath,
-  getAgentStderrPath,
-  getAgentStdoutPath,
-  getAgentSummaryPath,
-  getAgentWorkspaceDirectoryPath,
+  getAgentSessionArtifactsDirectoryPath,
+  getAgentSessionDiffPath,
+  getAgentSessionDirectoryPath,
+  getAgentSessionEvalsDirectoryPath,
+  getAgentSessionManifestPath,
+  getAgentSessionReviewPath,
+  getAgentSessionRuntimeDirectoryPath,
+  getAgentSessionSandboxDirectoryPath,
+  getAgentSessionSandboxHomePath,
+  getAgentSessionSandboxSettingsPath,
+  getAgentSessionStderrPath,
+  getAgentSessionStdoutPath,
+  getAgentSessionSummaryPath,
+  getAgentSessionWorkspaceDirectoryPath,
   getRunDirectoryPath,
+  VORATIQ_RUNS_DIR,
 } from "./structure.js";
 
 export interface RunWorkspacePaths {
@@ -79,7 +80,8 @@ type AgentWorkspaceArtifactDescriptorEntry = [
 ];
 
 interface AgentWorkspaceArtifactContext {
-  runId: string;
+  domain: string;
+  sessionId: string;
   agentId: AgentId;
 }
 
@@ -100,63 +102,67 @@ type AgentWorkspaceArtifactAbsoluteMap = Record<
 
 const AGENT_WORKSPACE_ARTIFACTS = {
   artifactsPath: {
-    getRelativePath: ({ runId, agentId }) =>
-      getAgentArtifactsDirectoryPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionArtifactsDirectoryPath(domain, sessionId, agentId),
     ensureDir: true,
   },
   stdoutPath: {
-    getRelativePath: ({ runId, agentId }) => getAgentStdoutPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionStdoutPath(domain, sessionId, agentId),
     initializeEmptyFile: true,
   },
   stderrPath: {
-    getRelativePath: ({ runId, agentId }) => getAgentStderrPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionStderrPath(domain, sessionId, agentId),
     initializeEmptyFile: true,
   },
   diffPath: {
-    getRelativePath: ({ runId, agentId }) => getAgentDiffPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionDiffPath(domain, sessionId, agentId),
     initializeEmptyFile: true,
   },
   summaryPath: {
-    getRelativePath: ({ runId, agentId }) =>
-      getAgentSummaryPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionSummaryPath(domain, sessionId, agentId),
     initializeEmptyFile: true,
   },
   reviewPath: {
-    getRelativePath: ({ runId, agentId }) => getAgentReviewPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionReviewPath(domain, sessionId, agentId),
     initializeEmptyFile: true,
   },
   workspacePath: {
-    getRelativePath: ({ runId, agentId }) =>
-      getAgentWorkspaceDirectoryPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionWorkspaceDirectoryPath(domain, sessionId, agentId),
     ensureDir: true,
   },
   evalsDirPath: {
-    getRelativePath: ({ runId, agentId }) =>
-      getAgentEvalsDirectoryPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionEvalsDirectoryPath(domain, sessionId, agentId),
     ensureDir: true,
   },
   runtimeManifestPath: {
-    getRelativePath: ({ runId, agentId }) =>
-      getAgentManifestPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionManifestPath(domain, sessionId, agentId),
   },
   runtimePath: {
-    getRelativePath: ({ runId, agentId }) =>
-      getAgentRuntimeDirectoryPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionRuntimeDirectoryPath(domain, sessionId, agentId),
     ensureDir: true,
   },
   sandboxPath: {
-    getRelativePath: ({ runId, agentId }) =>
-      getAgentSandboxDirectoryPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionSandboxDirectoryPath(domain, sessionId, agentId),
     ensureDir: true,
   },
   sandboxHomePath: {
-    getRelativePath: ({ runId, agentId }) =>
-      getAgentSandboxHomePath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionSandboxHomePath(domain, sessionId, agentId),
     ensureDir: true,
   },
   sandboxSettingsPath: {
-    getRelativePath: ({ runId, agentId }) =>
-      getAgentSandboxSettingsPath(runId, agentId),
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionSandboxSettingsPath(domain, sessionId, agentId),
   },
 } satisfies AgentWorkspaceArtifactDescriptorTable;
 
@@ -168,15 +174,16 @@ function getAgentWorkspaceArtifactDescriptorEntries(): AgentWorkspaceArtifactDes
 
 function resolveAgentWorkspaceArtifactPaths(options: {
   root: string;
-  runId: string;
+  domain: string;
+  sessionId: string;
   agentId: AgentId;
 }): AgentWorkspaceArtifactPathMap {
-  const { root, runId, agentId } = options;
+  const { root, domain, sessionId, agentId } = options;
   const entries = getAgentWorkspaceArtifactDescriptorEntries();
   const map = Object.create(null) as AgentWorkspaceArtifactPathMap;
   for (const [key, descriptor] of entries) {
     const relative = normalizePathForDisplay(
-      descriptor.getRelativePath({ runId, agentId }),
+      descriptor.getRelativePath({ domain, sessionId, agentId }),
     );
     map[key] = {
       relative,
@@ -202,16 +209,32 @@ export function buildAgentWorkspacePaths(options: {
   agentId: AgentId;
 }): AgentWorkspacePaths {
   const { root, runId, agentId } = options;
+  return buildAgentSessionWorkspacePaths({
+    root,
+    domain: VORATIQ_RUNS_DIR,
+    sessionId: runId,
+    agentId,
+  });
+}
+
+export function buildAgentSessionWorkspacePaths(options: {
+  root: string;
+  domain: string;
+  sessionId: string;
+  agentId: AgentId;
+}): AgentWorkspacePaths {
+  const { root, domain, sessionId, agentId } = options;
 
   const artifactPaths = resolveAgentWorkspaceArtifactPaths({
     root,
-    runId,
+    domain,
+    sessionId,
     agentId,
   });
   const absoluteArtifacts = buildAbsoluteArtifactPathMap(artifactPaths);
 
   const agentRelative = normalizePathForDisplay(
-    getAgentDirectoryPath(runId, agentId),
+    getAgentSessionDirectoryPath(domain, sessionId, agentId),
   );
   const agentRoot = resolvePath(root, agentRelative);
 
@@ -251,4 +274,15 @@ export async function scaffoldAgentWorkspace(
   for (const filePath of filesToInitialize) {
     await writeFile(filePath, "", { encoding: "utf8" });
   }
+}
+
+export async function scaffoldAgentSessionWorkspace(options: {
+  root: string;
+  domain: string;
+  sessionId: string;
+  agentId: AgentId;
+}): Promise<AgentWorkspacePaths> {
+  const paths = buildAgentSessionWorkspacePaths(options);
+  await scaffoldAgentWorkspace(paths);
+  return paths;
 }

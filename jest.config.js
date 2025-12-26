@@ -54,7 +54,7 @@ function createProject(displayName, testRegex, overrides = {}) {
 
 const unitProject = createProject(
   "unit",
-  String.raw`tests/(?!commands|cli)/.+\.test\.ts$`,
+  String.raw`tests/(?!commands|cli)[^/]+/.+\.test\.ts$`,
 );
 
 const commandsProject = createProject(

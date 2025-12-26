@@ -7,8 +7,10 @@ import {
   relativeToRoot,
 } from "../../src/utils/path.js";
 import {
+  buildAgentSessionWorkspacePaths,
   buildAgentWorkspacePaths,
   resolveRunWorkspacePaths,
+  scaffoldAgentSessionWorkspace,
   scaffoldAgentWorkspace,
 } from "../../src/workspace/layout.js";
 import {
@@ -21,6 +23,7 @@ import {
   getAgentSandboxDirectoryPath,
   getAgentSandboxHomePath,
   getAgentSandboxSettingsPath,
+  getAgentSessionWorkspaceDirectoryPath,
   getAgentStderrPath,
   getAgentStdoutPath,
   getAgentSummaryPath,
@@ -123,6 +126,30 @@ describe("workspace layout helpers", () => {
     );
   });
 
+  it("builds agent session paths for non-run domains", () => {
+    const domain = "specs";
+    const sessionId = "spec-20250102-xyz";
+    const sessionRoot = join(root, ".voratiq", domain, "sessions", sessionId);
+    const paths = buildAgentSessionWorkspacePaths({
+      root,
+      domain,
+      sessionId,
+      agentId,
+    });
+
+    expect(paths.agentRoot).toBe(join(sessionRoot, agentId));
+    expect(paths.workspacePath).toBe(
+      join(sessionRoot, agentId, WORKSPACE_DIRNAME),
+    );
+
+    const relativeDisplay = (absolutePath: string) =>
+      normalizePathForDisplay(relativeToRoot(root, absolutePath));
+
+    expect(relativeDisplay(paths.workspacePath)).toBe(
+      getAgentSessionWorkspaceDirectoryPath(domain, sessionId, agentId),
+    );
+  });
+
   it("derives all agent artifacts from the descriptor table", () => {
     const paths = buildAgentWorkspacePaths({ root, runId, agentId });
 
@@ -159,6 +186,30 @@ describe("workspace layout helpers", () => {
       for (const key of SCAFFOLD_FILE_KEYS) {
         await expect(readFile(workspacePaths[key], "utf8")).resolves.toBe("");
       }
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("scaffolds agent session workspace for non-run domains", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "voratiq-workspace-"));
+    const domain = "specs";
+    const sessionId = "spec-20250103-zzz";
+
+    try {
+      const workspacePaths = await scaffoldAgentSessionWorkspace({
+        root: tempRoot,
+        domain,
+        sessionId,
+        agentId,
+      });
+
+      await expect(
+        access(workspacePaths.workspacePath),
+      ).resolves.toBeUndefined();
+      await expect(readFile(workspacePaths.stdoutPath, "utf8")).resolves.toBe(
+        "",
+      );
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
