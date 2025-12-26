@@ -18,14 +18,14 @@ import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import {
   type AgentRecordMutators,
   createAgentRecordMutators,
-} from "../../../src/records/mutators.js";
-import { rewriteRunRecord } from "../../../src/records/persistence.js";
+} from "../../../src/runs/records/mutators.js";
+import { rewriteRunRecord } from "../../../src/runs/records/persistence.js";
 import type {
   AgentInvocationRecord,
   AgentReport,
   RunRecord,
   RunReport,
-} from "../../../src/records/types.js";
+} from "../../../src/runs/records/types.js";
 import { prepareRunWorkspace } from "../../../src/workspace/run.js";
 
 jest.mock("../../../src/commands/run/validation.js", () => ({
@@ -40,7 +40,7 @@ jest.mock("../../../src/commands/run/record-init.js", () => ({
   initializeRunRecord: jest.fn(),
 }));
 
-jest.mock("../../../src/records/mutators.js", () => ({
+jest.mock("../../../src/runs/records/mutators.js", () => ({
   createAgentRecordMutators: jest.fn(),
 }));
 
@@ -48,7 +48,7 @@ jest.mock("../../../src/commands/run/agent-execution.js", () => ({
   executeAgents: jest.fn(),
 }));
 
-jest.mock("../../../src/records/persistence.js", () => ({
+jest.mock("../../../src/runs/records/persistence.js", () => ({
   rewriteRunRecord: jest.fn(),
   flushRunRecordBuffer: jest.fn(),
 }));

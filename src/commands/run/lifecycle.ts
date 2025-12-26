@@ -3,8 +3,8 @@ import {
   disposeRunRecordBuffer,
   getRunRecordSnapshot,
   rewriteRunRecord,
-} from "../../records/persistence.js";
-import type { AgentInvocationRecord } from "../../records/types.js";
+} from "../../runs/records/persistence.js";
+import type { AgentInvocationRecord } from "../../runs/records/types.js";
 import type { RunStatus } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { preserveProviderChatTranscripts } from "../../workspace/chat/artifacts.js";

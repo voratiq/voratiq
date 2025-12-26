@@ -17,8 +17,8 @@ import { createPruneCommand } from "./cli/prune.js";
 import { createReviewCommand } from "./cli/review.js";
 import { createRunCommand } from "./cli/run.js";
 import { terminateActiveRun } from "./commands/run/lifecycle.js";
-import { flushAllRunRecordBuffers } from "./records/persistence.js";
 import { renderCliError } from "./render/utils/errors.js";
+import { flushAllRunRecordBuffers } from "./runs/records/persistence.js";
 import { toErrorMessage } from "./utils/errors.js";
 import { getVoratiqVersion } from "./utils/version.js";
 

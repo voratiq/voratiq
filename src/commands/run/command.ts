@@ -1,15 +1,15 @@
 import { teardownSessionAuth } from "../../agents/runtime/registry.js";
-import { createAgentRecordMutators } from "../../records/mutators.js";
+import type { RunProgressRenderer } from "../../render/transcripts/run.js";
+import { createAgentRecordMutators } from "../../runs/records/mutators.js";
 import {
   flushRunRecordBuffer,
   rewriteRunRecord,
-} from "../../records/persistence.js";
+} from "../../runs/records/persistence.js";
 import type {
   AgentInvocationRecord,
   RunRecord,
   RunReport,
-} from "../../records/types.js";
-import type { RunProgressRenderer } from "../../render/transcripts/run.js";
+} from "../../runs/records/types.js";
 import { toError } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
 import {

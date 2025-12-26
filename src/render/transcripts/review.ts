@@ -1,4 +1,4 @@
-import type { RunRecordEnhanced } from "../../records/enhanced.js";
+import type { RunRecordEnhanced } from "../../runs/records/enhanced.js";
 import { colorize } from "../../utils/colors.js";
 import { formatRunWorkspaceRelative } from "../../workspace/layout.js";
 import { formatRunTimestamp } from "../utils/records.js";

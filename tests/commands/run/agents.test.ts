@@ -20,7 +20,7 @@ import type { AgentExecutionResult } from "../../../src/commands/run/reports.js"
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
 import type { EvalDefinition } from "../../../src/configs/evals/types.js";
-import type { AgentInvocationRecord } from "../../../src/records/types.js";
+import type { AgentInvocationRecord } from "../../../src/runs/records/types.js";
 import { buildAgentWorkspacePaths } from "../../../src/workspace/layout.js";
 
 jest.mock("../../../src/agents/runtime/harness.js", () => ({

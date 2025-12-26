@@ -17,7 +17,7 @@ import {
   loadEvalConfig,
 } from "../../configs/evals/loader.js";
 import type { EvalDefinition } from "../../configs/evals/types.js";
-import { RunOptionValidationError } from "../../records/errors.js";
+import { RunOptionValidationError } from "../../runs/records/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { WorkspaceMissingEntryError } from "../../workspace/errors.js";
 import { NoAgentsEnabledError } from "./errors.js";

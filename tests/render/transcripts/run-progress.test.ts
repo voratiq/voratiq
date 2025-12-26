@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 
-import type { AgentInvocationRecord } from "../../../src/records/types.js";
 import { createRunRenderer } from "../../../src/render/transcripts/run.js";
+import type { AgentInvocationRecord } from "../../../src/runs/records/types.js";
 import { formatCliOutput } from "../../../src/utils/output.js";
 import { createRunReport } from "../../support/factories/run-records.js";
 

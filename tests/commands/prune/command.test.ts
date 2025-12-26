@@ -12,9 +12,9 @@ import type {
   PruneCommandInput,
   PruneConfirmationHandler,
 } from "../../../src/commands/prune/types.js";
-import { rewriteRunRecord } from "../../../src/records/persistence.js";
-import type { RunRecord } from "../../../src/records/types.js";
 import { renderPruneTranscript } from "../../../src/render/transcripts/prune.js";
+import { rewriteRunRecord } from "../../../src/runs/records/persistence.js";
+import type { RunRecord } from "../../../src/runs/records/types.js";
 import { pathExists } from "../../../src/utils/fs.js";
 import { runGitCommand } from "../../../src/utils/git.js";
 import {
@@ -30,9 +30,15 @@ jest.mock("../../../src/commands/fetch.js", () => ({
   fetchRunSafely: jest.fn(),
 }));
 
-jest.mock("../../../src/utils/fs.js", () => ({
-  pathExists: jest.fn(),
-}));
+jest.mock("../../../src/utils/fs.js", () => {
+  const actual = jest.requireActual<typeof import("../../../src/utils/fs.js")>(
+    "../../../src/utils/fs.js",
+  );
+  return {
+    ...actual,
+    pathExists: jest.fn(),
+  };
+});
 
 jest.mock("../../../src/workspace/prune.js", () => {
   const actual = jest.requireActual<
@@ -50,7 +56,7 @@ jest.mock("../../../src/utils/git.js", () => ({
   getGitStderr: jest.fn(),
 }));
 
-jest.mock("../../../src/records/persistence.js", () => ({
+jest.mock("../../../src/runs/records/persistence.js", () => ({
   rewriteRunRecord: jest.fn(),
 }));
 

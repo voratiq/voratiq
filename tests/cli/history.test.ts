@@ -14,12 +14,12 @@ import { promisify } from "node:util";
 
 import { executePruneCommand } from "../../src/commands/prune/command.js";
 import type { PruneSuccessResult } from "../../src/commands/prune/types.js";
-import { appendRunRecord } from "../../src/records/persistence.js";
+import type { ConfirmationOptions } from "../../src/render/interactions/confirmation.js";
+import { appendRunRecord } from "../../src/runs/records/persistence.js";
 import type {
   AgentInvocationRecord,
   RunRecord,
-} from "../../src/records/types.js";
-import type { ConfirmationOptions } from "../../src/render/interactions/confirmation.js";
+} from "../../src/runs/records/types.js";
 import { formatWorkspacePath } from "../../src/workspace/structure.js";
 import {
   createAgentInvocationRecord,

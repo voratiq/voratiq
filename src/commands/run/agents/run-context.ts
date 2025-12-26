@@ -10,7 +10,7 @@ import type {
   AgentInvocationRecord,
   AgentStatus,
   WatchdogMetadata,
-} from "../../../records/types.js";
+} from "../../../runs/records/types.js";
 import { normalizeDiffStatistics } from "../../../utils/diff.js";
 import type { ArtifactCollectionResult } from "../../../workspace/agents.js";
 import type { ChatArtifactFormat } from "../../../workspace/chat/types.js";

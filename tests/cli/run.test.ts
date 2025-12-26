@@ -13,9 +13,9 @@ import { runRunCommand } from "../../src/cli/run.js";
 import * as runAgentsModule from "../../src/commands/run/agents.js";
 import { executeRunCommand } from "../../src/commands/run/command.js";
 import { DirtyWorkingTreeError } from "../../src/preflight/errors.js";
-import { buildRunRecordEnhanced } from "../../src/records/enhanced.js";
-import * as persistence from "../../src/records/persistence.js";
-import type { RunRecord } from "../../src/records/types.js";
+import { buildRunRecordEnhanced } from "../../src/runs/records/enhanced.js";
+import * as persistence from "../../src/runs/records/persistence.js";
+import type { RunRecord } from "../../src/runs/records/types.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
 import {
   createRunTestWorkspace,

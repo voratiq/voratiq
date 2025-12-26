@@ -2,7 +2,7 @@ import type {
   AgentInvocationRecord,
   AgentReport,
   RunRecord,
-} from "../../records/types.js";
+} from "../../runs/records/types.js";
 
 export interface RunRecordInitResult {
   readonly initialRecord: RunRecord;

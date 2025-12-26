@@ -7,7 +7,7 @@ import {
 import type {
   AgentInvocationRecord,
   WatchdogMetadata,
-} from "../../../records/types.js";
+} from "../../../runs/records/types.js";
 import { toErrorMessage } from "../../../utils/errors.js";
 import { GIT_AUTHOR_EMAIL, GIT_AUTHOR_NAME } from "../../../utils/git.js";
 import {

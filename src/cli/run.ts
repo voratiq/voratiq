@@ -8,8 +8,8 @@ import {
   ensureSpecPath,
   resolveCliContext,
 } from "../preflight/index.js";
-import type { RunReport } from "../records/types.js";
 import { createRunRenderer } from "../render/transcripts/run.js";
+import type { RunReport } from "../runs/records/types.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import { writeCommandOutput } from "./output.js";
 

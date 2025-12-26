@@ -9,7 +9,7 @@ import { dirname, isAbsolute, relative as relativePath } from "node:path";
 
 import type { AgentManifest } from "../../commands/run/shim/agent-manifest.js";
 import type { DenialBackoffConfig } from "../../configs/sandbox/types.js";
-import type { WatchdogMetadata } from "../../records/types.js";
+import type { WatchdogMetadata } from "../../runs/records/types.js";
 import { getCliAssetPath, resolveCliAssetRoot } from "../../utils/cli-root.js";
 import { resolvePath } from "../../utils/path.js";
 import { spawnStreamingProcess } from "../../utils/process.js";

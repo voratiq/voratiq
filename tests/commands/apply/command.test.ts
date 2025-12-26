@@ -10,8 +10,8 @@ import {
   ApplyBaseMismatchError,
   ApplyPatchApplicationError,
 } from "../../../src/commands/apply/errors.js";
-import { appendRunRecord } from "../../../src/records/persistence.js";
-import type { RunRecord } from "../../../src/records/types.js";
+import { appendRunRecord } from "../../../src/runs/records/persistence.js";
+import type { RunRecord } from "../../../src/runs/records/types.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 import {
   createAgentInvocationRecord,

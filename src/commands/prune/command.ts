@@ -1,16 +1,16 @@
 import * as fs from "node:fs/promises";
 
 import { NonInteractiveShellError } from "../../cli/errors.js";
+import { buildPruneConfirmationPreface } from "../../render/transcripts/prune.js";
 import {
   RunRecordNotFoundError,
   RunRecordParseError,
-} from "../../records/errors.js";
+} from "../../runs/records/errors.js";
 import {
   rewriteRunRecord,
   RUN_RECORD_FILENAME,
-} from "../../records/persistence.js";
-import type { RunRecord } from "../../records/types.js";
-import { buildPruneConfirmationPreface } from "../../render/transcripts/prune.js";
+} from "../../runs/records/persistence.js";
+import type { RunRecord } from "../../runs/records/types.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { pathExists } from "../../utils/fs.js";
 import { getGitStderr, runGitCommand } from "../../utils/git.js";

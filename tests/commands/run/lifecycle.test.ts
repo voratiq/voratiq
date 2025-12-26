@@ -22,12 +22,12 @@ import {
   disposeRunRecordBuffer,
   getRunRecordSnapshot,
   rewriteRunRecord,
-} from "../../../src/records/persistence.js";
-import type { RunRecord } from "../../../src/records/types.js";
+} from "../../../src/runs/records/persistence.js";
+import type { RunRecord } from "../../../src/runs/records/types.js";
 import { pathExists } from "../../../src/utils/fs.js";
 import { preserveProviderChatTranscripts } from "../../../src/workspace/chat/artifacts.js";
 
-jest.mock("../../../src/records/persistence.js", () => ({
+jest.mock("../../../src/runs/records/persistence.js", () => ({
   rewriteRunRecord: jest.fn(),
   getRunRecordSnapshot: jest.fn(),
   disposeRunRecordBuffer: jest.fn(),

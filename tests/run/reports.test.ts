@@ -2,7 +2,7 @@ import { toAgentReport, toRunReport } from "../../src/commands/run/reports.js";
 import type {
   AgentInvocationRecord,
   AgentReport,
-} from "../../src/records/types.js";
+} from "../../src/runs/records/types.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,
