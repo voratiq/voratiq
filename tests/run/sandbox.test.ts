@@ -18,6 +18,7 @@ import {
   getRunCommand,
   runAgentProcess,
 } from "../../src/agents/runtime/launcher.js";
+import { buildRunAgentWorkspacePaths } from "../../src/commands/run/agents/workspace.js";
 import type { AgentId } from "../../src/configs/agents/types.js";
 import {
   buildAgentWorkspacePaths,
@@ -36,7 +37,7 @@ type RunAgentResult = Awaited<ReturnType<typeof runAgentProcess>>;
 
 interface SandboxProbeContext {
   root: string;
-  workspacePaths: ReturnType<typeof buildAgentWorkspacePaths>;
+  workspacePaths: ReturnType<typeof buildRunAgentWorkspacePaths>;
   targetPath: string;
   cleanup: () => Promise<void>;
 }
@@ -74,12 +75,18 @@ async function setupSandboxProbe(options: {
   let setupComplete = false;
   try {
     await mkdir(join(root, ".voratiq"), { recursive: true });
-    const workspacePaths = buildAgentWorkspacePaths({
+    const corePaths = buildAgentWorkspacePaths({
       root,
       runId: "sandbox-test",
       agentId: TEST_AGENT_ID,
     });
-    await scaffoldAgentWorkspace(workspacePaths);
+    const workspacePaths = buildRunAgentWorkspacePaths({
+      root,
+      runId: "sandbox-test",
+      agentId: TEST_AGENT_ID,
+      corePaths,
+    });
+    await scaffoldAgentWorkspace(corePaths);
     await mkdir(workspacePaths.sandboxHomePath, { recursive: true });
     await mkdir(dirname(workspacePaths.runtimeManifestPath), {
       recursive: true,

@@ -21,7 +21,6 @@ import { RunOptionValidationError } from "../../runs/records/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { WorkspaceMissingEntryError } from "../../workspace/errors.js";
 import { NoAgentsEnabledError } from "./errors.js";
-import { buildAgentPrompt } from "./prompts.js";
 
 export interface ValidationInput {
   readonly root: string;
@@ -30,7 +29,7 @@ export interface ValidationInput {
 }
 
 export interface ValidationResult {
-  readonly prompt: string;
+  readonly specContent: string;
   readonly baseRevisionSha: string;
   readonly agents: readonly AgentDefinition[];
   readonly evalPlan: readonly EvalDefinition[];
@@ -57,7 +56,6 @@ export async function validateAndPrepare(
   }
 
   const specContent = await readFile(specAbsolutePath, "utf8");
-  const prompt = buildAgentPrompt({ specContent });
 
   const baseRevisionSha = await getHeadRevision(root);
   const agents = loadAgentCatalog({ root });
@@ -88,7 +86,7 @@ export async function validateAndPrepare(
   const effectiveMaxParallel = resolveMaxParallel(agents, requestedMaxParallel);
 
   return {
-    prompt,
+    specContent,
     baseRevisionSha,
     agents,
     evalPlan,

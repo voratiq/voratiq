@@ -20,6 +20,9 @@ import {
   jest,
 } from "@jest/globals";
 
+import { collectAgentArtifacts } from "../../../src/commands/run/agents/artifacts.js";
+import type { RunAgentWorkspacePaths } from "../../../src/commands/run/agents/workspace.js";
+import { WORKSPACE_SUMMARY_FILENAME } from "../../../src/commands/run/agents/workspace.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
 import { pathExists } from "../../../src/utils/fs.js";
 import {
@@ -30,9 +33,7 @@ import {
   gitHasStagedChanges,
   runGitCommand,
 } from "../../../src/utils/git.js";
-import { collectAgentArtifacts } from "../../../src/workspace/agents.js";
 import * as workspaceDependencies from "../../../src/workspace/dependencies.js";
-import { WORKSPACE_SUMMARY_FILENAME } from "../../../src/workspace/layout.js";
 
 jest.mock("../../../src/utils/git.js", () => ({
   gitAddAll: jest.fn(),
@@ -64,6 +65,7 @@ describe("collectAgentArtifacts", () => {
   let summaryPath: string;
   let diffPath: string;
   let artifactsPath: string;
+  let workspacePaths: RunAgentWorkspacePaths;
   let gitAddNodeModulesPresent: boolean;
   let gitAddCwd: string | undefined;
   const environment: EnvironmentConfig = {
@@ -82,6 +84,22 @@ describe("collectAgentArtifacts", () => {
     await mkdir(artifactsPath, { recursive: true });
     summaryPath = join(artifactsPath, "summary.txt");
     diffPath = join(artifactsPath, "diff.patch");
+    workspacePaths = {
+      agentRoot: join(repoRoot, "agent"),
+      artifactsPath,
+      stdoutPath: join(artifactsPath, "stdout.log"),
+      stderrPath: join(artifactsPath, "stderr.log"),
+      reviewPath: join(artifactsPath, "review.md"),
+      workspacePath,
+      runtimeManifestPath: join(repoRoot, "runtime", "manifest.json"),
+      sandboxPath: join(repoRoot, "sandbox"),
+      sandboxHomePath: join(repoRoot, "sandbox", "home"),
+      sandboxSettingsPath: join(repoRoot, "runtime", "sandbox.json"),
+      runtimePath: join(repoRoot, "runtime"),
+      diffPath,
+      summaryPath,
+      evalsDirPath: join(repoRoot, "evals"),
+    };
 
     await mkdir(workspacePath, { recursive: true });
     const repoNodeModules = join(repoRoot, "node_modules");
@@ -119,10 +137,7 @@ describe("collectAgentArtifacts", () => {
   it("omits the workspace node_modules symlink from export diffs", async () => {
     const result = await collectAgentArtifacts({
       baseRevisionSha: "base-sha",
-      workspacePath,
-      artifactsPath,
-      summaryPath,
-      diffPath,
+      workspacePaths,
       root: repoRoot,
       environment,
       persona,
@@ -159,10 +174,7 @@ describe("collectAgentArtifacts", () => {
     await expect(
       collectAgentArtifacts({
         baseRevisionSha: "base-sha",
-        workspacePath,
-        artifactsPath,
-        summaryPath,
-        diffPath,
+        workspacePaths,
         root: repoRoot,
         environment,
         persona,
@@ -177,10 +189,7 @@ describe("collectAgentArtifacts", () => {
     await expect(
       collectAgentArtifacts({
         baseRevisionSha: "base-sha",
-        workspacePath,
-        artifactsPath,
-        summaryPath,
-        diffPath,
+        workspacePaths,
         root: repoRoot,
         environment,
         persona,
@@ -196,10 +205,7 @@ describe("collectAgentArtifacts", () => {
     await expect(
       collectAgentArtifacts({
         baseRevisionSha: "base-sha",
-        workspacePath,
-        artifactsPath,
-        summaryPath,
-        diffPath,
+        workspacePaths,
         root: repoRoot,
         environment,
         persona,
@@ -215,10 +221,7 @@ describe("collectAgentArtifacts", () => {
     await expect(
       collectAgentArtifacts({
         baseRevisionSha: "base-sha",
-        workspacePath,
-        artifactsPath,
-        summaryPath,
-        diffPath,
+        workspacePaths,
         root: repoRoot,
         environment,
         persona,
@@ -253,10 +256,7 @@ describe("collectAgentArtifacts", () => {
     try {
       const result = await collectAgentArtifacts({
         baseRevisionSha: "base-sha",
-        workspacePath,
-        artifactsPath,
-        summaryPath,
-        diffPath,
+        workspacePaths,
         root: repoRoot,
         environment,
         persona,
@@ -281,10 +281,7 @@ describe("collectAgentArtifacts", () => {
       await expect(
         collectAgentArtifacts({
           baseRevisionSha: "base-sha",
-          workspacePath,
-          artifactsPath,
-          summaryPath,
-          diffPath,
+          workspacePaths,
           root: repoRoot,
           environment,
           persona,

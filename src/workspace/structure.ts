@@ -11,6 +11,9 @@ export const VORATIQ_DIR = ".voratiq";
 export const VORATIQ_RUNS_DIR = "runs";
 export const VORATIQ_RUNS_FILE = "runs/index.json";
 export const VORATIQ_RUNS_SESSIONS_DIR = "runs/sessions";
+export const VORATIQ_SPECS_DIR = "specs";
+export const VORATIQ_SPECS_FILE = "specs/index.json";
+export const VORATIQ_SPECS_SESSIONS_DIR = "specs/sessions";
 export const VORATIQ_INDEX_FILENAME = "index.json";
 export const VORATIQ_HISTORY_LOCK_FILENAME = "history.lock";
 export const VORATIQ_SESSIONS_DIRNAME = "sessions";
@@ -135,6 +138,22 @@ export function getDomainHistoryLockPath(domain: string): string {
   return formatDomainScopedPath(domain, VORATIQ_HISTORY_LOCK_FILENAME);
 }
 
+export function getSpecsDirectoryPath(): string {
+  return getDomainDirectoryPath(VORATIQ_SPECS_DIR);
+}
+
+export function getSpecsIndexPath(): string {
+  return getDomainIndexPath(VORATIQ_SPECS_DIR);
+}
+
+export function getSpecsHistoryLockPath(): string {
+  return getDomainHistoryLockPath(VORATIQ_SPECS_DIR);
+}
+
+export function getSpecsSessionsDirectoryPath(): string {
+  return getDomainSessionsDirectoryPath(VORATIQ_SPECS_DIR);
+}
+
 export function getDomainSessionsDirectoryPath(domain: string): string {
   return formatDomainScopedPath(domain, VORATIQ_SESSIONS_DIRNAME);
 }
@@ -146,12 +165,23 @@ export function getSessionDirectoryPath(
   return formatSessionScopedPath(domain, sessionId);
 }
 
+export function getSpecSessionDirectoryPath(sessionId: string): string {
+  return getSessionDirectoryPath(VORATIQ_SPECS_DIR, sessionId);
+}
+
 export function getAgentSessionDirectoryPath(
   domain: string,
   sessionId: string,
   agentId: string,
 ): string {
   return formatAgentSessionScopedPath(domain, sessionId, agentId);
+}
+
+export function getSpecAgentSessionDirectoryPath(
+  sessionId: string,
+  agentId: string,
+): string {
+  return getAgentSessionDirectoryPath(VORATIQ_SPECS_DIR, sessionId, agentId);
 }
 
 export function getAgentSessionManifestPath(

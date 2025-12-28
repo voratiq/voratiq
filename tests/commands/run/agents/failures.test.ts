@@ -2,8 +2,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { detectAgentProcessFailureDetail } from "../../../../src/agents/runtime/failures.js";
 import { CLAUDE_OAUTH_RELOGIN_HINT } from "../../../../src/auth/providers/claude/constants.js";
-import { detectAgentProcessFailureDetail } from "../../../../src/commands/run/agents/failures.js";
 
 describe("detectAgentProcessFailureDetail", () => {
   it("returns Claude reauth hint when logs ask to run /login", async () => {
@@ -15,7 +15,6 @@ describe("detectAgentProcessFailureDetail", () => {
 
     try {
       const detail = await detectAgentProcessFailureDetail({
-        agentId: "claude",
         provider: "claude",
         stdoutPath,
         stderrPath,
@@ -39,7 +38,6 @@ describe("detectAgentProcessFailureDetail", () => {
 
     try {
       const detail = await detectAgentProcessFailureDetail({
-        agentId: "claude-haiku",
         provider: "claude",
         stdoutPath,
         stderrPath,
@@ -59,7 +57,6 @@ describe("detectAgentProcessFailureDetail", () => {
 
     try {
       const detail = await detectAgentProcessFailureDetail({
-        agentId: "claude",
         provider: "claude",
         stdoutPath,
         stderrPath,
@@ -79,7 +76,6 @@ describe("detectAgentProcessFailureDetail", () => {
 
     try {
       const detail = await detectAgentProcessFailureDetail({
-        agentId: "claude-sonnet",
         provider: "codex",
         stdoutPath,
         stderrPath,

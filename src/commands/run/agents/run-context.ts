@@ -12,7 +12,6 @@ import type {
   WatchdogMetadata,
 } from "../../../runs/records/types.js";
 import { normalizeDiffStatistics } from "../../../utils/diff.js";
-import type { ArtifactCollectionResult } from "../../../workspace/agents.js";
 import type { ChatArtifactFormat } from "../../../workspace/chat/types.js";
 import type { RunCommandError } from "../errors.js";
 import {
@@ -20,6 +19,7 @@ import {
   type AgentExecutionState,
   finalizeAgentResult,
 } from "../reports.js";
+import type { ArtifactCollectionResult } from "./artifacts.js";
 
 export class AgentRunContext {
   public readonly state: AgentExecutionState = {

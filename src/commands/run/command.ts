@@ -126,7 +126,7 @@ export async function executeRunCommand(
       baseRevisionSha: validation.baseRevisionSha,
       runId,
       root,
-      prompt: validation.prompt,
+      specContent: validation.specContent,
       evalPlan: validation.evalPlan,
       effectiveMaxParallel: validation.effectiveMaxParallel,
       environment: validation.environment,

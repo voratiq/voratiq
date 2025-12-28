@@ -5,9 +5,7 @@ import type { AgentId } from "../configs/agents/types.js";
 import { normalizePathForDisplay, resolvePath } from "../utils/path.js";
 import {
   getAgentSessionArtifactsDirectoryPath,
-  getAgentSessionDiffPath,
   getAgentSessionDirectoryPath,
-  getAgentSessionEvalsDirectoryPath,
   getAgentSessionManifestPath,
   getAgentSessionReviewPath,
   getAgentSessionRuntimeDirectoryPath,
@@ -16,7 +14,6 @@ import {
   getAgentSessionSandboxSettingsPath,
   getAgentSessionStderrPath,
   getAgentSessionStdoutPath,
-  getAgentSessionSummaryPath,
   getAgentSessionWorkspaceDirectoryPath,
   getRunDirectoryPath,
   VORATIQ_RUNS_DIR,
@@ -40,18 +37,13 @@ export function formatRunWorkspaceRelative(runId: string): string {
   return normalizePathForDisplay(getRunDirectoryPath(runId));
 }
 
-export const WORKSPACE_SUMMARY_FILENAME = ".summary.txt" as const;
-
 export interface AgentWorkspacePaths {
   agentRoot: string;
   artifactsPath: string;
   stdoutPath: string;
   stderrPath: string;
-  diffPath: string;
-  summaryPath: string;
   reviewPath: string;
   workspacePath: string;
-  evalsDirPath: string;
   runtimeManifestPath: string;
   sandboxPath: string;
   sandboxHomePath: string;
@@ -116,16 +108,6 @@ const AGENT_WORKSPACE_ARTIFACTS = {
       getAgentSessionStderrPath(domain, sessionId, agentId),
     initializeEmptyFile: true,
   },
-  diffPath: {
-    getRelativePath: ({ domain, sessionId, agentId }) =>
-      getAgentSessionDiffPath(domain, sessionId, agentId),
-    initializeEmptyFile: true,
-  },
-  summaryPath: {
-    getRelativePath: ({ domain, sessionId, agentId }) =>
-      getAgentSessionSummaryPath(domain, sessionId, agentId),
-    initializeEmptyFile: true,
-  },
   reviewPath: {
     getRelativePath: ({ domain, sessionId, agentId }) =>
       getAgentSessionReviewPath(domain, sessionId, agentId),
@@ -133,11 +115,6 @@ const AGENT_WORKSPACE_ARTIFACTS = {
   workspacePath: {
     getRelativePath: ({ domain, sessionId, agentId }) =>
       getAgentSessionWorkspaceDirectoryPath(domain, sessionId, agentId),
-    ensureDir: true,
-  },
-  evalsDirPath: {
-    getRelativePath: ({ domain, sessionId, agentId }) =>
-      getAgentSessionEvalsDirectoryPath(domain, sessionId, agentId),
     ensureDir: true,
   },
   runtimeManifestPath: {

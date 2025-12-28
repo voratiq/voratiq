@@ -15,8 +15,6 @@ import {
 } from "../../src/workspace/layout.js";
 import {
   getAgentArtifactsDirectoryPath,
-  getAgentDiffPath,
-  getAgentEvalsDirectoryPath,
   getAgentManifestPath,
   getAgentReviewPath,
   getAgentRuntimeDirectoryPath,
@@ -26,7 +24,6 @@ import {
   getAgentSessionWorkspaceDirectoryPath,
   getAgentStderrPath,
   getAgentStdoutPath,
-  getAgentSummaryPath,
   getAgentWorkspaceDirectoryPath,
   WORKSPACE_DIRNAME,
 } from "../../src/workspace/structure.js";
@@ -44,12 +41,9 @@ const ARTIFACT_BUILDERS: Record<
     getAgentArtifactsDirectoryPath(runId, agentId),
   stdoutPath: (runId, agentId) => getAgentStdoutPath(runId, agentId),
   stderrPath: (runId, agentId) => getAgentStderrPath(runId, agentId),
-  diffPath: (runId, agentId) => getAgentDiffPath(runId, agentId),
-  summaryPath: (runId, agentId) => getAgentSummaryPath(runId, agentId),
   reviewPath: (runId, agentId) => getAgentReviewPath(runId, agentId),
   workspacePath: (runId, agentId) =>
     getAgentWorkspaceDirectoryPath(runId, agentId),
-  evalsDirPath: (runId, agentId) => getAgentEvalsDirectoryPath(runId, agentId),
   runtimeManifestPath: (runId, agentId) => getAgentManifestPath(runId, agentId),
   runtimePath: (runId, agentId) => getAgentRuntimeDirectoryPath(runId, agentId),
   sandboxPath: (runId, agentId) => getAgentSandboxDirectoryPath(runId, agentId),
@@ -58,17 +52,11 @@ const ARTIFACT_BUILDERS: Record<
     getAgentSandboxSettingsPath(runId, agentId),
 };
 
-const SCAFFOLD_FILE_KEYS: ArtifactKey[] = [
-  "stdoutPath",
-  "stderrPath",
-  "diffPath",
-  "summaryPath",
-];
+const SCAFFOLD_FILE_KEYS: ArtifactKey[] = ["stdoutPath", "stderrPath"];
 
 const SCAFFOLD_DIR_KEYS: ArtifactKey[] = [
   "artifactsPath",
   "workspacePath",
-  "evalsDirPath",
   "runtimePath",
   "sandboxPath",
   "sandboxHomePath",
@@ -100,10 +88,6 @@ describe("workspace layout helpers", () => {
     expect(paths.stderrPath).toBe(
       join(runRoot, agentId, "artifacts", "stderr.log"),
     );
-    expect(paths.diffPath).toBe(
-      join(runRoot, agentId, "artifacts", "diff.patch"),
-    );
-    expect(paths.evalsDirPath).toBe(join(runRoot, agentId, "evals"));
 
     const relativeDisplay = (absolutePath: string) =>
       normalizePathForDisplay(relativeToRoot(root, absolutePath));
@@ -116,12 +100,6 @@ describe("workspace layout helpers", () => {
     );
     expect(relativeDisplay(paths.stderrPath)).toBe(
       getAgentStderrPath(runId, agentId),
-    );
-    expect(relativeDisplay(paths.diffPath)).toBe(
-      getAgentDiffPath(runId, agentId),
-    );
-    expect(relativeDisplay(paths.evalsDirPath)).toBe(
-      getAgentEvalsDirectoryPath(runId, agentId),
     );
   });
 

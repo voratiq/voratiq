@@ -46,6 +46,8 @@ describe("runApplyCommand", () => {
         workspaceDir: "/repo/.voratiq",
         runsDir: "/repo/.voratiq/runs",
         runsFile: "/repo/.voratiq/runs/index.json",
+        specsDir: "/repo/.voratiq/specs",
+        specsFile: "/repo/.voratiq/specs/index.json",
       },
     });
     mockedEnsureCleanWorkingTree.mockResolvedValue({ cleanWorkingTree: true });
@@ -111,6 +113,8 @@ describe("runApplyCommand", () => {
         workspaceDir: "/repo/.voratiq",
         runsDir: "/repo/.voratiq/runs",
         runsFile: "/repo/.voratiq/runs/index.json",
+        specsDir: "/repo/.voratiq/specs",
+        specsFile: "/repo/.voratiq/specs/index.json",
       },
     });
     mockedEnsureCleanWorkingTree.mockResolvedValue({ cleanWorkingTree: true });

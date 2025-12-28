@@ -32,8 +32,8 @@ voratiq init [-y, --yes]
 Creates:
 
 - `.voratiq/` directory
-- `runs/` subdirectory for run artifacts
-- `runs/index.json` for the run index (per-run `record.json` files are created during `voratiq run`)
+- `runs/` and subdirectories for run data
+- `specs/` and subdirectories for spec data
 - `agents.yaml` with detected agent binaries
 - `evals.yaml` with common eval commands
 - `environment.yaml` with environment settings
@@ -58,6 +58,97 @@ voratiq init -y
 - Repository is not a git repo
 - `.voratiq/` already exists
 - Insufficient permissions to create files
+
+## voratiq spec
+
+Generate a structured spec from a task description via a (specific) sandboxed agent.
+
+### Usage
+
+```bash
+voratiq spec --description <text> --agent <agent-id> [--title <text>] [--output <path>] [-y, --yes]
+```
+
+### Flags
+
+| Flag                   | Required | Description                                                                |
+| ---------------------- | -------- | -------------------------------------------------------------------------- |
+| `--description <text>` | Yes      | Task description for the spec                                              |
+| `--agent <agent-id>`   | Yes      | Agent to draft the spec (e.g., `claude-opus-4-5-20251101`)                 |
+| `--title <text>`       | No       | Spec title; agent infers if omitted                                        |
+| `--output <path>`      | No       | Output path; agent infers if omitted (default: `.voratiq/specs/<slug>.md`) |
+| `-y, --yes`            | No       | Auto-accept first draft and skip confirmation (required in non-TTY shells) |
+
+### Behavior
+
+- TTY (interactive): drafts a spec, shows a preview, prompts `Save this specification? (Y/n):`, and loops on feedback until accepted
+- Non-TTY: requires `--yes`; without it, exits with `Error: Non-interactive shell detected; re-run with --yes to accept defaults.`
+
+### Examples
+
+Interactive (TTY):
+
+````
+$ voratiq spec --description "add dark mode toggle with localStorage persistence" --agent claude-opus-4-5-20251101
+
+Generating specification...
+
+```markdown
+# Add Dark Mode Toggle
+
+## Summary
+Implement a dark mode toggle in the settings page that persists
+user preference to localStorage.
+
+## Context
+- Settings page: `src/components/Settings.tsx`
+- No existing theme infrastructure
+
+## Acceptance Criteria
+- [ ] Toggle appears in settings page
+- [ ] Preference persists in localStorage
+- [ ] Theme applies on page load
+```
+
+Save this specification? (Y/n): n
+
+What would you like to change?
+> add system preference detection via prefers-color-scheme
+
+Refining...
+
+```markdown
+# Add Dark Mode Toggle
+
+## Summary
+Implement a dark mode toggle in the settings page that respects
+system preferences and persists user choice to localStorage.
+
+## Context
+- Settings page: `src/components/Settings.tsx`
+- No existing theme infrastructure
+
+## Acceptance Criteria
+- [ ] Toggle appears in settings page
+- [ ] Respects `prefers-color-scheme` on first visit
+- [ ] User preference persists in localStorage and overrides system
+- [ ] Theme applies on page load
+```
+
+Save this specification? (Y/n): y
+
+Spec saved: .voratiq/specs/add-dark-mode-toggle.md
+
+To begin a run:
+  voratiq run --spec .voratiq/specs/add-dark-mode-toggle.md
+````
+
+### Errors
+
+- Missing required flags
+- Agent not found
+- Output path already exists
+- Specification generation failed
 
 ## `voratiq run`
 
@@ -126,7 +217,7 @@ voratiq review --run <run-id>
 
 ### Behavior
 
-Loads the run record from `.voratiq/runs/<run-id>/record.json` (via `.voratiq/runs/index.json`) and renders run metadata, agent statuses, eval results, diff summaries, and artifact paths.
+Loads the run record from `.voratiq/runs/sessions/<run-id>/record.json` (via `.voratiq/runs/index.json`) and renders run metadata, agent statuses, eval results, diff summaries, and artifact paths.
 
 ### Examples
 
@@ -159,7 +250,7 @@ voratiq apply --run <run-id> --agent <agent-id> [--ignore-base-mismatch]
 ### Behavior
 
 1. Validates git working tree is clean
-2. Loads the agent's diff from `.voratiq/runs/<run-id>/<agent-id>/artifacts/diff.patch`
+2. Loads the agent's diff from `.voratiq/runs/sessions/<run-id>/<agent-id>/artifacts/diff.patch`
 3. Compares current `HEAD` to the run's base revision; exits with a base mismatch error unless `--ignore-base-mismatch` is provided
 4. Executes `git apply <diff.patch>`
 
@@ -248,7 +339,7 @@ voratiq prune --run <run-id> [--purge] [-y, --yes]
 
 ### Behavior
 
-1. Loads run record from `.voratiq/runs/<run-id>/record.json`
+1. Loads run record from `.voratiq/runs/sessions/<run-id>/record.json`
 2. Displays a summary of workspaces, artifacts, and branches slated for deletion and requests confirmation (unless `-y/--yes`)
 3. Deletes run worktrees and, when `--purge` is set, all associated configs and artifacts
 4. Updates run record, marking it as pruned

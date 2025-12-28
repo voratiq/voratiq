@@ -1,26 +1,27 @@
-import {
-  ensureWorkspaceError,
-  prepareAgentWorkspace,
-} from "../../../workspace/agents.js";
-import { buildAgentWorkspacePaths } from "../../../workspace/layout.js";
+import { ensureWorkspaceError } from "../../../workspace/agents.js";
 import { RunCommandError } from "../errors.js";
+import { buildAgentPrompt } from "../prompts.js";
 import { AgentRunContext } from "./run-context.js";
 import type {
   AgentExecutionContext,
   AgentPreparationOutcome,
 } from "./types.js";
+import type { RunAgentWorkspacePaths } from "./workspace.js";
+import { buildRunAgentWorkspace } from "./workspace.js";
 
 export async function prepareAgentForExecution(
   context: AgentExecutionContext,
 ): Promise<AgentPreparationOutcome> {
-  const { agent, baseRevisionSha, runId, root, prompt, evalPlan, environment } =
-    context;
-
-  const workspacePaths = buildAgentWorkspacePaths({
-    root,
+  const {
+    agent,
+    baseRevisionSha,
     runId,
-    agentId: agent.id,
-  });
+    root,
+    specContent,
+    evalPlan,
+    environment,
+  } = context;
+
   const startedAt = new Date().toISOString();
   const agentContext = new AgentRunContext({
     agent,
@@ -29,13 +30,13 @@ export async function prepareAgentForExecution(
     evalPlan,
   });
 
+  let workspacePaths: RunAgentWorkspacePaths;
   try {
-    await prepareAgentWorkspace({
-      paths: workspacePaths,
-      baseRevisionSha,
+    workspacePaths = await buildRunAgentWorkspace({
       root,
-      agentId: agent.id,
       runId,
+      agentId: agent.id,
+      baseRevisionSha,
       environment,
     });
   } catch (error) {
@@ -45,12 +46,17 @@ export async function prepareAgentForExecution(
     };
   }
 
+  const prompt = buildAgentPrompt({
+    specContent,
+    workspacePath: workspacePaths.workspacePath,
+  });
+
   return {
     status: "ready",
     prepared: {
       agent,
       agentContext,
-      workspacePaths,
+      workspacePaths: workspacePaths,
       baseRevisionSha,
       root,
       runId,

@@ -4,16 +4,16 @@ import type {
   EvalDefinition,
 } from "../../../configs/evals/types.js";
 import { executeEvaluations } from "../../../evals/runner.js";
+import type { SandboxPersona } from "../../../workspace/agents.js";
 import {
   type ArtifactCollectionResult,
   collectAgentArtifacts,
-  type SandboxPersona,
-} from "../../../workspace/agents.js";
-import type { AgentWorkspacePaths } from "../../../workspace/layout.js";
+} from "./artifacts.js";
+import type { RunAgentWorkspacePaths } from "./workspace.js";
 
 export interface EvalRunInput {
   evalPlan: readonly EvalDefinition[];
-  workspacePaths: AgentWorkspacePaths;
+  workspacePaths: RunAgentWorkspacePaths;
   baseRevisionSha: string;
   root: string;
   manifestEnv: Record<string, string>;
@@ -42,10 +42,7 @@ export async function runPostProcessingAndEvaluations(
 
   const artifacts = await collectAgentArtifacts({
     baseRevisionSha,
-    workspacePath: workspacePaths.workspacePath,
-    artifactsPath: workspacePaths.artifactsPath,
-    summaryPath: workspacePaths.summaryPath,
-    diffPath: workspacePaths.diffPath,
+    workspacePaths,
     root,
     environment,
     persona,

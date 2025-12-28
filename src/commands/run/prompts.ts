@@ -1,9 +1,15 @@
+import {
+  appendConstraints,
+  appendOutputRequirements,
+} from "../shared/prompt-helpers.js";
+
 export interface BuildAgentPromptOptions {
   specContent: string;
+  workspacePath: string;
 }
 
 export function buildAgentPrompt(options: BuildAgentPromptOptions): string {
-  const { specContent } = options;
+  const { specContent, workspacePath } = options;
 
   const lines = [
     "Implement the following task:",
@@ -11,12 +17,15 @@ export function buildAgentPrompt(options: BuildAgentPromptOptions): string {
     "```",
     specContent.trimEnd(),
     "```",
-    "",
-    "Constraints:",
-    "- You are running headlessly. Never pause for user interaction.",
-    "- You are sandboxed. If an operation is blocked, skip it and continue.",
-    "- When finished, write a 1-2 sentence summary to `.summary.txt` (in the workspace root).",
   ];
+
+  appendConstraints(lines, {
+    readAccess: workspacePath,
+    writeAccess: workspacePath,
+  });
+  appendOutputRequirements(lines, [
+    "- When finished, write a 1-2 sentence summary to `.summary.txt` (in the workspace root).",
+  ]);
 
   return `${lines.join("\n")}\n`;
 }

@@ -40,17 +40,6 @@ export async function preserveProviderChatTranscripts(
     return { status: "not-found" };
   }
 
-  const existing: { path: string; format: ChatArtifactFormat } | undefined =
-    await locateExistingChatArtifact(agentRoot);
-  if (existing !== undefined) {
-    const { path, format } = existing;
-    return {
-      status: "already-exists",
-      artifactPath: path,
-      format,
-    };
-  }
-
   let transcriptPaths: readonly string[];
   try {
     transcriptPaths = await findProviderTranscripts(providerId, agentRoot);
@@ -61,9 +50,19 @@ export async function preserveProviderChatTranscripts(
     };
   }
 
+  const existing: { path: string; format: ChatArtifactFormat } | undefined =
+    await locateExistingChatArtifact(agentRoot);
+
   const selection: TranscriptSelection | undefined =
     selectTranscriptFiles(transcriptPaths);
   if (!selection) {
+    if (existing !== undefined) {
+      return {
+        status: "already-exists",
+        artifactPath: existing.path,
+        format: existing.format,
+      };
+    }
     return { status: "not-found" };
   }
   const { format: selectionFormat, files } = selection;
@@ -87,7 +86,7 @@ export async function preserveProviderChatTranscripts(
       await concatenateJsonlTranscripts(files, artifactPath);
     }
     return {
-      status: "captured",
+      status: existing ? "already-exists" : "captured",
       artifactPath,
       format: selectionFormat,
       sourceCount: files.length,
