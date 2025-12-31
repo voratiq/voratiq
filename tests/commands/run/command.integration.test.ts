@@ -86,7 +86,7 @@ describe("executeRunCommand integration", () => {
     generateRunIdMock.mockReturnValue("run-xyz");
     const createdAt = "2025-11-10T00:00:00.000Z";
     const validationResult: ValidationResult = {
-      prompt: "Implement feature",
+      specContent: "Implement feature",
       baseRevisionSha: "abc123",
       agents: [
         {
@@ -244,7 +244,7 @@ describe("executeRunCommand integration", () => {
     generateRunIdMock.mockReturnValue("run-aborted");
     const createdAt = "2025-11-10T00:00:00.000Z";
     const validationResult: ValidationResult = {
-      prompt: "Implement feature",
+      specContent: "Implement feature",
       baseRevisionSha: "abc123",
       agents: [
         {

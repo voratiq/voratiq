@@ -14,7 +14,7 @@ export async function prepareAgents(options: {
   baseRevisionSha: string;
   runId: string;
   root: string;
-  prompt: string;
+  specContent: string;
   evalPlan: readonly EvalDefinition[];
   environment: EnvironmentConfig;
 }): Promise<AgentPreparationResult> {
@@ -23,7 +23,7 @@ export async function prepareAgents(options: {
     baseRevisionSha,
     runId,
     root,
-    prompt,
+    specContent,
     evalPlan,
     environment,
   } = options;
@@ -37,7 +37,7 @@ export async function prepareAgents(options: {
       baseRevisionSha,
       runId,
       root,
-      prompt,
+      specContent,
       evalPlan,
       environment,
     });

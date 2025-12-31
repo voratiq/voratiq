@@ -16,6 +16,7 @@ import { runAgentsWithLimit } from "../../../src/commands/run/agents.js";
 import { runPostProcessingAndEvaluations } from "../../../src/commands/run/agents/eval-runner.js";
 import { AgentRunContext } from "../../../src/commands/run/agents/run-context.js";
 import type { PreparedAgentExecution } from "../../../src/commands/run/agents/types.js";
+import { buildRunAgentWorkspacePaths } from "../../../src/commands/run/agents/workspace.js";
 import type { AgentExecutionResult } from "../../../src/commands/run/reports.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
@@ -227,22 +228,28 @@ async function createPreparedExecution(agentId = "agent-id"): Promise<{
   tempRoots.push(root);
 
   const runId = "run-id";
-  const workspacePaths = buildAgentWorkspacePaths({ root, runId, agentId });
+  const corePaths = buildAgentWorkspacePaths({ root, runId, agentId });
+  const workspacePaths = buildRunAgentWorkspacePaths({
+    root,
+    runId,
+    agentId,
+    corePaths,
+  });
 
-  await mkdir(workspacePaths.agentRoot, { recursive: true });
-  await mkdir(workspacePaths.workspacePath, { recursive: true });
+  await mkdir(corePaths.agentRoot, { recursive: true });
+  await mkdir(corePaths.workspacePath, { recursive: true });
   await mkdir(workspacePaths.evalsDirPath, { recursive: true });
-  await mkdir(workspacePaths.sandboxPath, { recursive: true });
-  await mkdir(workspacePaths.sandboxHomePath, { recursive: true });
-  await mkdir(workspacePaths.runtimePath, { recursive: true });
-  await ensureParentDirectory(workspacePaths.stdoutPath);
-  await ensureParentDirectory(workspacePaths.stderrPath);
+  await mkdir(corePaths.sandboxPath, { recursive: true });
+  await mkdir(corePaths.sandboxHomePath, { recursive: true });
+  await mkdir(corePaths.runtimePath, { recursive: true });
+  await ensureParentDirectory(corePaths.stdoutPath);
+  await ensureParentDirectory(corePaths.stderrPath);
   await ensureParentDirectory(workspacePaths.diffPath);
   await ensureParentDirectory(workspacePaths.summaryPath);
-  await ensureParentDirectory(workspacePaths.runtimeManifestPath);
-  await ensureParentDirectory(workspacePaths.sandboxSettingsPath);
-  await writeFile(workspacePaths.stdoutPath, "", "utf8");
-  await writeFile(workspacePaths.stderrPath, "", "utf8");
+  await ensureParentDirectory(corePaths.runtimeManifestPath);
+  await ensureParentDirectory(corePaths.sandboxSettingsPath);
+  await writeFile(corePaths.stdoutPath, "", "utf8");
+  await writeFile(corePaths.stderrPath, "", "utf8");
 
   const agent: AgentDefinition = {
     id: agentId,

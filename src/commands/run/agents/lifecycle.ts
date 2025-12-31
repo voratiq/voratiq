@@ -1,3 +1,4 @@
+import { detectAgentProcessFailureDetail } from "../../../agents/runtime/failures.js";
 import { runSandboxedAgent } from "../../../agents/runtime/harness.js";
 import type { SandboxFailFastInfo } from "../../../agents/runtime/sandbox.js";
 import {
@@ -17,7 +18,6 @@ import {
 } from "../errors.js";
 import type { AgentExecutionResult } from "../reports.js";
 import { runPostProcessingAndEvaluations } from "./eval-runner.js";
-import { detectAgentProcessFailureDetail } from "./failures.js";
 import { AgentRunContext } from "./run-context.js";
 import type { PreparedAgentExecution } from "./types.js";
 
@@ -119,7 +119,6 @@ export async function executeAgentLifecycle(
         processResult.watchdog?.trigger && processResult.errorMessage
           ? processResult.errorMessage
           : await detectAgentProcessFailureDetail({
-              agentId: agent.id,
               provider: agent.provider,
               stdoutPath: workspacePaths.stdoutPath,
               stderrPath: workspacePaths.stderrPath,

@@ -72,7 +72,7 @@ function formatAlert(alert: Alert): string {
       formatted = formatAlertMessage("Warning", "yellow", alert.message);
       break;
     case "info":
-      formatted = formatAlertMessage("Info", "cyan", alert.message);
+      formatted = alert.message;
       break;
   }
 

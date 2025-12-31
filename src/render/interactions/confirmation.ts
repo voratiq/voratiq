@@ -84,9 +84,9 @@ export function createConfirmationInteractor(
 
       const suffix =
         defaultValue && defaultValue.length > 0 ? ` [${defaultValue}]` : "";
-      const response = await readlineInterface.question(
-        `${message}${suffix}: `,
-      );
+      const isInlinePrompt = message.trim() === ">";
+      const promptLabel = isInlinePrompt ? "> " : `${message}${suffix}: `;
+      const response = await readlineInterface.question(promptLabel);
       if (response.trim().length === 0) {
         return defaultValue ?? "";
       }

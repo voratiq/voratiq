@@ -35,15 +35,11 @@ Note: Windows is not currently supported.
 # Initialize workspace
 voratiq init
 
-# Write a spec
-cat > specs/fix-auth.md <<EOF
-# Fix Session Timeout Bug
-Users are logged out after 5 minutes instead of 30.
-Sessions should honor SESSION_TIMEOUT_MS (default 30 minutes).
-EOF
+# Generate a spec
+voratiq spec --description "add dark mode toggle with localStorage persistence" --agent claude-opus-4-5-20251101 --yes
 
 # Run agents in parallel
-voratiq run --spec specs/fix-auth.md
+voratiq run --spec .voratiq/specs/add-dark-mode-toggle.md
 
 # Review results
 voratiq review --run <run-id>

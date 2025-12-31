@@ -16,9 +16,11 @@ import { writeCommandOutput } from "./cli/output.js";
 import { createPruneCommand } from "./cli/prune.js";
 import { createReviewCommand } from "./cli/review.js";
 import { createRunCommand } from "./cli/run.js";
+import { createSpecCommand } from "./cli/spec.js";
 import { terminateActiveRun } from "./commands/run/lifecycle.js";
 import { renderCliError } from "./render/utils/errors.js";
 import { flushAllRunRecordBuffers } from "./runs/records/persistence.js";
+import { flushAllSpecRecordBuffers } from "./specs/records/persistence.js";
 import { toErrorMessage } from "./utils/errors.js";
 import { getVoratiqVersion } from "./utils/version.js";
 
@@ -89,6 +91,13 @@ async function flushPendingHistory(): Promise<void> {
       `[voratiq] Failed to flush run history buffers: ${(error as Error).message}`,
     );
   }
+  try {
+    await flushAllSpecRecordBuffers();
+  } catch (error) {
+    console.warn(
+      `[voratiq] Failed to flush spec history buffers: ${(error as Error).message}`,
+    );
+  }
 }
 
 installProcessGuards();
@@ -108,6 +117,7 @@ export async function runCli(
 
   program.addCommand(createInitCommand());
   program.addCommand(createListCommand());
+  program.addCommand(createSpecCommand());
   program.addCommand(createRunCommand());
   program.addCommand(createReviewCommand());
   program.addCommand(createApplyCommand());

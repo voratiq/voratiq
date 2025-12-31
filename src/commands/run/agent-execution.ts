@@ -12,7 +12,7 @@ export interface AgentExecutionInput {
   readonly baseRevisionSha: string;
   readonly runId: string;
   readonly root: string;
-  readonly prompt: string;
+  readonly specContent: string;
   readonly evalPlan: readonly EvalDefinition[];
   readonly effectiveMaxParallel: number;
   readonly mutators: AgentRecordMutators;
@@ -30,7 +30,7 @@ export async function executeAgents(
     baseRevisionSha,
     runId,
     root,
-    prompt,
+    specContent,
     evalPlan,
     effectiveMaxParallel,
     mutators,
@@ -51,7 +51,7 @@ export async function executeAgents(
         baseRevisionSha,
         runId,
         root,
-        prompt,
+        specContent,
         evalPlan,
         environment,
       });

@@ -16,6 +16,8 @@ import {
   resolveWorkspacePath,
   VORATIQ_RUNS_DIR,
   VORATIQ_RUNS_FILE,
+  VORATIQ_SPECS_DIR,
+  VORATIQ_SPECS_FILE,
 } from "../workspace/structure.js";
 import {
   DirtyWorkingTreeError,
@@ -32,6 +34,8 @@ export interface WorkspacePaths {
   workspaceDir: string;
   runsDir: string;
   runsFile: string;
+  specsDir: string;
+  specsFile: string;
 }
 
 export interface CliContext {
@@ -61,6 +65,8 @@ export async function resolveCliContext(
     workspaceDir,
     runsDir: resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
     runsFile: resolveWorkspacePath(root, VORATIQ_RUNS_FILE),
+    specsDir: resolveWorkspacePath(root, VORATIQ_SPECS_DIR),
+    specsFile: resolveWorkspacePath(root, VORATIQ_SPECS_FILE),
   };
 
   return { root, workspacePaths };

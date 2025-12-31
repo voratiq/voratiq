@@ -1,3 +1,5 @@
+import { sanitizeSlug } from "../../utils/slug.js";
+
 export const MODEL_PLACEHOLDER = "{{MODEL}}" as const;
 
 export interface AgentDefault {
@@ -7,16 +9,13 @@ export interface AgentDefault {
 }
 
 export function sanitizeAgentIdFromModel(model: string): string {
-  const lowered = model.toLowerCase();
-  const replaced = lowered.replace(/[^a-z0-9]+/g, "-");
-  const collapsed = replaced.replace(/-+/g, "-");
-  const trimmed = collapsed.replace(/^-+/u, "").replace(/-+$/u, "");
-  if (!trimmed) {
+  const sanitized = sanitizeSlug(model);
+  if (!sanitized) {
     throw new Error(
       `Unable to derive agent id from model "${model}". Provide a model slug with at least one alphanumeric character.`,
     );
   }
-  return trimmed;
+  return sanitized;
 }
 
 export const DEFAULT_AGENT_DEFAULTS: readonly AgentDefault[] = [

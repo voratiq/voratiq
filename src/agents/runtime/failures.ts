@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import {
   CLAUDE_OAUTH_RELOGIN_HINT,
   CLAUDE_PROVIDER_ID,
-} from "../../../auth/providers/claude/constants.js";
+} from "../../auth/providers/claude/constants.js";
 
 const CLAUDE_FAILURE_PATTERNS = [
   /Please run \/login/i,
@@ -11,7 +11,6 @@ const CLAUDE_FAILURE_PATTERNS = [
 ];
 
 export interface AgentFailureDetectionInput {
-  agentId: string;
   provider: string;
   stdoutPath: string;
   stderrPath: string;

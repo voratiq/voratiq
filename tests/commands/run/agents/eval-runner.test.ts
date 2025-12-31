@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+import { collectAgentArtifacts } from "../../../../src/commands/run/agents/artifacts.js";
 import { runPostProcessingAndEvaluations } from "../../../../src/commands/run/agents/eval-runner.js";
+import { buildRunAgentWorkspacePaths } from "../../../../src/commands/run/agents/workspace.js";
 import { executeEvaluations } from "../../../../src/evals/runner.js";
-import { collectAgentArtifacts } from "../../../../src/workspace/agents.js";
 import { buildAgentWorkspacePaths } from "../../../../src/workspace/layout.js";
 
-jest.mock("../../../../src/workspace/agents.js", () => ({
+jest.mock("../../../../src/commands/run/agents/artifacts.js", () => ({
   collectAgentArtifacts: jest.fn(),
 }));
 
@@ -36,10 +37,16 @@ describe("runPostProcessingAndEvaluations", () => {
       warnings: ["lint logs unavailable"],
     });
 
-    const workspacePaths = buildAgentWorkspacePaths({
+    const corePaths = buildAgentWorkspacePaths({
       root: "/repo",
       runId: "run-abc",
       agentId: "agent-x",
+    });
+    const workspacePaths = buildRunAgentWorkspacePaths({
+      root: "/repo",
+      runId: "run-abc",
+      agentId: "agent-x",
+      corePaths,
     });
     const persona = {
       authorName: "Sandbox Persona",
@@ -63,7 +70,7 @@ describe("runPostProcessingAndEvaluations", () => {
     expect(collectAgentArtifactsMock).toHaveBeenCalledWith(
       expect.objectContaining({
         persona,
-        artifactsPath: workspacePaths.artifactsPath,
+        workspacePaths,
       }),
     );
     expect(executeEvaluationsMock).toHaveBeenCalledTimes(1);
