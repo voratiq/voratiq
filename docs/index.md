@@ -28,18 +28,13 @@ Creates `.voratiq/` with workspace scaffolding, agent catalog, and eval configs.
 
 ### Create a Spec
 
-Write a task specification in Markdown:
+Generate a task specification in Markdown:
 
 ```bash
-cat > specs/fix-auth-bug.md <<EOF
-# Fix Authentication Bug
-
-Users are logged out after 5 minutes instead of the configured session timeout.
-
-## Expected Behavior
-
-Sessions should respect the SESSION_TIMEOUT_MS environment variable (default 30 minutes).
-EOF
+voratiq spec \
+  --description "Fix authentication bug: users are logged out after 5 minutes instead of the configured session timeout. Sessions should respect SESSION_TIMEOUT_MS (default 30 minutes)." \
+  --agent claude-opus-4-5-20251101 \
+  --output specs/fix-auth-bug.md
 ```
 
 ### Run
