@@ -37,6 +37,8 @@ voratiq spec \
   --output specs/fix-auth-bug.md
 ```
 
+An agent converts the description into a Markdown spec, giving the workflow a single source of truth for runs and evals.
+
 ### Run
 
 ```bash
