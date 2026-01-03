@@ -1,6 +1,9 @@
-const RUN_TIME_ZONE = "America/Los_Angeles";
-const RUN_TIMESTAMP_FORMAT = new Intl.DateTimeFormat("en-CA", {
-  timeZone: RUN_TIME_ZONE,
+import {
+  createLocalDateTimeFormatter,
+  formatLocalTimeZoneLabel,
+} from "./timezone.js";
+
+const RUN_TIMESTAMP_FORMAT = createLocalDateTimeFormatter({
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
@@ -30,7 +33,9 @@ export function formatRunTimestamp(isoTimestamp: string): string {
       return isoTimestamp;
     }
 
-    return `${year}-${month}-${day} ${hour}:${minute}`;
+    const timeZoneLabel = formatLocalTimeZoneLabel(date);
+
+    return `${year}-${month}-${day} ${hour}:${minute} ${timeZoneLabel}`;
   } catch {
     return isoTimestamp;
   }

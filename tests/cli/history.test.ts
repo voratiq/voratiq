@@ -15,6 +15,7 @@ import { promisify } from "node:util";
 import { executePruneCommand } from "../../src/commands/prune/command.js";
 import type { PruneSuccessResult } from "../../src/commands/prune/types.js";
 import type { ConfirmationOptions } from "../../src/render/interactions/confirmation.js";
+import { formatRunTimestamp } from "../../src/render/utils/records.js";
 import { appendRunRecord } from "../../src/runs/records/persistence.js";
 import type {
   AgentInvocationRecord,
@@ -154,11 +155,12 @@ describe("voratiq prune (integration)", () => {
     const normalizedPrefaceLines = prefaceLines.map((line) =>
       stripAnsi(line).trimEnd(),
     );
+    const expectedCreated = formatRunTimestamp(runRecord.createdAt);
     expect(normalizedPrefaceLines).toEqual([
       "",
       `${runId} SUCCEEDED`,
       "",
-      "Created    2025-10-15 03:00",
+      `Created    ${expectedCreated}`,
       "Spec       specs/sample.md",
       `Workspace  ${formatWorkspacePath("runs", "sessions", runId)}`,
       "",
@@ -326,11 +328,12 @@ describe("voratiq prune (integration)", () => {
     const normalizedPrefaceLines = prefaceLines.map((line) =>
       stripAnsi(line).trimEnd(),
     );
+    const expectedCreated = formatRunTimestamp(runRecord.createdAt);
     expect(normalizedPrefaceLines).toEqual([
       "",
       `${runId} SUCCEEDED`,
       "",
-      "Created    2025-10-15 04:00",
+      `Created    ${expectedCreated}`,
       "Spec       specs/purge.md",
       `Workspace  ${formatWorkspacePath("runs", "sessions", runId)}`,
       "",

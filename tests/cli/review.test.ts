@@ -17,6 +17,7 @@ import {
   formatAgentBadge,
   formatRunBadge,
 } from "../../src/render/utils/badges.js";
+import { formatRunTimestamp } from "../../src/render/utils/records.js";
 import { appendRunRecord } from "../../src/runs/records/persistence.js";
 import type {
   AgentEvalSnapshot,
@@ -120,7 +121,8 @@ describe("voratiq review", () => {
       expect(normalizedBody).toContain("RUNTIME PATH");
       expect(normalizedBody).toContain("manifest runtime/manifest.json");
       expect(normalizedBody).toContain("sandbox runtime/sandbox.json");
-      expect(normalizedBody).toContain("Created 2025-10-08 11:00");
+      const expectedCreated = formatRunTimestamp(runRecord.createdAt);
+      expect(normalizedBody).toContain(`Created ${expectedCreated}`);
       expect(normalizedBody).toContain("Base Revision abc1234");
       const expectedHeader = `  ${formatAgentBadge("claude")} ${colorize(
         "SUCCEEDED",
