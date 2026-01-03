@@ -1,4 +1,5 @@
 import { renderRunList } from "../../src/render/transcripts/list.js";
+import { formatRunTimestamp } from "../../src/render/utils/records.js";
 import type { RunRecord } from "../../src/runs/records/types.js";
 import { createRunRecord } from "../support/factories/run-records.js";
 
@@ -22,7 +23,9 @@ describe("renderRunList", () => {
     expect(lines[1]).toContain("SUCCEEDED");
     expect(lines[1]).toContain("specs/onboarding-ux.md");
     expect(lines[1]).toContain("20251016-133651-woeqr");
-    expect(lines[1]).toContain("2025-10-16");
+    const expectedTimestamp = formatRunTimestamp(records[0].createdAt);
+    expect(expectedTimestamp).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \S+$/);
+    expect(lines[1]).toContain(expectedTimestamp);
   });
 
   it("renders status values for each record", () => {
