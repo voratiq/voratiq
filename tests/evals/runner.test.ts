@@ -17,7 +17,7 @@ describe("executeEvaluations", () => {
     mockedSpawnStreamingProcess.mockReset();
   });
 
-  it("injects workspace test flag into eval environment", async () => {
+  it("passes environment overrides to eval subprocess", async () => {
     const workspaceRoot = await mkdtemp(join(tmpdir(), "voratiq-runner-"));
     const logsDirectory = join(workspaceRoot, "logs");
     const envOverrides: NodeJS.ProcessEnv = {
@@ -49,7 +49,6 @@ describe("executeEvaluations", () => {
     const spawnCall = mockedSpawnStreamingProcess.mock.calls[0][0];
     expect(spawnCall.env).toMatchObject({
       CUSTOM_FLAG: "enabled",
-      VORATIQ_WORKSPACE_TESTS: "1",
     });
     expect(spawnCall.env).not.toBe(envOverrides);
     expect(envOverrides).toEqual({ CUSTOM_FLAG: "enabled" });

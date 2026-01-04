@@ -73,10 +73,6 @@ export async function executeEvaluations(
     }
 
     try {
-      logStream.write(
-        "[voratiq] Injecting VORATIQ_WORKSPACE_TESTS=1 for workspace evals\n",
-      );
-
       const { exitCode: code, signal } = await spawnStreamingProcess({
         command,
         cwd,
@@ -119,7 +115,6 @@ function composeEvalEnvironment(
 ): NodeJS.ProcessEnv {
   return {
     ...overrides,
-    VORATIQ_WORKSPACE_TESTS: "1",
   };
 }
 

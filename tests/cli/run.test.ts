@@ -27,7 +27,9 @@ import type { RunIndexPayload } from "../support/types/persistence.js";
 const ANSI_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 
 // Skip agent-spawning integration tests in nested agent workspaces to break recursive eval loops.
-const runningInWorkspace = process.env.VORATIQ_WORKSPACE_TESTS === "1";
+// Agent spawning is structurally impossible from within a sandboxed environment.
+const cwd = process.cwd().replace(/\\/g, "/");
+const runningInWorkspace = cwd.includes("/.voratiq/runs/");
 const suite =
   runningInWorkspace || !isSandboxRuntimeSupported() ? describe.skip : describe;
 const RUN_INTEGRATION_TIMEOUT_MS = 60_000;

@@ -35,7 +35,9 @@ import {
 } from "../support/sandbox-requirements.js";
 
 // Skip agent-spawning integration tests in nested agent workspaces to break recursive eval loops.
-const runningInWorkspace = process.env.VORATIQ_WORKSPACE_TESTS === "1";
+// Agent spawning is structurally impossible from within a sandboxed environment.
+const cwd = process.cwd().replace(/\\/g, "/");
+const runningInWorkspace = cwd.includes("/.voratiq/runs/");
 const suite = runningInWorkspace ? describe.skip : describe;
 const AGENT_TEST_TIMEOUT_MS = 30_000;
 

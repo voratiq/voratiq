@@ -1,13 +1,15 @@
 /** @type {import('jest').Config} */
 const tsJestTransformer = "ts-jest";
-const runningInWorkspace = process.env.VORATIQ_WORKSPACE_TESTS === "1";
 
-const runsIgnorePattern = String.raw`/\.voratiq/runs/`;
+// Build a cwd-anchored pattern to ignore .voratiq/ directories that are children of the current
+// working directory. This allows tests inside .voratiq/runs/.../workspace to run without ignoring
+// themselves, while tests at the repo root ignore nested .voratiq/ directories.
+const cwd = process.cwd().replace(/\\/g, "/");
+const escapedCwd = cwd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const childVoratiqPattern = `^${escapedCwd}/.*\\.voratiq/`;
+
 const scratchIgnorePattern = String.raw`/\.internal/scratch/`;
-const workspaceIgnorePatterns = runningInWorkspace ? [] : [runsIgnorePattern];
-const sharedIgnorePatterns = runningInWorkspace
-  ? [scratchIgnorePattern]
-  : [...workspaceIgnorePatterns, scratchIgnorePattern, String.raw`/\.voratiq/`];
+const sharedIgnorePatterns = [childVoratiqPattern, scratchIgnorePattern];
 
 const moduleNameMapper = {
   "^chalk$": "<rootDir>/tests/support/mocks/chalk.ts",
