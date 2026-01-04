@@ -6,12 +6,6 @@ JEST_BIN="$ROOT_DIR/node_modules/jest/bin/jest.js"
 
 export VORATIQ_SUPPRESS_RUN_STATUS_TABLE="${VORATIQ_SUPPRESS_RUN_STATUS_TABLE:-true}"
 
-# Automatically flip workspace-aware test discovery on when running from a
-# sandbox workspace copy so Jest doesn't ignore every test path.
-if [[ "${VORATIQ_WORKSPACE_TESTS:-}" != "1" && "${ROOT_DIR}" == *"/.voratiq/runs/"* ]]; then
-  export VORATIQ_WORKSPACE_TESTS=1
-fi
-
 sandbox_only=false
 passthrough=()
 
