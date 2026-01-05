@@ -14,6 +14,8 @@ import {
 import { validateWorkspace } from "../workspace/setup.js";
 import {
   resolveWorkspacePath,
+  VORATIQ_REVIEWS_DIR,
+  VORATIQ_REVIEWS_FILE,
   VORATIQ_RUNS_DIR,
   VORATIQ_RUNS_FILE,
   VORATIQ_SPECS_DIR,
@@ -34,6 +36,8 @@ export interface WorkspacePaths {
   workspaceDir: string;
   runsDir: string;
   runsFile: string;
+  reviewsDir: string;
+  reviewsFile: string;
   specsDir: string;
   specsFile: string;
 }
@@ -65,6 +69,8 @@ export async function resolveCliContext(
     workspaceDir,
     runsDir: resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
     runsFile: resolveWorkspacePath(root, VORATIQ_RUNS_FILE),
+    reviewsDir: resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR),
+    reviewsFile: resolveWorkspacePath(root, VORATIQ_REVIEWS_FILE),
     specsDir: resolveWorkspacePath(root, VORATIQ_SPECS_DIR),
     specsFile: resolveWorkspacePath(root, VORATIQ_SPECS_FILE),
   };
