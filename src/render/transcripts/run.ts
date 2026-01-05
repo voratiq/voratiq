@@ -370,7 +370,7 @@ export function createRunRenderer(
       });
 
       const hint = {
-        message: `To review results:\n  voratiq review --run ${report.runId}`,
+        message: `To review results:\n  voratiq review --run ${report.runId} --agent <agent-id>`,
       };
 
       const sections = stdout.isTTY

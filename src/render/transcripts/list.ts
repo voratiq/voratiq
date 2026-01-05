@@ -51,7 +51,7 @@ export function renderListTranscript(records: readonly RunRecord[]): string {
     sections,
     hint: {
       message:
-        "To review a run in more detail:\n  voratiq review --run <run-id>",
+        "To review a run in more detail:\n  voratiq review --run <run-id> --agent <agent-id>",
     },
   });
 }
