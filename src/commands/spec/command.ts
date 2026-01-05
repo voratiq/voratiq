@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { detectAgentProcessFailureDetail } from "../../agents/runtime/failures.js";
@@ -38,6 +38,7 @@ import {
   getSpecsDirectoryPath,
   VORATIQ_SPECS_DIR,
 } from "../../workspace/structure.js";
+import { pruneWorkspace } from "../shared/prune.js";
 import {
   SpecAgentNotFoundError,
   SpecError,
@@ -626,10 +627,6 @@ async function writeFeedbackArtifact(options: {
   const feedbackPath = resolvePath(draftDir, "feedback.txt");
   await writeFile(feedbackPath, `${feedback.trim()}\n`, "utf8");
   return normalizePathForDisplay(relativeToRoot(root, feedbackPath));
-}
-
-async function pruneWorkspace(workspacePath: string): Promise<void> {
-  await rm(workspacePath, { recursive: true, force: true }).catch(() => {});
 }
 
 async function findUniqueOutputPath(desiredPath: string): Promise<string> {

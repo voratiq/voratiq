@@ -19,6 +19,7 @@ import { createRunCommand } from "./cli/run.js";
 import { createSpecCommand } from "./cli/spec.js";
 import { terminateActiveRun } from "./commands/run/lifecycle.js";
 import { renderCliError } from "./render/utils/errors.js";
+import { flushAllReviewRecordBuffers } from "./reviews/records/persistence.js";
 import { flushAllRunRecordBuffers } from "./runs/records/persistence.js";
 import { flushAllSpecRecordBuffers } from "./specs/records/persistence.js";
 import { toErrorMessage } from "./utils/errors.js";
@@ -89,6 +90,13 @@ async function flushPendingHistory(): Promise<void> {
   } catch (error) {
     console.warn(
       `[voratiq] Failed to flush run history buffers: ${(error as Error).message}`,
+    );
+  }
+  try {
+    await flushAllReviewRecordBuffers();
+  } catch (error) {
+    console.warn(
+      `[voratiq] Failed to flush review history buffers: ${(error as Error).message}`,
     );
   }
   try {

@@ -16,6 +16,9 @@ import {
   VORATIQ_AGENTS_FILE,
   VORATIQ_ENVIRONMENT_FILE,
   VORATIQ_EVALS_FILE,
+  VORATIQ_REVIEWS_DIR,
+  VORATIQ_REVIEWS_FILE,
+  VORATIQ_REVIEWS_SESSIONS_DIR,
   VORATIQ_RUNS_DIR,
   VORATIQ_RUNS_FILE,
   VORATIQ_RUNS_SESSIONS_DIR,
@@ -45,10 +48,16 @@ export async function createWorkspace(
   }
 
   const runsDir = resolveWorkspacePath(root, VORATIQ_RUNS_DIR);
+  const reviewsDir = resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR);
   const specsDir = resolveWorkspacePath(root, VORATIQ_SPECS_DIR);
   if (!(await pathExists(runsDir))) {
     await mkdir(runsDir, { recursive: true });
     createdDirectories.push(relativeToRoot(root, runsDir));
+  }
+
+  if (!(await pathExists(reviewsDir))) {
+    await mkdir(reviewsDir, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, reviewsDir));
   }
 
   if (!(await pathExists(specsDir))) {
@@ -57,6 +66,10 @@ export async function createWorkspace(
   }
 
   const sessionsDir = resolveWorkspacePath(root, VORATIQ_RUNS_SESSIONS_DIR);
+  const reviewSessionsDir = resolveWorkspacePath(
+    root,
+    VORATIQ_REVIEWS_SESSIONS_DIR,
+  );
   const specSessionsDir = resolveWorkspacePath(
     root,
     VORATIQ_SPECS_SESSIONS_DIR,
@@ -66,17 +79,31 @@ export async function createWorkspace(
     createdDirectories.push(relativeToRoot(root, sessionsDir));
   }
 
+  if (!(await pathExists(reviewSessionsDir))) {
+    await mkdir(reviewSessionsDir, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, reviewSessionsDir));
+  }
+
   if (!(await pathExists(specSessionsDir))) {
     await mkdir(specSessionsDir, { recursive: true });
     createdDirectories.push(relativeToRoot(root, specSessionsDir));
   }
 
   const runsIndexPath = resolveWorkspacePath(root, VORATIQ_RUNS_FILE);
+  const reviewsIndexPath = resolveWorkspacePath(root, VORATIQ_REVIEWS_FILE);
   const specsIndexPath = resolveWorkspacePath(root, VORATIQ_SPECS_FILE);
   if (!(await pathExists(runsIndexPath))) {
     const initialIndex = JSON.stringify({ version: 2, sessions: [] }, null, 2);
     await writeFile(runsIndexPath, `${initialIndex}\n`, { encoding: "utf8" });
     createdFiles.push(relativeToRoot(root, runsIndexPath));
+  }
+
+  if (!(await pathExists(reviewsIndexPath))) {
+    const initialIndex = JSON.stringify({ version: 1, sessions: [] }, null, 2);
+    await writeFile(reviewsIndexPath, `${initialIndex}\n`, {
+      encoding: "utf8",
+    });
+    createdFiles.push(relativeToRoot(root, reviewsIndexPath));
   }
 
   if (!(await pathExists(specsIndexPath))) {
@@ -126,13 +153,19 @@ export async function createWorkspace(
 export async function validateWorkspace(root: string): Promise<void> {
   const workspaceDir = resolveWorkspacePath(root);
   const runsDir = resolveWorkspacePath(root, VORATIQ_RUNS_DIR);
+  const reviewsDir = resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR);
   const specsDir = resolveWorkspacePath(root, VORATIQ_SPECS_DIR);
   const sessionsDir = resolveWorkspacePath(root, VORATIQ_RUNS_SESSIONS_DIR);
+  const reviewSessionsDir = resolveWorkspacePath(
+    root,
+    VORATIQ_REVIEWS_SESSIONS_DIR,
+  );
   const specSessionsDir = resolveWorkspacePath(
     root,
     VORATIQ_SPECS_SESSIONS_DIR,
   );
   const runsIndexPath = resolveWorkspacePath(root, VORATIQ_RUNS_FILE);
+  const reviewsIndexPath = resolveWorkspacePath(root, VORATIQ_REVIEWS_FILE);
   const specsIndexPath = resolveWorkspacePath(root, VORATIQ_SPECS_FILE);
   const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const evalsConfigPath = resolveWorkspacePath(root, VORATIQ_EVALS_FILE);
@@ -146,10 +179,13 @@ export async function validateWorkspace(root: string): Promise<void> {
     const missingEntries = [
       `${relativeToRoot(root, workspaceDir)}/`,
       `${relativeToRoot(root, runsDir)}/`,
+      `${relativeToRoot(root, reviewsDir)}/`,
       `${relativeToRoot(root, specsDir)}/`,
       `${relativeToRoot(root, sessionsDir)}/`,
+      `${relativeToRoot(root, reviewSessionsDir)}/`,
       `${relativeToRoot(root, specSessionsDir)}/`,
       relativeToRoot(root, runsIndexPath),
+      relativeToRoot(root, reviewsIndexPath),
       relativeToRoot(root, specsIndexPath),
       relativeToRoot(root, agentsConfigPath),
       relativeToRoot(root, environmentConfigPath),
@@ -164,6 +200,11 @@ export async function validateWorkspace(root: string): Promise<void> {
   );
 
   await ensureDirectoryExists(
+    reviewsDir,
+    () => new WorkspaceMissingEntryError(relativeToRoot(root, reviewsDir)),
+  );
+
+  await ensureDirectoryExists(
     specsDir,
     () => new WorkspaceMissingEntryError(relativeToRoot(root, specsDir)),
   );
@@ -174,6 +215,12 @@ export async function validateWorkspace(root: string): Promise<void> {
   );
 
   await ensureDirectoryExists(
+    reviewSessionsDir,
+    () =>
+      new WorkspaceMissingEntryError(relativeToRoot(root, reviewSessionsDir)),
+  );
+
+  await ensureDirectoryExists(
     specSessionsDir,
     () => new WorkspaceMissingEntryError(relativeToRoot(root, specSessionsDir)),
   );
@@ -181,6 +228,12 @@ export async function validateWorkspace(root: string): Promise<void> {
   await ensureFileExists(
     runsIndexPath,
     () => new WorkspaceMissingEntryError(relativeToRoot(root, runsIndexPath)),
+  );
+
+  await ensureFileExists(
+    reviewsIndexPath,
+    () =>
+      new WorkspaceMissingEntryError(relativeToRoot(root, reviewsIndexPath)),
   );
 
   await ensureFileExists(

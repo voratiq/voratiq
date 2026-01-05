@@ -11,6 +11,9 @@ export const VORATIQ_DIR = ".voratiq";
 export const VORATIQ_RUNS_DIR = "runs";
 export const VORATIQ_RUNS_FILE = "runs/index.json";
 export const VORATIQ_RUNS_SESSIONS_DIR = "runs/sessions";
+export const VORATIQ_REVIEWS_DIR = "reviews";
+export const VORATIQ_REVIEWS_FILE = "reviews/index.json";
+export const VORATIQ_REVIEWS_SESSIONS_DIR = "reviews/sessions";
 export const VORATIQ_SPECS_DIR = "specs";
 export const VORATIQ_SPECS_FILE = "specs/index.json";
 export const VORATIQ_SPECS_SESSIONS_DIR = "specs/sessions";
@@ -34,6 +37,7 @@ export const REVIEW_FILENAME = "review.md";
 export const RUNTIME_DIRNAME = "runtime";
 export const ARTIFACTS_DIRNAME = "artifacts";
 export const MANIFEST_FILENAME = "manifest.json";
+export const REVIEW_ARTIFACT_INFO_FILENAME = "artifact-information.json";
 export const SANDBOX_DIRNAME = "sandbox";
 export const SANDBOX_SETTINGS_FILENAME = "sandbox.json";
 
