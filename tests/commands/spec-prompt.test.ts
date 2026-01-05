@@ -4,9 +4,9 @@ describe("buildSpecDraftPrompt", () => {
   it("includes required headings, structure, and constraints", () => {
     const prompt = buildSpecDraftPrompt({
       description: "Define the onboarding flow.",
-      draftOutputPath: "spec.md",
+      outputPath: "spec.md",
       repoRootPath: "/repo",
-      workspaceRootPath: "/repo/.voratiq/specs/sessions/123/workspace",
+      workspacePath: "/repo/.voratiq/specs/sessions/123/workspace",
     });
 
     expect(prompt).toContain("Structure (when needed):");
@@ -33,9 +33,9 @@ describe("buildSpecDraftPrompt", () => {
       description: "Define the onboarding flow.",
       previousDraft: "# Draft\nOld details",
       feedback: "Tighten scope",
-      draftOutputPath: "spec.md",
+      outputPath: "spec.md",
       repoRootPath: "/repo",
-      workspaceRootPath: "/repo/.voratiq/specs/sessions/123/workspace",
+      workspacePath: "/repo/.voratiq/specs/sessions/123/workspace",
     });
 
     expect(prompt).toContain("Previous draft to refine:");

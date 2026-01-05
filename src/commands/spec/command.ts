@@ -39,6 +39,7 @@ import {
   VORATIQ_SPECS_DIR,
 } from "../../workspace/structure.js";
 import { pruneWorkspace } from "../shared/prune.js";
+import { generateSessionId } from "../shared/session-id.js";
 import {
   SpecAgentNotFoundError,
   SpecError,
@@ -46,7 +47,6 @@ import {
   SpecOutputExistsError,
   SpecOutputPathError,
 } from "./errors.js";
-import { generateSpecSessionId } from "./id.js";
 import { buildDraftPreviewLines } from "./preview.js";
 import { buildSpecDraftPrompt } from "./prompt.js";
 
@@ -136,7 +136,7 @@ export async function executeSpecCommand(
 
   await mkdir(dirname(outputAbsolute), { recursive: true });
 
-  const sessionId = generateSpecSessionId();
+  const sessionId = generateSessionId();
   const createdAt = new Date().toISOString();
 
   const workspacePaths = await buildSpecWorkspace({
@@ -431,9 +431,9 @@ async function runDraftIteration(options: {
     title: specTitle,
     feedback,
     previousDraft,
-    draftOutputPath: draftRelative,
+    outputPath: draftRelative,
     repoRootPath: root,
-    workspaceRootPath: workspacePaths.workspacePath,
+    workspacePath: workspacePaths.workspacePath,
   });
 
   try {

@@ -11,9 +11,9 @@ export interface BuildReviewPromptOptions {
   createdAt: string;
   completedAt?: string;
   artifactInfoPath: string;
-  reviewOutputPath: string;
+  outputPath: string;
   repoRootPath: string;
-  reviewWorkspaceRoot: string;
+  workspacePath: string;
 }
 
 export function buildReviewPrompt(options: BuildReviewPromptOptions): string {
@@ -25,9 +25,9 @@ export function buildReviewPrompt(options: BuildReviewPromptOptions): string {
     createdAt,
     completedAt,
     artifactInfoPath,
-    reviewOutputPath,
+    outputPath,
     repoRootPath,
-    reviewWorkspaceRoot,
+    workspacePath,
   } = options;
 
   const lines: string[] = [
@@ -95,10 +95,10 @@ export function buildReviewPrompt(options: BuildReviewPromptOptions): string {
 
   appendConstraints(lines, {
     readAccess: repoRootPath,
-    writeAccess: reviewWorkspaceRoot,
+    writeAccess: workspacePath,
   });
   appendOutputRequirements(lines, [
-    `- Save the full review to \`${reviewOutputPath}\` in the workspace root.`,
+    `- Save the full review to \`${outputPath}\` in the workspace root.`,
   ]);
 
   return `${lines.join("\n")}\n`;

@@ -11,7 +11,7 @@ function generateSlug(length: number): string {
   return slug;
 }
 
-export function generateSpecSessionId(now = new Date()): string {
+export function generateSessionId(now = new Date()): string {
   const pad = (value: number) => value.toString().padStart(2, "0");
   const year = now.getUTCFullYear();
   const month = pad(now.getUTCMonth() + 1);

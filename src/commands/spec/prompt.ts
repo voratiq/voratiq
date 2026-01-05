@@ -8,9 +8,9 @@ export interface BuildSpecPromptOptions {
   title?: string;
   feedback?: string;
   previousDraft?: string;
-  draftOutputPath: string;
+  outputPath: string;
   repoRootPath: string;
-  workspaceRootPath: string;
+  workspacePath: string;
 }
 
 export function buildSpecDraftPrompt(options: BuildSpecPromptOptions): string {
@@ -19,9 +19,9 @@ export function buildSpecDraftPrompt(options: BuildSpecPromptOptions): string {
     title,
     feedback,
     previousDraft,
-    draftOutputPath,
+    outputPath,
     repoRootPath,
-    workspaceRootPath,
+    workspacePath,
   } = options;
 
   const lines: string[] = [
@@ -49,10 +49,10 @@ export function buildSpecDraftPrompt(options: BuildSpecPromptOptions): string {
 
   appendConstraints(lines, {
     readAccess: repoRootPath,
-    writeAccess: workspaceRootPath,
+    writeAccess: workspacePath,
   });
   appendOutputRequirements(lines, [
-    `- Save the full spec to \`${draftOutputPath}\` in the workspace root.`,
+    `- Save the full spec to \`${outputPath}\` in the workspace root.`,
   ]);
 
   if (previousDraft && previousDraft.trim().length > 0) {

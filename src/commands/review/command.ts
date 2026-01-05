@@ -35,12 +35,12 @@ import {
 } from "../../workspace/structure.js";
 import { RunNotFoundCliError } from "../errors.js";
 import { pruneWorkspace } from "../shared/prune.js";
+import { generateSessionId } from "../shared/session-id.js";
 import {
   ReviewAgentNotFoundError,
   ReviewGenerationFailedError,
   ReviewNoAgentsConfiguredError,
 } from "./errors.js";
-import { generateReviewSessionId } from "./id.js";
 import { buildReviewManifest } from "./manifest.js";
 import { buildReviewPrompt } from "./prompt.js";
 
@@ -88,7 +88,7 @@ export async function executeReviewCommand(
 
   const agent = resolveReviewAgent({ agentId, root });
   const environment = loadEnvironmentConfig({ root });
-  const reviewId = generateReviewSessionId();
+  const reviewId = generateSessionId();
   const createdAt = new Date().toISOString();
 
   const workspacePaths = await buildReviewWorkspace({
@@ -147,9 +147,9 @@ export async function executeReviewCommand(
       createdAt: enhanced.createdAt,
       completedAt: manifest.run.completedAt,
       artifactInfoPath: REVIEW_ARTIFACT_INFO_FILENAME,
-      reviewOutputPath: REVIEW_FILENAME,
+      outputPath: REVIEW_FILENAME,
       repoRootPath: root,
-      reviewWorkspaceRoot: workspacePaths.workspacePath,
+      workspacePath: workspacePaths.workspacePath,
     });
 
     const result = await runSandboxedAgent({
