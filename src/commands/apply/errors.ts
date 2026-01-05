@@ -43,7 +43,9 @@ export class ApplyAgentNotFoundError extends ApplyError {
     super(
       `Agent ${agentId} not found in run ${runId}.`,
       [],
-      [`To review run information: voratiq review --run ${runId}.`],
+      [
+        `To review run information: voratiq review --run ${runId} --agent <agent-id>.`,
+      ],
     );
     this.name = "ApplyAgentNotFoundError";
   }
@@ -55,7 +57,7 @@ export class ApplyAgentDiffNotRecordedError extends ApplyError {
     public readonly agentId: string,
   ) {
     super(`Agent ${agentId} did not record a diff for run ${runId}.`, [
-      `Select an agent that produced a diff via \`voratiq review --run ${runId}\`.`,
+      `Select an agent that produced a diff via \`voratiq review --run ${runId} --agent <agent-id>\`.`,
     ]);
     this.name = "ApplyAgentDiffNotRecordedError";
   }
