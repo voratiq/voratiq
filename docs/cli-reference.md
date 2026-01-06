@@ -189,10 +189,10 @@ Note: the run itself completes, but the exit code indicates failure.
 
 ```bash
 # Run all enabled agents against a spec
-voratiq run --spec specs/fix-auth-bug.md
+voratiq run --spec .voratiq/specs/fix-auth-bug.md
 
 # Limit concurrency to 2 agents at a time
-voratiq run --spec specs/refactor.md --max-parallel 2
+voratiq run --spec .voratiq/specs/refactor.md --max-parallel 2
 ```
 
 ### Errors
@@ -312,7 +312,7 @@ voratiq list
 voratiq list --limit 10
 
 # List runs for a specific spec
-voratiq list --spec specs/fix-auth-bug.md
+voratiq list --spec .voratiq/specs/fix-auth-bug.md
 
 # Show a specific run
 voratiq list --run 20251031-232802-abc123
