@@ -218,7 +218,7 @@ voratiq review --run <run-id> --agent <agent-id>
 
 ### Behavior
 
-Invokes the specified reviewer agent in headless mode. The agent reads run artifacts under `.voratiq/runs/sessions/<run-id>/` and writes its analysis to `.voratiq/reviews/<run-id>/<agent-id>/review.md`. Execution is one-shot—there is no interactive accept/refine loop.
+Invokes the specified reviewer agent in headless mode. The agent reads run artifacts under `.voratiq/runs/sessions/<run-id>/` and writes its analysis to `.voratiq/reviews/sessions/<review-id>/<agent-id>/artifacts/review.md`. Execution is one-shot—there is no interactive accept/refine loop.
 
 ### Examples
 
@@ -297,7 +297,7 @@ voratiq list [--limit <n>] [--spec <path>] [--run <run-id>] [--include-pruned]
 
 ### Behavior
 
-Reads `.voratiq/runs/index.json` plus per-run `record.json` files and renders a table with run ID, status, spec path, and creation timestamp.
+Reads `.voratiq/runs/index.json` plus per-run `record.json` files in `.voratiq/runs/sessions/<run-id>/record.json` and renders a table with run ID, status, spec path, and creation timestamp.
 
 ### Examples
 
