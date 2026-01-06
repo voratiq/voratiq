@@ -23,7 +23,7 @@ Each agent entry supports:
 - `model` (required) – provider-specific model slug, e.g. `claude-sonnet-4-5-20250929`, `gpt-5.1-codex-max`, `gemini-2.5-pro`.
 - `enabled` (optional, default `true`) – set to `false` to keep a definition without executing it.
 - `binary` (optional, default empty string) – absolute path to the agent executable.
-- `extraArgs` (optional) – array of additional agent CLI arguments.
+- `extraArgs` (optional) – array of additional agent CLI arguments (non-empty; cannot include `--model` or `{{MODEL}}`).
 
 ## `agents.yaml` Examples
 

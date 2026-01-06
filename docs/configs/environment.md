@@ -33,6 +33,12 @@ Each language entry may be:
 
 - `path` (required) – path to a virtual environment directory.
 
+Path constraints (both Node and Python):
+
+- Paths must be repository-relative (no absolute paths).
+- Paths cannot include `..`.
+- Use forward slashes (`/`), not backslashes.
+
 ## `environment.yaml` Examples
 
 ### Node Dependencies

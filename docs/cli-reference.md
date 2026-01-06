@@ -32,12 +32,14 @@ voratiq init [-y, --yes]
 Creates:
 
 - `.voratiq/` directory
-- `runs/` and subdirectories for run data
-- `specs/` and subdirectories for spec data
+- `runs/` and subdirectories for run data (including `runs/sessions/`)
+- `specs/` and subdirectories for spec data (including `specs/sessions/`)
+- `reviews/` and subdirectories for review data (including `reviews/sessions/`)
 - `agents.yaml` with detected agent binaries
 - `evals.yaml` with common eval commands
 - `environment.yaml` with environment settings
 - `sandbox.yaml` with sandbox policies
+- `index.json` files under `runs/`, `specs/`, and `reviews/`
 
 Detects common agent binaries (`claude`, `codex`, `gemini`, etc.) on `$PATH` and pre-populates `agents.yaml`.
 
@@ -56,8 +58,9 @@ voratiq init -y
 ### Errors
 
 - Repository is not a git repo
-- `.voratiq/` already exists
 - Insufficient permissions to create files
+
+If `.voratiq/` already exists, `voratiq init` fills any missing files and directories.
 
 ## voratiq spec
 
