@@ -223,7 +223,7 @@ Invokes the specified reviewer agent in headless mode. The agent reads run artif
 ### Examples
 
 ```bash
-voratiq review --run 20251031-232802-abc123 --agent claude-opus-4-5-20251101
+voratiq review --run 20251031-232802-abc123 --agent gpt-5-2-codex
 ```
 
 ### Errors
@@ -265,10 +265,10 @@ Common `git apply` failures:
 
 ```bash
 # Apply agent's diff (with base check)
-voratiq apply --run 20251031-232802-abc123 --agent claude
+voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh
 
 # Apply diff, ignoring base mismatch
-voratiq apply --run 20251031-232802-abc123 --agent claude --ignore-base-mismatch
+voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh --ignore-base-mismatch
 ```
 
 ### Errors

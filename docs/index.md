@@ -33,7 +33,7 @@ Generate a task specification in Markdown:
 ```bash
 voratiq spec \
   --description "Fix authentication bug: users are logged out after 5 minutes instead of the configured session timeout. Sessions should respect SESSION_TIMEOUT_MS (default 30 minutes)." \
-  --agent claude-opus-4-5-20251101 \
+  --agent <agent-id> \
   --output specs/fix-auth-bug.md
 ```
 
@@ -69,7 +69,7 @@ Applies the selected agent's diff using `git apply`.
 voratiq prune --run <run-id>
 ```
 
-Removes run artifacts and workspaces. Metadata remains in `.voratiq/runs/index.json` + `.voratiq/runs/<id>/record.json`.
+Removes run artifacts and workspaces. Metadata remains in `.voratiq/runs/index.json` + `.voratiq/runs/<run-id>/record.json`.
 
 ## Documentation
 
