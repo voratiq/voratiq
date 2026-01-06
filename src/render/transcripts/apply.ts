@@ -46,6 +46,11 @@ export function renderApplyTranscript(result: ApplyResult): string {
       ]
     : undefined;
 
+  const afterAgentsLines = [colorize("Diff applied to working tree.", "green")];
+  if (result.appliedCommitSha) {
+    afterAgentsLines.push(`Commit created: ${result.appliedCommitSha}`);
+  }
+
   return renderTranscriptWithMetadata({
     metadata: {
       runId: result.runId,
@@ -57,10 +62,11 @@ export function renderApplyTranscript(result: ApplyResult): string {
     },
     agents: [agentDisplay],
     warnings,
-    afterAgents: [[colorize("Diff applied to working tree.", "green")]],
+    afterAgents: [afterAgentsLines],
     hint: {
-      message:
-        "Review changes (e.g., `git status`) and run tests before committing.",
+      message: result.appliedCommitSha
+        ? "Review the commit (e.g., `git show --stat`) and run tests."
+        : "Review changes (e.g., `git status`) and run tests before committing.",
     },
   });
 }

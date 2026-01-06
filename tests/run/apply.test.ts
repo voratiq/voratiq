@@ -99,6 +99,7 @@ describe("runApplyCommand", () => {
       runId: "run-123",
       agentId: "claude",
       ignoreBaseMismatch: false,
+      commit: false,
     });
     expect(mockedRenderApplyTranscript).toHaveBeenCalledWith(applyResult);
     expect(output).toEqual({

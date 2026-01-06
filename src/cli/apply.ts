@@ -13,6 +13,7 @@ export interface ApplyCommandOptions {
   runId: string;
   agentId: string;
   ignoreBaseMismatch?: boolean;
+  commit?: boolean;
 }
 
 export interface ApplyCommandResult {
@@ -24,7 +25,12 @@ export interface ApplyCommandResult {
 export async function runApplyCommand(
   options: ApplyCommandOptions,
 ): Promise<ApplyCommandResult> {
-  const { runId, agentId, ignoreBaseMismatch = false } = options;
+  const {
+    runId,
+    agentId,
+    ignoreBaseMismatch = false,
+    commit = false,
+  } = options;
 
   const { root, workspacePaths } = await resolveCliContext();
   await ensureCleanWorkingTree(root);
@@ -35,6 +41,7 @@ export async function runApplyCommand(
     runId,
     agentId,
     ignoreBaseMismatch,
+    commit,
   });
 
   const body = renderApplyTranscript(result);
@@ -46,6 +53,7 @@ interface ApplyCommandActionOptions {
   run: string;
   agent: string;
   ignoreBaseMismatch?: boolean;
+  commit?: boolean;
 }
 
 export function createApplyCommand(): Command {
@@ -58,12 +66,18 @@ export function createApplyCommand(): Command {
       "Apply even if the current HEAD differs from the recorded base",
       () => true,
     )
+    .option(
+      "--commit",
+      "Commit the applied diff immediately using the agent summary",
+      () => true,
+    )
     .allowExcessArguments(false)
     .action(async (options: ApplyCommandActionOptions) => {
       const result = await runApplyCommand({
         runId: options.run,
         agentId: options.agent,
         ignoreBaseMismatch: options.ignoreBaseMismatch ?? false,
+        commit: options.commit ?? false,
       });
 
       writeCommandOutput({

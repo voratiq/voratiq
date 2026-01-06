@@ -11,4 +11,5 @@ export interface ApplyResult {
   agent: AgentInvocationRecord;
   diffPath: string;
   ignoredBaseMismatch: boolean;
+  appliedCommitSha?: string;
 }

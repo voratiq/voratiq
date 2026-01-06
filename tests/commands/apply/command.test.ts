@@ -7,6 +7,8 @@ import { promisify } from "node:util";
 import { executeApplyCommand } from "../../../src/commands/apply/command.js";
 import {
   ApplyAgentDiffMissingOnDiskError,
+  ApplyAgentSummaryEmptyError,
+  ApplyAgentSummaryNotRecordedError,
   ApplyBaseMismatchError,
   ApplyPatchApplicationError,
 } from "../../../src/commands/apply/errors.js";
@@ -85,6 +87,167 @@ describe("executeApplyCommand", () => {
         ),
       ).toBe(false);
       expect(updatedRecord?.applyStatus?.detail ?? undefined).toBeUndefined();
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("creates a git commit when requested", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-commit-"));
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const { filePath, baseRevisionSha, diffContent, diffStatistics } =
+        await createDiffFixture({
+          repoRoot,
+          original: "console.log('hello');\n",
+          updated: "console.log('hello committed');\n",
+        });
+
+      const runId = "run-commit";
+      const agentId = "claude";
+      await writeRunRecord({
+        repoRoot,
+        runId,
+        agentId,
+        baseRevisionSha,
+        diffContent,
+        diffStatistics,
+        summaryContent: "commit subject\n",
+      });
+
+      const result = await executeApplyCommand({
+        root: repoRoot,
+        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        runId,
+        agentId,
+        ignoreBaseMismatch: false,
+        commit: true,
+      });
+
+      await expect(readFile(filePath, "utf8")).resolves.toBe(
+        "console.log('hello committed');\n",
+      );
+
+      const appliedCommitSha = await runGit(repoRoot, ["rev-parse", "HEAD"]);
+      expect(result.appliedCommitSha).toBe(appliedCommitSha);
+      await expect(
+        runGit(repoRoot, ["log", "-1", "--pretty=%s"]),
+      ).resolves.toBe("commit subject");
+
+      const recordPath = join(
+        repoRoot,
+        ".voratiq",
+        "runs",
+        "sessions",
+        runId,
+        "record.json",
+      );
+      const updatedRecord = JSON.parse(
+        await readFile(recordPath, "utf8"),
+      ) as RunRecord;
+      expect(updatedRecord?.applyStatus?.appliedCommitSha).toBe(
+        appliedCommitSha,
+      );
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when the summary artifact is missing and does not commit", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-no-summary-"));
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const { filePath, baseRevisionSha, diffContent, diffStatistics } =
+        await createDiffFixture({
+          repoRoot,
+          original: "console.log('hello');\n",
+          updated: "console.log('hello no summary');\n",
+        });
+
+      const runId = "run-no-summary";
+      const agentId = "claude";
+      await writeRunRecord({
+        repoRoot,
+        runId,
+        agentId,
+        baseRevisionSha,
+        diffContent,
+        diffStatistics,
+        artifacts: { diffCaptured: true },
+      });
+
+      await expect(
+        executeApplyCommand({
+          root: repoRoot,
+          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          runId,
+          agentId,
+          ignoreBaseMismatch: false,
+          commit: true,
+        }),
+      ).rejects.toBeInstanceOf(ApplyAgentSummaryNotRecordedError);
+
+      await expect(readFile(filePath, "utf8")).resolves.toBe(
+        "console.log('hello no summary');\n",
+      );
+
+      await expect(runGit(repoRoot, ["rev-parse", "HEAD"])).resolves.toBe(
+        baseRevisionSha,
+      );
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when the summary artifact is empty and does not commit", async () => {
+    const repoRoot = await mkdtemp(
+      join(tmpdir(), "voratiq-apply-empty-summary-"),
+    );
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const { filePath, baseRevisionSha, diffContent, diffStatistics } =
+        await createDiffFixture({
+          repoRoot,
+          original: "console.log('hello');\n",
+          updated: "console.log('hello empty summary');\n",
+        });
+
+      const runId = "run-empty-summary";
+      const agentId = "claude";
+      await writeRunRecord({
+        repoRoot,
+        runId,
+        agentId,
+        baseRevisionSha,
+        diffContent,
+        diffStatistics,
+        summaryContent: "   \n",
+      });
+
+      await expect(
+        executeApplyCommand({
+          root: repoRoot,
+          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          runId,
+          agentId,
+          ignoreBaseMismatch: false,
+          commit: true,
+        }),
+      ).rejects.toBeInstanceOf(ApplyAgentSummaryEmptyError);
+
+      await expect(readFile(filePath, "utf8")).resolves.toBe(
+        "console.log('hello empty summary');\n",
+      );
+
+      await expect(runGit(repoRoot, ["rev-parse", "HEAD"])).resolves.toBe(
+        baseRevisionSha,
+      );
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
@@ -320,6 +483,8 @@ async function writeRunRecord(options: {
   baseRevisionSha: string;
   diffContent: string;
   diffStatistics: string;
+  summaryContent?: string;
+  artifacts?: RunRecord["agents"][number]["artifacts"];
 }): Promise<string> {
   const {
     repoRoot,
@@ -328,6 +493,8 @@ async function writeRunRecord(options: {
     baseRevisionSha,
     diffContent,
     diffStatistics,
+    summaryContent = "summary\n",
+    artifacts,
   } = options;
   void diffStatistics;
 
@@ -345,7 +512,7 @@ async function writeRunRecord(options: {
 
   await writeFile(stdoutPath, "stdout\n", "utf8");
   await writeFile(stderrPath, "stderr\n", "utf8");
-  await writeFile(summaryPath, "summary\n", "utf8");
+  await writeFile(summaryPath, summaryContent, "utf8");
   await writeFile(diffPath, diffContent, "utf8");
 
   const diffRelative = `.voratiq/runs/sessions/${runId}/${agentId}/artifacts/diff.patch`;
@@ -358,6 +525,7 @@ async function writeRunRecord(options: {
     startedAt: now,
     completedAt: now,
     commitSha: baseRevisionSha,
+    ...(artifacts ? { artifacts } : {}),
   });
 
   const runRecord = createRunRecord({

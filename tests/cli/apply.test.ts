@@ -57,10 +57,34 @@ describe("apply command options", () => {
       ignoreBaseMismatch: true,
     });
   });
+
+  it("parses --commit as a boolean flag", async () => {
+    let received: ApplyCommandActionOptions | undefined;
+
+    const applyCommand = silenceCommander(createApplyCommand());
+    applyCommand.exitOverride().action((options: ApplyCommandActionOptions) => {
+      received = options;
+    });
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(applyCommand);
+
+    await program.parseAsync(
+      ["apply", "--run", "run-123", "--agent", "claude", "--commit"],
+      { from: "user" },
+    );
+
+    expect(received).toEqual({
+      run: "run-123",
+      agent: "claude",
+      commit: true,
+    });
+  });
 });
 
 interface ApplyCommandActionOptions {
   run: string;
   agent: string;
   ignoreBaseMismatch?: boolean;
+  commit?: boolean;
 }

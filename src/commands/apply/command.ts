@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { buildRunRecordEnhanced } from "../../runs/records/enhanced.js";
 import { rewriteRunRecord } from "../../runs/records/persistence.js";
 import type { RunApplyStatus } from "../../runs/records/types.js";
@@ -14,7 +16,11 @@ import {
   ApplyAgentDiffMissingOnDiskError,
   ApplyAgentDiffNotRecordedError,
   ApplyAgentNotFoundError,
+  ApplyAgentSummaryEmptyError,
+  ApplyAgentSummaryMissingOnDiskError,
+  ApplyAgentSummaryNotRecordedError,
   ApplyBaseMismatchError,
+  ApplyGitCommitError,
   ApplyPatchApplicationError,
   ApplyRunDeletedError,
 } from "./errors.js";
@@ -26,12 +32,20 @@ export interface ApplyCommandInput {
   runId: string;
   agentId: string;
   ignoreBaseMismatch: boolean;
+  commit?: boolean;
 }
 
 export async function executeApplyCommand(
   input: ApplyCommandInput,
 ): Promise<ApplyResult> {
-  const { root, runsFilePath, runId, agentId, ignoreBaseMismatch } = input;
+  const {
+    root,
+    runsFilePath,
+    runId,
+    agentId,
+    ignoreBaseMismatch,
+    commit = false,
+  } = input;
 
   const runRecord = await fetchRunSafely({
     root,
@@ -68,6 +82,9 @@ export async function executeApplyCommand(
     () => new ApplyAgentDiffMissingOnDiskError(diffDisplayPath),
   );
 
+  const summaryRecorded = agentRecord.artifacts?.summaryCaptured ?? false;
+  const summaryDisplayPath = enhancedAgent.assets.summaryPath;
+
   const headRevision = await getHeadRevision(root);
   const baseRevisionSha = runRecord.baseRevisionSha;
   const baseMismatch = headRevision !== baseRevisionSha;
@@ -103,6 +120,31 @@ export async function executeApplyCommand(
     throw error;
   }
 
+  let appliedCommitSha: string | undefined;
+
+  if (commit) {
+    try {
+      appliedCommitSha = await commitAppliedDiff({
+        root,
+        runId,
+        agentId,
+        summaryRecorded,
+        summaryDisplayPath,
+      });
+    } catch (error) {
+      await recordApplyStatus({
+        root,
+        runsFilePath,
+        runId,
+        agentId,
+        ignoredBaseMismatch,
+        status: "failed",
+        detail: extractCommitFailureDetail(error),
+      });
+      throw error;
+    }
+  }
+
   await recordApplyStatus({
     root,
     runsFilePath,
@@ -110,6 +152,7 @@ export async function executeApplyCommand(
     agentId,
     ignoredBaseMismatch,
     status: "succeeded",
+    appliedCommitSha,
   });
 
   return {
@@ -122,6 +165,7 @@ export async function executeApplyCommand(
     agent: agentRecord,
     diffPath: diffDisplayPath,
     ignoredBaseMismatch,
+    ...(appliedCommitSha ? { appliedCommitSha } : {}),
   };
 }
 
@@ -158,6 +202,7 @@ interface RecordApplyStatusOptions {
   agentId: string;
   status: RunApplyStatus["status"];
   ignoredBaseMismatch: boolean;
+  appliedCommitSha?: string;
   detail?: string;
 }
 
@@ -171,6 +216,7 @@ async function recordApplyStatus(
     agentId,
     status,
     ignoredBaseMismatch,
+    appliedCommitSha,
     detail,
   } = options;
 
@@ -196,6 +242,10 @@ async function recordApplyStatus(
         applyStatus.detail = normalizedDetail;
       }
 
+      if (typeof appliedCommitSha === "string" && appliedCommitSha.length > 0) {
+        applyStatus.appliedCommitSha = appliedCommitSha;
+      }
+
       return {
         ...record,
         applyStatus,
@@ -214,7 +264,61 @@ function extractApplyFailureDetail(
   return error.message;
 }
 
+function extractCommitFailureDetail(error: unknown): string | undefined {
+  const stderr = getGitStderr(error);
+  if (stderr && stderr.trim().length > 0) {
+    const [firstLine] = stderr.split(/\r?\n/);
+    if (firstLine && firstLine.trim().length > 0) {
+      return firstLine.trim();
+    }
+    return stderr.trim();
+  }
+
+  return toErrorMessage(error);
+}
+
 function truncateDetail(detail: string): string {
   const trimmed = detail.trim();
   return trimmed.length > 256 ? trimmed.slice(0, 256) : trimmed;
+}
+
+async function commitAppliedDiff(options: {
+  root: string;
+  runId: string;
+  agentId: string;
+  summaryRecorded: boolean;
+  summaryDisplayPath?: string;
+}): Promise<string> {
+  const { root, runId, agentId, summaryRecorded, summaryDisplayPath } = options;
+
+  if (!summaryRecorded || !summaryDisplayPath) {
+    throw new ApplyAgentSummaryNotRecordedError(runId, agentId);
+  }
+
+  const summaryAbsolutePath =
+    resolveDisplayPath(root, summaryDisplayPath) ?? summaryDisplayPath;
+  await ensureFileExists(
+    summaryAbsolutePath,
+    () => new ApplyAgentSummaryMissingOnDiskError(summaryDisplayPath),
+  );
+
+  const rawSummary = await readFile(summaryAbsolutePath, "utf8");
+  const commitSubject = normalizeCommitSubject(rawSummary);
+  if (!commitSubject) {
+    throw new ApplyAgentSummaryEmptyError(summaryDisplayPath);
+  }
+
+  try {
+    await runGitCommand(["add", "-A"], { cwd: root });
+    await runGitCommand(["commit", "-m", commitSubject], { cwd: root });
+    return await runGitCommand(["rev-parse", "HEAD"], { cwd: root });
+  } catch (error) {
+    const detail = getGitStderr(error) ?? toErrorMessage(error);
+    throw new ApplyGitCommitError(detail);
+  }
+}
+
+function normalizeCommitSubject(summary: string): string {
+  const normalized = summary.trim().replace(/\s+/gu, " ");
+  return normalized.length > 0 ? normalized : "";
 }
