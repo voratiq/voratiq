@@ -203,7 +203,7 @@ voratiq run --spec specs/refactor.md --max-parallel 2
 
 ## `voratiq review`
 
-Display a summary of a recorded run.
+Run a reviewer agent headlessly against a recorded run.
 
 ### Usage
 
@@ -218,7 +218,7 @@ voratiq review --run <run-id> --agent <agent-id>
 
 ### Behavior
 
-Loads the run record from `.voratiq/runs/sessions/<run-id>/record.json` (via `.voratiq/runs/index.json`) and renders run metadata, agent statuses, eval results, diff summaries, and artifact paths.
+Invokes the specified reviewer agent in headless mode. The agent reads run artifacts under `.voratiq/runs/sessions/<run-id>/` and writes its analysis to `.voratiq/reviews/<run-id>/<agent-id>/review.md`. Execution is one-shot—there is no interactive accept/refine loop.
 
 ### Examples
 

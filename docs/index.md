@@ -53,7 +53,7 @@ Agents execute in parallel, each in its own sandboxed worktree. Voratiq captures
 voratiq review --run <run-id> --agent <agent-id>
 ```
 
-Displays agent statuses, eval results, diff summaries, and artifact links.
+Runs the specified reviewer agent headlessly against the recorded run and writes its findings to `.voratiq/reviews/<run-id>/<agent-id>/review.md`.
 
 ### Apply
 
