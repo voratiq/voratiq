@@ -33,8 +33,8 @@ Generate a task specification in Markdown:
 ```bash
 voratiq spec \
   --description "Fix authentication bug: users are logged out after 5 minutes instead of the configured session timeout. Sessions should respect SESSION_TIMEOUT_MS (default 30 minutes)." \
-  --agent claude-opus-4-5-20251101 \
-  --output specs/fix-auth-bug.md
+  --agent <agent-id> \
+  --output .voratiq/specs/fix-auth-bug.md
 ```
 
 An agent converts the description into a Markdown spec, giving the workflow a single source of truth for runs and evals.
@@ -42,10 +42,10 @@ An agent converts the description into a Markdown spec, giving the workflow a si
 ### Run
 
 ```bash
-voratiq run --spec specs/fix-auth-bug.md
+voratiq run --spec .voratiq/specs/fix-auth-bug.md
 ```
 
-Agents execute in parallel, each in its own sandboxed worktree. Voratiq captures stdout/stderr, code diffs, and eval results. Run metadata persists under `.voratiq/runs/<run-id>/`.
+Agents execute in parallel, each in its own sandboxed worktree. Voratiq captures stdout/stderr, code diffs, and eval results. Run metadata persists under `.voratiq/runs/sessions/<run-id>/`.
 
 ### Review
 
@@ -53,7 +53,7 @@ Agents execute in parallel, each in its own sandboxed worktree. Voratiq captures
 voratiq review --run <run-id> --agent <agent-id>
 ```
 
-Runs the specified reviewer agent headlessly against the recorded run and writes its findings to `.voratiq/reviews/<run-id>/<agent-id>/review.md`.
+Runs the specified reviewer agent headlessly against the recorded run and writes its findings to `.voratiq/reviews/sessions/<review-id>/<agent-id>/artifacts/review.md`.
 
 ### Apply
 
@@ -69,7 +69,7 @@ Applies the selected agent's diff using `git apply`.
 voratiq prune --run <run-id>
 ```
 
-Removes run artifacts and workspaces. Metadata remains in `.voratiq/runs/index.json` + `.voratiq/runs/<id>/record.json`.
+Removes run workspaces and branches. Use `--purge` to delete artifacts. Metadata remains in `.voratiq/runs/index.json` + `.voratiq/runs/sessions/<run-id>/record.json`.
 
 ## Documentation
 

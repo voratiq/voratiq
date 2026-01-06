@@ -23,7 +23,7 @@ Each agent entry supports:
 - `model` (required) – provider-specific model slug, e.g. `claude-sonnet-4-5-20250929`, `gpt-5.1-codex-max`, `gemini-2.5-pro`.
 - `enabled` (optional, default `true`) – set to `false` to keep a definition without executing it.
 - `binary` (optional, default empty string) – absolute path to the agent executable.
-- `extraArgs` (optional) – array of additional agent CLI arguments.
+- `extraArgs` (optional) – array of additional agent CLI arguments (non-empty; cannot include `--model` or `{{MODEL}}`).
 
 ## `agents.yaml` Examples
 
@@ -41,7 +41,7 @@ agents:
     provider: codex
     model: gpt-5.1-codex-max
     enabled: true
-    binary: ~/.local/bin/codex
+    binary: /usr/local/bin/codex
 
   - id: gemini-3-pro-preview
     provider: gemini
@@ -66,7 +66,7 @@ agents:
     provider: codex
     model: gpt-5.1-codex-mini
     enabled: true
-    binary: ~/.local/bin/codex
+    binary: /usr/local/bin/codex
 
   - id: gemini-2-5-flash
     provider: gemini
@@ -85,13 +85,13 @@ agents:
     provider: codex
     model: gpt-5.1-codex
     enabled: true
-    binary: ~/.local/bin/codex
+    binary: /usr/local/bin/codex
 
   - id: gpt-5-1-codex-high
     provider: codex
     model: gpt-5.1-codex
     enabled: true
-    binary: ~/.local/bin/codex
+    binary: /usr/local/bin/codex
     extraArgs:
       - "--config"
       - "model_reasoning_effort=high"
@@ -109,13 +109,13 @@ agents:
     provider: codex
     model: gpt-5-codex
     enabled: true
-    binary: ~/.local/bin/codex
+    binary: /usr/local/bin/codex
 
   - id: gpt-5-1-codex
     provider: codex
     model: gpt-5.1-codex
     enabled: true
-    binary: ~/.local/bin/codex
+    binary: /usr/local/bin/codex
 ```
 
 **Gemini:**

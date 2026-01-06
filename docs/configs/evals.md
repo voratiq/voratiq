@@ -8,7 +8,7 @@ Defines automated checks that validate agent output after each agent completes.
 
 ## Overview
 
-Voratiq reads `.voratiq/evals.yaml` for shell commands that gate a run's success. `voratiq init` seeds common scripts (tests, lint, build). Extend or replace them freely.
+Voratiq reads `.voratiq/evals.yaml` for shell commands that gate a run's success. `voratiq init` seeds slugs for common checks (format, lint, typecheck, tests) with empty commands you can fill in. Extend or replace them freely.
 
 Each eval runs in the agent workspace after the agent completes. Voratiq records stderr/stdout in the run report.
 
@@ -28,13 +28,13 @@ Each eval entry:
 ### Core Checks
 
 ```yaml
-test: npm test
-lint: npm run lint
-typecheck: tsc --noEmit
-build: npm run build
+format:
+lint:
+typecheck:
+tests:
 ```
 
-Default gates seeded by `voratiq init`.
+Default gates seeded by `voratiq init` (commands are blank by default).
 
 ### Expanded Gates
 

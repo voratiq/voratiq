@@ -57,16 +57,15 @@ See [Sandbox Configuration](https://github.com/voratiq/voratiq/blob/main/docs/co
 
 ## Everything Is Auditable
 
-Voratiq preserves a complete audit trail for every run under `.voratiq/runs/<run-id>/`. Each run directory contains the prompt (generated from the spec), base git revision, agent logs (stdout/stderr), generated diffs, eval results, and agent summaries.
+Voratiq preserves a complete audit trail for every run under `.voratiq/runs/sessions/<run-id>/`. Each run directory contains the base git revision, agent logs (stdout/stderr), generated diffs, eval results, and agent summaries.
 
 Review any past run, inspect what an agent changed, understand why an eval failed, or compare multiple agents' approaches to the same spec. Nothing is lost or overwritten.
 
 Example run directory:
 
 ```
-.voratiq/runs/20251105-143022-abc123/
+.voratiq/runs/sessions/20251105-143022-abc123/
 ├── record.json             # Run metadata (status, agents, timestamps)
-├── prompt.txt              # The canonical prompt sent to all agents
 ├── claude-sonnet-4-5-20250929/
 │   ├── artifacts/          # Harvested outputs
 │   │   ├── diff.patch      # Git diff of all changes made by the agent
@@ -77,6 +76,7 @@ Example run directory:
 │   ├── runtime/            # Agent invocation details
 │   │   ├── manifest.json   # Binary path, argv, env vars, workspace path
 │   │   └── sandbox.json    # Applied network and filesystem policies
+│   ├── sandbox/            # Sandbox home (logs, temp files)
 │   └── workspace/          # Agent's git worktree (preserved for inspection)
 ├── gpt-5-1-codex/
 │   ├── artifacts/
@@ -91,6 +91,8 @@ Example run directory:
 ```
 
 Each agent directory follows the same structure, keeping runs consistent and easy to navigate.
+
+Note: Voratiq does not persist a run-level `prompt.txt`. It generates the canonical prompt from the spec at runtime, writes it to ephemeral runtime files, and removes those files when execution completes.
 
 ## Open & Transparent
 

@@ -32,12 +32,14 @@ voratiq init [-y, --yes]
 Creates:
 
 - `.voratiq/` directory
-- `runs/` and subdirectories for run data
-- `specs/` and subdirectories for spec data
+- `runs/` and subdirectories for run data (including `runs/sessions/`)
+- `specs/` and subdirectories for spec data (including `specs/sessions/`)
+- `reviews/` and subdirectories for review data (including `reviews/sessions/`)
 - `agents.yaml` with detected agent binaries
 - `evals.yaml` with common eval commands
 - `environment.yaml` with environment settings
 - `sandbox.yaml` with sandbox policies
+- `index.json` files under `runs/`, `specs/`, and `reviews/`
 
 Detects common agent binaries (`claude`, `codex`, `gemini`, etc.) on `$PATH` and pre-populates `agents.yaml`.
 
@@ -56,8 +58,9 @@ voratiq init -y
 ### Errors
 
 - Repository is not a git repo
-- `.voratiq/` already exists
 - Insufficient permissions to create files
+
+If `.voratiq/` already exists, `voratiq init` fills any missing files and directories.
 
 ## voratiq spec
 
@@ -186,10 +189,10 @@ Note: the run itself completes, but the exit code indicates failure.
 
 ```bash
 # Run all enabled agents against a spec
-voratiq run --spec specs/fix-auth-bug.md
+voratiq run --spec .voratiq/specs/fix-auth-bug.md
 
 # Limit concurrency to 2 agents at a time
-voratiq run --spec specs/refactor.md --max-parallel 2
+voratiq run --spec .voratiq/specs/refactor.md --max-parallel 2
 ```
 
 ### Errors
@@ -218,12 +221,12 @@ voratiq review --run <run-id> --agent <agent-id>
 
 ### Behavior
 
-Invokes the specified reviewer agent in headless mode. The agent reads run artifacts under `.voratiq/runs/sessions/<run-id>/` and writes its analysis to `.voratiq/reviews/<run-id>/<agent-id>/review.md`. Execution is one-shot—there is no interactive accept/refine loop.
+Invokes the specified reviewer agent in headless mode. The agent reads run artifacts under `.voratiq/runs/sessions/<run-id>/` and writes its analysis to `.voratiq/reviews/sessions/<review-id>/<agent-id>/artifacts/review.md`. Execution is one-shot—there is no interactive accept/refine loop.
 
 ### Examples
 
 ```bash
-voratiq review --run 20251031-232802-abc123 --agent claude-opus-4-5-20251101
+voratiq review --run 20251031-232802-abc123 --agent gpt-5-2-codex
 ```
 
 ### Errors
@@ -265,10 +268,10 @@ Common `git apply` failures:
 
 ```bash
 # Apply agent's diff (with base check)
-voratiq apply --run 20251031-232802-abc123 --agent claude
+voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh
 
 # Apply diff, ignoring base mismatch
-voratiq apply --run 20251031-232802-abc123 --agent claude --ignore-base-mismatch
+voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh --ignore-base-mismatch
 ```
 
 ### Errors
@@ -297,7 +300,7 @@ voratiq list [--limit <n>] [--spec <path>] [--run <run-id>] [--include-pruned]
 
 ### Behavior
 
-Reads `.voratiq/runs/index.json` plus per-run `record.json` files and renders a table with run ID, status, spec path, and creation timestamp.
+Reads `.voratiq/runs/index.json` plus per-run `record.json` files in `.voratiq/runs/sessions/<run-id>/record.json` and renders a table with run ID, status, spec path, and creation timestamp.
 
 ### Examples
 
@@ -309,7 +312,7 @@ voratiq list
 voratiq list --limit 10
 
 # List runs for a specific spec
-voratiq list --spec specs/fix-auth-bug.md
+voratiq list --spec .voratiq/specs/fix-auth-bug.md
 
 # Show a specific run
 voratiq list --run 20251031-232802-abc123
@@ -324,7 +327,7 @@ voratiq list --include-pruned
 
 ## `voratiq prune`
 
-Remove run artifacts and mark the run as pruned in records.
+Remove run workspaces and mark the run as pruned in records (use `--purge` to delete artifacts).
 
 ### Usage
 

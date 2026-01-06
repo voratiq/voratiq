@@ -30,6 +30,15 @@ Each provider entry supports:
   - `denyRead` (optional) – array of paths to block from reads.
   - `denyWrite` (optional) – array of paths to block from writes.
 
+- **Denial backoff overrides** (top-level under the provider entry):
+  - `denialBackoff` (optional) – override the default backoff strategy for denied network requests.
+  - `denialBackoff.enabled` (optional) – enable or disable backoff entirely.
+  - `denialBackoff.warningThreshold` (optional) – number of denies before warnings trigger.
+  - `denialBackoff.delayThreshold` (optional) – number of denies before delays begin.
+  - `denialBackoff.delayMs` (optional) – delay duration when backoff is active.
+  - `denialBackoff.failFastThreshold` (optional) – number of denies before failing fast.
+  - `denialBackoff.windowMs` (optional) – rolling window for deny counts.
+
 ## `sandbox.yaml` Examples
 
 ### Allow Extra Network Domains
