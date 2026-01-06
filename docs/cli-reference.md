@@ -324,7 +324,7 @@ voratiq list --include-pruned
 
 ## `voratiq prune`
 
-Remove run artifacts and mark the run as pruned in records.
+Remove run workspaces and mark the run as pruned in records (use `--purge` to delete artifacts).
 
 ### Usage
 

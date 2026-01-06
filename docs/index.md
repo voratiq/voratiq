@@ -69,7 +69,7 @@ Applies the selected agent's diff using `git apply`.
 voratiq prune --run <run-id>
 ```
 
-Removes run artifacts and workspaces. Metadata remains in `.voratiq/runs/index.json` + `.voratiq/runs/sessions/<run-id>/record.json`.
+Removes run workspaces and branches. Use `--purge` to delete artifacts. Metadata remains in `.voratiq/runs/index.json` + `.voratiq/runs/sessions/<run-id>/record.json`.
 
 ## Documentation
 
