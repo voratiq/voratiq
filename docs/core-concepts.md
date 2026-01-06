@@ -76,6 +76,7 @@ Example run directory:
 │   ├── runtime/            # Agent invocation details
 │   │   ├── manifest.json   # Binary path, argv, env vars, workspace path
 │   │   └── sandbox.json    # Applied network and filesystem policies
+│   ├── sandbox/            # Sandbox home (logs, temp files)
 │   └── workspace/          # Agent's git worktree (preserved for inspection)
 ├── gpt-5-1-codex/
 │   ├── artifacts/
