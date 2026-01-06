@@ -42,7 +42,7 @@ voratiq spec --description "add dark mode toggle with localStorage persistence" 
 voratiq run --spec .voratiq/specs/add-dark-mode-toggle.md
 
 # Review results
-voratiq review --run <run-id>
+voratiq review --run <run-id> --agent <agent-id>
 
 # Apply the best solution
 voratiq apply --run <run-id> --agent <agent-id>

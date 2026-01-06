@@ -18,7 +18,7 @@ import { writeCommandOutput } from "./output.js";
 
 export interface ReviewCommandOptions {
   runId: string;
-  agentId?: string;
+  agentId: string;
 }
 
 export interface ReviewCommandResult extends ReviewExecutionResult {
@@ -75,14 +75,14 @@ export async function runReviewCommand(
 
 interface ReviewCommandActionOptions {
   run: string;
-  agent?: string;
+  agent: string;
 }
 
 export function createReviewCommand(): Command {
   return new Command("review")
     .description("Generate a one-shot, headless review of run artifacts")
     .requiredOption("--run <run-id>", "Identifier of the recorded run")
-    .option("--agent <agent-id>", "Reviewer agent identifier")
+    .requiredOption("--agent <agent-id>", "Reviewer agent identifier")
     .allowExcessArguments(false)
     .action(async (options: ReviewCommandActionOptions) => {
       const result = await runReviewCommand({

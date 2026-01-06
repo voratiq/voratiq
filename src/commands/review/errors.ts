@@ -22,13 +22,6 @@ export class ReviewAgentNotFoundError extends ReviewError {
   }
 }
 
-export class ReviewNoAgentsConfiguredError extends ReviewError {
-  constructor() {
-    super("No enabled agents found in `.voratiq/agents.yaml`.");
-    this.name = "ReviewNoAgentsConfiguredError";
-  }
-}
-
 export class ReviewGenerationFailedError extends ReviewError {
   constructor(
     detailLines: readonly string[] = [],
