@@ -45,6 +45,18 @@ describe("voratiq review", () => {
       ).rejects.toThrow(/required option '--run <run-id>'/iu);
     });
 
+    it("requires --agent", async () => {
+      const reviewCommand = silenceCommander(createReviewCommand());
+      reviewCommand.exitOverride().action(() => {});
+
+      const program = silenceCommander(new Command());
+      program.exitOverride().addCommand(reviewCommand);
+
+      await expect(
+        program.parseAsync(["node", "voratiq", "review", "--run", "abc123"]),
+      ).rejects.toThrow(/required option '--agent <agent-id>'/iu);
+    });
+
     it("parses --run", async () => {
       let received: unknown;
       const reviewCommand = silenceCommander(createReviewCommand());
@@ -61,6 +73,8 @@ describe("voratiq review", () => {
         "review",
         "--run",
         "20250101-abcde",
+        "--agent",
+        "reviewer",
       ]);
 
       expect((received as { run?: string }).run).toBe("20250101-abcde");

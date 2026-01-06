@@ -19,7 +19,7 @@ describe("renderListTranscript", () => {
     expect(output).toContain("SPEC");
     expect(output).toContain("20251016-133651-woeqr");
     expect(output).toContain(
-      "To review a run in more detail:\n  voratiq review --run <run-id>",
+      "To review a run in more detail:\n  voratiq review --run <run-id> --agent <agent-id>",
     );
   });
 

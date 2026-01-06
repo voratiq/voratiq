@@ -208,12 +208,13 @@ Display a summary of a recorded run.
 ### Usage
 
 ```bash
-voratiq review --run <run-id>
+voratiq review --run <run-id> --agent <agent-id>
 ```
 
 ### Options
 
 - `--run <run-id>`: Run ID to review (required)
+- `--agent <agent-id>`: Reviewer agent identifier (required)
 
 ### Behavior
 
@@ -222,7 +223,7 @@ Loads the run record from `.voratiq/runs/sessions/<run-id>/record.json` (via `.v
 ### Examples
 
 ```bash
-voratiq review --run 20251031-232802-abc123
+voratiq review --run 20251031-232802-abc123 --agent claude-opus-4-5-20251101
 ```
 
 ### Errors

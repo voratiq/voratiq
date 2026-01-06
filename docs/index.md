@@ -50,7 +50,7 @@ Agents execute in parallel, each in its own sandboxed worktree. Voratiq captures
 ### Review
 
 ```bash
-voratiq review --run <run-id>
+voratiq review --run <run-id> --agent <agent-id>
 ```
 
 Displays agent statuses, eval results, diff summaries, and artifact links.

@@ -4,10 +4,7 @@ import { join } from "node:path";
 import { detectAgentProcessFailureDetail } from "../../agents/runtime/failures.js";
 import { runSandboxedAgent } from "../../agents/runtime/harness.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
-import {
-  loadAgentById,
-  loadAgentCatalog,
-} from "../../configs/agents/loader.js";
+import { loadAgentById } from "../../configs/agents/loader.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import {
@@ -39,7 +36,6 @@ import { generateSessionId } from "../shared/session-id.js";
 import {
   ReviewAgentNotFoundError,
   ReviewGenerationFailedError,
-  ReviewNoAgentsConfiguredError,
 } from "./errors.js";
 import { buildReviewManifest } from "./manifest.js";
 import { buildReviewPrompt } from "./prompt.js";
@@ -49,7 +45,7 @@ export interface ReviewCommandInput {
   runsFilePath: string;
   reviewsFilePath: string;
   runId: string;
-  agentId?: string;
+  agentId: string;
 }
 
 export interface ReviewCommandResult {
@@ -262,27 +258,18 @@ export async function executeReviewCommand(
 }
 
 function resolveReviewAgent(options: {
-  agentId?: string;
+  agentId: string;
   root: string;
 }): AgentDefinition {
   const { agentId, root } = options;
-  if (agentId) {
-    try {
-      return loadAgentById(agentId, { root });
-    } catch (error) {
-      if (error instanceof AgentNotFoundError) {
-        throw new ReviewAgentNotFoundError(error.agentId);
-      }
-      throw error;
+  try {
+    return loadAgentById(agentId, { root });
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) {
+      throw new ReviewAgentNotFoundError(error.agentId);
     }
+    throw error;
   }
-
-  const catalog = loadAgentCatalog({ root });
-  const first = catalog[0];
-  if (!first) {
-    throw new ReviewNoAgentsConfiguredError();
-  }
-  return first;
 }
 
 async function buildReviewWorkspace(options: {
