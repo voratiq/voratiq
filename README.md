@@ -2,7 +2,7 @@
 
 Run agents in parallel, compare results, and apply the best solution.
 
-![`voratiq run --spec specs/p1/agent-workspace-guardrails.md`](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/run-demo.png)
+![`voratiq run --spec .voratiq/specs/apply-commit-flag.md`](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/run-demo.png)
 
 ## Installation
 
