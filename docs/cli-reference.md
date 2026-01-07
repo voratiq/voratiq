@@ -242,7 +242,7 @@ Apply a specific agent's diff to the repository using `git apply`.
 ### Usage
 
 ```bash
-voratiq apply --run <run-id> --agent <agent-id> [--ignore-base-mismatch]
+voratiq apply --run <run-id> --agent <agent-id> [--ignore-base-mismatch] [--commit]
 ```
 
 ### Options
@@ -250,6 +250,7 @@ voratiq apply --run <run-id> --agent <agent-id> [--ignore-base-mismatch]
 - `--run <run-id>`: Run ID containing the agent (required)
 - `--agent <agent-id>`: Agent ID whose diff to apply (required)
 - `--ignore-base-mismatch`: Skip base revision check (apply even if current HEAD differs from run's base)
+- `--commit`: Create a git commit after a successful apply, using the agent's summary as the commit message
 
 ### Behavior
 

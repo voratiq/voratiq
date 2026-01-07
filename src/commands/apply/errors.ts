@@ -74,6 +74,57 @@ export class ApplyAgentDiffMissingOnDiskError extends ApplyError {
   }
 }
 
+export class ApplyAgentSummaryNotRecordedError extends ApplyError {
+  constructor(
+    public readonly runId: string,
+    public readonly agentId: string,
+  ) {
+    super(
+      `Agent ${agentId} did not record a summary for run ${runId}.`,
+      ["A summary artifact is required for `voratiq apply --commit`."],
+      [
+        "Re-run the spec to regenerate artifacts or apply without `--commit` and commit manually.",
+      ],
+    );
+    this.name = "ApplyAgentSummaryNotRecordedError";
+  }
+}
+
+export class ApplyAgentSummaryMissingOnDiskError extends ApplyError {
+  constructor(public readonly summaryPath: string) {
+    super(
+      "Recorded summary is missing from disk.",
+      [`Expected summary at ${summaryPath} but it was not found.`],
+      ["Ensure the run directory still exists or re-run the agents."],
+    );
+    this.name = "ApplyAgentSummaryMissingOnDiskError";
+  }
+}
+
+export class ApplyAgentSummaryEmptyError extends ApplyError {
+  constructor(public readonly summaryPath: string) {
+    super(
+      "Recorded summary is empty.",
+      [`Expected summary at ${summaryPath} to contain a commit subject.`],
+      [
+        "Re-run the spec to regenerate artifacts or apply without `--commit` and commit manually.",
+      ],
+    );
+    this.name = "ApplyAgentSummaryEmptyError";
+  }
+}
+
+export class ApplyGitCommitError extends ApplyError {
+  constructor(detail: string) {
+    super(
+      "Failed to create git commit.",
+      [detail],
+      ["The diff remains applied; resolve the issue and commit manually."],
+    );
+    this.name = "ApplyGitCommitError";
+  }
+}
+
 export interface ApplyBaseMismatchOptions {
   baseRevisionSha: string;
   headRevision: string;

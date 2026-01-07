@@ -185,6 +185,7 @@ export const applyStatusSchema = z.object({
   status: applyStatusEnum,
   appliedAt: z.string(),
   ignoredBaseMismatch: z.boolean(),
+  appliedCommitSha: z.string().min(1).optional(),
   detail: z.string().max(256).nullable().optional(),
 });
 
