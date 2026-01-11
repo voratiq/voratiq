@@ -46,10 +46,10 @@ export function renderApplyTranscript(result: ApplyResult): string {
       ]
     : undefined;
 
-  const afterAgentsLines = [colorize("Diff applied to working tree.", "green")];
-  if (result.appliedCommitSha) {
-    afterAgentsLines.push(`Commit created: ${result.appliedCommitSha}`);
-  }
+  const applyMessage = result.appliedCommitSha
+    ? `Diff applied to working tree (commit: ${result.appliedCommitSha}).`
+    : "Diff applied to working tree.";
+  const afterAgentsLines = [colorize(applyMessage, "green")];
 
   return renderTranscriptWithMetadata({
     metadata: {
