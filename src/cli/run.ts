@@ -49,10 +49,10 @@ export async function runRunCommand(
   const body = renderer.complete(report);
 
   // Unlike other commands, `run` signals a degraded outcome via exit code 1
-  // when any agent or eval fails. All other CLI commands either throw on error
+  // when any agent fails. Eval failures are quality signals displayed in the output
+  // but do not affect exit code. All other CLI commands either throw on error
   // or return a clean success with exit code 0, so keep this deviation explicit.
-  const exitCode =
-    report.hadAgentFailure || report.hadEvalFailure ? 1 : undefined;
+  const exitCode = report.hadAgentFailure ? 1 : undefined;
 
   return { report, body, exitCode };
 }

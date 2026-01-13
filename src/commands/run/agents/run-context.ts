@@ -121,33 +121,9 @@ export class AgentRunContext {
       const evaluation = bySlug.get(fallback.slug);
       return evaluation ?? fallback;
     });
-    if (this.status === "failed") {
-      return;
-    }
-
-    const hasErrored = this.evalResults.some((evaluation) => {
-      return evaluation.status === "errored";
-    });
-    const hasFailed = this.evalResults.some(
-      (evaluation) => evaluation.status === "failed",
-    );
-
-    if (hasErrored) {
-      this.status = "errored";
-      if (!this.errorMessage) {
-        const erroredEval = this.evalResults.find(
-          (evaluation) => evaluation.status === "errored" && evaluation.error,
-        );
-        if (erroredEval?.error) {
-          this.errorMessage = erroredEval.error;
-        }
-      }
-      return;
-    }
-
-    if (hasFailed) {
-      this.status = "failed";
-    }
+    // Evals are quality signals, not execution outcomes.
+    // Agent status depends only on execution results (process exit code, etc.),
+    // not on eval failures. Eval results are tracked and exposed separately.
   }
 
   public markChatArtifact(format: ChatArtifactFormat): void {

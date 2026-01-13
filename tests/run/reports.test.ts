@@ -139,7 +139,7 @@ describe("report mapping helpers", () => {
     );
   });
 
-  it("derives eval failure from evaluation results", () => {
+  it("tracks eval failure independently from execution status", () => {
     const failingRunId = "tests-failed-run";
     const evalFailedRecord: AgentInvocationRecord = {
       ...baseAgentRecord,
@@ -167,12 +167,12 @@ describe("report mapping helpers", () => {
       spec: { path: "specs/sample.md" },
       createdAt: new Date(0).toISOString(),
       agents: [evalFailedRecord],
-      status: "failed",
+      status: "succeeded",
     });
 
     const runReport = toRunReport(runRecord, [agentReport], false, true);
     expect(runReport.hadEvalFailure).toBe(true);
     expect(runReport.hadAgentFailure).toBe(false);
-    expect(runReport.status).toBe("failed");
+    expect(runReport.status).toBe("succeeded");
   });
 });
