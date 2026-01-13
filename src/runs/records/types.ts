@@ -2,14 +2,25 @@ import { z } from "zod";
 
 import { agentIdSchema } from "../../configs/agents/types.js";
 import { evalSlugSchema, evalStatusSchema } from "../../configs/evals/types.js";
-import type { AgentStatus as StatusAgentStatus } from "../../status/index.js";
 import {
-  agentStatusSchema as sharedAgentStatusSchema,
+  type AgentStatus,
+  agentStatusSchema,
   applyStatusEnum,
+  EVAL_REQUIRED_AGENT_STATUSES,
+  IN_PROGRESS_AGENT_STATUSES,
   runStatusSchema,
+  TERMINAL_AGENT_STATUSES,
 } from "../../status/index.js";
 import { assertRepoRelativePath } from "../../utils/path.js";
 import type { ChatArtifactFormat } from "../../workspace/chat/types.js";
+
+export type { AgentStatus };
+export {
+  agentStatusSchema,
+  EVAL_REQUIRED_AGENT_STATUSES,
+  IN_PROGRESS_AGENT_STATUSES,
+  TERMINAL_AGENT_STATUSES,
+};
 
 function validateRepoRelativePath(value: string, ctx: z.RefinementCtx): void {
   try {
@@ -32,30 +43,6 @@ export const runSpecDescriptorSchema = z.object({
 });
 
 export type RunSpecDescriptor = z.infer<typeof runSpecDescriptorSchema>;
-
-export const agentStatusSchema = sharedAgentStatusSchema;
-
-export type AgentStatus = StatusAgentStatus;
-
-export const TERMINAL_AGENT_STATUSES: AgentStatus[] = [
-  "succeeded",
-  "failed",
-  "errored",
-  "skipped",
-  "aborted",
-] as const;
-
-export const EVAL_REQUIRED_AGENT_STATUSES: AgentStatus[] = [
-  "succeeded",
-  "failed",
-  "errored",
-  "skipped",
-] as const;
-
-export const IN_PROGRESS_AGENT_STATUSES: AgentStatus[] = [
-  "queued",
-  "running",
-] as const;
 
 const CHAT_ARTIFACT_FORMATS = [
   "json",

@@ -6,6 +6,7 @@ import {
 } from "../../runs/records/persistence.js";
 import type { AgentInvocationRecord } from "../../runs/records/types.js";
 import type { RunStatus } from "../../status/index.js";
+import { TERMINABLE_RUN_STATUSES } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { preserveProviderChatTranscripts } from "../../workspace/chat/artifacts.js";
 import type { ChatArtifactFormat } from "../../workspace/chat/types.js";
@@ -28,8 +29,6 @@ interface ActiveRunAgentContext {
 let activeRun: ActiveRunContext | undefined;
 let terminationInFlight = false;
 let activeTerminationStatus: RunStatus | undefined;
-
-const TERMINABLE_STATUSES = ["failed", "aborted"] as const;
 
 export function registerActiveRun(context: ActiveRunContext): void {
   activeRun = context;
@@ -60,9 +59,9 @@ export function getActiveTerminationStatus(
 }
 
 export async function terminateActiveRun(
-  status: Extract<RunStatus, (typeof TERMINABLE_STATUSES)[number]>,
+  status: Extract<RunStatus, (typeof TERMINABLE_RUN_STATUSES)[number]>,
 ): Promise<void> {
-  if (!TERMINABLE_STATUSES.includes(status)) {
+  if (!TERMINABLE_RUN_STATUSES.includes(status)) {
     return;
   }
 

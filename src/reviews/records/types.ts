@@ -1,7 +1,15 @@
 import { z } from "zod";
 
 import { agentIdSchema } from "../../configs/agents/types.js";
+import {
+  type ReviewStatus,
+  reviewStatusSchema,
+  TERMINAL_REVIEW_STATUSES,
+} from "../../status/index.js";
 import { assertRepoRelativePath } from "../../utils/path.js";
+
+export type { ReviewStatus };
+export { reviewStatusSchema, TERMINAL_REVIEW_STATUSES };
 
 function validateRepoRelativePath(value: string, ctx: z.RefinementCtx): void {
   try {
@@ -18,10 +26,6 @@ function validateRepoRelativePath(value: string, ctx: z.RefinementCtx): void {
 const repoRelativePathSchema = z
   .string()
   .superRefine((value, ctx) => validateRepoRelativePath(value, ctx));
-
-export const reviewStatusSchema = z.enum(["running", "succeeded", "failed"]);
-
-export type ReviewStatus = z.infer<typeof reviewStatusSchema>;
 
 export const reviewRecordSchema = z.object({
   sessionId: z.string(),
@@ -40,8 +44,3 @@ export type ReviewIndexEntry = Pick<
   ReviewRecord,
   "sessionId" | "createdAt" | "status"
 >;
-
-export const TERMINAL_REVIEW_STATUSES: readonly ReviewStatus[] = [
-  "succeeded",
-  "failed",
-] as const;
