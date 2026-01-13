@@ -1,7 +1,15 @@
 import { z } from "zod";
 
 import { agentIdSchema } from "../../configs/agents/types.js";
+import {
+  type SpecRecordStatus,
+  specRecordStatusSchema,
+  TERMINAL_SPEC_STATUSES,
+} from "../../status/index.js";
 import { assertRepoRelativePath } from "../../utils/path.js";
+
+export type { SpecRecordStatus };
+export { specRecordStatusSchema, TERMINAL_SPEC_STATUSES };
 
 function validateRepoRelativePath(value: string, ctx: z.RefinementCtx): void {
   try {
@@ -27,18 +35,6 @@ export const specIterationRecordSchema = z.object({
 
 export type SpecIterationRecord = z.infer<typeof specIterationRecordSchema>;
 
-export const specRecordStatusSchema = z.enum([
-  "drafting",
-  "awaiting-feedback",
-  "refining",
-  "saving",
-  "saved",
-  "aborted",
-  "failed",
-]);
-
-export type SpecRecordStatus = z.infer<typeof specRecordStatusSchema>;
-
 export const specRecordSchema = z.object({
   sessionId: z.string(),
   createdAt: z.string(),
@@ -58,9 +54,3 @@ export type SpecIndexEntry = Pick<
   SpecRecord,
   "sessionId" | "createdAt" | "status"
 >;
-
-export const TERMINAL_SPEC_STATUSES: SpecRecordStatus[] = [
-  "saved",
-  "aborted",
-  "failed",
-];
