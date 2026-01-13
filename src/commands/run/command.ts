@@ -136,7 +136,7 @@ export async function executeRunCommand(
     agentRecords = executionResult.agentRecords;
 
     const derivedRunStatus: RunRecord["status"] =
-      executionResult.hadAgentFailure || executionResult.hadEvalFailure
+      executionResult.hadAgentFailure
         ? "failed"
         : executionResult.agentReports.some(
               (report) => report.status === "errored",
