@@ -5,7 +5,7 @@ import { evalSlugSchema, evalStatusSchema } from "../../configs/evals/types.js";
 import {
   type AgentStatus,
   agentStatusSchema,
-  applyStatusEnum,
+  applyStatusSchema as applyStatusValueSchema,
   EVAL_REQUIRED_AGENT_STATUSES,
   IN_PROGRESS_AGENT_STATUSES,
   runStatusSchema,
@@ -169,7 +169,7 @@ export type AgentInvocationRecord = z.infer<typeof agentInvocationRecordSchema>;
 
 export const applyStatusSchema = z.object({
   agentId: agentIdSchema,
-  status: applyStatusEnum,
+  status: applyStatusValueSchema,
   appliedAt: z.string(),
   ignoredBaseMismatch: z.boolean(),
   appliedCommitSha: z.string().min(1).optional(),

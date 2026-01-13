@@ -15,6 +15,24 @@ export type RunStatus = (typeof RUN_STATUS_VALUES)[number];
 export const runStatusSchema = z.enum(RUN_STATUS_VALUES);
 
 /**
+ * Run statuses that indicate the run has finished execution.
+ */
+export const TERMINAL_RUN_STATUSES: readonly RunStatus[] = [
+  "succeeded",
+  "failed",
+  "errored",
+  "aborted",
+] as const satisfies readonly RunStatus[];
+
+/**
+ * Run statuses that indicate the run is queued or executing.
+ */
+export const IN_PROGRESS_RUN_STATUSES: readonly RunStatus[] = [
+  "queued",
+  "running",
+] as const satisfies readonly RunStatus[];
+
+/**
  * Run statuses that allow forced termination (e.g., abort or fail).
  */
 export const TERMINABLE_RUN_STATUSES: readonly RunStatus[] = [
@@ -57,6 +75,7 @@ export const IN_PROGRESS_AGENT_STATUSES: readonly AgentStatus[] = [
 
 /**
  * Agent statuses that require eval results to be present.
+ * "aborted" is excluded because agents can be cancelled before evals are produced.
  */
 export const EVAL_REQUIRED_AGENT_STATUSES: readonly AgentStatus[] = [
   "succeeded",
@@ -80,7 +99,7 @@ export const APPLY_STATUS_VALUES = ["succeeded", "failed"] as const;
 
 export type ApplyStatus = (typeof APPLY_STATUS_VALUES)[number];
 
-export const applyStatusEnum = z.enum(APPLY_STATUS_VALUES);
+export const applyStatusSchema = z.enum(APPLY_STATUS_VALUES);
 
 export const REVIEW_STATUS_VALUES = ["running", "succeeded", "failed"] as const;
 
