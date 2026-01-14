@@ -76,7 +76,7 @@ Removes run workspaces and branches. Use `--purge` to delete artifacts. Metadata
 - [Tutorial](https://github.com/voratiq/voratiq/blob/main/docs/tutorial.md) — End-to-end walkthrough
 - [Core Concepts](https://github.com/voratiq/voratiq/blob/main/docs/core-concepts.md) — Mental model and design philosophy
 - [CLI Reference](https://github.com/voratiq/voratiq/blob/main/docs/cli-reference.md) — All commands and options
-- **Configuration:**
+- Configurations:
   - [Agents](https://github.com/voratiq/voratiq/blob/main/docs/configs/agents.md) — Define which agents run and how to invoke them
   - [Environment](https://github.com/voratiq/voratiq/blob/main/docs/configs/environment.md) — Configure runtime environments
   - [Evals](https://github.com/voratiq/voratiq/blob/main/docs/configs/evals.md) — Define checks that gate agent output

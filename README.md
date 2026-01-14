@@ -18,7 +18,7 @@ Core:
 
 - Node 20+
 - git
-- 1+ AI coding agent (Claude [(>=2.0.55)](https://github.com/anthropics/claude-code?tab=readme-ov-file#get-started), Codex [(>=0.66.0)](https://github.com/openai/codex?tab=readme-ov-file#quickstart), or Gemini [(>=0.19.4)](https://github.com/google-gemini/gemini-cli?tab=readme-ov-file#quick-install))
+- 1+ AI coding agent (Claude [>=2.0.55](https://github.com/anthropics/claude-code?tab=readme-ov-file#get-started), Codex [>=0.66.0](https://github.com/openai/codex?tab=readme-ov-file#quickstart), or Gemini [>=0.19.4](https://github.com/google-gemini/gemini-cli?tab=readme-ov-file#quick-install))
 
 Platform-specific:
 
