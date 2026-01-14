@@ -1,7 +1,10 @@
+import { basename } from "node:path";
+
 import { Command } from "commander";
 
 import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
 import { executeRunCommand } from "../commands/run/command.js";
+import { checkoutOrCreateBranch } from "../preflight/branch.js";
 import {
   ensureCleanWorkingTree,
   ensureSandboxDependencies,
@@ -16,6 +19,7 @@ import { writeCommandOutput } from "./output.js";
 export interface RunCommandOptions {
   specPath: string;
   maxParallel?: number;
+  branch?: boolean;
 }
 
 export interface RunCommandResult {
@@ -27,13 +31,18 @@ export interface RunCommandResult {
 export async function runRunCommand(
   options: RunCommandOptions,
 ): Promise<RunCommandResult> {
-  const { specPath, maxParallel } = options;
+  const { specPath, maxParallel, branch } = options;
 
   const { root, workspacePaths } = await resolveCliContext();
   checkPlatformSupport();
   ensureSandboxDependencies();
   await ensureCleanWorkingTree(root);
   const { absolutePath, displayPath } = await ensureSpecPath(specPath, root);
+
+  if (branch) {
+    const branchName = deriveBranchNameFromSpecPath(displayPath);
+    await checkoutOrCreateBranch(root, branchName);
+  }
 
   const renderer = createRunRenderer();
 
@@ -57,9 +66,27 @@ export async function runRunCommand(
   return { report, body, exitCode };
 }
 
+/**
+ * Derives a branch name from a spec file path by extracting the basename without extension.
+ *
+ * Examples:
+ * - `specs/separate-eval-outcomes.md` → `separate-eval-outcomes`
+ * - `specs/foo/bar.md` → `bar`
+ * - `my-feature.md` → `my-feature`
+ */
+export function deriveBranchNameFromSpecPath(specPath: string): string {
+  const base = basename(specPath);
+  const lastDotIndex = base.lastIndexOf(".");
+  if (lastDotIndex <= 0) {
+    return base;
+  }
+  return base.slice(0, lastDotIndex);
+}
+
 interface RunCommandActionOptions {
   spec: string;
   maxParallel?: number;
+  branch?: boolean;
 }
 
 function parseMaxParallelOption(value: string): number {
@@ -79,11 +106,13 @@ export function createRunCommand(): Command {
       "Maximum number of agents to run concurrently",
       parseMaxParallelOption,
     )
+    .option("--branch", "Checkout or create a branch named after the spec file")
     .allowExcessArguments(false)
     .action(async (options: RunCommandActionOptions) => {
       const runOptions: RunCommandOptions = {
         specPath: options.spec,
         maxParallel: options.maxParallel,
+        branch: options.branch,
       };
 
       const result = await runRunCommand(runOptions);

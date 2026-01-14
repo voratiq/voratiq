@@ -30,3 +30,11 @@ export class SandboxDependenciesError extends CliError {
     this.name = "SandboxDependenciesError";
   }
 }
+
+export class BranchCheckoutError extends CliError {
+  constructor(message: string, gitError?: string) {
+    const detailLines = gitError ? [gitError] : [];
+    super(message, detailLines);
+    this.name = "BranchCheckoutError";
+  }
+}
