@@ -73,6 +73,7 @@ Removes run workspaces and branches. Use `--purge` to delete artifacts. Metadata
 
 ## Documentation
 
+- [Tutorial](https://github.com/voratiq/voratiq/blob/main/docs/tutorial.md) — End-to-end walkthrough
 - [Core Concepts](https://github.com/voratiq/voratiq/blob/main/docs/core-concepts.md) — Mental model and design philosophy
 - [CLI Reference](https://github.com/voratiq/voratiq/blob/main/docs/cli-reference.md) — All commands and options
 - **Configuration:**

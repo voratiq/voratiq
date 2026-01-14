@@ -48,7 +48,9 @@ voratiq review --run <run-id> --agent <agent-id>
 voratiq apply --run <run-id> --agent <agent-id>
 ```
 
-See the [docs](https://github.com/voratiq/voratiq/blob/main/docs/index.md) for core concepts, CLI reference, and guides on configuring agents, evals, runtime environments, and sandbox restrictions.
+For a full walkthrough, see the [CLI tutorial](https://github.com/voratiq/voratiq/blob/main/docs/tutorial.md).
+
+See the [docs](https://github.com/voratiq/voratiq/blob/main/docs/index.md) for core concepts, CLI reference, and configuration guides.
 
 ## License
 
