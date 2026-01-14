@@ -18,7 +18,7 @@ Core:
 
 - Node 20+
 - git
-- 1+ AI coding agent (Claude [(>=2.0.55)](https://github.com/anthropics/claude-code?tab=readme-ov-file#get-started), Codex [(>=0.66.0)](https://github.com/openai/codex?tab=readme-ov-file#quickstart), or Gemini [(>=0.19.4)](https://github.com/google-gemini/gemini-cli?tab=readme-ov-file#quick-install))
+- 1+ AI coding agent (Claude [>=2.0.55](https://github.com/anthropics/claude-code?tab=readme-ov-file#get-started), Codex [>=0.66.0](https://github.com/openai/codex?tab=readme-ov-file#quickstart), or Gemini [>=0.19.4](https://github.com/google-gemini/gemini-cli?tab=readme-ov-file#quick-install))
 
 Platform-specific:
 
@@ -48,7 +48,9 @@ voratiq review --run <run-id> --agent <agent-id>
 voratiq apply --run <run-id> --agent <agent-id>
 ```
 
-See the [docs](https://github.com/voratiq/voratiq/blob/main/docs/index.md) for core concepts, CLI reference, and guides on configuring agents, evals, runtime environments, and sandbox restrictions.
+For a full walkthrough, see the [CLI tutorial](https://github.com/voratiq/voratiq/blob/main/docs/tutorial.md).
+
+See the [docs](https://github.com/voratiq/voratiq/blob/main/docs/index.md) for core concepts, CLI reference, and configuration guides.
 
 ## License
 
