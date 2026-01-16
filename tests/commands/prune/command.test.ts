@@ -3,7 +3,10 @@ import * as fs from "node:fs/promises";
 import { jest } from "@jest/globals";
 
 import { fetchRunSafely } from "../../../src/commands/fetch.js";
-import { executePruneCommand } from "../../../src/commands/prune/command.js";
+import {
+  executePruneAllCommand,
+  executePruneCommand,
+} from "../../../src/commands/prune/command.js";
 import {
   PruneBranchDeletionError,
   PruneRunDeletedError,
@@ -12,8 +15,14 @@ import type {
   PruneCommandInput,
   PruneConfirmationHandler,
 } from "../../../src/commands/prune/types.js";
-import { renderPruneTranscript } from "../../../src/render/transcripts/prune.js";
-import { rewriteRunRecord } from "../../../src/runs/records/persistence.js";
+import {
+  renderPruneAllTranscript,
+  renderPruneTranscript,
+} from "../../../src/render/transcripts/prune.js";
+import {
+  fetchRunsSafely,
+  rewriteRunRecord,
+} from "../../../src/runs/records/persistence.js";
 import type { RunRecord } from "../../../src/runs/records/types.js";
 import { pathExists } from "../../../src/utils/fs.js";
 import { runGitCommand } from "../../../src/utils/git.js";
@@ -57,12 +66,15 @@ jest.mock("../../../src/utils/git.js", () => ({
 }));
 
 jest.mock("../../../src/runs/records/persistence.js", () => ({
+  fetchRunsSafely: jest.fn(),
   rewriteRunRecord: jest.fn(),
+  RUN_RECORD_FILENAME: "record.json",
 }));
 
 type ConfirmHandler = PruneConfirmationHandler;
 
 const fetchRunSafelyMock = jest.mocked(fetchRunSafely);
+const fetchRunsSafelyMock = jest.mocked(fetchRunsSafely);
 const pathExistsMock = jest.mocked(pathExists);
 const removeRunDirectoryMock = jest.mocked(removeRunDirectory);
 const removeWorkspaceEntryMock = jest.mocked(removeWorkspaceEntry);
@@ -280,6 +292,146 @@ describe("executePruneCommand", () => {
   });
 });
 
+describe("executePruneAllCommand", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getReaddirMock().mockReset();
+    pathExistsMock.mockResolvedValue(true);
+    removeRunDirectoryMock.mockResolvedValue(undefined);
+    removeWorkspaceEntryMock.mockResolvedValue(undefined);
+    runGitCommandMock.mockResolvedValue("");
+    rewriteRunRecordMock.mockImplementation(({ runId, mutate }) =>
+      Promise.resolve(
+        mutate(
+          createRunRecord({
+            runId,
+            agents: [createAgentInvocationRecord({ agentId: "claude" })],
+            spec: { path: "specs/demo.md" },
+          }),
+        ),
+      ),
+    );
+  });
+
+  it("returns a no-op result when no runs are eligible", async () => {
+    fetchRunsSafelyMock.mockResolvedValue({ records: [], warnings: [] });
+
+    const confirm: jest.MockedFunction<ConfirmHandler> = jest.fn();
+    confirm.mockResolvedValue(true);
+
+    const result = await executePruneAllCommand({
+      root: "/repo",
+      runsDir: "/repo/.voratiq/runs",
+      runsFilePath: "/repo/.voratiq/runs/index.json",
+      confirm,
+      purge: false,
+    });
+
+    expect(result).toEqual({ status: "noop", runIds: [] });
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("prompts once and prunes every eligible run when confirmed", async () => {
+    const runNewer = createRunRecord({
+      runId: "20260110-newer",
+      createdAt: "2026-01-10T10:00:00.000Z",
+      status: "succeeded",
+      spec: { path: "specs/newer.md" },
+      agents: [createAgentInvocationRecord({ agentId: "claude" })],
+    });
+    const runOlder = createRunRecord({
+      runId: "20251201-older",
+      createdAt: "2025-12-01T10:00:00.000Z",
+      status: "failed",
+      spec: { path: "specs/older.md" },
+      agents: [createAgentInvocationRecord({ agentId: "claude" })],
+    });
+
+    fetchRunsSafelyMock.mockResolvedValue({
+      records: [runNewer, runOlder],
+      warnings: [],
+    });
+
+    const runById = new Map<string, RunRecord>([
+      [runNewer.runId, runNewer],
+      [runOlder.runId, runOlder],
+    ]);
+
+    fetchRunSafelyMock.mockImplementation(({ runId }) => {
+      const record = runById.get(runId);
+      if (!record) {
+        throw new Error(`Unexpected runId ${runId}`);
+      }
+      return Promise.resolve(record);
+    });
+
+    const confirm: jest.MockedFunction<ConfirmHandler> = jest.fn();
+    confirm.mockResolvedValue(true);
+
+    const result = await executePruneAllCommand({
+      root: "/repo",
+      runsDir: "/repo/.voratiq/runs",
+      runsFilePath: "/repo/.voratiq/runs/index.json",
+      confirm,
+      purge: false,
+    });
+
+    expect(result).toEqual({
+      status: "pruned",
+      runIds: [runOlder.runId, runNewer.runId],
+    });
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    const confirmationOptions = confirm.mock.calls[0]?.[0];
+    expect(confirmationOptions).toMatchObject({
+      message: "Proceed?",
+      defaultValue: false,
+    });
+    const prefaceLines = confirmationOptions?.prefaceLines ?? [];
+    expect(prefaceLines.some((line) => line.includes("Workspaces to be"))).toBe(
+      false,
+    );
+    expect(prefaceLines.some((line) => line.includes("Branches to be"))).toBe(
+      false,
+    );
+    expect(prefaceLines.some((line) => line.includes("2 runs to prune."))).toBe(
+      true,
+    );
+
+    expect(rewriteRunRecordMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("aborts without pruning when confirmation declines", async () => {
+    const runRecord = createRunRecord({
+      runId: "20260110-abcde",
+      createdAt: "2026-01-10T10:00:00.000Z",
+      status: "succeeded",
+      spec: { path: "specs/demo.md" },
+      agents: [createAgentInvocationRecord({ agentId: "claude" })],
+    });
+
+    fetchRunsSafelyMock.mockResolvedValue({
+      records: [runRecord],
+      warnings: [],
+    });
+
+    const confirm: jest.MockedFunction<ConfirmHandler> = jest.fn();
+    confirm.mockResolvedValue(false);
+
+    const result = await executePruneAllCommand({
+      root: "/repo",
+      runsDir: "/repo/.voratiq/runs",
+      runsFilePath: "/repo/.voratiq/runs/index.json",
+      confirm,
+      purge: false,
+    });
+
+    expect(result).toEqual({ status: "aborted", runIds: [runRecord.runId] });
+    expect(fetchRunSafelyMock).not.toHaveBeenCalled();
+    expect(rewriteRunRecordMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("renderPruneTranscript", () => {
   it("renders aborted output with hint", () => {
     const transcript = renderPruneTranscript({
@@ -307,6 +459,36 @@ describe("renderPruneTranscript", () => {
     });
 
     expect(transcript).toContain("Run pruned successfully.");
+  });
+});
+
+describe("renderPruneAllTranscript", () => {
+  it("renders aborted output with hint", () => {
+    const transcript = renderPruneAllTranscript({
+      status: "aborted",
+      runIds: ["2025"],
+    });
+
+    expect(transcript).toContain("Prune aborted; no changes were made.");
+    expect(transcript).toContain("voratiq prune --all");
+  });
+
+  it("renders a no-op output when there are no runs", () => {
+    const transcript = renderPruneAllTranscript({
+      status: "noop",
+      runIds: [],
+    });
+
+    expect(transcript).toContain("No runs to prune.");
+  });
+
+  it("renders success output", () => {
+    const transcript = renderPruneAllTranscript({
+      status: "pruned",
+      runIds: ["2025"],
+    });
+
+    expect(transcript).toContain("Runs pruned successfully.");
   });
 });
 jest.mock("node:fs/promises", () => {
