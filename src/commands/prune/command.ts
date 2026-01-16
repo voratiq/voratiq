@@ -1,12 +1,16 @@
 import * as fs from "node:fs/promises";
 
 import { NonInteractiveShellError } from "../../cli/errors.js";
-import { buildPruneConfirmationPreface } from "../../render/transcripts/prune.js";
+import {
+  buildPruneAllConfirmationPreface,
+  buildPruneConfirmationPreface,
+} from "../../render/transcripts/prune.js";
 import {
   RunRecordNotFoundError,
   RunRecordParseError,
 } from "../../runs/records/errors.js";
 import {
+  fetchRunsSafely,
   rewriteRunRecord,
   RUN_RECORD_FILENAME,
 } from "../../runs/records/persistence.js";
@@ -40,6 +44,8 @@ import {
   RunMetadataMissingError,
 } from "./errors.js";
 import type {
+  PruneAllCommandInput,
+  PruneAllResult,
   PruneArtifactSummary,
   PruneCommandInput,
   PruneResult,
@@ -157,6 +163,68 @@ export async function executePruneCommand(
     artifacts: artifactSummary,
     branches: branchSummary,
   };
+}
+
+export async function executePruneAllCommand(
+  input: PruneAllCommandInput,
+): Promise<PruneAllResult> {
+  const { root, runsFilePath, confirm, clock, purge: purgeInput } = input;
+  const purge = purgeInput ?? false;
+
+  if (!confirm) {
+    throw new NonInteractiveShellError();
+  }
+
+  if (!(await pathExists(runsFilePath))) {
+    return { status: "noop", runIds: [] };
+  }
+
+  const { records, warnings } = await fetchRunsSafely({
+    root,
+    runsFilePath,
+  });
+
+  const firstWarning = warnings[0];
+  if (firstWarning) {
+    if (firstWarning.kind === "parse-error") {
+      throw new RunRecordParseError(
+        firstWarning.displayPath,
+        firstWarning.details,
+      );
+    }
+    throw new RunMetadataMissingError(firstWarning.runId);
+  }
+
+  if (records.length === 0) {
+    return { status: "noop", runIds: [] };
+  }
+
+  const eligibleRuns = sortRunRecordsByCreatedAt(records);
+  const runIds = eligibleRuns.map((record) => record.runId);
+
+  const confirmationAccepted = await confirm({
+    message: "Proceed?",
+    defaultValue: false,
+    prefaceLines: buildPruneAllConfirmationPreface({
+      records: eligibleRuns,
+    }),
+  });
+
+  if (!confirmationAccepted) {
+    return { status: "aborted", runIds };
+  }
+
+  for (const runId of runIds) {
+    await executePruneCommand({
+      ...input,
+      runId,
+      confirm: () => Promise.resolve(true),
+      purge,
+      clock,
+    });
+  }
+
+  return { status: "pruned", runIds };
 }
 
 interface WorkspaceTarget {
@@ -456,6 +524,19 @@ async function branchExists(root: string, branch: string): Promise<boolean> {
     cwd: root,
   });
   return output.length > 0;
+}
+
+function sortRunRecordsByCreatedAt(records: readonly RunRecord[]): RunRecord[] {
+  return Array.from(records).sort((a, b) => {
+    const aTimestamp = Date.parse(a.createdAt);
+    const bTimestamp = Date.parse(b.createdAt);
+
+    if (Number.isNaN(aTimestamp) || Number.isNaN(bTimestamp)) {
+      return a.createdAt.localeCompare(b.createdAt);
+    }
+
+    return aTimestamp - bTimestamp;
+  });
 }
 
 interface RewriteHistoryOptions {

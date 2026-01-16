@@ -14,6 +14,15 @@ export interface PruneCommandInput {
   clock?: () => Date;
 }
 
+export interface PruneAllCommandInput {
+  root: string;
+  runsDir: string;
+  runsFilePath: string;
+  confirm: PruneConfirmationHandler;
+  purge?: boolean;
+  clock?: () => Date;
+}
+
 export interface PruneBranchSummary {
   deleted: string[];
   skipped: string[];
@@ -50,3 +59,23 @@ export interface PruneAbortedResult {
 }
 
 export type PruneResult = PruneSuccessResult | PruneAbortedResult;
+
+export interface PruneAllSuccessResult {
+  status: "pruned";
+  runIds: string[];
+}
+
+export interface PruneAllNoopResult {
+  status: "noop";
+  runIds: string[];
+}
+
+export interface PruneAllAbortedResult {
+  status: "aborted";
+  runIds: string[];
+}
+
+export type PruneAllResult =
+  | PruneAllSuccessResult
+  | PruneAllNoopResult
+  | PruneAllAbortedResult;
