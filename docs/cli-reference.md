@@ -160,13 +160,14 @@ Execute enabled agents against a Markdown spec.
 ### Usage
 
 ```bash
-voratiq run --spec <path> [--max-parallel <count>]
+voratiq run --spec <path> [--max-parallel <count>] [--branch]
 ```
 
 ### Options
 
 - `--spec <path>`: Path to the Markdown spec file (required)
 - `--max-parallel <count>`: Maximum number of agents to run concurrently (default: number of enabled agents)
+- `--branch`: Checkout or create a branch named after the spec file
 
 ### Behavior
 
@@ -333,12 +334,13 @@ Remove run workspaces and mark the run as pruned in records (use `--purge` to de
 ### Usage
 
 ```bash
-voratiq prune --run <run-id> [--purge] [-y, --yes]
+voratiq prune (--run <run-id> | --all) [--purge] [-y, --yes]
 ```
 
 ### Options
 
 - `--run <run-id>`: Run ID to prune (required)
+- `--all`: Prune all non-pruned runs
 - `--purge`: Delete all associated configs and artifacts
 - `-y, --yes`: Skip interactive confirmations
 
