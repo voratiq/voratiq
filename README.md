@@ -36,7 +36,10 @@ Note: Windows is not currently supported.
 voratiq init
 
 # Generate a spec
-voratiq spec --description "add dark mode toggle with localStorage persistence" --agent <agent-id> --yes
+voratiq spec \
+  --description "add dark mode toggle with localStorage persistence" \
+  --agent <agent-id> \
+  --yes
 
 # Run agents in parallel
 voratiq run --spec .voratiq/specs/add-dark-mode-toggle.md
