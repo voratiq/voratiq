@@ -1,4 +1,4 @@
-# Voratiq CLI walkthrough
+# Using Voratiq to build Voratiq
 
 This tutorial will walk you through how to use the Voratiq CLI end-to-end to implement a real task: adding a `--branch` flag to `voratiq run`.
 
