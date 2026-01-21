@@ -1,5 +1,6 @@
 import { stat } from "node:fs/promises";
 
+import { renderBlocks } from "../../render/utils/transcript.js";
 import { pathExists } from "../../utils/fs.js";
 import { resolvePath } from "../../utils/path.js";
 import { type EnvironmentConfig, normalizeEnvironmentConfig } from "./types.js";
@@ -59,10 +60,14 @@ export async function detectEnvironmentConfig(
         message:
           "Enter the path to an existing Python virtual environment (press Enter to skip)",
         defaultValue: ".venv",
-        prefaceLines: [
-          "",
-          "Detected Python project markers but no virtual environment directory.",
-        ],
+        prefaceLines: renderBlocks({
+          sections: [
+            [
+              "Detected Python project markers but no virtual environment directory.",
+            ],
+          ],
+          leadingBlankLine: true,
+        }),
       })
     ).trim();
 

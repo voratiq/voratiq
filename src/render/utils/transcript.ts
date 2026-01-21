@@ -14,11 +14,20 @@ export interface TranscriptOptions {
   hint?: TranscriptHintOptions;
 }
 
-export function renderTranscript({
+export interface RenderBlocksOptions extends TranscriptOptions {
+  leadingBlankLine?: boolean;
+  trailingBlankLine?: boolean;
+  trimTrailingBlankLines?: boolean;
+}
+
+export function renderBlocks({
   metadata = [],
   sections = [],
   hint,
-}: TranscriptOptions): string {
+  leadingBlankLine = false,
+  trailingBlankLine = false,
+  trimTrailingBlankLines: shouldTrim = true,
+}: RenderBlocksOptions): string[] {
   const lines: string[] = [];
 
   const metadataLines = metadata
@@ -26,6 +35,10 @@ export function renderTranscript({
       return typeof entry.value === "string" && entry.value.length > 0;
     })
     .map((entry) => `${entry.label}: ${entry.value}`);
+
+  if (leadingBlankLine) {
+    lines.push("");
+  }
 
   if (metadataLines.length > 0) {
     lines.push(...metadataLines, "");
@@ -51,7 +64,16 @@ export function renderTranscript({
     lines.push(resolvedHint);
   }
 
-  return trimTrailingBlankLines(lines).join("\n");
+  const trimmed = shouldTrim ? trimTrailingBlankLines(lines) : lines;
+  if (trailingBlankLine) {
+    trimmed.push("");
+  }
+
+  return trimmed;
+}
+
+export function renderTranscript(options: TranscriptOptions): string {
+  return renderBlocks(options).join("\n");
 }
 
 function withRerunHint(message: string): string {
