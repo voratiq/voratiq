@@ -21,7 +21,7 @@ export function sanitizeAgentIdFromModel(model: string): string {
 export const DEFAULT_AGENT_DEFAULTS: readonly AgentDefault[] = [
   {
     provider: "claude",
-    model: "claude-sonnet-4-5-20250929",
+    model: "claude-opus-4-5-20251101",
     argv: [
       "--model",
       MODEL_PLACEHOLDER,
