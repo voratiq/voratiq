@@ -7,7 +7,7 @@ import type { RunStatus } from "../../status/index.js";
 import { colorize } from "../../utils/colors.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import { buildRunMetadataSection } from "../utils/runs.js";
-import { renderTranscript } from "../utils/transcript.js";
+import { renderBlocks, renderTranscript } from "../utils/transcript.js";
 import { renderRunList } from "./list.js";
 
 export interface PruneConfirmationPrefaceOptions {
@@ -47,32 +47,44 @@ export function buildPruneConfirmationPreface(
     createdAt: formatRunTimestamp(createdAt),
   });
 
-  const lines: string[] = ["", ...introLines];
-
+  const sections: string[][] = [];
+  const summaryLines = [...introLines];
   if (previouslyDeletedAt) {
-    lines.push(
+    summaryLines.push(
       `Marked deleted: ${previouslyDeletedAt}`,
       "Proceeding will update the deletion timestamp.",
     );
   }
+  if (summaryLines.length > 0) {
+    sections.push(summaryLines);
+  }
 
   if (purge) {
     if (directories.length > 0) {
-      lines.push("", "Directories to be deleted:");
-      directories.forEach((directory) => lines.push(`  - ${directory}`));
+      sections.push([
+        "Directories to be deleted:",
+        ...directories.map((directory) => `  - ${directory}`),
+      ]);
     }
   } else if (workspaces.length > 0) {
-    lines.push("", "Workspaces to be removed:");
-    workspaces.forEach((workspace) => lines.push(`  - ${workspace}`));
+    sections.push([
+      "Workspaces to be removed:",
+      ...workspaces.map((workspace) => `  - ${workspace}`),
+    ]);
   }
 
   if (branches.length > 0) {
-    lines.push("", "Branches to be deleted:");
-    branches.forEach((branch) => lines.push(`  - ${branch}`));
+    sections.push([
+      "Branches to be deleted:",
+      ...branches.map((branch) => `  - ${branch}`),
+    ]);
   }
 
-  lines.push("");
-  return lines;
+  return renderBlocks({
+    sections,
+    leadingBlankLine: true,
+    trailingBlankLine: true,
+  });
 }
 
 export interface PruneAllConfirmationPrefaceOptions {
@@ -84,12 +96,20 @@ export function buildPruneAllConfirmationPreface(
 ): string[] {
   const { records } = options;
   const tableOutput = renderRunList(records);
-  const lines =
-    tableOutput.trim().length > 0 ? ["", ...tableOutput.split("\n")] : [];
+  const sections: string[][] = [];
+
+  if (tableOutput.trim().length > 0) {
+    sections.push(tableOutput.split("\n"));
+  }
 
   const runLabel = records.length === 1 ? "run" : "runs";
-  lines.push("", `${records.length} ${runLabel} to prune.`, "");
-  return lines;
+  sections.push([`${records.length} ${runLabel} to prune.`]);
+
+  return renderBlocks({
+    sections,
+    leadingBlankLine: true,
+    trailingBlankLine: true,
+  });
 }
 
 export function renderPruneTranscript(result: PruneResult): string {

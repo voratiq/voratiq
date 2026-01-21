@@ -10,6 +10,7 @@ import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
 import type { ConfirmationInteractor } from "../../render/interactions/confirmation.js";
+import { renderBlocks } from "../../render/utils/transcript.js";
 import {
   appendSpecRecord,
   finalizeSpecRecord,
@@ -262,7 +263,10 @@ export async function executeSpecCommand(
       const userFeedback = await promptForInput({
         message: ">",
         defaultValue: "",
-        prefaceLines: ["", "What would you like to change?"],
+        prefaceLines: renderBlocks({
+          sections: [["What would you like to change?"]],
+          leadingBlankLine: true,
+        }),
       });
       feedback = userFeedback.trim();
 

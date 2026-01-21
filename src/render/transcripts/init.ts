@@ -7,7 +7,7 @@ import type {
 } from "../../commands/init/types.js";
 import type { EvalSlug } from "../../configs/evals/types.js";
 import { colorize } from "../../utils/colors.js";
-import { renderTranscript } from "../utils/transcript.js";
+import { renderBlocks, renderTranscript } from "../utils/transcript.js";
 
 export function buildInitializationPrompt(): string {
   return "Initializing Voratiq…";
@@ -26,20 +26,21 @@ export function renderAgentPromptPreface({
   detected,
   firstPrompt,
 }: AgentPromptRenderOptions): string[] {
-  const lines: string[] = [];
+  const sections: string[][] = [];
   if (firstPrompt) {
-    lines.push("");
-    lines.push("Configuring agents…");
-    lines.push("");
+    sections.push(["Configuring agents…"]);
   }
 
   if (detected && binaryPath) {
-    lines.push(`\`${agentId}\` binary detected: \`${binaryPath}\``);
+    sections.push([`\`${agentId}\` binary detected: \`${binaryPath}\``]);
   } else {
-    lines.push(`\`${agentId}\` binary not detected. Keeping disabled.`);
+    sections.push([`\`${agentId}\` binary not detected. Keeping disabled.`]);
   }
 
-  return lines;
+  return renderBlocks({
+    sections,
+    leadingBlankLine: firstPrompt,
+  });
 }
 
 interface EvalCommandPromptRenderOptions {
@@ -53,15 +54,17 @@ export function renderEvalCommandPreface({
   commandText,
   firstPrompt,
 }: EvalCommandPromptRenderOptions): string[] {
-  const lines: string[] = [];
+  const sections: string[][] = [];
   if (firstPrompt) {
-    lines.push("");
-    lines.push("Configuring evals…");
-    lines.push("");
+    sections.push(["Configuring evals…"]);
   }
 
-  lines.push(`\`${commandName}\` command detected: \`${commandText}\``);
-  return lines;
+  sections.push([`\`${commandName}\` command detected: \`${commandText}\``]);
+
+  return renderBlocks({
+    sections,
+    leadingBlankLine: firstPrompt,
+  });
 }
 
 export function renderInitTranscript({
