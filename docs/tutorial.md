@@ -8,7 +8,7 @@ At a high level, the Voratiq workflow follows this sequence: `init` â†’ `spec` â
 
 ## Before you start
 
-To start, Voratiq should be installed and in your `$PATH` (`npm install -g voratiq@beta`).
+To start, Voratiq should be installed and in your `$PATH` (`npm install -g voratiq`).
 
 Then, you need a git repo with a clean working tree, and 1 or more authenticated CLI agents. These prerequisites are checked during preflight, and will throw an error if something is off.
 
