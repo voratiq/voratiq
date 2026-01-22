@@ -4,7 +4,7 @@ title: Voratiq Documentation
 
 # Voratiq
 
-Voratiq is an open-source CLI that helps you run agents in parallel, compare results, and apply the best solution.
+Voratiq helps you write software in a new way. Run coding agents against each other on real tasks, compare results, and merge the winner.
 
 Write a spec in Markdown, run it against any number of agents (Claude, Codex, or Gemini), and let automated evals help determine which output is best.
 

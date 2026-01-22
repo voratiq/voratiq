@@ -1,6 +1,6 @@
 # Voratiq
 
-Run agents in parallel, compare results, and apply the best solution.
+Run coding agents against each other. Merge the winner.
 
 ![`voratiq run --spec .voratiq/specs/apply-commit-flag.md`](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/run-demo.png)
 
