@@ -1,7 +1,7 @@
 {
   "name": "voratiq",
   "version": "0.1.0-beta.6",
-  "description": "Run multiple AI coding agents in parallel, compare their results, and apply the best solution.",
+  "description": "Run coding agents against each other. Merge the winner.",
   "keywords": [
     "ai",
     "cli",
