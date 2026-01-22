@@ -13,7 +13,7 @@ Write a spec in Markdown, run it against any number of agents (Claude, Codex, or
 ### Install
 
 ```bash
-npm install -g voratiq@beta
+npm install -g voratiq
 ```
 
 ### Initialize

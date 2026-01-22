@@ -9,7 +9,7 @@ Run coding agents against each other. Merge the winner.
 Voratiq is in public beta. Install via npm:
 
 ```bash
-npm install -g voratiq@beta
+npm install -g voratiq
 ```
 
 ### Requirements
