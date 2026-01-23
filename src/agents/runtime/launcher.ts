@@ -28,7 +28,6 @@ import {
   type WatchdogTrigger,
 } from "./watchdog.js";
 
-const DEFAULT_SRT_ARGUMENTS = ["--debug"] as const;
 const SRT_BINARY_ENV = "VORATIQ_SRT_BINARY" as const;
 
 let cachedSrtBinaryPath: string | undefined;
@@ -122,7 +121,6 @@ function getRunArgs(options: {
 }): string[] {
   const { settingsArg, configArg, shimEntryPath } = options;
   return [
-    ...DEFAULT_SRT_ARGUMENTS,
     "--settings",
     settingsArg,
     "--",
@@ -202,6 +200,7 @@ export async function runAgentProcess(
       command,
       args,
       cwd: agentRoot,
+      env: { SRT_DEBUG: process.env.SRT_DEBUG ?? "1" },
       stdout: { writable: stdoutStream },
       stderr: { writable: stderrStream },
       detached: true,

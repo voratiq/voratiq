@@ -1,5 +1,9 @@
 import { hasSandboxDependencies } from "../../src/workspace/sandbox-requirements.js";
 
+if (process.env.SRT_DEBUG === undefined) {
+  process.env.SRT_DEBUG = "";
+}
+
 export function isSandboxRuntimeSupported(): boolean {
   return hasSandboxDependencies();
 }
