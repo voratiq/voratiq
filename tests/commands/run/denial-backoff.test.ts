@@ -24,6 +24,26 @@ describe("sandbox denial backoff", () => {
     });
   });
 
+  it("parses alternative sandbox-runtime denial phrasing (synced fork)", () => {
+    expect(
+      parseSandboxDenialLine(
+        "[SandboxDebug] No matching config rule, denying: registry.npmjs.org:443",
+      ),
+    ).toEqual({
+      operation: "network-connect",
+      target: "registry.npmjs.org:443",
+    });
+  });
+
+  it("returns undefined for unrelated stderr lines", () => {
+    expect(parseSandboxDenialLine("random log line")).toBeUndefined();
+    expect(
+      parseSandboxDenialLine("[SandboxDebug] Allowed by config rule"),
+    ).toBeUndefined();
+    expect(parseSandboxDenialLine("")).toBeUndefined();
+    expect(parseSandboxDenialLine("   ")).toBeUndefined();
+  });
+
   it("escalates warn -> delay -> fail-fast for repeated denials", () => {
     const tracker = new DenialBackoffTracker(DEFAULT_DENIAL_BACKOFF);
     const info: SandboxFailFastInfo = {
@@ -122,6 +142,37 @@ describe("sandbox denial backoff", () => {
     expect(stderrChunks.join("")).toMatch(/SandboxBackoff: WARN/u);
     expect(stderrChunks.join("")).toMatch(/SandboxBackoff: ERROR/u);
 
+    killSpy.mockRestore();
+  });
+
+  it("ignores unmatched stderr lines and does not influence the backoff tracker", () => {
+    const killSpy = jest.spyOn(process, "kill").mockImplementation(() => true);
+
+    const child = new EventEmitter() as unknown as ChildProcess;
+    Object.assign(child, { pid: 4242, exitCode: null, signalCode: null });
+
+    const stderrStream = new PassThrough();
+    const stderrChunks: string[] = [];
+    stderrStream.on("data", (chunk: Buffer) =>
+      stderrChunks.push(chunk.toString("utf8")),
+    );
+
+    const onWatchdogTrigger = jest.fn();
+
+    const watchdog = createWatchdog(child, stderrStream, {
+      providerId: "codex",
+      denialBackoff: { ...DEFAULT_DENIAL_BACKOFF, delayMs: 5 },
+      onWatchdogTrigger,
+    });
+
+    watchdog.handleOutput("unrelated line\n");
+    watchdog.handleOutput("[SandboxDebug] Not a denial: something\n");
+
+    expect(onWatchdogTrigger).not.toHaveBeenCalled();
+    expect(killSpy).not.toHaveBeenCalled();
+    expect(stderrChunks.join("")).not.toMatch(/SandboxBackoff:/u);
+
+    watchdog.cleanup();
     killSpy.mockRestore();
   });
 });
