@@ -176,7 +176,6 @@ suite("agent integrations", () => {
           "--config",
           "model_reasoning_effort=high",
         ]);
-        expect(manifest.env.RUST_BACKTRACE).toBe("1");
         const stagedSandbox = manifest.env.CODEX_HOME;
         await expect(pathExists(stagedSandbox)).resolves.toBe(false);
         await expect(access(stagedSandbox)).rejects.toThrow();

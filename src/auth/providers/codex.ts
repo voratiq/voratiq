@@ -94,7 +94,6 @@ export const codexAuthProvider: AuthProvider = {
 
     const envResult = composeSandboxEnvResult(sandboxPaths.home, {
       CODEX_HOME: sandboxPaths.codex,
-      RUST_BACKTRACE: "1",
     });
 
     return envResult;
