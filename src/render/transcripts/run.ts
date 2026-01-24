@@ -38,12 +38,14 @@ interface RunRendererOptions {
   stdout?: CliWriter;
   stderr?: CliWriter;
   now?: () => number;
+  suppressLeadingBlankLine?: boolean;
+  suppressTrailingBlankLine?: boolean;
 }
 
 interface RunProgressRenderer {
   begin(context?: RunProgressContext): void;
   update(record: AgentInvocationRecord): void;
-  complete(report: RunReport): string;
+  complete(report: RunReport, options?: { suppressHint?: boolean }): string;
 }
 
 interface AgentRow {
@@ -108,6 +110,8 @@ export function createRunRenderer(
   const stdout: CliWriter = options.stdout ?? process.stdout;
   const stderr: CliWriter = options.stderr ?? process.stderr;
   const now = options.now ?? Date.now.bind(Date);
+  const suppressLeadingBlankLine = options.suppressLeadingBlankLine === true;
+  const suppressTrailingBlankLine = options.suppressTrailingBlankLine === true;
 
   let context: RunProgressContext | undefined;
   let disabled = shouldSuppressRunStatusTable();
@@ -143,7 +147,10 @@ export function createRunRenderer(
       return [];
     }
 
-    const lines: string[] = [""];
+    const lines: string[] = [];
+    if (!suppressLeadingBlankLine) {
+      lines.push("");
+    }
     lines.push(...metadataLines);
 
     if (tableLines.length > 0) {
@@ -151,7 +158,9 @@ export function createRunRenderer(
       lines.push(...tableLines);
     }
 
-    lines.push("");
+    if (!suppressTrailingBlankLine) {
+      lines.push("");
+    }
     return lines;
   }
 
@@ -160,7 +169,15 @@ export function createRunRenderer(
       return [];
     }
 
-    return ["", ...tableLines, ""];
+    const lines: string[] = [];
+    if (!suppressLeadingBlankLine) {
+      lines.push("");
+    }
+    lines.push(...tableLines);
+    if (!suppressTrailingBlankLine) {
+      lines.push("");
+    }
+    return lines;
   }
 
   function render(): void {
@@ -361,7 +378,7 @@ export function createRunRenderer(
         render();
       });
     },
-    complete(report: RunReport): string {
+    complete(report: RunReport, options?: { suppressHint?: boolean }): string {
       let transcript = "";
       guard(() => {
         ensureFinalRender(report);
@@ -369,9 +386,11 @@ export function createRunRenderer(
         disabled = true;
       });
 
-      const hint = {
-        message: `To review results:\n  voratiq review --run ${report.runId} --agent <agent-id>`,
-      };
+      const hint = options?.suppressHint
+        ? undefined
+        : {
+            message: `To review results:\n  voratiq review --run ${report.runId} --agent <agent-id>`,
+          };
 
       const sections = stdout.isTTY
         ? undefined

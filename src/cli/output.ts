@@ -1,6 +1,7 @@
 import {
   formatAlertMessage,
   formatCliOutput,
+  type FormatCliOutputOptions,
   formatErrorMessage,
 } from "../utils/output.js";
 
@@ -20,6 +21,7 @@ export interface CommandOutputPayload {
   readonly alerts?: readonly Alert[];
   readonly stderr?: string | readonly string[];
   readonly exitCode?: number;
+  readonly formatBody?: FormatCliOutputOptions;
 }
 
 export function writeCommandOutput(payload: CommandOutputPayload): void {
@@ -51,7 +53,7 @@ export function renderCommandOutput(payload: CommandOutputPayload): void {
   if (body !== undefined) {
     const normalizedBody = typeof body === "string" ? body : body.join("\n");
     if (normalizedBody.trim().length > 0) {
-      const formattedBody = formatCliOutput(normalizedBody);
+      const formattedBody = formatCliOutput(normalizedBody, payload.formatBody);
       process.stdout.write(formattedBody);
     }
   }

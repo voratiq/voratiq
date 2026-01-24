@@ -1,8 +1,18 @@
 import { colorize, type TerminalColor } from "./colors.js";
 
-export function formatCliOutput(value: string): string {
+export interface FormatCliOutputOptions {
+  leadingNewline?: boolean;
+  trailingNewline?: boolean;
+}
+
+export function formatCliOutput(
+  value: string,
+  options: FormatCliOutputOptions = {},
+): string {
   const trimmedEnd = value.trimEnd();
-  return `\n${trimmedEnd}\n\n`;
+  const leading = options.leadingNewline === false ? "" : "\n";
+  const trailing = options.trailingNewline === false ? "\n" : "\n\n";
+  return `${leading}${trimmedEnd}${trailing}`;
 }
 
 export function formatAlertMessage(

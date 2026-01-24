@@ -20,6 +20,9 @@ export interface RunCommandOptions {
   specPath: string;
   maxParallel?: number;
   branch?: boolean;
+  suppressHint?: boolean;
+  suppressLeadingBlankLine?: boolean;
+  suppressTrailingBlankLine?: boolean;
 }
 
 export interface RunCommandResult {
@@ -31,7 +34,14 @@ export interface RunCommandResult {
 export async function runRunCommand(
   options: RunCommandOptions,
 ): Promise<RunCommandResult> {
-  const { specPath, maxParallel, branch } = options;
+  const {
+    specPath,
+    maxParallel,
+    branch,
+    suppressHint,
+    suppressLeadingBlankLine,
+    suppressTrailingBlankLine,
+  } = options;
 
   const { root, workspacePaths } = await resolveCliContext();
   checkPlatformSupport();
@@ -44,7 +54,10 @@ export async function runRunCommand(
     await checkoutOrCreateBranch(root, branchName);
   }
 
-  const renderer = createRunRenderer();
+  const renderer = createRunRenderer({
+    suppressLeadingBlankLine,
+    suppressTrailingBlankLine,
+  });
 
   const report = await executeRunCommand({
     root,
@@ -55,7 +68,7 @@ export async function runRunCommand(
     renderer,
   });
 
-  const body = renderer.complete(report);
+  const body = renderer.complete(report, { suppressHint });
 
   // Unlike other commands, `run` signals a degraded outcome via exit code 1
   // when any agent fails. Eval failures are quality signals displayed in the output

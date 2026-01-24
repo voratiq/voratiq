@@ -17,16 +17,18 @@ export interface SpecCommandOptions {
   title?: string;
   output?: string;
   yes?: boolean;
+  suppressHint?: boolean;
 }
 
 export interface SpecCommandResult {
   body: string;
+  outputPath: string;
 }
 
 export async function runSpecCommand(
   options: SpecCommandOptions,
 ): Promise<SpecCommandResult> {
-  const { description, agent, title, output, yes } = options;
+  const { description, agent, title, output, yes, suppressHint } = options;
 
   const { root, workspacePaths } = await resolveCliContext();
   checkPlatformSupport();
@@ -56,9 +58,12 @@ export async function runSpecCommand(
       },
     });
 
-    const body = renderSpecTranscript(result.outputPath);
+    const body = renderSpecTranscript(result.outputPath, { suppressHint });
 
-    return { body };
+    return {
+      body,
+      outputPath: result.outputPath,
+    };
   } finally {
     confirmation.close();
   }

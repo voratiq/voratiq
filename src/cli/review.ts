@@ -19,6 +19,7 @@ import { writeCommandOutput } from "./output.js";
 export interface ReviewCommandOptions {
   runId: string;
   agentId: string;
+  suppressHint?: boolean;
 }
 
 export interface ReviewCommandResult extends ReviewExecutionResult {
@@ -30,7 +31,7 @@ export interface ReviewCommandResult extends ReviewExecutionResult {
 export async function runReviewCommand(
   options: ReviewCommandOptions,
 ): Promise<ReviewCommandResult> {
-  const { runId, agentId } = options;
+  const { runId, agentId, suppressHint } = options;
   const { root, workspacePaths } = await resolveCliContext();
   checkPlatformSupport();
   ensureSandboxDependencies();
@@ -62,6 +63,7 @@ export async function runReviewCommand(
     runId: execution.runRecord.runId,
     outputPath: execution.outputPath,
     previewLines,
+    suppressHint,
     ...(execution.missingArtifacts.length > 0
       ? { missingArtifacts: execution.missingArtifacts }
       : {}),
