@@ -145,11 +145,13 @@ describe("voratiq auto", () => {
       expect.objectContaining({ yes: true }),
     );
 
-    expect(runReviewCommandMock).toHaveBeenCalledWith({
-      runId: "run-123",
-      agentId: "reviewer",
-      suppressHint: true,
-    });
+    expect(runReviewCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-123",
+        agentId: "reviewer",
+        suppressHint: true,
+      }),
+    );
 
     expect(stripAnsi(stdout.join(""))).toContain("Auto SUCCEEDED");
     expect(process.exitCode).toBe(1);
@@ -206,6 +208,67 @@ describe("voratiq auto", () => {
     expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
     expect(process.exitCode).toBe(1);
     expect(stderr.join("")).toHaveLength(0);
+  });
+
+  it("keeps single-blank separation between chained transcripts", async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    stderrSpy = jest
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: unknown) => {
+        stderr.push(String(chunk));
+        return true;
+      });
+
+    runSpecCommandMock.mockResolvedValue({
+      body: "Spec saved: .voratiq/specs/generated.md",
+      outputPath: ".voratiq/specs/generated.md",
+    });
+
+    runRunCommandMock.mockResolvedValue({
+      report: {
+        runId: "run-xyz",
+        spec: { path: ".voratiq/specs/generated.md" },
+        status: "succeeded",
+        createdAt: new Date().toISOString(),
+        baseRevisionSha: "deadbeef",
+        agents: [],
+        hadAgentFailure: false,
+        hadEvalFailure: false,
+      },
+      body: "RUN BODY",
+    });
+
+    runReviewCommandMock.mockResolvedValue({
+      reviewId: "review-xyz",
+      runRecord: {} as never,
+      agentId: "reviewer",
+      outputPath: ".voratiq/reviews/review.md",
+      missingArtifacts: [],
+      body: "REVIEW BODY",
+    });
+
+    await runAutoCommand({
+      description: "write a spec",
+      specAgent: "spec-agent",
+      reviewerAgent: "reviewer",
+    });
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output.startsWith("\n")).toBe(true);
+    expect(output).not.toContain("\n\n\n");
+    expect(output).toContain("Spec saved");
+    expect(output).toContain("\n\nRUN BODY");
+    expect(output).toContain("RUN BODY\n\nREVIEW BODY");
+    expect(output).toContain("REVIEW BODY\n\nAuto SUCCEEDED");
   });
 
   it("aborts after spec failure (no run/review)", async () => {

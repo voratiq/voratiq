@@ -23,6 +23,8 @@ export interface RunCommandOptions {
   suppressHint?: boolean;
   suppressLeadingBlankLine?: boolean;
   suppressTrailingBlankLine?: boolean;
+  stdout?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
+  stderr?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
 }
 
 export interface RunCommandResult {
@@ -41,6 +43,8 @@ export async function runRunCommand(
     suppressHint,
     suppressLeadingBlankLine,
     suppressTrailingBlankLine,
+    stdout,
+    stderr,
   } = options;
 
   const { root, workspacePaths } = await resolveCliContext();
@@ -55,6 +59,8 @@ export async function runRunCommand(
   }
 
   const renderer = createRunRenderer({
+    stdout,
+    stderr,
     suppressLeadingBlankLine,
     suppressTrailingBlankLine,
   });

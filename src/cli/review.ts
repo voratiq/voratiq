@@ -14,12 +14,13 @@ import {
   resolveCliContext,
 } from "../preflight/index.js";
 import { renderReviewTranscript } from "../render/transcripts/review.js";
-import { writeCommandOutput } from "./output.js";
+import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface ReviewCommandOptions {
   runId: string;
   agentId: string;
   suppressHint?: boolean;
+  writeOutput?: CommandOutputWriter;
 }
 
 export interface ReviewCommandResult extends ReviewExecutionResult {
@@ -31,12 +32,17 @@ export interface ReviewCommandResult extends ReviewExecutionResult {
 export async function runReviewCommand(
   options: ReviewCommandOptions,
 ): Promise<ReviewCommandResult> {
-  const { runId, agentId, suppressHint } = options;
+  const {
+    runId,
+    agentId,
+    suppressHint,
+    writeOutput = writeCommandOutput,
+  } = options;
   const { root, workspacePaths } = await resolveCliContext();
   checkPlatformSupport();
   ensureSandboxDependencies();
 
-  writeCommandOutput({
+  writeOutput({
     alerts: [{ severity: "info", message: "Generating review..." }],
   });
 

@@ -5,7 +5,7 @@ import { renderCliError } from "../render/utils/errors.js";
 import type { RunStatus } from "../status/index.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import { toCliError } from "./errors.js";
-import { writeCommandOutput } from "./output.js";
+import { beginChainedCommandOutput, writeCommandOutput } from "./output.js";
 import { runReviewCommand } from "./review.js";
 import { runRunCommand } from "./run.js";
 import { runSpecCommand } from "./spec.js";
@@ -47,195 +47,188 @@ export async function runAutoCommand(
   const now = runtime.now ?? Date.now.bind(Date);
 
   const overallStart = now();
+  const chainedOutput = beginChainedCommandOutput();
 
-  let exitCode = 0;
+  try {
+    let exitCode = 0;
 
-  let specStartedAt: number | undefined;
-  let specStatus: "succeeded" | "failed" | "skipped" = "skipped";
-  let specOutputPath: string | undefined;
-  let specDetail: string | undefined;
+    let specStartedAt: number | undefined;
+    let specStatus: "succeeded" | "failed" | "skipped" = "skipped";
+    let specOutputPath: string | undefined;
+    let specDetail: string | undefined;
 
-  let runStartedAt: number | undefined;
-  let runStatus: "succeeded" | "failed" | "skipped" = "skipped";
-  let runId: string | undefined;
-  let runDetail: string | undefined;
-  let runRecordStatus: RunStatus | undefined;
-  let runCreatedAt: string | undefined;
-  let runSpecPath: string | undefined;
-  let runBaseRevisionSha: string | undefined;
+    let runStartedAt: number | undefined;
+    let runStatus: "succeeded" | "failed" | "skipped" = "skipped";
+    let runId: string | undefined;
+    let runDetail: string | undefined;
+    let runRecordStatus: RunStatus | undefined;
+    let runCreatedAt: string | undefined;
+    let runSpecPath: string | undefined;
+    let runBaseRevisionSha: string | undefined;
 
-  let reviewStartedAt: number | undefined;
-  let reviewStatus: "succeeded" | "failed" | "skipped" = "skipped";
-  let reviewOutputPath: string | undefined;
-  let reviewDetail: string | undefined;
+    let reviewStartedAt: number | undefined;
+    let reviewStatus: "succeeded" | "failed" | "skipped" = "skipped";
+    let reviewOutputPath: string | undefined;
+    let reviewDetail: string | undefined;
 
-  if (options.description) {
-    specStartedAt = now();
-
-    try {
-      if (!options.specAgent) {
-        throw new Error(
-          "Expected --spec-agent when --description is provided.",
-        );
-      }
-
-      const specResult = await runSpecCommand({
-        description: options.description,
-        agent: options.specAgent,
-        title: options.title,
-        output: options.output,
-        yes: true,
-        suppressHint: true,
-      });
-
-      specStatus = "succeeded";
-      specOutputPath = specResult.outputPath;
-
-      writeCommandOutput({ body: specResult.body });
-    } catch (error) {
-      specStatus = "failed";
-      specDetail = toCliError(error).headline;
-      exitCode = 1;
-      writeCommandOutput({
-        body: renderCliError(toCliError(error)),
-        formatBody: { leadingNewline: false },
-      });
-    }
-  } else if (options.specPath) {
-    specStatus = "skipped";
-    specOutputPath = options.specPath;
-  } else {
-    specStatus = "failed";
-    specDetail = "Either --description or --spec must be provided.";
-    exitCode = 1;
-    writeCommandOutput({
-      body: renderCliError(toCliError(new Error(specDetail))),
-      formatBody: { leadingNewline: false },
-    });
-  }
-
-  if (exitCode === 0 && specOutputPath) {
-    runStartedAt = now();
-
-    try {
-      const runResult = await runRunCommand({
-        specPath: specOutputPath,
-        maxParallel: options.maxParallel,
-        branch: options.branch,
-        suppressHint: true,
-        suppressLeadingBlankLine: true,
-      });
-
-      runStatus = "succeeded";
-      runId = runResult.report.runId;
-      runRecordStatus = runResult.report.status;
-      runCreatedAt = runResult.report.createdAt;
-      runSpecPath = runResult.report.spec?.path;
-      runBaseRevisionSha = runResult.report.baseRevisionSha;
-
-      if (runResult.exitCode === 1) {
-        exitCode = 1;
-      }
-
-      writeCommandOutput({
-        body: runResult.body,
-        formatBody: { leadingNewline: false, trailingNewline: false },
-      });
-    } catch (error) {
-      runStatus = "failed";
-      runDetail = toCliError(error).headline;
-      exitCode = 1;
-      writeCommandOutput({
-        body: renderCliError(toCliError(error)),
-        formatBody: { leadingNewline: false },
-      });
-    }
-  }
-
-  if (exitCode === 0 || runId) {
-    if (!runId) {
-      reviewStatus = "skipped";
-    } else {
-      reviewStartedAt = now();
+    if (options.description) {
+      specStartedAt = now();
 
       try {
-        const reviewResult = await runReviewCommand({
-          runId,
-          agentId: options.reviewerAgent,
+        if (!options.specAgent) {
+          throw new Error(
+            "Expected --spec-agent when --description is provided.",
+          );
+        }
+
+        const specResult = await runSpecCommand({
+          description: options.description,
+          agent: options.specAgent,
+          title: options.title,
+          output: options.output,
+          yes: true,
           suppressHint: true,
         });
 
-        reviewStatus = "succeeded";
-        reviewOutputPath = reviewResult.outputPath;
+        specStatus = "succeeded";
+        specOutputPath = specResult.outputPath;
 
-        writeCommandOutput({
-          body: reviewResult.body,
-          stderr: reviewResult.stderr,
-        });
+        writeCommandOutput({ body: specResult.body });
       } catch (error) {
-        reviewStatus = "failed";
-        reviewDetail = toCliError(error).headline;
+        specStatus = "failed";
+        specDetail = toCliError(error).headline;
         exitCode = 1;
-        writeCommandOutput({
-          body: renderCliError(toCliError(error)),
-          formatBody: { leadingNewline: false },
+        writeCommandOutput({ body: renderCliError(toCliError(error)) });
+      }
+    } else if (options.specPath) {
+      specStatus = "skipped";
+      specOutputPath = options.specPath;
+    } else {
+      specStatus = "failed";
+      specDetail = "Either --description or --spec must be provided.";
+      exitCode = 1;
+      writeCommandOutput({
+        body: renderCliError(toCliError(new Error(specDetail))),
+      });
+    }
+
+    if (exitCode === 0 && specOutputPath) {
+      runStartedAt = now();
+
+      try {
+        const runResult = await runRunCommand({
+          specPath: specOutputPath,
+          maxParallel: options.maxParallel,
+          branch: options.branch,
+          suppressHint: true,
+          suppressLeadingBlankLine: true,
+          stdout: chainedOutput.stdout,
+          stderr: chainedOutput.stderr,
         });
+
+        runStatus = "succeeded";
+        runId = runResult.report.runId;
+        runRecordStatus = runResult.report.status;
+        runCreatedAt = runResult.report.createdAt;
+        runSpecPath = runResult.report.spec?.path;
+        runBaseRevisionSha = runResult.report.baseRevisionSha;
+
+        if (runResult.exitCode === 1) {
+          exitCode = 1;
+        }
+
+        writeCommandOutput({ body: runResult.body });
+      } catch (error) {
+        runStatus = "failed";
+        runDetail = toCliError(error).headline;
+        exitCode = 1;
+        writeCommandOutput({ body: renderCliError(toCliError(error)) });
       }
     }
+
+    if (exitCode === 0 || runId) {
+      if (!runId) {
+        reviewStatus = "skipped";
+      } else {
+        reviewStartedAt = now();
+
+        try {
+          const reviewResult = await runReviewCommand({
+            runId,
+            agentId: options.reviewerAgent,
+            suppressHint: true,
+          });
+
+          reviewStatus = "succeeded";
+          reviewOutputPath = reviewResult.outputPath;
+
+          writeCommandOutput({
+            body: reviewResult.body,
+            stderr: reviewResult.stderr,
+          });
+        } catch (error) {
+          reviewStatus = "failed";
+          reviewDetail = toCliError(error).headline;
+          exitCode = 1;
+          writeCommandOutput({ body: renderCliError(toCliError(error)) });
+        }
+      }
+    }
+
+    const overallDurationMs = now() - overallStart;
+    const specDurationMs =
+      specStartedAt !== undefined ? now() - specStartedAt : undefined;
+    const runDurationMs =
+      runStartedAt !== undefined ? now() - runStartedAt : undefined;
+    const reviewDurationMs =
+      reviewStartedAt !== undefined ? now() - reviewStartedAt : undefined;
+
+    const summaryBody = renderAutoSummaryTranscript({
+      totalDurationMs: overallDurationMs,
+      spec: {
+        status: specStatus,
+        ...(typeof specDurationMs === "number"
+          ? { durationMs: specDurationMs }
+          : {}),
+        outputPath: specOutputPath,
+        ...(specDetail ? { detail: specDetail } : {}),
+      },
+      run: {
+        status: runStatus,
+        ...(typeof runDurationMs === "number"
+          ? { durationMs: runDurationMs }
+          : {}),
+        ...(runId ? { runId } : {}),
+        ...(runRecordStatus ? { runStatus: runRecordStatus } : {}),
+        ...(runCreatedAt ? { createdAt: runCreatedAt } : {}),
+        ...(runSpecPath ? { specPath: runSpecPath } : {}),
+        ...(runBaseRevisionSha ? { baseRevisionSha: runBaseRevisionSha } : {}),
+        ...(runDetail ? { detail: runDetail } : {}),
+      },
+      review: {
+        status: reviewStatus,
+        ...(typeof reviewDurationMs === "number"
+          ? { durationMs: reviewDurationMs }
+          : {}),
+        ...(reviewOutputPath ? { outputPath: reviewOutputPath } : {}),
+        ...(reviewDetail ? { detail: reviewDetail } : {}),
+      },
+    });
+
+    writeCommandOutput({
+      body: summaryBody,
+      exitCode,
+    });
+
+    return {
+      exitCode,
+      specOutputPath,
+      runId,
+      reviewOutputPath,
+    };
+  } finally {
+    chainedOutput.end();
   }
-
-  const overallDurationMs = now() - overallStart;
-  const specDurationMs =
-    specStartedAt !== undefined ? now() - specStartedAt : undefined;
-  const runDurationMs =
-    runStartedAt !== undefined ? now() - runStartedAt : undefined;
-  const reviewDurationMs =
-    reviewStartedAt !== undefined ? now() - reviewStartedAt : undefined;
-
-  const summaryBody = renderAutoSummaryTranscript({
-    totalDurationMs: overallDurationMs,
-    spec: {
-      status: specStatus,
-      ...(typeof specDurationMs === "number"
-        ? { durationMs: specDurationMs }
-        : {}),
-      outputPath: specOutputPath,
-      ...(specDetail ? { detail: specDetail } : {}),
-    },
-    run: {
-      status: runStatus,
-      ...(typeof runDurationMs === "number"
-        ? { durationMs: runDurationMs }
-        : {}),
-      ...(runId ? { runId } : {}),
-      ...(runRecordStatus ? { runStatus: runRecordStatus } : {}),
-      ...(runCreatedAt ? { createdAt: runCreatedAt } : {}),
-      ...(runSpecPath ? { specPath: runSpecPath } : {}),
-      ...(runBaseRevisionSha ? { baseRevisionSha: runBaseRevisionSha } : {}),
-      ...(runDetail ? { detail: runDetail } : {}),
-    },
-    review: {
-      status: reviewStatus,
-      ...(typeof reviewDurationMs === "number"
-        ? { durationMs: reviewDurationMs }
-        : {}),
-      ...(reviewOutputPath ? { outputPath: reviewOutputPath } : {}),
-      ...(reviewDetail ? { detail: reviewDetail } : {}),
-    },
-  });
-
-  writeCommandOutput({
-    body: summaryBody,
-    exitCode,
-    formatBody: { leadingNewline: false },
-  });
-
-  return {
-    exitCode,
-    specOutputPath,
-    runId,
-    reviewOutputPath,
-  };
 }
 
 interface AutoCommandActionOptions {
