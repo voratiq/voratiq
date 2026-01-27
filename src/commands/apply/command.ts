@@ -251,6 +251,7 @@ async function recordApplyStatus(
         applyStatus,
       };
     },
+    forceFlush: true,
   });
 }
 

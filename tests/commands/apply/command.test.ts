@@ -12,7 +12,10 @@ import {
   ApplyBaseMismatchError,
   ApplyPatchApplicationError,
 } from "../../../src/commands/apply/errors.js";
-import { appendRunRecord } from "../../../src/runs/records/persistence.js";
+import {
+  appendRunRecord,
+  rewriteRunRecord,
+} from "../../../src/runs/records/persistence.js";
 import type { RunRecord } from "../../../src/runs/records/types.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 import {
@@ -87,6 +90,227 @@ describe("executeApplyCommand", () => {
         ),
       ).toBe(false);
       expect(updatedRecord?.applyStatus?.detail ?? undefined).toBeUndefined();
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("overwrites applyStatus when applying multiple agents", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-overwrite-"));
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const srcDir = join(repoRoot, "src");
+      await mkdir(srcDir, { recursive: true });
+
+      const fileA = join(srcDir, "artifact-a.ts");
+      const fileB = join(srcDir, "artifact-b.ts");
+      await writeFile(fileA, "console.log('a');\n", "utf8");
+      await writeFile(fileB, "console.log('b');\n", "utf8");
+      await runGit(repoRoot, ["add", "src/artifact-a.ts", "src/artifact-b.ts"]);
+      await runGit(repoRoot, ["commit", "-m", "seed artifacts"]);
+
+      const baseRevisionSha = await runGit(repoRoot, ["rev-parse", "HEAD"]);
+
+      await writeFile(fileA, "console.log('a apply');\n", "utf8");
+      const diffA = await runGit(repoRoot, ["diff"], { trim: false });
+      const diffStatsA = await runGit(repoRoot, ["diff", "--shortstat"]);
+      await runGit(repoRoot, ["checkout", "--", "src/artifact-a.ts"]);
+
+      await writeFile(fileB, "console.log('b apply');\n", "utf8");
+      const diffB = await runGit(repoRoot, ["diff"], { trim: false });
+      const diffStatsB = await runGit(repoRoot, ["diff", "--shortstat"]);
+      await runGit(repoRoot, ["checkout", "--", "src/artifact-b.ts"]);
+
+      const runId = "run-apply-overwrite";
+      const agentA = "agent-a";
+      const agentB = "agent-b";
+
+      await writeRunRecordWithAgents({
+        repoRoot,
+        runId,
+        baseRevisionSha,
+        agents: [
+          {
+            agentId: agentA,
+            diffContent: diffA,
+            diffStatistics: diffStatsA,
+          },
+          {
+            agentId: agentB,
+            diffContent: diffB,
+            diffStatistics: diffStatsB,
+          },
+        ],
+      });
+
+      const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
+
+      await executeApplyCommand({
+        root: repoRoot,
+        runsFilePath,
+        runId,
+        agentId: agentA,
+        ignoreBaseMismatch: false,
+      });
+
+      const recordPath = join(
+        repoRoot,
+        ".voratiq",
+        "runs",
+        "sessions",
+        runId,
+        "record.json",
+      );
+      const afterFirstApply = JSON.parse(
+        await readFile(recordPath, "utf8"),
+      ) as RunRecord;
+      expect(afterFirstApply.applyStatus?.agentId).toBe(agentA);
+
+      await executeApplyCommand({
+        root: repoRoot,
+        runsFilePath,
+        runId,
+        agentId: agentB,
+        ignoreBaseMismatch: false,
+      });
+
+      const afterSecondApply = JSON.parse(
+        await readFile(recordPath, "utf8"),
+      ) as RunRecord;
+      expect(afterSecondApply.applyStatus?.agentId).toBe(agentB);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("persists applyStatus when applying during a running run", async () => {
+    jest.useFakeTimers();
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-running-"));
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const { baseRevisionSha, diffContent, diffStatistics } =
+        await createDiffFixture({
+          repoRoot,
+          original: "console.log('hello');\n",
+          updated: "console.log('hello running apply');\n",
+        });
+
+      const runId = "run-running-apply";
+      const agentId = "claude";
+      const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
+
+      await writeRunRecordWithAgents({
+        repoRoot,
+        runId,
+        baseRevisionSha,
+        runStatus: "running",
+        agents: [
+          {
+            agentId,
+            diffContent,
+            diffStatistics,
+          },
+        ],
+      });
+
+      await executeApplyCommand({
+        root: repoRoot,
+        runsFilePath,
+        runId,
+        agentId,
+        ignoreBaseMismatch: false,
+      });
+
+      // Simulate the apply process exiting immediately; scheduled flush timers
+      // must not be relied upon for persistence.
+      jest.clearAllTimers();
+
+      const recordPath = join(
+        repoRoot,
+        ".voratiq",
+        "runs",
+        "sessions",
+        runId,
+        "record.json",
+      );
+      const updatedRecord = JSON.parse(
+        await readFile(recordPath, "utf8"),
+      ) as RunRecord;
+      expect(updatedRecord.applyStatus?.agentId).toBe(agentId);
+      expect(updatedRecord.applyStatus?.status).toBe("succeeded");
+    } finally {
+      jest.useRealTimers();
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("applies work and records applyStatus for an aborted run", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-aborted-"));
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const { filePath, baseRevisionSha, diffContent, diffStatistics } =
+        await createDiffFixture({
+          repoRoot,
+          original: "console.log('hello');\n",
+          updated: "console.log('hello aborted apply');\n",
+        });
+
+      const runId = "run-aborted-apply";
+      const agentId = "claude";
+      await writeRunRecord({
+        repoRoot,
+        runId,
+        agentId,
+        baseRevisionSha,
+        diffContent,
+        diffStatistics,
+      });
+
+      const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
+      await rewriteRunRecord({
+        root: repoRoot,
+        runsFilePath,
+        runId,
+        mutate: (existing) => ({
+          ...existing,
+          status: "aborted",
+        }),
+      });
+
+      const result = await executeApplyCommand({
+        root: repoRoot,
+        runsFilePath,
+        runId,
+        agentId,
+        ignoreBaseMismatch: false,
+      });
+
+      await expect(readFile(filePath, "utf8")).resolves.toBe(
+        "console.log('hello aborted apply');\n",
+      );
+      expect(result.status).toBe("aborted");
+
+      const recordPath = join(
+        repoRoot,
+        ".voratiq",
+        "runs",
+        "sessions",
+        runId,
+        "record.json",
+      );
+      const updatedRecord = JSON.parse(
+        await readFile(recordPath, "utf8"),
+      ) as RunRecord;
+
+      expect(updatedRecord.status).toBe("aborted");
+      expect(updatedRecord.applyStatus?.agentId).toBe(agentId);
+      expect(updatedRecord.applyStatus?.status).toBe("succeeded");
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
@@ -541,6 +765,80 @@ async function writeRunRecord(options: {
   await appendRunRecord({ root: repoRoot, runsFilePath, record: runRecord });
 
   return diffRelative;
+}
+
+async function writeRunRecordWithAgents(options: {
+  repoRoot: string;
+  runId: string;
+  baseRevisionSha: string;
+  runStatus?: RunRecord["status"];
+  agents: Array<{
+    agentId: string;
+    diffContent: string;
+    diffStatistics: string;
+    summaryContent?: string;
+    artifacts?: RunRecord["agents"][number]["artifacts"];
+    status?: RunRecord["agents"][number]["status"];
+  }>;
+}): Promise<void> {
+  const { repoRoot, runId, baseRevisionSha, agents, runStatus } = options;
+  const now = new Date().toISOString();
+
+  const agentRecords = await Promise.all(
+    agents.map(async (agent) => {
+      const {
+        agentId,
+        diffContent,
+        diffStatistics,
+        summaryContent = "summary\n",
+        artifacts,
+        status,
+      } = agent;
+      void diffStatistics;
+
+      const agentDir = join(
+        repoRoot,
+        ".voratiq",
+        "runs",
+        "sessions",
+        runId,
+        agentId,
+      );
+      const artifactsDir = join(agentDir, "artifacts");
+      await mkdir(artifactsDir, { recursive: true });
+
+      await writeFile(join(artifactsDir, "stdout.log"), "stdout\n", "utf8");
+      await writeFile(join(artifactsDir, "stderr.log"), "stderr\n", "utf8");
+      await writeFile(
+        join(artifactsDir, "summary.txt"),
+        summaryContent,
+        "utf8",
+      );
+      await writeFile(join(artifactsDir, "diff.patch"), diffContent, "utf8");
+
+      return createAgentInvocationRecord({
+        agentId,
+        model: `${agentId}-model`,
+        status: status ?? "succeeded",
+        startedAt: now,
+        completedAt: now,
+        commitSha: baseRevisionSha,
+        ...(artifacts ? { artifacts } : {}),
+      });
+    }),
+  );
+
+  const runRecord = createRunRecord({
+    runId,
+    baseRevisionSha,
+    spec: { path: "specs/sample.md" },
+    createdAt: now,
+    agents: agentRecords,
+    status: runStatus ?? "succeeded",
+  });
+
+  const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
+  await appendRunRecord({ root: repoRoot, runsFilePath, record: runRecord });
 }
 
 async function initGitRepository(root: string): Promise<void> {
