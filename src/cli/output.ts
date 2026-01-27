@@ -261,13 +261,18 @@ function createTrackingWriter(
     write(chunk: string | Uint8Array): boolean {
       const text =
         typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+      // Skip prefix insertion for TTY outputs - the run renderer uses cursor
+      // control sequences that assume precise line counts, and adding a prefix
+      // here would throw off those calculations.
       if (!hasWritten && text.length > 0) {
         hasWritten = true;
-        const prefix = getChainedPrefix(state);
-        if (prefix) {
-          target.write(prefix as never);
-          updateTrailingNewlines(state, prefix);
-          state.stdoutHasOutput = true;
+        if (!target.isTTY) {
+          const prefix = getChainedPrefix(state);
+          if (prefix) {
+            target.write(prefix as never);
+            updateTrailingNewlines(state, prefix);
+            state.stdoutHasOutput = true;
+          }
         }
       }
 
