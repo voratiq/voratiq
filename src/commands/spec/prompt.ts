@@ -13,7 +13,7 @@ export interface BuildSpecPromptOptions {
   workspacePath: string;
 }
 
-export function buildSpecDraftPrompt(options: BuildSpecPromptOptions): string {
+export function buildSpecPrompt(options: BuildSpecPromptOptions): string {
   const {
     description,
     title,

@@ -1,8 +1,8 @@
-import { buildSpecDraftPrompt } from "../../src/commands/spec/prompt.js";
+import { buildSpecPrompt } from "../../src/commands/spec/prompt.js";
 
-describe("buildSpecDraftPrompt", () => {
+describe("buildSpecPrompt", () => {
   it("includes required headings, structure, and constraints", () => {
-    const prompt = buildSpecDraftPrompt({
+    const prompt = buildSpecPrompt({
       description: "Define the onboarding flow.",
       outputPath: "spec.md",
       repoRootPath: "/repo",
@@ -29,7 +29,7 @@ describe("buildSpecDraftPrompt", () => {
   });
 
   it("includes previous draft and feedback when refining", () => {
-    const prompt = buildSpecDraftPrompt({
+    const prompt = buildSpecPrompt({
       description: "Define the onboarding flow.",
       previousDraft: "# Draft\nOld details",
       feedback: "Tighten scope",
