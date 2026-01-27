@@ -49,7 +49,7 @@ import {
   SpecOutputPathError,
 } from "./errors.js";
 import { buildDraftPreviewLines } from "./preview.js";
-import { buildSpecDraftPrompt } from "./prompt.js";
+import { buildSpecPrompt } from "./prompt.js";
 
 export interface ExecuteSpecCommandInput {
   root: string;
@@ -430,7 +430,7 @@ async function runDraftIteration(options: {
   const padded = iterationNumber.toString().padStart(2, "0");
   const draftRelative = DRAFT_FILENAME;
 
-  const prompt = buildSpecDraftPrompt({
+  const prompt = buildSpecPrompt({
     description,
     title: specTitle,
     feedback,

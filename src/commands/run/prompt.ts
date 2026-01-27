@@ -3,12 +3,12 @@ import {
   appendOutputRequirements,
 } from "../shared/prompt-helpers.js";
 
-export interface BuildAgentPromptOptions {
+export interface BuildRunPromptOptions {
   specContent: string;
   workspacePath: string;
 }
 
-export function buildAgentPrompt(options: BuildAgentPromptOptions): string {
+export function buildRunPrompt(options: BuildRunPromptOptions): string {
   const { specContent, workspacePath } = options;
 
   const lines = [

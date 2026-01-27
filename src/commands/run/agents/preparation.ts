@@ -1,6 +1,6 @@
 import { ensureWorkspaceError } from "../../../workspace/agents.js";
 import { RunCommandError } from "../errors.js";
-import { buildAgentPrompt } from "../prompts.js";
+import { buildRunPrompt } from "../prompt.js";
 import { AgentRunContext } from "./run-context.js";
 import type {
   AgentExecutionContext,
@@ -46,7 +46,7 @@ export async function prepareAgentForExecution(
     };
   }
 
-  const prompt = buildAgentPrompt({
+  const prompt = buildRunPrompt({
     specContent,
     workspacePath: workspacePaths.workspacePath,
   });

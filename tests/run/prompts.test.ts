@@ -1,8 +1,8 @@
-import { buildAgentPrompt } from "../../src/commands/run/prompts.js";
+import { buildRunPrompt } from "../../src/commands/run/prompt.js";
 
-describe("buildAgentPrompt", () => {
+describe("buildRunPrompt", () => {
   it("includes spec metadata, constraints, and workspace boundary instructions", () => {
-    const prompt = buildAgentPrompt({
+    const prompt = buildRunPrompt({
       specContent: "# Example\nDo the work.",
       workspacePath: "/repo/.voratiq/runs/sessions/run-123/agent-123/workspace",
     });
