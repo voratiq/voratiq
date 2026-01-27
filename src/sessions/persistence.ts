@@ -75,6 +75,16 @@ export interface SessionPersistenceConfig<RecordType, IndexEntry, StatusType> {
   buildIndexEntry: (record: RecordType) => IndexEntry;
   getIndexEntryId: (entry: IndexEntry) => string;
   mergeIndexEntry?: (existing: IndexEntry, incoming: IndexEntry) => IndexEntry;
+  /**
+   * Optional hook to merge buffered state with the latest on-disk record before
+   * persisting. This is useful when multiple processes can update the same
+   * record (for example, apply operations updating run metadata while a run is
+   * still active in another process).
+   */
+  mergeRecordOnFlush?: (
+    buffered: RecordType,
+    disk: RecordType | undefined,
+  ) => RecordType;
   shouldForceFlush: (record: RecordType) => boolean;
   getRecordId: (record: RecordType) => string;
   getRecordStatus: (record: RecordType) => StatusType;
@@ -438,14 +448,31 @@ export function createSessionPersistence<RecordType, IndexEntry, StatusType>(
     const promise = (async () => {
       const release = await config.acquireLock(entry.lockPath);
       try {
-        await atomicWriteRecord(entry.recordPath, entry.record);
+        let recordToPersist = entry.record;
+        if (config.mergeRecordOnFlush) {
+          const diskRecord = await tryReadRecordForMerge(entry);
+          recordToPersist = config.mergeRecordOnFlush(
+            recordToPersist,
+            diskRecord,
+          );
+
+          if (config.getRecordId(recordToPersist) !== entry.sessionId) {
+            throw new SessionRecordMutationError(
+              `Refusing to change session identifier while flushing history for ${entry.sessionId}.`,
+            );
+          }
+
+          entry.record = recordToPersist;
+        }
+
+        await atomicWriteRecord(entry.recordPath, recordToPersist);
         entry.dirty = false;
 
-        const currentStatus = config.getRecordStatus(entry.record);
+        const currentStatus = config.getRecordStatus(recordToPersist);
         if (entry.lastPersistedStatus !== currentStatus) {
           await upsertIndexEntry(
             entry.indexPath,
-            config.buildIndexEntry(entry.record),
+            config.buildIndexEntry(recordToPersist),
           );
           entry.lastPersistedStatus = currentStatus;
         }
@@ -496,6 +523,31 @@ export function createSessionPersistence<RecordType, IndexEntry, StatusType>(
         throw new SessionRecordParseError(path, error.message);
       }
       throw error;
+    }
+  }
+
+  async function tryReadRecordForMerge(
+    entry: SessionRecordBufferEntry<RecordType, StatusType>,
+  ): Promise<RecordType | undefined> {
+    try {
+      const raw = await readFile(entry.recordPath, "utf8");
+      return config.parseRecord({ path: entry.recordPath, raw });
+    } catch (error) {
+      if (isFileSystemError(error) && error.code === "ENOENT") {
+        return undefined;
+      }
+
+      const displayPath = relativeToRoot(entry.root, entry.recordPath);
+      const detail =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "unknown error";
+      console.warn(
+        `[voratiq] Failed to read existing session record at ${displayPath} while merging flush for ${entry.sessionId}: ${detail}`,
+      );
+      return undefined;
     }
   }
 

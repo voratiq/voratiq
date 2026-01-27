@@ -21,7 +21,11 @@ import {
   RunRecordParseError,
 } from "./errors.js";
 import { acquireHistoryLock } from "./history-lock.js";
-import { type RunRecord, runRecordSchema } from "./types.js";
+import {
+  type RunApplyStatus,
+  type RunRecord,
+  runRecordSchema,
+} from "./types.js";
 
 export { HISTORY_LOCK_STALE_GRACE_MS } from "./history-lock.js";
 
@@ -125,6 +129,7 @@ const runPersistence = createSessionPersistence<
     }
     return result.data;
   },
+  mergeRecordOnFlush: (buffered, disk) => mergeApplyStatus(buffered, disk),
   buildIndexEntry: (record) => ({
     runId: record.runId,
     createdAt: record.createdAt,
@@ -329,6 +334,68 @@ export async function fetchRunsSafely(
 
 function shouldForceFlush(status: RunRecord["status"]): boolean {
   return status !== "running" && status !== "queued";
+}
+
+function mergeApplyStatus(buffered: RunRecord, disk?: RunRecord): RunRecord {
+  const latest = pickLatestApplyStatus(buffered.applyStatus, disk?.applyStatus);
+  if (!latest) {
+    return buffered;
+  }
+
+  const bufferedStatus = buffered.applyStatus;
+  if (bufferedStatus && areSameApplyStatus(bufferedStatus, latest)) {
+    return buffered;
+  }
+
+  return {
+    ...buffered,
+    applyStatus: { ...latest },
+  };
+}
+
+function pickLatestApplyStatus(
+  buffered?: RunApplyStatus,
+  disk?: RunApplyStatus,
+): RunApplyStatus | undefined {
+  if (!buffered) {
+    return disk;
+  }
+  if (!disk) {
+    return buffered;
+  }
+
+  return compareApplyStatus(buffered, disk) >= 0 ? buffered : disk;
+}
+
+function compareApplyStatus(a: RunApplyStatus, b: RunApplyStatus): number {
+  const aTime = Date.parse(a.appliedAt);
+  const bTime = Date.parse(b.appliedAt);
+
+  const aValid = Number.isFinite(aTime);
+  const bValid = Number.isFinite(bTime);
+
+  if (aValid && bValid) {
+    return aTime - bTime;
+  }
+  if (aValid) {
+    return 1;
+  }
+  if (bValid) {
+    return -1;
+  }
+
+  return a.appliedAt.localeCompare(b.appliedAt);
+}
+
+function areSameApplyStatus(a: RunApplyStatus, b: RunApplyStatus): boolean {
+  return (
+    a.agentId === b.agentId &&
+    a.status === b.status &&
+    a.appliedAt === b.appliedAt &&
+    a.ignoredBaseMismatch === b.ignoredBaseMismatch &&
+    a.appliedCommitSha === b.appliedCommitSha &&
+    (a.detail ?? undefined) === (b.detail ?? undefined)
+  );
 }
 
 function buildRunPaths(
