@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
 
 import { createApplyCommand } from "./cli/apply.js";
+import { createAutoCommand } from "./cli/auto.js";
 import { commanderAlreadyRendered } from "./cli/commander-utils.js";
 import { CliError, toCliError } from "./cli/errors.js";
 import { createInitCommand } from "./cli/init.js";
@@ -128,6 +129,7 @@ export async function runCli(
   program.addCommand(createSpecCommand());
   program.addCommand(createRunCommand());
   program.addCommand(createReviewCommand());
+  program.addCommand(createAutoCommand());
   program.addCommand(createApplyCommand());
   program.addCommand(createPruneCommand());
 

@@ -5,8 +5,10 @@ export function renderReviewTranscript(options: {
   outputPath: string;
   previewLines?: readonly string[];
   missingArtifacts?: readonly string[];
+  suppressHint?: boolean;
 }): string {
-  const { runId, outputPath, previewLines, missingArtifacts } = options;
+  const { runId, outputPath, previewLines, missingArtifacts, suppressHint } =
+    options;
 
   const sections: string[][] = [];
 
@@ -22,10 +24,11 @@ export function renderReviewTranscript(options: {
 
   sections.push([`Review saved: ${outputPath}`]);
 
-  return renderTranscript({
-    sections,
-    hint: {
-      message: `To integrate a solution:\n  voratiq apply --run ${runId} --agent <agent-id>`,
-    },
-  });
+  const hint = suppressHint
+    ? undefined
+    : {
+        message: `To integrate a solution:\n  voratiq apply --run ${runId} --agent <agent-id>`,
+      };
+
+  return renderTranscript({ sections, hint });
 }

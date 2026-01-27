@@ -9,7 +9,7 @@ import {
 import { renderSpecTranscript } from "../render/transcripts/spec.js";
 import { createConfirmationWorkflow } from "./confirmation.js";
 import { NonInteractiveShellError } from "./errors.js";
-import { writeCommandOutput } from "./output.js";
+import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface SpecCommandOptions {
   description: string;
@@ -17,16 +17,27 @@ export interface SpecCommandOptions {
   title?: string;
   output?: string;
   yes?: boolean;
+  suppressHint?: boolean;
+  writeOutput?: CommandOutputWriter;
 }
 
 export interface SpecCommandResult {
   body: string;
+  outputPath: string;
 }
 
 export async function runSpecCommand(
   options: SpecCommandOptions,
 ): Promise<SpecCommandResult> {
-  const { description, agent, title, output, yes } = options;
+  const {
+    description,
+    agent,
+    title,
+    output,
+    yes,
+    suppressHint,
+    writeOutput = writeCommandOutput,
+  } = options;
 
   const { root, workspacePaths } = await resolveCliContext();
   checkPlatformSupport();
@@ -52,13 +63,16 @@ export async function runSpecCommand(
       confirm: confirmation.confirm,
       prompt: confirmation.prompt,
       onStatus: (message) => {
-        writeCommandOutput({ alerts: [{ severity: "info", message }] });
+        writeOutput({ alerts: [{ severity: "info", message }] });
       },
     });
 
-    const body = renderSpecTranscript(result.outputPath);
+    const body = renderSpecTranscript(result.outputPath, { suppressHint });
 
-    return { body };
+    return {
+      body,
+      outputPath: result.outputPath,
+    };
   } finally {
     confirmation.close();
   }
