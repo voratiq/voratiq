@@ -116,12 +116,17 @@ export async function runAutoCommand(
       runStartedAt = now();
 
       try {
+        // For non-TTY, suppress run renderer blank lines and let the chained
+        // output system handle spacing. For TTY, let the run renderer handle
+        // its own spacing since cursor control requires precise line counts.
+        const suppressBlankLines = !process.stdout.isTTY;
         const runResult = await runRunCommand({
           specPath: specOutputPath,
           maxParallel: options.maxParallel,
           branch: options.branch,
           suppressHint: true,
-          suppressLeadingBlankLine: true,
+          suppressLeadingBlankLine: suppressBlankLines,
+          suppressTrailingBlankLine: suppressBlankLines,
           stdout: chainedOutput.stdout,
           stderr: chainedOutput.stderr,
         });
