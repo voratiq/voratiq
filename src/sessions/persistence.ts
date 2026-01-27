@@ -53,6 +53,7 @@ export interface RewriteSessionRecordOptions<RecordType> {
   paths: SessionPersistencePaths;
   sessionId: string;
   mutate: (record: RecordType) => RecordType;
+  forceFlush?: boolean;
 }
 
 export interface SessionIndexPayload<Entry> {
@@ -263,7 +264,7 @@ export function createSessionPersistence<RecordType, IndexEntry, StatusType>(
   async function rewriteRecord(
     options: RewriteSessionRecordOptions<RecordType>,
   ): Promise<RecordType> {
-    const { paths, sessionId, mutate } = options;
+    const { paths, sessionId, mutate, forceFlush = false } = options;
     const recordPath = join(
       paths.sessionsDir,
       sessionId,
@@ -290,7 +291,7 @@ export function createSessionPersistence<RecordType, IndexEntry, StatusType>(
     entry.record = mutated;
     entry.dirty = true;
 
-    if (config.shouldForceFlush(entry.record)) {
+    if (forceFlush || config.shouldForceFlush(entry.record)) {
       await flushBufferEntry(entry, { force: true });
       await disposeBufferEntry(entry);
     } else {

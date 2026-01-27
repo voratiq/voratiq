@@ -61,6 +61,12 @@ export interface RewriteRunRecordOptions {
   runsFilePath: string;
   runId: string;
   mutate: (record: RunRecord) => RunRecord;
+  /**
+   * When true, forces an immediate flush of the rewritten record even if the
+   * run is still active. This is useful for callers (like apply) that must
+   * persist state before the process exits.
+   */
+  forceFlush?: boolean;
 }
 
 export interface RunQueryFilters {
@@ -199,7 +205,7 @@ export async function appendRunRecord(
 export async function rewriteRunRecord(
   options: RewriteRunRecordOptions,
 ): Promise<RunRecord> {
-  const { root, runsFilePath, runId, mutate } = options;
+  const { root, runsFilePath, runId, mutate, forceFlush = false } = options;
   const paths = buildRunPaths(root, runsFilePath);
 
   try {
@@ -207,6 +213,7 @@ export async function rewriteRunRecord(
       paths,
       sessionId: runId,
       mutate,
+      forceFlush,
     });
   } catch (error) {
     mapSessionError(error);

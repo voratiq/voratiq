@@ -96,9 +96,7 @@ describe("executeApplyCommand", () => {
   });
 
   it("overwrites applyStatus when applying multiple agents", async () => {
-    const repoRoot = await mkdtemp(
-      join(tmpdir(), "voratiq-apply-overwrite-"),
-    );
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-overwrite-"));
     try {
       await initGitRepository(repoRoot);
       await createWorkspace(repoRoot);
@@ -189,9 +187,7 @@ describe("executeApplyCommand", () => {
 
   it("persists applyStatus when applying during a running run", async () => {
     jest.useFakeTimers();
-    const repoRoot = await mkdtemp(
-      join(tmpdir(), "voratiq-apply-running-"),
-    );
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-running-"));
     try {
       await initGitRepository(repoRoot);
       await createWorkspace(repoRoot);
@@ -228,6 +224,10 @@ describe("executeApplyCommand", () => {
         agentId,
         ignoreBaseMismatch: false,
       });
+
+      // Simulate the apply process exiting immediately; scheduled flush timers
+      // must not be relied upon for persistence.
+      jest.clearAllTimers();
 
       const recordPath = join(
         repoRoot,
@@ -814,11 +814,7 @@ async function writeRunRecordWithAgents(options: {
         summaryContent,
         "utf8",
       );
-      await writeFile(
-        join(artifactsDir, "diff.patch"),
-        diffContent,
-        "utf8",
-      );
+      await writeFile(join(artifactsDir, "diff.patch"), diffContent, "utf8");
 
       return createAgentInvocationRecord({
         agentId,

@@ -111,6 +111,69 @@ describe("run applyStatus persistence", () => {
     expect(diskRecordAfterAbort.status).toBe("aborted");
     expect(diskRecordAfterAbort.applyStatus).toEqual(applyStatus);
   });
+
+  it("forces an immediate flush for running runs when requested", async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-01-27T18:00:00.000Z"));
+
+    const root = await mkdtemp(join(tmpdir(), "voratiq-apply-flush-"));
+    tempRoots.push(root);
+
+    const runsFilePath = join(root, ".voratiq", "runs", "index.json");
+    await mkdir(join(root, ".voratiq", "runs"), { recursive: true });
+
+    const runningAgent = createAgentInvocationRecord({
+      agentId,
+      model: "gpt-5",
+      status: "running",
+      startedAt: "2026-01-27T17:55:00.000Z",
+      completedAt: undefined,
+    });
+
+    const record = createRunRecord({
+      runId: "run-force-flush",
+      status: "running",
+      agents: [runningAgent],
+    });
+
+    await appendRunRecord({ root, runsFilePath, record });
+
+    const appliedAt = new Date().toISOString();
+
+    await rewriteRunRecord({
+      root,
+      runsFilePath,
+      runId: "run-force-flush",
+      forceFlush: true,
+      mutate: (existing) => ({
+        ...existing,
+        applyStatus: {
+          agentId,
+          status: "succeeded",
+          appliedAt,
+          ignoredBaseMismatch: false,
+        },
+      }),
+    });
+
+    // Simulate the process exiting before any buffered flush timers could fire.
+    jest.clearAllTimers();
+
+    const recordPath = join(
+      root,
+      ".voratiq",
+      "runs",
+      "sessions",
+      "run-force-flush",
+      "record.json",
+    );
+    const diskRecord = await readRunRecord(recordPath);
+
+    expect(diskRecord.status).toBe("running");
+    expect(diskRecord.applyStatus?.agentId).toBe(agentId);
+    expect(diskRecord.applyStatus?.status).toBe("succeeded");
+    expect(diskRecord.applyStatus?.appliedAt).toBe(appliedAt);
+  });
 });
 
 async function readRunRecord(path: string): Promise<RunRecord> {
