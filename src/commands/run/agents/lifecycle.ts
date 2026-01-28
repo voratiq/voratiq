@@ -114,15 +114,21 @@ export async function executeAgentLifecycle(
     }
 
     if (processResult.exitCode !== 0 || processResult.errorMessage) {
-      // Use watchdog error message if available, otherwise detect from logs
+      const watchdogTrigger = processResult.watchdog?.trigger;
+      const extractedDetail = await detectAgentProcessFailureDetail({
+        provider: agent.provider,
+        stdoutPath: workspacePaths.stdoutPath,
+        stderrPath: workspacePaths.stderrPath,
+      });
+      const fallbackError =
+        processResult.errorMessage &&
+        isGenericProcessFailure(processResult.errorMessage)
+          ? undefined
+          : processResult.errorMessage;
       const failureDetail =
-        processResult.watchdog?.trigger && processResult.errorMessage
-          ? processResult.errorMessage
-          : await detectAgentProcessFailureDetail({
-              provider: agent.provider,
-              stdoutPath: workspacePaths.stdoutPath,
-              stderrPath: workspacePaths.stderrPath,
-            });
+        watchdogTrigger === "fatal-pattern"
+          ? (extractedDetail ?? fallbackError)
+          : (fallbackError ?? extractedDetail);
 
       const failure = new AgentProcessError({
         exitCode: processResult.exitCode,
@@ -207,6 +213,17 @@ export function classifyPostProcessError(error: unknown): RunCommandError {
     operation: "Run finalization failed",
     detail,
   });
+}
+
+function isGenericProcessFailure(message: string): boolean {
+  const trimmed = message.trim();
+  if (trimmed.startsWith("Agent exited with code ")) {
+    return true;
+  }
+  if (trimmed.startsWith("Agent terminated by signal ")) {
+    return true;
+  }
+  return false;
 }
 
 async function finalizeExecution(
