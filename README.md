@@ -57,7 +57,7 @@ See the [docs](https://github.com/voratiq/voratiq/blob/main/docs/index.md) for c
 
 ## How It Works
 
-Voratiq takes your task spec, fans it out to multiple [sandboxed](https://github.com/voratiq/voratiq/blob/main/docs/configs/sandbox.md) [agents](https://github.com/voratiq/voratiq/blob/main/docs/configs/agents.md), and runs automatic [evals](https://github.com/voratiq/voratiq/blob/main/docs/configs/evals.md) (tests, lint, custom checks) on each result. You pick the best solution and merge it into your codebase.
+The same spec goes to all agents, evals run automatically, human picks the winner.
 
 ```mermaid
 flowchart TD
@@ -79,6 +79,8 @@ flowchart TD
     Evals --> Pick
     Pick --> Apply
 ```
+
+No single model is best for every task. We use selection pressure because it leads to high quality code.
 
 ## License
 
