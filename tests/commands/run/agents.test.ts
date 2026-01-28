@@ -79,6 +79,35 @@ describe("executeAgentLifecycle integration", () => {
     expect(runPostProcessingAndEvaluationsMock).not.toHaveBeenCalled();
   });
 
+  it("prefers extracted failure detail over fatal watchdog pattern text", async () => {
+    const { execution } = await createPreparedExecution();
+    execution.agent.provider = "codex";
+    await writeFile(
+      execution.workspacePaths.stdoutPath,
+      '{"error":{"type":"invalid_request_error","message":"unsupported_value: model"}}',
+      "utf8",
+    );
+
+    runSandboxedAgentMock.mockResolvedValue({
+      exitCode: 1,
+      signal: null,
+      errorMessage:
+        "Fatal error pattern detected: invalid_request_error (exit code 0)",
+      watchdog: {
+        silenceTimeoutMs: 1,
+        wallClockCapMs: 1,
+        trigger: "fatal-pattern",
+      },
+      sandboxSettings: minimalSandboxSettings(),
+      manifestEnv: {},
+    });
+
+    const [result] = await runAgentsWithLimit([execution], 1);
+
+    expect(result.record.status).toBe("failed");
+    expect(result.record.error).toBe("unsupported_value: model (exit code 1)");
+  });
+
   it("invokes onCompleted exactly once for successful agents", async () => {
     const { execution, progress } = await createPreparedExecution();
     runSandboxedAgentMock.mockResolvedValue({

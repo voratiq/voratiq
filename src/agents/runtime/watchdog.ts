@@ -32,8 +32,29 @@ export const WATCHDOG_DEFAULTS = {
 } as const;
 
 export const FATAL_PATTERNS: ReadonlyMap<string, RegExp[]> = new Map([
-  ["gemini", [/You have exhausted your capacity on this model\./i]],
-  ["codex", [/Connection failed: error sending request for url\./i]],
+  [
+    "gemini",
+    [
+      /PERMISSION_DENIED/i,
+      /RESOURCE_EXHAUSTED/i,
+      /MODEL_CAPACITY_EXHAUSTED/i,
+      /No capacity available for model/i,
+    ],
+  ],
+  [
+    "codex",
+    [/invalid_request_error/i, /unsupported_value/i, /thread .* panicked/i],
+  ],
+  [
+    "claude",
+    [
+      /OAuth token revoked/i,
+      /OAuth token has expired/i,
+      /Please run \/login/i,
+      /invalid.*api.*key/i,
+      /insufficient_quota/i,
+    ],
+  ],
 ]);
 
 export interface WatchdogResult {

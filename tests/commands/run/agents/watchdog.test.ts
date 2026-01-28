@@ -98,28 +98,34 @@ describe("watchdog", () => {
   });
 
   describe("FATAL_PATTERNS", () => {
-    it("should have gemini pattern for capacity exhaustion", () => {
+    it("should have gemini patterns for permission and quota errors", () => {
       const patterns = FATAL_PATTERNS.get("gemini");
       expect(patterns).toBeDefined();
-      expect(patterns!.length).toBeGreaterThan(0);
-      expect(
-        patterns![0].test("You have exhausted your capacity on this model."),
-      ).toBe(true);
-      expect(
-        patterns![0].test("YOU HAVE EXHAUSTED YOUR CAPACITY ON THIS MODEL."),
-      ).toBe(true);
+      expect(patterns!.length).toBe(4);
+      expect(patterns![0].test("PERMISSION_DENIED")).toBe(true);
+      expect(patterns![1].test("RESOURCE_EXHAUSTED")).toBe(true);
+      expect(patterns![2].test("MODEL_CAPACITY_EXHAUSTED")).toBe(true);
+      expect(patterns![3].test("No capacity available for model")).toBe(true);
     });
 
-    it("should have codex pattern for connection failure", () => {
+    it("should have codex patterns for invalid requests and panics", () => {
       const patterns = FATAL_PATTERNS.get("codex");
       expect(patterns).toBeDefined();
-      expect(patterns!.length).toBeGreaterThan(0);
-      expect(
-        patterns![0].test("Connection failed: error sending request for url."),
-      ).toBe(true);
-      expect(
-        patterns![0].test("CONNECTION FAILED: ERROR SENDING REQUEST FOR URL."),
-      ).toBe(true);
+      expect(patterns!.length).toBe(3);
+      expect(patterns![0].test("invalid_request_error")).toBe(true);
+      expect(patterns![1].test("unsupported_value")).toBe(true);
+      expect(patterns![2].test("thread 0 panicked")).toBe(true);
+    });
+
+    it("should have claude patterns for auth and quota errors", () => {
+      const patterns = FATAL_PATTERNS.get("claude");
+      expect(patterns).toBeDefined();
+      expect(patterns!.length).toBe(5);
+      expect(patterns![0].test("OAuth token revoked")).toBe(true);
+      expect(patterns![1].test("OAuth token has expired")).toBe(true);
+      expect(patterns![2].test("Please run /login")).toBe(true);
+      expect(patterns![3].test("invalid_api_key")).toBe(true);
+      expect(patterns![4].test("insufficient_quota")).toBe(true);
     });
   });
 
@@ -277,9 +283,7 @@ describe("watchdog", () => {
           },
         );
 
-        controller.handleOutput(
-          Buffer.from("You have exhausted your capacity on this model."),
-        );
+        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED"));
 
         expect(controller.getState().triggered).toBeNull();
         expect(onTrigger).not.toHaveBeenCalled();
@@ -303,13 +307,9 @@ describe("watchdog", () => {
           },
         );
 
-        controller.handleOutput(
-          Buffer.from("You have exhausted your capacity on this model."),
-        );
+        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED"));
         jest.advanceTimersByTime(30000);
-        controller.handleOutput(
-          Buffer.from("You have exhausted your capacity on this model."),
-        );
+        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED"));
 
         const state = controller.getState();
         expect(state.triggered).toBe("fatal-pattern");
@@ -344,13 +344,9 @@ describe("watchdog", () => {
           },
         );
 
-        controller.handleOutput(
-          Buffer.from("You have exhausted your capacity on this model."),
-        );
+        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED"));
         jest.advanceTimersByTime(WATCHDOG_DEFAULTS.fatalRetryWindowMs + 1000);
-        controller.handleOutput(
-          Buffer.from("You have exhausted your capacity on this model."),
-        );
+        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED"));
 
         expect(controller.getState().triggered).toBeNull();
         expect(onTrigger).not.toHaveBeenCalled();
@@ -374,13 +370,9 @@ describe("watchdog", () => {
           },
         );
 
-        controller.handleOutput(
-          Buffer.from("Connection failed: error sending request for url."),
-        );
+        controller.handleOutput(Buffer.from("Error: invalid_request_error"));
         jest.advanceTimersByTime(10000);
-        controller.handleOutput(
-          Buffer.from("Connection failed: error sending request for url."),
-        );
+        controller.handleOutput(Buffer.from("Error: invalid_request_error"));
 
         expect(controller.getState().triggered).toBe("fatal-pattern");
       });
