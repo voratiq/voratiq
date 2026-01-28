@@ -55,6 +55,31 @@ For a full walkthrough, see the [CLI tutorial](https://github.com/voratiq/vorati
 
 See the [docs](https://github.com/voratiq/voratiq/blob/main/docs/index.md) for core concepts, CLI reference, and configuration guides.
 
+## How It Works
+
+Voratiq takes your task spec, fans it out to multiple [sandboxed](https://github.com/voratiq/voratiq/blob/main/docs/configs/sandbox.md) [agents](https://github.com/voratiq/voratiq/blob/main/docs/configs/agents.md), and runs automatic [evals](https://github.com/voratiq/voratiq/blob/main/docs/configs/evals.md) (tests, lint, custom checks) on each result. You pick the best solution and merge it into your codebase.
+
+```mermaid
+flowchart TD
+    Spec["Same spec goes to all agents"]
+
+    subgraph Run[" "]
+        direction LR
+        A["Agent 1"]
+        B["..."]
+        C["Agent N"]
+    end
+
+    Evals["Evals run automatically"]
+    Pick["User picks the best implementation"]
+    Apply["Winning diff merged to codebase"]
+
+    Spec --> A & B & C
+    A & B & C --> Evals
+    Evals --> Pick
+    Pick --> Apply
+```
+
 ## License
 
 Voratiq is available under the [MIT License](https://github.com/voratiq/voratiq/blob/main/LICENSE).
