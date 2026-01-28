@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import { verifyAgentProviders } from "../../agents/runtime/auth.js";
-import { loadAgentCatalog } from "../../configs/agents/loader.js";
+import { loadAgentCatalogDiagnostics } from "../../configs/agents/loader.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import {
   EnvironmentConfigParseError,
@@ -20,7 +20,7 @@ import type { EvalDefinition } from "../../configs/evals/types.js";
 import { RunOptionValidationError } from "../../runs/records/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { WorkspaceMissingEntryError } from "../../workspace/errors.js";
-import { NoAgentsEnabledError } from "./errors.js";
+import { NoAgentsEnabledError, RunPreflightError } from "./errors.js";
 
 export interface ValidationInput {
   readonly root: string;
@@ -58,13 +58,26 @@ export async function validateAndPrepare(
   const specContent = await readFile(specAbsolutePath, "utf8");
 
   const baseRevisionSha = await getHeadRevision(root);
-  const agents = loadAgentCatalog({ root });
+  const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
+  const enabledAgents = agentDiagnostics.enabledAgents;
 
-  if (agents.length === 0) {
+  if (enabledAgents.length === 0) {
     throw new NoAgentsEnabledError();
   }
 
-  await verifyAgentProviders(agents);
+  const providerIssues = await verifyAgentProviders(
+    enabledAgents.map((entry) => ({
+      id: entry.id,
+      provider: entry.provider,
+    })),
+  );
+
+  const preflightIssues = [...agentDiagnostics.issues, ...providerIssues];
+  if (preflightIssues.length > 0) {
+    throw new RunPreflightError(preflightIssues);
+  }
+
+  const agents: readonly AgentDefinition[] = agentDiagnostics.catalog;
 
   const environment = (() => {
     try {

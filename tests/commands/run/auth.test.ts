@@ -31,29 +31,32 @@ afterAll(() => {
 });
 
 describe("auth provider verification", () => {
-  it("throws when auth provider is missing", async () => {
+  it("reports an issue when auth provider is missing", async () => {
     const agent = {
       ...BASE_AGENT,
       provider: "",
     } as AgentDefinition;
 
-    await expect(verifyAgentProviders([agent])).rejects.toThrow(
-      'Agent "test-agent" missing provider.',
-    );
+    await expect(verifyAgentProviders([agent])).resolves.toEqual([
+      { agentId: "test-agent", message: "missing provider" },
+    ]);
   });
 
-  it("throws when provider id is unknown", async () => {
+  it("reports an issue when provider id is unknown", async () => {
     const agent: AgentDefinition = {
       ...BASE_AGENT,
       provider: "unknown-provider",
     };
 
-    await expect(verifyAgentProviders([agent])).rejects.toThrow(
-      'Unknown auth provider "unknown-provider".',
-    );
+    await expect(verifyAgentProviders([agent])).resolves.toEqual([
+      {
+        agentId: "test-agent",
+        message: 'unknown auth provider "unknown-provider"',
+      },
+    ]);
   });
 
-  it("throws when Claude credentials are missing", async () => {
+  it("reports an issue when Claude credentials are missing", async () => {
     if (process.platform === "darwin") {
       return;
     }
@@ -63,9 +66,13 @@ describe("auth provider verification", () => {
     const previousConfigDir = process.env.CLAUDE_CONFIG_DIR;
     process.env.CLAUDE_CONFIG_DIR = scratchDir;
     try {
-      await expect(verifyAgentProviders([agent])).rejects.toThrow(
-        "Claude authentication failed. Authenticate directly via Claude before continuing.",
-      );
+      await expect(verifyAgentProviders([agent])).resolves.toEqual([
+        {
+          agentId: "test-agent",
+          message:
+            "Claude authentication failed. Authenticate directly via Claude before continuing.",
+        },
+      ]);
     } finally {
       if (previousConfigDir === undefined) {
         delete process.env.CLAUDE_CONFIG_DIR;
@@ -94,7 +101,7 @@ describe("auth provider verification", () => {
     const previousHome = process.env.HOME;
     process.env.HOME = scratchHome;
     try {
-      await expect(verifyAgentProviders([agent])).resolves.toBeUndefined();
+      await expect(verifyAgentProviders([agent])).resolves.toEqual([]);
     } finally {
       if (previousHome === undefined) {
         delete process.env.HOME;
@@ -105,7 +112,7 @@ describe("auth provider verification", () => {
     }
   });
 
-  it("fails fast when mac login keychain is missing", async () => {
+  it("reports an issue when mac login keychain is missing", async () => {
     const agent: AgentDefinition = BASE_AGENT;
 
     const scratchHome = mkdtempSync(
@@ -122,16 +129,20 @@ describe("auth provider verification", () => {
       }));
 
     try {
-      await expect(verifyAgentProviders([agent])).rejects.toThrow(
-        "Claude authentication failed. Authenticate directly via Claude before continuing.",
-      );
+      await expect(verifyAgentProviders([agent])).resolves.toEqual([
+        {
+          agentId: "test-agent",
+          message:
+            "Claude authentication failed. Authenticate directly via Claude before continuing.",
+        },
+      ]);
     } finally {
       runtimeSpy.mockRestore();
       rmSync(scratchHome, { recursive: true, force: true });
     }
   });
 
-  it("throws when Codex credentials are missing", async () => {
+  it("reports an issue when Codex credentials are missing", async () => {
     const agent: AgentDefinition = {
       ...BASE_AGENT,
       id: "codex-agent",
@@ -142,9 +153,13 @@ describe("auth provider verification", () => {
     const previousCodexHome = process.env.CODEX_HOME;
     process.env.CODEX_HOME = scratchDir;
     try {
-      await expect(verifyAgentProviders([agent])).rejects.toThrow(
-        "Codex authentication failed. Authenticate directly via Codex before continuing.",
-      );
+      await expect(verifyAgentProviders([agent])).resolves.toEqual([
+        {
+          agentId: "codex-agent",
+          message:
+            "Codex authentication failed. Authenticate directly via Codex before continuing.",
+        },
+      ]);
     } finally {
       if (previousCodexHome === undefined) {
         delete process.env.CODEX_HOME;
@@ -172,7 +187,7 @@ describe("auth provider verification", () => {
     const previousCodexHome = process.env.CODEX_HOME;
     process.env.CODEX_HOME = scratchDir;
     try {
-      await expect(verifyAgentProviders([agent])).resolves.toBeUndefined();
+      await expect(verifyAgentProviders([agent])).resolves.toEqual([]);
     } finally {
       if (previousCodexHome === undefined) {
         delete process.env.CODEX_HOME;
@@ -183,7 +198,7 @@ describe("auth provider verification", () => {
     }
   });
 
-  it("throws when Gemini credentials are missing", async () => {
+  it("reports an issue when Gemini credentials are missing", async () => {
     const agent: AgentDefinition = {
       ...BASE_AGENT,
       id: "gemini-agent",
@@ -202,9 +217,13 @@ describe("auth provider verification", () => {
         username: "voratiq-test",
       }));
     try {
-      await expect(verifyAgentProviders([agent])).rejects.toThrow(
-        "Gemini authentication failed. Authenticate directly via Gemini before continuing.",
-      );
+      await expect(verifyAgentProviders([agent])).resolves.toEqual([
+        {
+          agentId: "gemini-agent",
+          message:
+            "Gemini authentication failed. Authenticate directly via Gemini before continuing.",
+        },
+      ]);
     } finally {
       runtimeSpy.mockRestore();
       if (previousHome === undefined) {
@@ -254,7 +273,7 @@ describe("auth provider verification", () => {
         username: "voratiq-test",
       }));
     try {
-      await expect(verifyAgentProviders([agent])).resolves.toBeUndefined();
+      await expect(verifyAgentProviders([agent])).resolves.toEqual([]);
     } finally {
       runtimeSpy.mockRestore();
       if (previousHome === undefined) {
@@ -289,7 +308,7 @@ describe("auth provider verification", () => {
         username: "voratiq-test",
       }));
     try {
-      await expect(verifyAgentProviders([agent])).resolves.toBeUndefined();
+      await expect(verifyAgentProviders([agent])).resolves.toEqual([]);
     } finally {
       runtimeSpy.mockRestore();
       if (previousHome === undefined) {

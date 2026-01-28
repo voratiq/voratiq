@@ -1,5 +1,6 @@
 import { accessSync, constants as fsConstants } from "node:fs";
 
+import { toErrorMessage } from "../../utils/errors.js";
 import { isFileSystemError } from "../../utils/fs.js";
 import { relativeToRoot } from "../../utils/path.js";
 import {
@@ -108,6 +109,46 @@ export function loadAgentCatalog(
   return catalog;
 }
 
+export interface AgentCatalogDiagnostics {
+  readonly enabledAgents: readonly AgentConfigEntry[];
+  readonly catalog: AgentCatalog;
+  readonly issues: readonly AgentCatalogIssue[];
+}
+
+export interface AgentCatalogIssue {
+  readonly agentId: string;
+  readonly message: string;
+}
+
+export function loadAgentCatalogDiagnostics(
+  options: LoadAgentCatalogOptions = {},
+): AgentCatalogDiagnostics {
+  const { enabledAgents } = loadAgentsConfig(options);
+
+  const catalog: AgentDefinition[] = [];
+  const issues: AgentCatalogIssue[] = [];
+
+  for (const entry of enabledAgents) {
+    let definition: AgentDefinition | undefined;
+    try {
+      definition = buildAgentDefinition(entry);
+    } catch (error) {
+      issues.push(...coerceAgentIssues(entry.id, error));
+      continue;
+    }
+
+    try {
+      assertAgentBinary(definition);
+    } catch (error) {
+      issues.push(...coerceAgentIssues(entry.id, error));
+    }
+
+    catalog.push(definition);
+  }
+
+  return { enabledAgents, catalog, issues };
+}
+
 export function loadAgentById(
   id: string,
   options: LoadAgentCatalogOptions = {},
@@ -161,6 +202,60 @@ function formatBinaryAccessError(error: unknown): string {
     return error.message;
   }
   return "unknown error";
+}
+
+function coerceAgentIssues(
+  agentId: string,
+  error: unknown,
+): AgentCatalogIssue[] {
+  if (error instanceof AgentBinaryMissingError) {
+    return [{ agentId, message: "missing binary path" }];
+  }
+
+  if (error instanceof AgentBinaryAccessError) {
+    return [
+      {
+        agentId,
+        message: `binary "${error.binaryPath}" is not executable (${error.detail})`,
+      },
+    ];
+  }
+
+  if (error instanceof UnknownAgentProviderTemplateError) {
+    return [
+      {
+        agentId,
+        message: `unknown provider "${error.provider}" referenced in agents.yaml`,
+      },
+    ];
+  }
+
+  if (error instanceof ModelPlaceholderMissingError) {
+    return [
+      {
+        agentId,
+        message: `argv missing ${error.placeholder}`,
+      },
+    ];
+  }
+
+  if (error instanceof AgentsYamlParseError) {
+    const normalized = stripPrefix(error.message, `${DEFAULT_ERROR_CONTEXT}: `);
+    return [{ agentId, message: normalized }];
+  }
+
+  if (error instanceof Error && error.message) {
+    return [{ agentId, message: error.message }];
+  }
+
+  return [{ agentId, message: toErrorMessage(error) }];
+}
+
+function stripPrefix(message: string, prefix: string): string {
+  if (message.startsWith(prefix)) {
+    return message.slice(prefix.length);
+  }
+  return message;
 }
 
 function buildAgentDefinition(entry: AgentConfigEntry): AgentDefinition {
