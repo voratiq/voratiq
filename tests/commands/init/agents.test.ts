@@ -221,10 +221,16 @@ describe("configureAgents", () => {
     const configPath = join(repoRoot, ".voratiq", "agents.yaml");
     await writeFile(configPath, serializeAgentsConfigEntries([]), "utf8");
 
+    const confirm = jest.fn<Promise<boolean>, [ConfirmationOptions]>(() =>
+      Promise.resolve(true),
+    );
+
     const summary = await configureAgents(repoRoot, "manual", {
       interactive: true,
+      confirm,
     });
 
+    expect(confirm).not.toHaveBeenCalled();
     expect(summary).toEqual({
       configPath: ".voratiq/agents.yaml",
       enabledAgents: [],

@@ -98,4 +98,18 @@ describe("listAgentPresetTemplates", () => {
     const presets = descriptors.map((descriptor) => descriptor.preset);
     expect(presets.sort()).toEqual(["lite", "manual", "pro"].sort());
   });
+
+  it("emits deterministic templates without binary paths", () => {
+    const descriptors = listAgentPresetTemplates();
+
+    const manual = descriptors.find((d) => d.preset === "manual");
+    expect(manual?.template.trim()).toBe("agents: []");
+
+    const nonManual = descriptors.filter((d) => d.preset !== "manual");
+    for (const descriptor of nonManual) {
+      expect(descriptor.template).toContain('binary: ""');
+      expect(descriptor.template).not.toMatch(/binary:\s*\//);
+      expect(descriptor.template).not.toMatch(/binary:\s*[A-Za-z]:\\/);
+    }
+  });
 });

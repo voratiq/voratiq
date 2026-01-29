@@ -14,7 +14,6 @@ import {
   serializeEvalDefaults,
 } from "../configs/evals/defaults.js";
 import { listSandboxProviderDefaults } from "../configs/sandbox/defaults.js";
-import { detectBinary } from "../utils/binaries.js";
 export type { AgentPreset } from "../configs/agents/defaults.js";
 export {
   AGENT_PRESET_CHOICES,
@@ -70,13 +69,12 @@ export function serializeAgentsConfigEntries(
 function buildAgentEntryFromTemplate(
   template: VendorTemplate,
 ): AgentConfigEntry {
-  const binary = detectBinary(template.provider) ?? "";
   return agentConfigEntrySchema.parse({
     id: sanitizeAgentIdFromModel(template.model),
     provider: template.provider,
     model: template.model,
     enabled: false,
-    binary,
+    binary: "",
   });
 }
 
