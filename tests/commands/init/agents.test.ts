@@ -60,7 +60,9 @@ describe("configureAgents", () => {
     const configPath = join(repoRoot, ".voratiq", "agents.yaml");
     await writeFile(configPath, content, "utf8");
 
-    const summary = await configureAgents(repoRoot, { interactive: false });
+    const summary = await configureAgents(repoRoot, "pro", {
+      interactive: false,
+    });
 
     expect(summary).toEqual({
       configPath: ".voratiq/agents.yaml",
@@ -140,7 +142,7 @@ describe("configureAgents", () => {
       },
     );
 
-    const summary = await configureAgents(repoRoot, {
+    const summary = await configureAgents(repoRoot, "pro", {
       interactive: true,
       confirm,
     });
@@ -204,7 +206,7 @@ describe("configureAgents", () => {
     ]);
     await writeFile(configPath, blankContent, "utf8");
 
-    const summary = await configureAgents(repoRoot, {
+    const summary = await configureAgents(repoRoot, "pro", {
       interactive: true,
       confirm: () => Promise.resolve(true),
     });
@@ -213,5 +215,22 @@ describe("configureAgents", () => {
     expect(summary.zeroDetections).toBe(true);
     expect(summary.configCreated).toBe(false);
     expect(summary.configUpdated).toBe(false);
+  });
+
+  it("skips prompting when preset is manual", async () => {
+    const configPath = join(repoRoot, ".voratiq", "agents.yaml");
+    await writeFile(configPath, serializeAgentsConfigEntries([]), "utf8");
+
+    const summary = await configureAgents(repoRoot, "manual", {
+      interactive: true,
+    });
+
+    expect(summary).toEqual({
+      configPath: ".voratiq/agents.yaml",
+      enabledAgents: [],
+      zeroDetections: true,
+      configCreated: false,
+      configUpdated: false,
+    });
   });
 });

@@ -4,10 +4,12 @@ import type {
   ConfirmationOptions,
   PromptOptions,
 } from "../../render/interactions/confirmation.js";
+import type { AgentPreset } from "../../workspace/templates.js";
 import type { CreateWorkspaceResult } from "../../workspace/types.js";
 
 export interface InitCommandInput {
   root: string;
+  preset: AgentPreset;
   interactive: boolean;
   confirm?: InitConfirmationHandler;
   prompt?: InitPromptHandler;
