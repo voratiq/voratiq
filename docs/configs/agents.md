@@ -8,7 +8,9 @@ Defines which AI coding agents Voratiq runs and how each process is invoked.
 
 ## Overview
 
-Voratiq reads `.voratiq/agents.yaml` to determine which AI coding agents to spawn and how to invoke them. `voratiq init` scaffolds this file, detects known agent binaries, and seeds each provider with its flagship model. Update it at any time.
+Voratiq reads `.voratiq/agents.yaml` to determine which AI coding agents to spawn and how to invoke them.
+
+`voratiq init` seeds .voratiq/agents.yaml from a preset (pro, lite, or manual). In interactive mode, it detects supported agent CLIs on $PATH and prompts to enable them. Edit the file any time.
 
 ## Schema
 
