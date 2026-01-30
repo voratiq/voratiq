@@ -143,9 +143,7 @@ function buildEvalsSection(summary: EvalInitSummary): string[] {
 
   if (summary.configuredEvals.length === 0) {
     lines.push("No evals configured, unable to detect project tooling yet.");
-    lines.push(
-      `To modify eval setup manually, edit \`${summary.configPath}\`.`,
-    );
+    lines.push(`To modify, edit \`${summary.configPath}\`.`);
     return lines;
   }
 
