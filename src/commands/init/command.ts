@@ -1,13 +1,9 @@
-import { writeCommandPreface } from "../../cli/output.js";
 import { readAgentsConfig } from "../../configs/agents/loader.js";
 import type {
   AgentConfigEntry,
   AgentsConfig,
 } from "../../configs/agents/types.js";
-import {
-  buildInitializationPrompt,
-  renderPresetPromptPreface,
-} from "../../render/transcripts/init.js";
+import { renderPresetPromptPreface } from "../../render/transcripts/init.js";
 import {
   normalizeConfigText,
   readConfigSnapshot,
@@ -41,9 +37,6 @@ export async function executeInitCommand(
   input: InitCommandInput,
 ): Promise<InitCommandResult> {
   const { root, preset, presetProvided, interactive, confirm, prompt } = input;
-
-  const initializationPrompt = buildInitializationPrompt();
-  writeCommandPreface(initializationPrompt);
 
   const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const agentsSnapshotBeforeInit = await readConfigSnapshot(agentsConfigPath);
