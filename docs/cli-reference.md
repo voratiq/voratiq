@@ -20,12 +20,13 @@ Bootstrap workspace scaffolding in the current repository.
 ### Usage
 
 ```bash
-voratiq init [-y, --yes]
+voratiq init [--preset pro|lite|manual] [-y, --yes]
 ```
 
 ### Options
 
-- `-y, --yes`: Skip interactive confirmations (useful for CI/scripts)
+- `-y, --yes`: Assume yes and accept defaults (suppresses prompts; useful for CI/scripts)
+- `--preset <preset>`: Select an agent preset (`pro|lite|manual`, default: `pro`)
 
 ### Behavior
 
@@ -35,13 +36,13 @@ Creates:
 - `runs/` and subdirectories for run data (including `runs/sessions/`)
 - `specs/` and subdirectories for spec data (including `specs/sessions/`)
 - `reviews/` and subdirectories for review data (including `reviews/sessions/`)
-- `agents.yaml` with detected agent binaries
+- `agents.yaml` seeded from the selected preset template
 - `evals.yaml` with common eval commands
 - `environment.yaml` with environment settings
 - `sandbox.yaml` with sandbox policies
 - `index.json` files under `runs/`, `specs/`, and `reviews/`
 
-Detects common agent binaries (`claude`, `codex`, `gemini`, etc.) on `$PATH` and pre-populates `agents.yaml`.
+Detects common agent CLIs (`claude`, `codex`, `gemini`, etc.) on `$PATH` and pre-populates `agents.yaml`.
 
 Interactive mode (TTY) prompts for confirmation. Non-TTY environments require the `--yes` flag.
 
@@ -53,6 +54,12 @@ voratiq init
 
 # Non-interactive mode (skip prompts)
 voratiq init -y
+
+# Use faster default models
+voratiq init --preset lite
+
+# Start with an empty agents.yaml (configure agents yourself)
+voratiq init --preset manual --yes
 ```
 
 ### Errors
