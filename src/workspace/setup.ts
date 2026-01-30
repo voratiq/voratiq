@@ -42,28 +42,9 @@ export async function createWorkspace(
   const createdFiles: string[] = [];
 
   const workspaceDir = resolveWorkspacePath(root);
-  if (!(await pathExists(workspaceDir))) {
-    await mkdir(workspaceDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, workspaceDir));
-  }
-
   const runsDir = resolveWorkspacePath(root, VORATIQ_RUNS_DIR);
   const reviewsDir = resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR);
   const specsDir = resolveWorkspacePath(root, VORATIQ_SPECS_DIR);
-  if (!(await pathExists(runsDir))) {
-    await mkdir(runsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, runsDir));
-  }
-
-  if (!(await pathExists(reviewsDir))) {
-    await mkdir(reviewsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, reviewsDir));
-  }
-
-  if (!(await pathExists(specsDir))) {
-    await mkdir(specsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, specsDir));
-  }
 
   const sessionsDir = resolveWorkspacePath(root, VORATIQ_RUNS_SESSIONS_DIR);
   const reviewSessionsDir = resolveWorkspacePath(
@@ -74,31 +55,93 @@ export async function createWorkspace(
     root,
     VORATIQ_SPECS_SESSIONS_DIR,
   );
-  if (!(await pathExists(sessionsDir))) {
-    await mkdir(sessionsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, sessionsDir));
-  }
-
-  if (!(await pathExists(reviewSessionsDir))) {
-    await mkdir(reviewSessionsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, reviewSessionsDir));
-  }
-
-  if (!(await pathExists(specSessionsDir))) {
-    await mkdir(specSessionsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, specSessionsDir));
-  }
 
   const runsIndexPath = resolveWorkspacePath(root, VORATIQ_RUNS_FILE);
   const reviewsIndexPath = resolveWorkspacePath(root, VORATIQ_REVIEWS_FILE);
   const specsIndexPath = resolveWorkspacePath(root, VORATIQ_SPECS_FILE);
-  if (!(await pathExists(runsIndexPath))) {
+
+  const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
+  const evalsConfigPath = resolveWorkspacePath(root, VORATIQ_EVALS_FILE);
+  const environmentConfigPath = resolveWorkspacePath(
+    root,
+    VORATIQ_ENVIRONMENT_FILE,
+  );
+  const sandboxConfigPath = resolveWorkspacePath(root, VORATIQ_SANDBOX_FILE);
+
+  const [
+    workspaceExists,
+    runsExists,
+    reviewsExists,
+    specsExists,
+    runsSessionsExists,
+    reviewsSessionsExists,
+    specsSessionsExists,
+    runsIndexExists,
+    reviewsIndexExists,
+    specsIndexExists,
+    agentsConfigExists,
+    evalsConfigExists,
+    environmentConfigExists,
+    sandboxConfigExists,
+  ] = await Promise.all([
+    pathExists(workspaceDir),
+    pathExists(runsDir),
+    pathExists(reviewsDir),
+    pathExists(specsDir),
+    pathExists(sessionsDir),
+    pathExists(reviewSessionsDir),
+    pathExists(specSessionsDir),
+    pathExists(runsIndexPath),
+    pathExists(reviewsIndexPath),
+    pathExists(specsIndexPath),
+    pathExists(agentsConfigPath),
+    pathExists(evalsConfigPath),
+    pathExists(environmentConfigPath),
+    pathExists(sandboxConfigPath),
+  ]);
+
+  if (!workspaceExists) {
+    await mkdir(workspaceDir, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, workspaceDir));
+  }
+
+  if (!runsExists) {
+    await mkdir(runsDir, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, runsDir));
+  }
+
+  if (!reviewsExists) {
+    await mkdir(reviewsDir, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, reviewsDir));
+  }
+
+  if (!specsExists) {
+    await mkdir(specsDir, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, specsDir));
+  }
+
+  if (!runsSessionsExists) {
+    await mkdir(sessionsDir, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, sessionsDir));
+  }
+
+  if (!reviewsSessionsExists) {
+    await mkdir(reviewSessionsDir, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, reviewSessionsDir));
+  }
+
+  if (!specsSessionsExists) {
+    await mkdir(specSessionsDir, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, specSessionsDir));
+  }
+
+  if (!runsIndexExists) {
     const initialIndex = JSON.stringify({ version: 2, sessions: [] }, null, 2);
     await writeFile(runsIndexPath, `${initialIndex}\n`, { encoding: "utf8" });
     createdFiles.push(relativeToRoot(root, runsIndexPath));
   }
 
-  if (!(await pathExists(reviewsIndexPath))) {
+  if (!reviewsIndexExists) {
     const initialIndex = JSON.stringify({ version: 1, sessions: [] }, null, 2);
     await writeFile(reviewsIndexPath, `${initialIndex}\n`, {
       encoding: "utf8",
@@ -106,31 +149,25 @@ export async function createWorkspace(
     createdFiles.push(relativeToRoot(root, reviewsIndexPath));
   }
 
-  if (!(await pathExists(specsIndexPath))) {
+  if (!specsIndexExists) {
     const initialIndex = JSON.stringify({ version: 1, sessions: [] }, null, 2);
     await writeFile(specsIndexPath, `${initialIndex}\n`, { encoding: "utf8" });
     createdFiles.push(relativeToRoot(root, specsIndexPath));
   }
 
-  const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
-  if (!(await pathExists(agentsConfigPath))) {
+  if (!agentsConfigExists) {
     const agentsTemplate = buildDefaultAgentsTemplate();
     await writeFile(agentsConfigPath, agentsTemplate, { encoding: "utf8" });
     createdFiles.push(relativeToRoot(root, agentsConfigPath));
   }
 
-  const evalsConfigPath = resolveWorkspacePath(root, VORATIQ_EVALS_FILE);
-  if (!(await pathExists(evalsConfigPath))) {
+  if (!evalsConfigExists) {
     const evalsTemplate = buildDefaultEvalsTemplate();
     await writeFile(evalsConfigPath, evalsTemplate, { encoding: "utf8" });
     createdFiles.push(relativeToRoot(root, evalsConfigPath));
   }
 
-  const environmentConfigPath = resolveWorkspacePath(
-    root,
-    VORATIQ_ENVIRONMENT_FILE,
-  );
-  if (!(await pathExists(environmentConfigPath))) {
+  if (!environmentConfigExists) {
     const environmentTemplate = buildDefaultEnvironmentTemplate();
     await writeFile(environmentConfigPath, environmentTemplate, {
       encoding: "utf8",
@@ -138,8 +175,7 @@ export async function createWorkspace(
     createdFiles.push(relativeToRoot(root, environmentConfigPath));
   }
 
-  const sandboxConfigPath = resolveWorkspacePath(root, VORATIQ_SANDBOX_FILE);
-  if (!(await pathExists(sandboxConfigPath))) {
+  if (!sandboxConfigExists) {
     const sandboxTemplate = buildDefaultSandboxTemplate();
     await writeFile(sandboxConfigPath, sandboxTemplate, {
       encoding: "utf8",
