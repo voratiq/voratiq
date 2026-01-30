@@ -1,9 +1,11 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 
 import { executeInitCommand } from "../commands/init/command.js";
 import type { InitCommandResult } from "../commands/init/types.js";
 import { resolveCliContext } from "../preflight/index.js";
 import { renderInitTranscript } from "../render/transcripts/init.js";
+import type { AgentPreset } from "../workspace/templates.js";
+import { AGENT_PRESET_CHOICES } from "../workspace/templates.js";
 import { createConfirmationWorkflow } from "./confirmation.js";
 import { NonInteractiveShellError } from "./errors.js";
 import { writeCommandOutput } from "./output.js";
@@ -14,6 +16,7 @@ export interface RunInitCommandResult extends InitCommandResult {
 
 export interface InitCommandOptions {
   yes?: boolean;
+  preset?: AgentPreset;
 }
 
 export async function runInitCommand(
@@ -22,6 +25,7 @@ export async function runInitCommand(
   const { root } = await resolveCliContext({ requireWorkspace: false });
 
   const assumeYes = Boolean(options.yes);
+  const preset: AgentPreset = options.preset ?? "pro";
   const confirmation = createConfirmationWorkflow({
     assumeYes,
     onUnavailable: () => {
@@ -32,6 +36,7 @@ export async function runInitCommand(
   try {
     const initResult = await executeInitCommand({
       root,
+      preset,
       interactive: confirmation.interactive,
       confirm: confirmation.confirm,
       prompt: confirmation.prompt,
@@ -46,9 +51,17 @@ export async function runInitCommand(
 }
 
 export function createInitCommand(): Command {
+  const presetOption = new Option(
+    "--preset <preset>",
+    "Select the agent preset (pro, lite, manual)",
+  )
+    .choices(AGENT_PRESET_CHOICES)
+    .default("pro");
+
   return new Command("init")
     .description("Bootstrap the Voratiq workspace")
     .option("-y, --yes", "Assume yes for all prompts")
+    .addOption(presetOption)
     .allowExcessArguments(false)
     .action(async (commandOptions: InitCommandOptions) => {
       const result = await runInitCommand(commandOptions);

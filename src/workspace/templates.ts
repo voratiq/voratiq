@@ -1,6 +1,8 @@
 import {
+  AGENT_PRESET_CHOICES,
   type AgentDefault,
-  DEFAULT_AGENT_DEFAULTS,
+  type AgentPreset,
+  getAgentDefaultsForPreset,
   sanitizeAgentIdFromModel,
 } from "../configs/agents/defaults.js";
 import {
@@ -12,8 +14,9 @@ import {
   serializeEvalDefaults,
 } from "../configs/evals/defaults.js";
 import { listSandboxProviderDefaults } from "../configs/sandbox/defaults.js";
-import { detectBinary } from "../utils/binaries.js";
+export type { AgentPreset } from "../configs/agents/defaults.js";
 export {
+  AGENT_PRESET_CHOICES,
   DEFAULT_AGENT_DEFAULTS,
   MODEL_PLACEHOLDER,
   sanitizeAgentIdFromModel,
@@ -54,6 +57,10 @@ function serializeAgentEntry(entry: AgentConfigEntry): string {
 export function serializeAgentsConfigEntries(
   entries: ReadonlyArray<AgentConfigEntry>,
 ): string {
+  if (entries.length === 0) {
+    return "agents: []\n";
+  }
+
   const header = "agents:\n";
   const body = entries.map(serializeAgentEntry).join("\n\n");
   return `${header}${body}\n`;
@@ -62,21 +69,37 @@ export function serializeAgentsConfigEntries(
 function buildAgentEntryFromTemplate(
   template: VendorTemplate,
 ): AgentConfigEntry {
-  const binary = detectBinary(template.provider) ?? "";
   return agentConfigEntrySchema.parse({
     id: sanitizeAgentIdFromModel(template.model),
     provider: template.provider,
     model: template.model,
     enabled: false,
-    binary,
+    binary: "",
   });
 }
 
 export function buildDefaultAgentsTemplate(): string {
-  const entries = DEFAULT_AGENT_DEFAULTS.map((template) =>
+  return buildAgentsTemplate("pro");
+}
+
+export function buildAgentsTemplate(preset: AgentPreset): string {
+  const templates = getAgentDefaultsForPreset(preset);
+  const entries = templates.map((template) =>
     buildAgentEntryFromTemplate(template),
   );
   return serializeAgentsConfigEntries(entries);
+}
+
+export interface AgentPresetTemplateDescriptor {
+  preset: AgentPreset;
+  template: string;
+}
+
+export function listAgentPresetTemplates(): AgentPresetTemplateDescriptor[] {
+  return AGENT_PRESET_CHOICES.map((preset) => ({
+    preset,
+    template: buildAgentsTemplate(preset),
+  }));
 }
 
 export function buildDefaultEvalsTemplate(): string {

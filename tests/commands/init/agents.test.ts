@@ -5,11 +5,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { configureAgents } from "../../../src/commands/init/agents.js";
-import { getDefaultAgentIdByProvider } from "../../../src/configs/agents/defaults.js";
+import {
+  getAgentDefaultsForPreset,
+  getDefaultAgentIdByProvider,
+  sanitizeAgentIdFromModel,
+} from "../../../src/configs/agents/defaults.js";
 import { readAgentsConfig } from "../../../src/configs/agents/loader.js";
 import type { AgentConfigEntry } from "../../../src/configs/agents/types.js";
 import type { ConfirmationOptions } from "../../../src/render/interactions/confirmation.js";
 import {
+  buildAgentsTemplate,
   buildDefaultAgentsTemplate,
   serializeAgentsConfigEntries,
 } from "../../../src/workspace/templates.js";
@@ -60,15 +65,48 @@ describe("configureAgents", () => {
     const configPath = join(repoRoot, ".voratiq", "agents.yaml");
     await writeFile(configPath, content, "utf8");
 
-    const summary = await configureAgents(repoRoot, { interactive: false });
+    const summary = await configureAgents(repoRoot, "pro", {
+      interactive: false,
+    });
 
     expect(summary).toEqual({
       configPath: ".voratiq/agents.yaml",
       enabledAgents: ["custom"],
+      agentCount: 1,
       zeroDetections: false,
       configCreated: false,
       configUpdated: false,
     });
+
+    const updated = await readFile(configPath, "utf8");
+    expect(updated).toBe(content);
+  });
+
+  it("skips prompting when config is customized (not a preset template)", async () => {
+    const entries: AgentConfigEntry[] = [
+      {
+        id: "custom",
+        provider: "claude",
+        model: "custom-model",
+        enabled: true,
+        binary: "/usr/local/bin/custom",
+      },
+    ];
+    const content = serializeAgentsConfigEntries(entries);
+    const configPath = join(repoRoot, ".voratiq", "agents.yaml");
+    await writeFile(configPath, content, "utf8");
+
+    const confirm = jest.fn<Promise<boolean>, [ConfirmationOptions]>(() =>
+      Promise.resolve(true),
+    );
+
+    const summary = await configureAgents(repoRoot, "pro", {
+      interactive: true,
+      confirm,
+    });
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(summary.enabledAgents).toEqual(["custom"]);
 
     const updated = await readFile(configPath, "utf8");
     expect(updated).toBe(content);
@@ -140,7 +178,7 @@ describe("configureAgents", () => {
       },
     );
 
-    const summary = await configureAgents(repoRoot, {
+    const summary = await configureAgents(repoRoot, "pro", {
       interactive: true,
       confirm,
     });
@@ -176,10 +214,79 @@ describe("configureAgents", () => {
     expect(summary).toEqual({
       configPath: ".voratiq/agents.yaml",
       enabledAgents: [CLAUDE_DEFAULT_ID],
+      agentCount: 3,
       zeroDetections: false,
       configCreated: false,
       configUpdated: true,
     });
+  });
+
+  it("includes lite preset agent ids when binaries are detected", async () => {
+    const binaries: Record<string, string> = {
+      claude: "/usr/bin/claude",
+      codex: "/usr/bin/codex",
+      gemini: "/usr/bin/gemini",
+    };
+
+    (spawnSync as jest.MockedFunction<typeof spawnSync>).mockImplementation(
+      (command, args) => {
+        if (command !== "bash" || !Array.isArray(args)) {
+          return {
+            status: 1,
+            stdout: "",
+            stderr: "",
+          } as SpawnSyncReturns<string>;
+        }
+
+        const lookup = String(args.at(-1));
+        const match = /command -v (\w+)/.exec(lookup);
+        if (!match) {
+          return {
+            status: 1,
+            stdout: "",
+            stderr: "",
+          } as SpawnSyncReturns<string>;
+        }
+
+        const binaryPath = binaries[match[1]];
+        if (!binaryPath) {
+          return {
+            status: 1,
+            stdout: "",
+            stderr: "",
+          } as SpawnSyncReturns<string>;
+        }
+
+        return {
+          status: 0,
+          stdout: `${binaryPath}\n`,
+          stderr: "",
+          pid: 0,
+          signal: null,
+          output: ["", `${binaryPath}\n`, ""],
+        } as SpawnSyncReturns<string>;
+      },
+    );
+
+    const configPath = join(repoRoot, ".voratiq", "agents.yaml");
+    await writeFile(configPath, buildAgentsTemplate("lite"), "utf8");
+
+    const confirm = jest.fn<Promise<boolean>, [ConfirmationOptions]>(() =>
+      Promise.resolve(true),
+    );
+
+    const summary = await configureAgents(repoRoot, "lite", {
+      interactive: true,
+      confirm,
+    });
+
+    const expectedLiteIds = getAgentDefaultsForPreset("lite").map((entry) =>
+      sanitizeAgentIdFromModel(entry.model),
+    );
+    expect(summary.enabledAgents).toEqual(expectedLiteIds);
+    expect(summary.agentCount).toBe(expectedLiteIds.length);
+    expect(summary.zeroDetections).toBe(false);
+    expect(confirm).toHaveBeenCalledTimes(expectedLiteIds.length);
   });
 
   it("reports zero detections when no agent binaries are found", async () => {
@@ -204,7 +311,7 @@ describe("configureAgents", () => {
     ]);
     await writeFile(configPath, blankContent, "utf8");
 
-    const summary = await configureAgents(repoRoot, {
+    const summary = await configureAgents(repoRoot, "pro", {
       interactive: true,
       confirm: () => Promise.resolve(true),
     });
@@ -213,5 +320,29 @@ describe("configureAgents", () => {
     expect(summary.zeroDetections).toBe(true);
     expect(summary.configCreated).toBe(false);
     expect(summary.configUpdated).toBe(false);
+  });
+
+  it("skips prompting when preset is manual", async () => {
+    const configPath = join(repoRoot, ".voratiq", "agents.yaml");
+    await writeFile(configPath, serializeAgentsConfigEntries([]), "utf8");
+
+    const confirm = jest.fn<Promise<boolean>, [ConfirmationOptions]>(() =>
+      Promise.resolve(true),
+    );
+
+    const summary = await configureAgents(repoRoot, "manual", {
+      interactive: true,
+      confirm,
+    });
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(summary).toEqual({
+      configPath: ".voratiq/agents.yaml",
+      enabledAgents: [],
+      agentCount: 0,
+      zeroDetections: true,
+      configCreated: false,
+      configUpdated: false,
+    });
   });
 });

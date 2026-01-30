@@ -92,7 +92,11 @@ export function renderInitTranscript({
 function buildAgentsSection(summary: AgentInitSummary): string[] {
   const lines: string[] = [];
 
-  if (summary.zeroDetections && summary.enabledAgents.length === 0) {
+  if (
+    summary.agentCount > 0 &&
+    summary.zeroDetections &&
+    summary.enabledAgents.length === 0
+  ) {
     lines.push("No agents configured, unable to find agent binaries.");
     lines.push(
       `To modify agent setup manually, edit \`${summary.configPath}\`.`,

@@ -1,3 +1,4 @@
+import { getAgentDefaultsForPreset } from "../../configs/agents/defaults.js";
 import { readAgentsConfig } from "../../configs/agents/loader.js";
 import type {
   AgentConfigEntry,
@@ -16,8 +17,8 @@ import {
   VORATIQ_AGENTS_FILE,
 } from "../../workspace/structure.js";
 import {
-  buildDefaultAgentsTemplate,
-  DEFAULT_AGENT_DEFAULTS,
+  type AgentPreset,
+  buildAgentsTemplate,
   sanitizeAgentIdFromModel,
   serializeAgentsConfigEntries,
   type VendorTemplate,
@@ -29,10 +30,11 @@ export const AGENTS_CONFIG_DISPLAY_PATH =
 
 export async function configureAgents(
   root: string,
+  preset: AgentPreset,
   options: InitConfigureOptions,
 ): Promise<AgentInitSummary> {
   const filePath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
-  const defaultTemplate = buildDefaultAgentsTemplate();
+  const defaultTemplate = buildAgentsTemplate(preset);
 
   const loadResult = await loadYamlConfig(filePath, readAgentsConfig);
   const defaultStatus = isDefaultYamlTemplate(
@@ -40,6 +42,14 @@ export async function configureAgents(
     defaultTemplate,
   );
   const configCreated = !loadResult.snapshot.exists;
+  if (preset === "manual") {
+    return buildAgentSummary(
+      loadResult.config.agents,
+      computeZeroDetections(loadResult.config.agents),
+      configCreated,
+      false,
+    );
+  }
 
   const canInteract = canConfirm(options);
 
@@ -55,6 +65,7 @@ export async function configureAgents(
   const lifecycle = scanWorkspaceForAgentDefaults(
     loadResult.config,
     defaultStatus,
+    getAgentDefaultsForPreset(preset),
   );
 
   const configChanged = await applyAgentOperatorChoices(lifecycle, options);
@@ -93,6 +104,7 @@ interface AgentTemplateState {
 function scanWorkspaceForAgentDefaults(
   config: AgentsConfig,
   isDefaultTemplate: boolean,
+  templates: readonly VendorTemplate[],
 ): AgentLifecycleState {
   const templatesById = new Map<string, AgentConfigEntry>();
   for (const entry of config.agents) {
@@ -101,7 +113,7 @@ function scanWorkspaceForAgentDefaults(
 
   const templateStates: AgentTemplateState[] = [];
   const templateIds = new Set<string>();
-  const templateEntries = DEFAULT_AGENT_DEFAULTS.map((template) => ({
+  const templateEntries = templates.map((template) => ({
     template,
     defaultId: sanitizeAgentIdFromModel(template.model),
   }));
@@ -258,6 +270,7 @@ function buildAgentSummary(
   return {
     configPath: AGENTS_CONFIG_DISPLAY_PATH,
     enabledAgents,
+    agentCount: entries.length,
     zeroDetections,
     configCreated,
     configUpdated,
