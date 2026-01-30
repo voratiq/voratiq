@@ -270,6 +270,7 @@ function buildAgentSummary(
   return {
     configPath: AGENTS_CONFIG_DISPLAY_PATH,
     enabledAgents,
+    agentCount: entries.length,
     zeroDetections,
     configCreated,
     configUpdated,

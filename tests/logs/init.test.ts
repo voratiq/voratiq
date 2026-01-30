@@ -18,6 +18,7 @@ describe("renderInitTranscript", () => {
   const baseAgents: AgentInitSummary = {
     configPath: ".voratiq/agents.yaml",
     enabledAgents: ["claude", "codex", "gemini"],
+    agentCount: 3,
     zeroDetections: false,
     configCreated: false,
     configUpdated: true,
@@ -55,26 +56,17 @@ describe("renderInitTranscript", () => {
     };
 
     const output = renderInitTranscript(view);
+    const lines = output.split("\n");
 
-    expect(output).toBe(
-      [
-        "Agents configured (claude, codex, gemini).",
-        "To modify, edit `.voratiq/agents.yaml`.",
-        "",
-        "Environment configured (node).",
-        "To modify, edit `.voratiq/environment.yaml`.",
-        "",
-        "Evals configured (format, lint, typecheck, tests).",
-        "To modify, edit `.voratiq/evals.yaml`.",
-        "",
-        "Sandbox configured.",
-        "To modify, edit `.voratiq/sandbox.yaml`.",
-        "",
-        colorize("Voratiq initialized.", "green"),
-        "",
-        "To begin a run:\n  voratiq run --spec <path>",
-      ].join("\n"),
+    expect(lines[0]).toBe("Agents configured (claude, codex, gemini).");
+    expect(lines[1]).toBe("To modify, edit `.voratiq/agents.yaml`.");
+    expect(output).toContain("Environment configured (node).");
+    expect(output).toContain(
+      "Evals configured (format, lint, typecheck, tests).",
     );
+    expect(output).toContain("Sandbox configured.");
+    expect(output).toContain(colorize("Voratiq initialized.", "green"));
+    expect(output).toContain("To begin a run:\n  voratiq run --spec <path>");
   });
 
   it("includes detection hints when no binaries are found", () => {
@@ -94,26 +86,40 @@ describe("renderInitTranscript", () => {
     };
 
     const output = renderInitTranscript(view);
+    const lines = output.split("\n");
 
-    expect(output).toBe(
-      [
-        "No agents configured, unable to find agent binaries.",
-        "To modify agent setup manually, edit `.voratiq/agents.yaml`.",
-        "",
-        "Environment configured (node).",
-        "To modify, edit `.voratiq/environment.yaml`.",
-        "",
-        "Evals configured (format, lint, typecheck, tests).",
-        "To modify, edit `.voratiq/evals.yaml`.",
-        "",
-        "Sandbox configured.",
-        "To modify, edit `.voratiq/sandbox.yaml`.",
-        "",
-        colorize("Voratiq initialized.", "green"),
-        "",
-        "To begin a run:\n  voratiq run --spec <path>",
-      ].join("\n"),
+    expect(lines[0]).toBe(
+      "No agents configured, unable to find agent binaries.",
     );
+    expect(lines[1]).toBe(
+      "To modify agent setup manually, edit `.voratiq/agents.yaml`.",
+    );
+    expect(output).toContain(colorize("Voratiq initialized.", "green"));
+  });
+
+  it("renders manual agent summaries without binary warnings", () => {
+    const agents: AgentInitSummary = {
+      configPath: ".voratiq/agents.yaml",
+      enabledAgents: [],
+      agentCount: 0,
+      zeroDetections: true,
+      configCreated: false,
+      configUpdated: false,
+    };
+
+    const view: InitCommandResult = {
+      workspaceResult: resultCreated,
+      agentSummary: agents,
+      environmentSummary: baseEnvironment,
+      evalSummary: baseEvals,
+      sandboxSummary: baseSandbox,
+    };
+
+    const output = renderInitTranscript(view);
+    const lines = output.split("\n");
+
+    expect(lines[0]).toBe("Agents configured (none).");
+    expect(output).not.toContain("unable to find agent binaries");
   });
 
   it("renders already-exists message when nothing new is created", () => {

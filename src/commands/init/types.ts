@@ -26,6 +26,7 @@ export interface InitCommandResult {
 export interface AgentInitSummary {
   configPath: string;
   enabledAgents: string[];
+  agentCount: number;
   zeroDetections: boolean;
   configCreated: boolean;
   configUpdated: boolean;

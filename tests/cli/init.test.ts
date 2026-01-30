@@ -1,0 +1,68 @@
+import { describe, expect, it, jest } from "@jest/globals";
+
+import { runInitCommand } from "../../src/cli/init.js";
+import { executeInitCommand } from "../../src/commands/init/command.js";
+import { resolveCliContext } from "../../src/preflight/index.js";
+
+jest.mock("../../src/preflight/index.js", () => ({
+  resolveCliContext: jest.fn(),
+}));
+
+jest.mock("../../src/commands/init/command.js", () => ({
+  executeInitCommand: jest.fn(),
+}));
+
+const resolveCliContextMock = jest.mocked(resolveCliContext);
+const executeInitCommandMock = jest.mocked(executeInitCommand);
+
+describe("voratiq init (cli)", () => {
+  it("defaults to the pro preset when --yes is set and --preset is omitted", async () => {
+    resolveCliContextMock.mockResolvedValue({
+      root: "/repo",
+      workspacePaths: {
+        root: "/repo",
+        workspaceDir: "/repo/.voratiq",
+        runsDir: "/repo/.voratiq/runs",
+        runsFile: "/repo/.voratiq/runs/index.json",
+        reviewsDir: "/repo/.voratiq/reviews",
+        reviewsFile: "/repo/.voratiq/reviews/index.json",
+        specsDir: "/repo/.voratiq/specs",
+        specsFile: "/repo/.voratiq/specs/index.json",
+      },
+    });
+    executeInitCommandMock.mockResolvedValue({
+      workspaceResult: { createdDirectories: [], createdFiles: [] },
+      agentSummary: {
+        configPath: ".voratiq/agents.yaml",
+        enabledAgents: [],
+        agentCount: 0,
+        zeroDetections: true,
+        configCreated: false,
+        configUpdated: false,
+      },
+      environmentSummary: {
+        configPath: ".voratiq/environment.yaml",
+        detectedEntries: [],
+        configCreated: false,
+        configUpdated: false,
+        config: {},
+      },
+      evalSummary: {
+        configPath: ".voratiq/evals.yaml",
+        configuredEvals: [],
+        configCreated: false,
+        configUpdated: false,
+      },
+      sandboxSummary: {
+        configPath: ".voratiq/sandbox.yaml",
+        configCreated: false,
+      },
+    });
+
+    await runInitCommand({ yes: true });
+
+    expect(executeInitCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({ preset: "pro" }),
+    );
+  });
+});
