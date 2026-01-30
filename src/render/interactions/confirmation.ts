@@ -48,7 +48,7 @@ export function createConfirmationInteractor(
         }
       }
 
-      const suffix = defaultValue ? "(Y/n)" : "(y/N)";
+      const suffix = defaultValue ? "[Y/n]" : "[y/N]";
 
       for (;;) {
         const response = await readlineInterface.question(
