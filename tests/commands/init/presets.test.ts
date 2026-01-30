@@ -71,4 +71,37 @@ describe("voratiq init preset application", () => {
     const updated = await readFile(agentsPath, "utf8");
     expect(updated).toBe(content);
   });
+
+  it("prompts for preset selection when interactive and config is default", async () => {
+    const prompt = jest.fn().mockResolvedValue("2");
+
+    await executeInitCommand({
+      root: repoRoot,
+      preset: "pro",
+      interactive: true,
+      prompt,
+    });
+
+    const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
+    const content = await readFile(agentsPath, "utf8");
+    expect(content).toBe(buildAgentsTemplate("lite"));
+    expect(prompt).toHaveBeenCalled();
+  });
+
+  it("skips preset selection when preset is provided", async () => {
+    const prompt = jest.fn().mockResolvedValue("2");
+
+    await executeInitCommand({
+      root: repoRoot,
+      preset: "lite",
+      presetProvided: true,
+      interactive: true,
+      prompt,
+    });
+
+    const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
+    const content = await readFile(agentsPath, "utf8");
+    expect(content).toBe(buildAgentsTemplate("lite"));
+    expect(prompt).not.toHaveBeenCalled();
+  });
 });

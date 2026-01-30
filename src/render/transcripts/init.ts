@@ -13,6 +13,22 @@ export function buildInitializationPrompt(): string {
   return "Initializing Voratiq…";
 }
 
+export function renderPresetPromptPreface(firstPrompt: boolean): string[] {
+  const sections: string[][] = [
+    [
+      "Which agent preset would you like?",
+      "  [1] Pro (flagship models)",
+      "  [2] Lite (faster models)",
+      "  [3] Manual (configure yourself)",
+    ],
+  ];
+
+  return renderBlocks({
+    sections,
+    leadingBlankLine: firstPrompt,
+  });
+}
+
 interface AgentPromptRenderOptions {
   agentId: string;
   binaryPath?: string;

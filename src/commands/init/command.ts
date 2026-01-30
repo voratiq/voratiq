@@ -1,5 +1,8 @@
 import { writeCommandPreface } from "../../cli/output.js";
-import { buildInitializationPrompt } from "../../render/transcripts/init.js";
+import {
+  buildInitializationPrompt,
+  renderPresetPromptPreface,
+} from "../../render/transcripts/init.js";
 import {
   normalizeConfigText,
   readConfigSnapshot,
@@ -23,21 +26,29 @@ import { configureEvals } from "./evals.js";
 import type {
   InitCommandInput,
   InitCommandResult,
+  InitPromptHandler,
   SandboxInitSummary,
 } from "./types.js";
 
 export async function executeInitCommand(
   input: InitCommandInput,
 ): Promise<InitCommandResult> {
-  const { root, preset, interactive, confirm, prompt } = input;
+  const { root, preset, presetProvided, interactive, confirm, prompt } = input;
 
   const workspaceResult = await createWorkspace(root);
-  await applyAgentPresetTemplate(root, preset);
 
   const initializationPrompt = buildInitializationPrompt();
   writeCommandPreface(initializationPrompt);
 
-  const agentSummary = await configureAgents(root, preset, {
+  const resolvedPreset = await resolveAgentPreset(root, {
+    preset,
+    presetProvided,
+    interactive,
+    prompt,
+  });
+  await applyAgentPresetTemplate(root, resolvedPreset);
+
+  const agentSummary = await configureAgents(root, resolvedPreset, {
     interactive,
     confirm,
   });
@@ -105,4 +116,75 @@ async function applyAgentPresetTemplate(
 
   const baseline = snapshot.exists ? snapshot.normalized : "__missing__";
   await writeConfigIfChanged(filePath, selected.template, baseline);
+}
+
+async function resolveAgentPreset(
+  root: string,
+  options: {
+    preset: AgentPreset;
+    presetProvided?: boolean;
+    interactive: boolean;
+    prompt?: InitPromptHandler;
+  },
+): Promise<AgentPreset> {
+  const { preset, presetProvided = false, interactive, prompt } = options;
+
+  if (presetProvided) {
+    return preset;
+  }
+
+  if (!interactive || !prompt) {
+    return preset;
+  }
+
+  const shouldPrompt = await shouldPromptForPreset(root);
+  if (!shouldPrompt) {
+    return preset;
+  }
+
+  return promptForPresetSelection(prompt);
+}
+
+async function shouldPromptForPreset(root: string): Promise<boolean> {
+  const filePath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
+  const snapshot = await readConfigSnapshot(filePath);
+  if (!snapshot.exists) {
+    return true;
+  }
+
+  const knownTemplates = listAgentPresetTemplates();
+  const knownNormalized = new Set(
+    knownTemplates.map((descriptor) =>
+      normalizeConfigText(descriptor.template),
+    ),
+  );
+  return knownNormalized.has(snapshot.normalized);
+}
+
+async function promptForPresetSelection(
+  prompt: InitPromptHandler,
+): Promise<AgentPreset> {
+  const choices: Record<string, AgentPreset> = {
+    "1": "pro",
+    "2": "lite",
+    "3": "manual",
+  };
+
+  let firstPrompt = true;
+
+  for (;;) {
+    const response = await prompt({
+      message: "[1]",
+      prefaceLines: renderPresetPromptPreface(firstPrompt),
+    });
+    const trimmed = response.trim();
+    const normalized = trimmed.length === 0 ? "1" : trimmed;
+    const selected = choices[normalized];
+    if (selected) {
+      return selected;
+    }
+
+    process.stdout.write("Please choose 1, 2, or 3.\n");
+    firstPrompt = false;
+  }
 }

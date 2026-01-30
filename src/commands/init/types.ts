@@ -10,6 +10,7 @@ import type { CreateWorkspaceResult } from "../../workspace/types.js";
 export interface InitCommandInput {
   root: string;
   preset: AgentPreset;
+  presetProvided?: boolean;
   interactive: boolean;
   confirm?: InitConfirmationHandler;
   prompt?: InitPromptHandler;

@@ -17,6 +17,7 @@ export interface RunInitCommandResult extends InitCommandResult {
 export interface InitCommandOptions {
   yes?: boolean;
   preset?: AgentPreset;
+  presetProvided?: boolean;
 }
 
 export async function runInitCommand(
@@ -26,6 +27,7 @@ export async function runInitCommand(
 
   const assumeYes = Boolean(options.yes);
   const preset: AgentPreset = options.preset ?? "pro";
+  const presetProvided = Boolean(options.presetProvided);
   const confirmation = createConfirmationWorkflow({
     assumeYes,
     onUnavailable: () => {
@@ -37,6 +39,7 @@ export async function runInitCommand(
     const initResult = await executeInitCommand({
       root,
       preset,
+      presetProvided,
       interactive: confirmation.interactive,
       confirm: confirmation.confirm,
       prompt: confirmation.prompt,
@@ -53,7 +56,7 @@ export async function runInitCommand(
 export function createInitCommand(): Command {
   const presetOption = new Option(
     "--preset <preset>",
-    "Select the agent preset (pro, lite, manual)",
+    "Select the agent preset",
   )
     .choices(AGENT_PRESET_CHOICES)
     .default("pro");
@@ -63,8 +66,14 @@ export function createInitCommand(): Command {
     .option("-y, --yes", "Assume yes for all prompts")
     .addOption(presetOption)
     .allowExcessArguments(false)
-    .action(async (commandOptions: InitCommandOptions) => {
-      const result = await runInitCommand(commandOptions);
+    .action(async (commandOptions: InitCommandOptions, command: Command) => {
+      const presetSource = command.getOptionValueSource("preset");
+      const presetProvided =
+        typeof presetSource === "string" && presetSource !== "default";
+      const result = await runInitCommand({
+        ...commandOptions,
+        presetProvided,
+      });
 
       writeCommandOutput({
         body: result.body,

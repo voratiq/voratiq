@@ -84,7 +84,7 @@ voratiq spec --description <text> --agent <agent-id> [--title <text>] [--output 
 
 ### Behavior
 
-- TTY (interactive): drafts a spec, shows a preview, prompts `Save this specification? (Y/n):`, and loops on feedback until accepted
+- TTY (interactive): drafts a spec, shows a preview, prompts `Save this specification? [Y/n]:`, and loops on feedback until accepted
 - Non-TTY: requires `--yes`; without it, exits with `Error: Non-interactive shell detected; re-run with --yes to accept defaults.`
 
 ### Examples
@@ -113,7 +113,7 @@ user preference to localStorage.
 - [ ] Theme applies on page load
 ```
 
-Save this specification? (Y/n): n
+Save this specification? [Y/n]: n
 
 What would you like to change?
 > add system preference detection via prefers-color-scheme
@@ -138,7 +138,7 @@ system preferences and persists user choice to localStorage.
 - [ ] Theme applies on page load
 ```
 
-Save this specification? (Y/n): y
+Save this specification? [Y/n]: y
 
 Spec saved: .voratiq/specs/add-dark-mode-toggle.md
 
