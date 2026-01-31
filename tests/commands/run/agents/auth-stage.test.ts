@@ -8,6 +8,7 @@ import type {
 } from "../../../../src/auth/providers/types.js";
 import { buildAuthRuntimeContext } from "../../../../src/auth/runtime.js";
 import type { AgentDefinition } from "../../../../src/configs/agents/types.js";
+import { loadRepoSettings } from "../../../../src/configs/settings/loader.js";
 
 jest.mock("../../../../src/auth/providers/index.js", () => ({
   resolveAuthProvider: jest.fn(),
@@ -17,12 +18,20 @@ jest.mock("../../../../src/auth/runtime.js", () => ({
   buildAuthRuntimeContext: jest.fn(),
 }));
 
+jest.mock("../../../../src/configs/settings/loader.js", () => ({
+  loadRepoSettings: jest.fn(),
+}));
+
 const resolveAuthProviderMock = jest.mocked(resolveAuthProvider);
 const buildAuthRuntimeContextMock = jest.mocked(buildAuthRuntimeContext);
+const loadRepoSettingsMock = jest.mocked(loadRepoSettings);
 
 describe("stageAgentAuth", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    loadRepoSettingsMock.mockReturnValue({
+      codex: { globalConfigPolicy: "apply" },
+    });
   });
 
   it("stages credentials and returns the staged context", async () => {
@@ -66,6 +75,7 @@ describe("stageAgentAuth", () => {
     expect(stageMock).toHaveBeenCalledWith({
       agentId: "alpha",
       agentRoot: "/tmp/workspace",
+      includeConfigToml: true,
       runtime,
       runId: "run-123",
       root: "/tmp",

@@ -7,6 +7,7 @@ import type {
 } from "../../auth/providers/types.js";
 import { buildAuthRuntimeContext } from "../../auth/runtime.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
+import { loadRepoSettings } from "../../configs/settings/loader.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { isFileSystemError } from "../../utils/fs.js";
 import {
@@ -89,6 +90,8 @@ export async function stageAgentAuth(
   const provider = resolveAgentProvider(agent);
   const runtime = options.runtime ?? buildAuthRuntimeContext();
 
+  const includeConfigToml = shouldIncludeCodexConfigToml(root);
+
   try {
     const stageResult = await provider.stage({
       agentId: agent.id,
@@ -96,6 +99,7 @@ export async function stageAgentAuth(
       runtime,
       runId: runId ?? "runtime",
       root,
+      includeConfigToml,
     });
     return {
       env: stageResult.env,
@@ -145,6 +149,15 @@ export async function teardownAuthContext(
 }
 
 const tornDownContexts = new WeakSet<StagedAuthContext>();
+
+function shouldIncludeCodexConfigToml(root: string): boolean {
+  try {
+    const settings = loadRepoSettings({ root });
+    return settings.codex.globalConfigPolicy !== "ignore";
+  } catch {
+    return true;
+  }
+}
 
 function isIgnorableTeardownError(error: unknown): boolean {
   if (!isFileSystemError(error)) {

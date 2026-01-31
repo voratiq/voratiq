@@ -35,6 +35,7 @@ describe("codexAuthProvider.stage", () => {
       stageResult = await codexAuthProvider.stage({
         agentId: "codex",
         agentRoot,
+        includeConfigToml: true,
         runtime: {
           platform: process.platform,
           env: { ...process.env, CODEX_HOME: codexHome },
@@ -110,6 +111,7 @@ describe("codexAuthProvider optional config", () => {
       stageResult = await codexAuthProvider.stage({
         agentId: "codex",
         agentRoot,
+        includeConfigToml: true,
         runtime: {
           platform: process.platform,
           env: { ...process.env, CODEX_HOME: codexHome },
@@ -119,6 +121,54 @@ describe("codexAuthProvider optional config", () => {
       });
 
       const sandboxCodex = join(stageResult.sandboxPath, ".codex");
+      await expect(access(join(sandboxCodex, "config.toml"))).rejects.toThrow();
+    } finally {
+      if (stageResult && typeof codexAuthProvider.teardown === "function") {
+        await codexAuthProvider.teardown({
+          sandboxPath: stageResult.sandboxPath,
+        });
+      }
+      await rm(agentRoot, { recursive: true, force: true });
+      await rm(codexHome, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("codexAuthProvider optional config policy", () => {
+  it("does not copy config.toml when includeConfigToml is false", async () => {
+    const agentRoot = await mkdtemp(
+      join(os.tmpdir(), "voratiq-codex-stage-policy-"),
+    );
+    const codexHome = await mkdtemp(
+      join(os.tmpdir(), "voratiq-codex-auth-policy-"),
+    );
+    await writeFile(
+      join(codexHome, "auth.json"),
+      JSON.stringify({ access_token: "test" }),
+      "utf8",
+    );
+    await writeFile(join(codexHome, "config.toml"), "setting = true\n", "utf8");
+
+    let stageResult:
+      | Awaited<ReturnType<typeof codexAuthProvider.stage>>
+      | undefined;
+    try {
+      stageResult = await codexAuthProvider.stage({
+        agentId: "codex",
+        agentRoot,
+        includeConfigToml: false,
+        runtime: {
+          platform: process.platform,
+          env: { ...process.env, CODEX_HOME: codexHome },
+          homeDir: os.homedir(),
+          username: "voratiq-test",
+        },
+      });
+
+      const sandboxCodex = join(stageResult.sandboxPath, ".codex");
+      await expect(
+        access(join(sandboxCodex, "auth.json")),
+      ).resolves.toBeUndefined();
       await expect(access(join(sandboxCodex, "config.toml"))).rejects.toThrow();
     } finally {
       if (stageResult && typeof codexAuthProvider.teardown === "function") {
