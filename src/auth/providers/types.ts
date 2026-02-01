@@ -18,6 +18,7 @@ export interface StageOptions extends VerifyOptions {
   agentRoot: string;
   runId?: string;
   root?: string;
+  includeConfigToml?: boolean;
 }
 
 export interface StageResult {

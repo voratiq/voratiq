@@ -84,7 +84,9 @@ export const codexAuthProvider: AuthProvider = {
       });
       secretHandles.push(handle);
 
-      await copyOptionalConfig(options, sandboxPaths.codex);
+      if (options.includeConfigToml !== false) {
+        await copyOptionalConfig(options, sandboxPaths.codex);
+      }
     } catch (error) {
       await disposeHandles(secretHandles);
       throw error;

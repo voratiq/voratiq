@@ -165,11 +165,18 @@ function formatPreflightIssueLines(
   for (const issue of issues) {
     const messageLines = normalizeIssueMessage(issue.message);
     for (const message of messageLines) {
-      const full = `- ${issue.agentId}: ${message}`;
+      const full = formatIssueLine(issue.agentId, message);
       lines.push(truncateLine(full, PREFLIGHT_SUMMARY_MAX_CHARS));
     }
   }
   return lines;
+}
+
+function formatIssueLine(agentId: string, message: string): string {
+  if (agentId === "settings") {
+    return `- ${message}`;
+  }
+  return `- ${agentId}: ${message}`;
 }
 
 function normalizeIssueMessage(message: string): string[] {

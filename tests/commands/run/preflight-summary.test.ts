@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -109,5 +109,42 @@ describe("run preflight error summary", () => {
     expect(preflightError.hintLines).toContain(
       "Run `voratiq init` to configure the workspace.",
     );
+  });
+
+  it("surfaces invalid settings.yaml as a preflight issue", async () => {
+    const diagnostics: AgentCatalogDiagnostics = {
+      enabledAgents: [
+        {
+          id: "gpt-5-1-codex",
+          provider: "codex",
+          model: "model",
+          enabled: true,
+          binary: "/bin/true",
+        },
+      ],
+      catalog: [],
+      issues: [],
+    };
+    loadAgentCatalogDiagnosticsMock.mockReturnValue(diagnostics);
+    verifyAgentProvidersMock.mockResolvedValue([]);
+
+    await mkdir(join(root, ".voratiq"), { recursive: true });
+    await writeFile(
+      join(root, ".voratiq", "settings.yaml"),
+      "codex:\n  globalConfigPolicy: unignore\n",
+      "utf8",
+    );
+
+    let captured: unknown;
+    try {
+      await validateAndPrepare({ root, specAbsolutePath: specPath });
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(captured).toBeInstanceOf(RunPreflightError);
+    const preflightError = captured as RunPreflightError;
+    expect(preflightError.detailLines).toHaveLength(1);
+    expect(preflightError.detailLines[0]).toContain("Invalid settings file");
   });
 });
