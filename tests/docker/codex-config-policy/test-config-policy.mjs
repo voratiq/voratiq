@@ -88,7 +88,7 @@ await mkdir(defaultRoot, { recursive: true });
 await runCase({
   name: "default-policy",
   rootDir: defaultRoot,
-  expectConfigToml: true,
+  expectConfigToml: false,
   runtime,
   agent,
 });

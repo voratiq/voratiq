@@ -15,7 +15,7 @@ export interface LoadRepoSettingsOptions {
 
 const DEFAULT_SETTINGS: RepoSettings = {
   codex: {
-    globalConfigPolicy: "apply",
+    globalConfigPolicy: "ignore",
   },
 };
 

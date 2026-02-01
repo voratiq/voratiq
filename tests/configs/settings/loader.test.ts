@@ -3,7 +3,7 @@ import { describe, expect, test } from "@jest/globals";
 import { loadRepoSettings } from "../../../src/configs/settings/loader.js";
 
 describe("loadRepoSettings", () => {
-  test("defaults to apply when settings.yaml is missing", () => {
+  test("defaults to ignore when settings.yaml is missing", () => {
     const error = new Error("missing") as NodeJS.ErrnoException;
     error.code = "ENOENT";
 
@@ -14,7 +14,7 @@ describe("loadRepoSettings", () => {
       },
     });
 
-    expect(settings.codex.globalConfigPolicy).toBe("apply");
+    expect(settings.codex.globalConfigPolicy).toBe("ignore");
   });
 
   test("parses ignore policy", () => {
