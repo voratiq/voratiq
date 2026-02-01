@@ -89,24 +89,25 @@ Output:
 ```
 20260113-235501-hhkox SUCCEEDED
 
+Elapsed        12m 11s
 Created        2026-01-13 15:55 PST
 Spec           .voratiq/specs/add-run-branch.md
 Workspace      .voratiq/runs/sessions/20260113-235501-hhkox
 Base Revision  29163b77
 
-AGENT                       STATUS     ELAPSED  CHANGES     EVALS
-claude-haiku-4-5-20251001   SUCCEEDED  4m 58s   5f +381/-2  format lint typecheck tests
-claude-sonnet-4-5-20250929  SUCCEEDED  6m 15s   4f +265/-1  format lint typecheck tests
-claude-opus-4-5-20251101    SUCCEEDED  5m 6s    4f +265/-1  format lint typecheck tests
-gpt-5-codex                 SUCCEEDED  5m 26s   4f +244/-9  format lint typecheck tests
-gpt-5-1-codex               SUCCEEDED  5m 40s   4f +261/-1  format lint typecheck tests
-gpt-5-1-codex-max           SUCCEEDED  7m 18s   2f +260/-3  format lint typecheck tests
-gpt-5-1-codex-max-xhigh     SUCCEEDED  12m 11s  3f +264/-1  format lint typecheck tests
-gpt-5-1-codex-mini          SUCCEEDED  6m 9s    4f +235/-1  format lint typecheck tests
-gpt-5-2                     SUCCEEDED  7m 5s    6f +236/-2  format lint typecheck tests
-gpt-5-2-xhigh               SUCCEEDED  11m 37s  6f +312/-2  format lint typecheck tests
-gpt-5-2-codex               SUCCEEDED  5m 50s   2f +175/-1  format lint typecheck tests
-gpt-5-2-codex-xhigh         SUCCEEDED  10m 55s  4f +281/-1  format lint typecheck tests
+AGENT                       STATUS     DURATION  CHANGES     EVALS
+claude-haiku-4-5-20251001   SUCCEEDED  4m 58s    5f +381/-2  format lint typecheck tests
+claude-sonnet-4-5-20250929  SUCCEEDED  6m 15s    4f +265/-1  format lint typecheck tests
+claude-opus-4-5-20251101    SUCCEEDED  5m 6s     4f +265/-1  format lint typecheck tests
+gpt-5-codex                 SUCCEEDED  5m 26s    4f +244/-9  format lint typecheck tests
+gpt-5-1-codex               SUCCEEDED  5m 40s    4f +261/-1  format lint typecheck tests
+gpt-5-1-codex-max           SUCCEEDED  7m 18s    2f +260/-3  format lint typecheck tests
+gpt-5-1-codex-max-xhigh     SUCCEEDED  12m 11s   3f +264/-1  format lint typecheck tests
+gpt-5-1-codex-mini          SUCCEEDED  6m 9s     4f +235/-1  format lint typecheck tests
+gpt-5-2                     SUCCEEDED  7m 5s     6f +236/-2  format lint typecheck tests
+gpt-5-2-xhigh               SUCCEEDED  11m 37s   6f +312/-2  format lint typecheck tests
+gpt-5-2-codex               SUCCEEDED  5m 50s    2f +175/-1  format lint typecheck tests
+gpt-5-2-codex-xhigh         SUCCEEDED  10m 55s   4f +281/-1  format lint typecheck tests
 
 To review results:
   voratiq review --run 20260113-235501-hhkox --agent <agent-id>

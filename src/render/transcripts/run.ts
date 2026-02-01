@@ -51,7 +51,7 @@ interface RunProgressRenderer {
 interface AgentRow {
   agentId: string;
   status: string;
-  elapsed: string;
+  duration: string;
   diff: string;
   evals: string;
 }
@@ -119,9 +119,70 @@ export function createRunRenderer(
   let lastRenderedLines = 0;
   let blockInitialized = false;
   let metadataPrinted = false;
+  let refreshInterval: ReturnType<typeof setInterval> | undefined;
+  let lastElapsedLabel: string | null = null;
 
   const agentOrder: string[] = [];
   const agentRecords = new Map<string, AgentInvocationRecord>();
+
+  function stopRefreshLoop(): void {
+    if (!refreshInterval) {
+      return;
+    }
+
+    clearInterval(refreshInterval);
+    refreshInterval = undefined;
+  }
+
+  function hasRunningAgents(): boolean {
+    for (const record of agentRecords.values()) {
+      if (record.status === "running") {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function syncRefreshLoop(): void {
+    if (!stdout.isTTY || disabled) {
+      stopRefreshLoop();
+      return;
+    }
+
+    if (!hasRunningAgents()) {
+      stopRefreshLoop();
+      return;
+    }
+
+    if (refreshInterval) {
+      return;
+    }
+
+    refreshInterval = setInterval(() => {
+      guard(() => {
+        if (!stdout.isTTY || disabled || !context) {
+          stopRefreshLoop();
+          return;
+        }
+
+        if (!hasRunningAgents()) {
+          stopRefreshLoop();
+          return;
+        }
+
+        const nextElapsed =
+          context.createdAt && formatRunElapsed(context.createdAt);
+        if (nextElapsed === lastElapsedLabel) {
+          return;
+        }
+
+        render();
+      });
+    }, 1000);
+
+    refreshInterval.unref?.();
+  }
 
   function guard(action: () => void): void {
     if (disabled) {
@@ -131,6 +192,7 @@ export function createRunRenderer(
       action();
     } catch (error) {
       disabled = true;
+      stopRefreshLoop();
       if (!warningLogged) {
         warningLogged = true;
         const detail = formatErrorDetail(error);
@@ -185,11 +247,17 @@ export function createRunRenderer(
       return;
     }
 
+    const elapsedLabel = context.createdAt
+      ? (formatRunElapsed(context.createdAt) ?? undefined)
+      : undefined;
+    lastElapsedLabel = elapsedLabel ?? null;
+
     const metadataLines = buildRunMetadataSection({
       runId: context.runId,
       status: context.status,
       specPath: context.specPath,
       workspacePath: context.workspacePath,
+      elapsed: elapsedLabel,
       createdAt: formatRunTimestamp(context.createdAt),
       baseRevisionSha: context.baseRevisionSha,
     });
@@ -262,7 +330,7 @@ export function createRunRenderer(
         return {
           agentId: formatAgentBadge(agentId),
           status: formatAgentStatusLabel(record.status),
-          elapsed: formatElapsed(record),
+          duration: formatDuration(record),
           diff: formatDiffCell(record.diffStatistics),
           evals: formatEvals(record),
         };
@@ -272,7 +340,7 @@ export function createRunRenderer(
       columns: [
         { header: "AGENT", accessor: (row) => row.agentId },
         { header: "STATUS", accessor: (row) => row.status },
-        { header: "ELAPSED", accessor: (row) => row.elapsed },
+        { header: "DURATION", accessor: (row) => row.duration },
         { header: "CHANGES", accessor: (row) => row.diff },
         { header: "EVALS", accessor: (row) => row.evals },
       ],
@@ -288,44 +356,23 @@ export function createRunRenderer(
     return value ?? DASH;
   }
 
-  function formatElapsed(record: AgentInvocationRecord): string {
-    if (!record.startedAt) {
-      return DASH;
+  function formatDuration(record: AgentInvocationRecord): string {
+    const duration = formatAgentDuration(record);
+    return duration ?? DASH;
+  }
+
+  function formatRunElapsed(createdAt: string): string | undefined {
+    if (!createdAt) {
+      return undefined;
     }
 
-    const started = Date.parse(record.startedAt);
-    if (Number.isNaN(started)) {
-      return DASH;
+    const startedAt = Date.parse(createdAt);
+    if (Number.isNaN(startedAt)) {
+      return undefined;
     }
 
-    if (!record.completedAt && record.status === "running") {
-      const elapsedMs = Math.max(0, now() - started);
-      const formattedElapsed = formatDurationLabel(elapsedMs);
-      return formattedElapsed ?? DASH;
-    }
-
-    if (!record.completedAt) {
-      return DASH;
-    }
-
-    const formatted = formatAgentDuration({
-      agentId: record.agentId,
-      status: record.status,
-      startedAt: record.startedAt,
-      completedAt: record.completedAt,
-    });
-
-    if (formatted) {
-      return formatted;
-    }
-
-    const completed = Date.parse(record.completedAt);
-    if (Number.isNaN(completed)) {
-      return DASH;
-    }
-
-    const elapsed = formatDurationLabel(Math.max(0, completed - started));
-    return elapsed ?? DASH;
+    const elapsedMs = Math.max(0, now() - startedAt);
+    return formatDurationLabel(elapsedMs);
   }
 
   function formatEvals(record: AgentInvocationRecord): string {
@@ -366,20 +413,24 @@ export function createRunRenderer(
       guard(() => {
         if (!beginContext) {
           render();
+          syncRefreshLoop();
           return;
         }
         context = { ...beginContext };
         render();
+        syncRefreshLoop();
       });
     },
     update(record: AgentInvocationRecord): void {
       guard(() => {
         upsertRecord(record);
         render();
+        syncRefreshLoop();
       });
     },
     complete(report: RunReport, options?: { suppressHint?: boolean }): string {
       let transcript = "";
+      stopRefreshLoop();
       guard(() => {
         ensureFinalRender(report);
 

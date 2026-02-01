@@ -6,8 +6,14 @@ import { formatCliOutput } from "../../../src/utils/output.js";
 import { createRunReport } from "../../support/factories/run-records.js";
 
 const SUPPRESS_ENV = "VORATIQ_SUPPRESS_RUN_STATUS_TABLE";
+const ESC = String.fromCharCode(0x1b);
+const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
 const CONTROL_SEQUENCE = new RegExp(String.raw`^\x1b\[(\d+)([A-Za-z])`);
 const originalSuppress = process.env[SUPPRESS_ENV];
+
+function stripAnsi(value: string): string {
+  return value.replace(ANSI_PATTERN, "");
+}
 
 beforeEach(() => {
   delete process.env[SUPPRESS_ENV];
@@ -271,6 +277,17 @@ describe("createRunRenderer", () => {
       expect(combined).toContain("\u001b[2K");
       expect(combined).toContain("\u001b[");
       expect(combined).not.toContain("\u001b[J");
+
+      renderer.complete(
+        createRunReport({
+          runId: "20251105-test-12345",
+          status: "succeeded",
+          spec: { path: "specs/test.md" },
+          baseRevisionSha: "abc123",
+          createdAt: "2025-11-05T12:00:00.000Z",
+          agents: [],
+        }),
+      );
     });
 
     it("leaves previously printed stdout intact while redrawing", () => {
@@ -298,6 +315,17 @@ describe("createRunRenderer", () => {
 
       const snapshot = tty.snapshot();
       expect(snapshot).toContain("preface line");
+
+      renderer.complete(
+        createRunReport({
+          runId: context.runId,
+          status: "succeeded",
+          spec: { path: context.specPath },
+          baseRevisionSha: context.baseRevisionSha,
+          createdAt: context.createdAt,
+          agents: [],
+        }),
+      );
     });
 
     it("clears leftover lines when the redraw shrinks", () => {
@@ -432,7 +460,7 @@ describe("createRunRenderer", () => {
   });
 
   describe("elapsed time formatting", () => {
-    it("shows elapsed time for running agents", () => {
+    it("shows run-level elapsed while agents run and keeps per-agent duration final-only", () => {
       const lines: string[] = [];
       const mockStdout = {
         write: (data: string) => {
@@ -464,7 +492,9 @@ describe("createRunRenderer", () => {
       });
 
       const output = lines.join("");
+      expect(output).toContain("Elapsed");
       expect(output).toContain("1m 5s");
+      expect(stripAnsi(output)).toMatch(/test-agent\s+RUNNING\s+—/);
     });
   });
 
