@@ -17,7 +17,9 @@ import {
   loadEvalConfig,
 } from "../../configs/evals/loader.js";
 import type { EvalDefinition } from "../../configs/evals/types.js";
+import { loadRepoSettings } from "../../configs/settings/loader.js";
 import { RunOptionValidationError } from "../../runs/records/errors.js";
+import { toErrorMessage } from "../../utils/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { WorkspaceMissingEntryError } from "../../workspace/errors.js";
 import { NoAgentsEnabledError, RunPreflightError } from "./errors.js";
@@ -65,6 +67,16 @@ export async function validateAndPrepare(
     throw new NoAgentsEnabledError();
   }
 
+  const preflightIssues = [...agentDiagnostics.issues];
+  try {
+    loadRepoSettings({ root });
+  } catch (error) {
+    preflightIssues.push({
+      agentId: "settings",
+      message: toErrorMessage(error),
+    });
+  }
+
   const providerIssues = await verifyAgentProviders(
     enabledAgents.map((entry) => ({
       id: entry.id,
@@ -72,7 +84,7 @@ export async function validateAndPrepare(
     })),
   );
 
-  const preflightIssues = [...agentDiagnostics.issues, ...providerIssues];
+  preflightIssues.push(...providerIssues);
   if (preflightIssues.length > 0) {
     throw new RunPreflightError(preflightIssues);
   }

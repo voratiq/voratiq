@@ -35,12 +35,12 @@ describe("loadRepoSettings", () => {
     expect(settings.codex.globalConfigPolicy).toBe("apply");
   });
 
-  test("defaults to apply when policy value is invalid", () => {
-    const settings = loadRepoSettings({
-      root: "/repo",
-      readFile: () => "codex:\n  globalConfigPolicy: nope\n",
-    });
-
-    expect(settings.codex.globalConfigPolicy).toBe("apply");
+  test("throws when policy value is invalid", () => {
+    expect(() =>
+      loadRepoSettings({
+        root: "/repo",
+        readFile: () => "codex:\n  globalConfigPolicy: nope\n",
+      }),
+    ).toThrow("Invalid settings file");
   });
 });

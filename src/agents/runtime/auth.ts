@@ -151,12 +151,8 @@ export async function teardownAuthContext(
 const tornDownContexts = new WeakSet<StagedAuthContext>();
 
 function shouldIncludeCodexConfigToml(root: string): boolean {
-  try {
-    const settings = loadRepoSettings({ root });
-    return settings.codex.globalConfigPolicy !== "ignore";
-  } catch {
-    return true;
-  }
+  const settings = loadRepoSettings({ root });
+  return settings.codex.globalConfigPolicy !== "ignore";
 }
 
 function isIgnorableTeardownError(error: unknown): boolean {

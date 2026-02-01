@@ -33,12 +33,8 @@ const repoSettingsLoader = createConfigLoader<
     options.filePath ?? resolveWorkspacePath(root, SETTINGS_CONFIG_FILENAME),
   selectReadFile: (options) => options.readFile,
   handleMissing: () => cloneSettings(DEFAULT_SETTINGS),
-  parse: (content) => {
-    const parsed = safeParseSettingsYaml(content);
-    if (!parsed) {
-      return cloneSettings(DEFAULT_SETTINGS);
-    }
-
+  parse: (content, context) => {
+    const parsed = parseSettingsYaml(content, context);
     const { codex } = parsed;
     return {
       codex: {
@@ -52,16 +48,15 @@ export function loadRepoSettings(
   options: LoadRepoSettingsOptions = {},
 ): RepoSettings {
   const root = options.root ?? process.cwd();
-  try {
-    return repoSettingsLoader({ ...options, root });
-  } catch {
-    return cloneSettings(DEFAULT_SETTINGS);
-  }
+  return repoSettingsLoader({ ...options, root });
 }
 
-function safeParseSettingsYaml(content: string): {
+function parseSettingsYaml(
+  content: string,
+  context: { filePath: string },
+): {
   codex?: { globalConfigPolicy?: "ignore" | "apply" };
-} | null {
+} {
   let document: unknown;
   try {
     document = parseYamlDocument(content, {
@@ -71,13 +66,19 @@ function safeParseSettingsYaml(content: string): {
       },
       emptyValue: {},
     });
-  } catch {
-    return null;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown YAML error";
+    throw new Error(
+      `Invalid settings file at ${context.filePath}: ${message.replace(/\s+/gu, " ").trim()}`,
+    );
   }
 
   const result = repoSettingsSchema.safeParse(document);
   if (!result.success) {
-    return null;
+    const issue = result.error.issues[0];
+    const detail = issue?.message ? issue.message : "Invalid settings value";
+    throw new Error(`Invalid settings file at ${context.filePath}: ${detail}`);
   }
   return result.data;
 }
