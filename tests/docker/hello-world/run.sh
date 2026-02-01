@@ -32,7 +32,6 @@ require_env_path "${CODEX_HOME}" "Set CODEX_HOME=/path/to/.codex before running 
 [[ -d "${CODEX_HOME}" ]] || die "Codex home directory not found at ${CODEX_HOME}."
 [[ -f "${CODEX_HOME}/auth.json" ]] || die "${CODEX_HOME}/auth.json missing (run 'codex login')."
 
-# Derive the Codex install root (one level above the binary's directory).
 CODEX_ROOT=$(python3 - <<'PY'
 import os
 path = os.environ["CODEX_BIN"]
@@ -43,6 +42,8 @@ PY
 )
 
 [[ -d "${CODEX_ROOT}" ]] || die "Unable to derive Codex root from ${CODEX_BIN}."
+
+command -v docker >/dev/null || die "docker CLI not found."
 
 log "Building ${IMAGE_TAG} from ${DOCKERFILE}..."
 docker build -f "${DOCKERFILE}" -t "${IMAGE_TAG}" "${ROOT_DIR}"

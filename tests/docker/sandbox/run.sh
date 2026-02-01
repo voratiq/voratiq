@@ -7,10 +7,21 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT_DIR=$(cd "${SCRIPT_DIR}/../../.." && pwd)
 DOCKERFILE="${ROOT_DIR}/tests/docker/sandbox/Dockerfile"
 
-echo "[voratiq] Building ${IMAGE_TAG} from ${DOCKERFILE}..." >&2
+log() {
+  echo "[voratiq] $*" >&2
+}
+
+die() {
+  log "ERROR: $*"
+  exit 1
+}
+
+command -v docker >/dev/null || die "docker CLI not found."
+
+log "Building ${IMAGE_TAG} from ${DOCKERFILE}..."
 docker build -f "${DOCKERFILE}" -t "${IMAGE_TAG}" "${ROOT_DIR}"
 
-echo "[voratiq] Running sandbox tests..." >&2
+log "Running npm run test:sandbox..."
 docker run --rm \
   --cap-add=NET_ADMIN \
   --cap-add=SYS_ADMIN \
