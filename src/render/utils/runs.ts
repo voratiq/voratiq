@@ -9,6 +9,7 @@ export interface RunDisplayInfo {
   status?: RunStatus;
   specPath?: string;
   workspacePath?: string;
+  elapsed?: string;
   createdAt?: string;
   baseRevisionSha?: string;
 }
@@ -20,6 +21,7 @@ type RunMetadataRow = {
 
 export function getRunMetadata(info: RunDisplayInfo): RunMetadataRow[] {
   const detailRows = [
+    { label: "Elapsed", value: info.elapsed },
     { label: "Created", value: info.createdAt },
     { label: "Spec", value: info.specPath },
     { label: "Workspace", value: info.workspacePath },
