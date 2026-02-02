@@ -55,7 +55,9 @@ For a detailed walkthrough, see the [tutorial](https://github.com/voratiq/vorati
 
 The same spec goes to all agents, evals run automatically, you, a human, picks the winner.
 
-![Voratiq workflow](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/voratiq-architecture.svg)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/voratiq/voratiq/main/assets/voratiq-workflow.svg" alt="Voratiq workflow" width="450">
+</p>
 
 Why? Because no single model is best for every task. We use selection pressure because it leads to high quality code.
 
