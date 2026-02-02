@@ -55,26 +55,7 @@ For a detailed walkthrough, see the [tutorial](https://github.com/voratiq/vorati
 
 The same spec goes to all agents, evals run automatically, you, a human, picks the winner.
 
-```mermaid
-flowchart TD
-    Spec["Same spec goes to all agents"]
-
-    subgraph Run[" "]
-        direction LR
-        A["Agent 1"]
-        B["..."]
-        C["Agent N"]
-    end
-
-    Evals["Evals run automatically"]
-    Pick["User picks the best implementation"]
-    Apply["Winning diff merged to codebase"]
-
-    Spec --> A & B & C
-    A & B & C --> Evals
-    Evals --> Pick
-    Pick --> Apply
-```
+![Voratiq workflow](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/voratiq-architecture.svg)
 
 Why? Because no single model is best for every task. We use selection pressure because it leads to high quality code.
 
