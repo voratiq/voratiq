@@ -4,6 +4,8 @@ Run coding agents against each other. Merge the winner.
 
 ![`voratiq run --spec .voratiq/specs/standardize-docker-test-scripts.md`](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/run-demo.png)
 
+Why? Because no single model is best for every task. We use selection pressure because it leads to higher quality code.
+
 ## Installation
 
 Install via npm:
@@ -28,7 +30,7 @@ Windows is not currently supported.
 
 ```bash
 # Initialize workspace
-voratiq init
+voratiq init --yes
 
 # Generate a spec
 voratiq spec \
@@ -53,13 +55,15 @@ For a detailed walkthrough, see the [tutorial](https://github.com/voratiq/vorati
 
 ## How It Works
 
-The same spec goes to all agents, evals run automatically, you, a human, picks the winner.
+Voratiq positions you as the architect and reviewer, and shifts implementation onto an ensemble of agents.
+
+In practice, the same spec goes to all agents, evals run automatically, and you pick the winner.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/voratiq/voratiq/main/assets/voratiq-workflow.svg" alt="Voratiq workflow" width="450">
+  <img src="https://raw.githubusercontent.com/voratiq/voratiq/main/assets/voratiq-workflow.svg" alt="Voratiq workflow" width="500">
 </p>
 
-Why? Because no single model is best for every task. We use selection pressure because it leads to high quality code.
+Every run (diffs, logs, eval results, and agent summaries) is local, configurable, inspectable, and fully auditable.
 
 ## Documentation
 
