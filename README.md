@@ -4,7 +4,7 @@ Run coding agents against each other. Merge the winner.
 
 ![`voratiq run --spec .voratiq/specs/standardize-docker-test-scripts.md`](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/run-demo.png)
 
-Why? Because no single model is best for every task. We use selection pressure because it leads to higher quality code.
+Why? Because no single model is best for every task. We use selection because it leads to [higher quality code](https://voratiq.com/blog/selection-rather-than-prediction/).
 
 ## Installation
 
