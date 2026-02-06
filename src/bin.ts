@@ -129,66 +129,76 @@ export async function runCli(
     cachePath: resolveUpdateStatePath(process.env),
   });
 
-  // Show update prompt if a cached notice is available
-  const updateNotice = updateHandle?.peekNotice();
-  if (updateNotice) {
-    const { showUpdatePrompt } = await import("./update-check/prompt.js");
-    const shouldExit = await showUpdatePrompt(updateNotice, {
-      stdin: process.stdin,
-      stdout: process.stdout,
-    });
-    if (shouldExit) {
-      updateHandle?.finish();
+  try {
+    // Show update prompt if a cached notice is available
+    const updateNotice = updateHandle?.peekNotice();
+    if (updateNotice) {
+      const { showUpdatePrompt } = await import("./update-check/prompt.js");
+      const { createConfirmationInteractor } = await import(
+        "./render/interactions/confirmation.js"
+      );
+
+      const interactor = createConfirmationInteractor();
+      try {
+        const result = await showUpdatePrompt(updateNotice, {
+          prompt: (opts) => interactor.prompt(opts),
+          write: (text) => process.stdout.write(text),
+        });
+        if (result.shouldExit) {
+          if (result.exitCode !== undefined && result.exitCode !== 0) {
+            process.exitCode = result.exitCode;
+          }
+          return;
+        }
+      } finally {
+        interactor.close();
+      }
+    }
+
+    await registerCommands(program, argv);
+
+    if (argv.length <= 2) {
+      const { writeCommandOutput } = await import("./cli/output.js");
+      writeCommandOutput({ body: program.helpInformation() });
       return;
     }
-  }
 
-  await registerCommands(program, argv);
+    try {
+      await program.parseAsync(argv);
+    } catch (error) {
+      if (error instanceof CommanderError) {
+        const { commanderAlreadyRendered } = await import(
+          "./cli/commander-utils.js"
+        );
+        if (commanderAlreadyRendered(error)) {
+          process.exitCode = error.exitCode ?? 0;
+          return;
+        }
 
-  if (argv.length <= 2) {
-    const { writeCommandOutput } = await import("./cli/output.js");
-    writeCommandOutput({ body: program.helpInformation() });
-    updateHandle?.finish();
-    return;
-  }
-
-  try {
-    await program.parseAsync(argv);
-  } catch (error) {
-    if (error instanceof CommanderError) {
-      const { commanderAlreadyRendered } = await import(
-        "./cli/commander-utils.js"
-      );
-      if (commanderAlreadyRendered(error)) {
-        process.exitCode = error.exitCode ?? 0;
-        updateHandle?.finish();
+        const { CliError } = await import("./cli/errors.js");
+        const { renderCliError } = await import("./render/utils/errors.js");
+        const { toErrorMessage } = await import("./utils/errors.js");
+        const { writeCommandOutput } = await import("./cli/output.js");
+        writeCommandOutput({
+          body: renderCliError(new CliError(toErrorMessage(error))),
+          exitCode: error.exitCode ?? 1,
+        });
         return;
       }
 
-      const { CliError } = await import("./cli/errors.js");
+      const { toCliError } = await import("./cli/errors.js");
       const { renderCliError } = await import("./render/utils/errors.js");
-      const { toErrorMessage } = await import("./utils/errors.js");
       const { writeCommandOutput } = await import("./cli/output.js");
+      const cliError = toCliError(error);
+      const body = renderCliError(cliError);
       writeCommandOutput({
-        body: renderCliError(new CliError(toErrorMessage(error))),
-        exitCode: error.exitCode ?? 1,
+        body,
+        exitCode: 1,
       });
-      updateHandle?.finish();
-      return;
     }
-
-    const { toCliError } = await import("./cli/errors.js");
-    const { renderCliError } = await import("./render/utils/errors.js");
-    const { writeCommandOutput } = await import("./cli/output.js");
-    const cliError = toCliError(error);
-    const body = renderCliError(cliError);
-    writeCommandOutput({
-      body,
-      exitCode: 1,
-    });
+  } finally {
+    updateHandle?.finish();
   }
-
-  updateHandle?.finish();
 }
 
 async function registerCommands(

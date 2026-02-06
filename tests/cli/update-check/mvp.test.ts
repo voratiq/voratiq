@@ -131,6 +131,46 @@ describe("startUpdateCheck", () => {
       });
       expect(handle).toBeDefined();
     });
+
+    it("does not skip when CI is empty string", () => {
+      const handle = startUpdateCheck("0.4.0", {
+        ...baseOpts,
+        env: { CI: "" },
+      });
+      expect(handle).toBeDefined();
+    });
+
+    it("normalizes CI with trim and lowercase (TRUE with whitespace)", () => {
+      const handle = startUpdateCheck("0.4.0", {
+        ...baseOpts,
+        env: { CI: " TRUE " },
+      });
+      expect(handle).toBeUndefined();
+    });
+
+    it("normalizes CI with trim and lowercase ( False )", () => {
+      const handle = startUpdateCheck("0.4.0", {
+        ...baseOpts,
+        env: { CI: " False " },
+      });
+      expect(handle).toBeDefined();
+    });
+
+    it("treats CI=yes as truthy", () => {
+      const handle = startUpdateCheck("0.4.0", {
+        ...baseOpts,
+        env: { CI: "yes" },
+      });
+      expect(handle).toBeUndefined();
+    });
+
+    it("does not skip when CI is undefined", () => {
+      const handle = startUpdateCheck("0.4.0", {
+        ...baseOpts,
+        env: {},
+      });
+      expect(handle).toBeDefined();
+    });
   });
 
   describe("cache gating", () => {

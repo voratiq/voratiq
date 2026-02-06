@@ -53,6 +53,15 @@ export function writeCache(cachePath: string, state: CacheState): void {
   }
 }
 
+function isCiEnvironment(env: NodeJS.ProcessEnv): boolean {
+  const raw = env.CI;
+  if (raw === undefined) {
+    return false;
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized !== "" && normalized !== "0" && normalized !== "false";
+}
+
 function isCacheFresh(cache: CacheState, now: Date): boolean {
   try {
     const checkedAt = new Date(cache.lastCheckedAt);
@@ -109,8 +118,7 @@ export function startUpdateCheck(
     return undefined;
   }
 
-  const ciValue = opts.env.CI;
-  if (ciValue && ciValue !== "0" && ciValue !== "false" && ciValue !== "") {
+  if (isCiEnvironment(opts.env)) {
     return undefined;
   }
 
@@ -122,19 +130,19 @@ export function startUpdateCheck(
   const cache = readCache(cachePath);
 
   // Start background refresh if cache is stale or missing
-  let backgroundPromise: Promise<void> | undefined;
   if (!cache || !isCacheFresh(cache, now())) {
-    backgroundPromise = fetchLatestVersion(fetchFn).then((version) => {
-      if (version) {
-        writeCache(cachePath, {
-          lastCheckedAt: now().toISOString(),
-          latestVersion: version,
-        });
-      }
-    });
-
-    // Ensure unhandled rejections are swallowed
-    backgroundPromise.catch(() => {});
+    fetchLatestVersion(fetchFn)
+      .then((version) => {
+        if (version) {
+          writeCache(cachePath, {
+            lastCheckedAt: now().toISOString(),
+            latestVersion: version,
+          });
+        }
+      })
+      .catch(() => {
+        // Network error, timeout - silent.
+      });
   }
 
   let consumed = false;
