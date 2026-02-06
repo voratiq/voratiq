@@ -108,23 +108,47 @@ export async function runCli(
   const { Command, CommanderError } = await import("commander");
   const program = new Command();
 
+  const localVersion = (await import("./utils/version.js")).getVoratiqVersion();
+
   program
     .name("voratiq")
     .description("Voratiq CLI")
-    .version(
-      (await import("./utils/version.js")).getVoratiqVersion(),
-      "-v, --version",
-      "print the Voratiq version",
-    )
+    .version(localVersion, "-v, --version", "print the Voratiq version")
     .exitOverride()
     .showHelpAfterError()
     .helpCommand(false);
+
+  // Start update check (non-blocking)
+  const { startUpdateCheck } = await import("./update-check/mvp.js");
+  const { resolveUpdateStatePath } = await import(
+    "./update-check/state-path.js"
+  );
+  const updateHandle = startUpdateCheck(localVersion, {
+    isTty: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+    env: process.env,
+    cachePath: resolveUpdateStatePath(process.env),
+  });
+
+  // Show update prompt if a cached notice is available
+  const updateNotice = updateHandle?.peekNotice();
+  if (updateNotice) {
+    const { showUpdatePrompt } = await import("./update-check/prompt.js");
+    const shouldExit = await showUpdatePrompt(updateNotice, {
+      stdin: process.stdin,
+      stdout: process.stdout,
+    });
+    if (shouldExit) {
+      updateHandle?.finish();
+      return;
+    }
+  }
 
   await registerCommands(program, argv);
 
   if (argv.length <= 2) {
     const { writeCommandOutput } = await import("./cli/output.js");
     writeCommandOutput({ body: program.helpInformation() });
+    updateHandle?.finish();
     return;
   }
 
@@ -137,6 +161,7 @@ export async function runCli(
       );
       if (commanderAlreadyRendered(error)) {
         process.exitCode = error.exitCode ?? 0;
+        updateHandle?.finish();
         return;
       }
 
@@ -148,6 +173,7 @@ export async function runCli(
         body: renderCliError(new CliError(toErrorMessage(error))),
         exitCode: error.exitCode ?? 1,
       });
+      updateHandle?.finish();
       return;
     }
 
@@ -161,6 +187,8 @@ export async function runCli(
       exitCode: 1,
     });
   }
+
+  updateHandle?.finish();
 }
 
 async function registerCommands(
