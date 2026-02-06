@@ -137,12 +137,14 @@ export async function runCli(
       const { createConfirmationInteractor } = await import(
         "./render/interactions/confirmation.js"
       );
+      const { writeCommandOutput } = await import("./cli/output.js");
 
       const interactor = createConfirmationInteractor();
       try {
         const result = await showUpdatePrompt(updateNotice, {
           prompt: (opts) => interactor.prompt(opts),
           write: (text) => process.stdout.write(text),
+          writeCommandOutput,
         });
         if (result.shouldExit) {
           if (result.exitCode !== undefined && result.exitCode !== 0) {
