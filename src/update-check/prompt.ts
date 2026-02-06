@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 import { colorize } from "../utils/colors.js";
 
@@ -13,13 +13,17 @@ export interface UpdatePromptWriter {
 export interface UpdatePromptDeps {
   prompt: UpdatePromptHandler;
   write: UpdatePromptWriter;
-  execCommand?: (command: string) => void;
+  execCommand?: (command: string, args: readonly string[]) => void;
 }
 
 export interface UpdatePromptResult {
   shouldExit: boolean;
   exitCode?: number;
 }
+
+const UPDATE_COMMAND = "npm";
+const UPDATE_ARGS = ["install", "-g", "voratiq@latest"] as const;
+const UPDATE_COMMAND_TEXT = `${UPDATE_COMMAND} ${UPDATE_ARGS.join(" ")}`;
 
 /**
  * Show the interactive update prompt and handle user choice.
@@ -51,9 +55,9 @@ export async function showUpdatePrompt(
     const normalized = trimmed.length === 0 ? "1" : trimmed;
 
     if (normalized === "1") {
-      write("  Updating Voratiq via `npm install -g voratiq@latest`\n");
+      write(`  Updating Voratiq via \`${UPDATE_COMMAND_TEXT}\`\n`);
       try {
-        execCommand("npm install -g voratiq@latest");
+        execCommand(UPDATE_COMMAND, UPDATE_ARGS);
       } catch {
         write("\n");
         write(colorize("  Update failed. Please try again manually.", "red"));
@@ -77,6 +81,15 @@ export async function showUpdatePrompt(
   }
 }
 
-function defaultExecCommand(command: string): void {
-  execSync(command, { stdio: "inherit" });
+function defaultExecCommand(command: string, args: readonly string[]): void {
+  const result = spawnSync(command, args, { stdio: "inherit" });
+  if (result.error) {
+    throw result.error;
+  }
+  if (typeof result.status === "number" && result.status !== 0) {
+    throw new Error(`Update command exited with status ${result.status}`);
+  }
+  if (result.signal) {
+    throw new Error(`Update command terminated with signal ${result.signal}`);
+  }
 }

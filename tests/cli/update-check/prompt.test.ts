@@ -6,9 +6,7 @@ import type {
 } from "../../../src/update-check/prompt.js";
 import { showUpdatePrompt } from "../../../src/update-check/prompt.js";
 
-function createMockPrompt(
-  responses: string[],
-): UpdatePromptHandler & {
+function createMockPrompt(responses: string[]): UpdatePromptHandler & {
   calls: { message: string; prefaceLines?: string[] }[];
 } {
   let index = 0;
@@ -55,7 +53,11 @@ describe("showUpdatePrompt", () => {
 
     expect(result.shouldExit).toBe(true);
     expect(result.exitCode).toBe(0);
-    expect(execMock).toHaveBeenCalledWith("npm install -g voratiq@latest");
+    expect(execMock).toHaveBeenCalledWith("npm", [
+      "install",
+      "-g",
+      "voratiq@latest",
+    ]);
 
     // Check preface lines contain expected content
     const firstCall = prompt.calls[0];
@@ -85,7 +87,11 @@ describe("showUpdatePrompt", () => {
 
     expect(result.shouldExit).toBe(true);
     expect(result.exitCode).toBe(0);
-    expect(execMock).toHaveBeenCalledWith("npm install -g voratiq@latest");
+    expect(execMock).toHaveBeenCalledWith("npm", [
+      "install",
+      "-g",
+      "voratiq@latest",
+    ]);
   });
 
   it("input '2' skips and continues", async () => {
