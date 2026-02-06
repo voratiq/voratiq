@@ -77,11 +77,11 @@ function generateAgentDefaults(
 const PRO_AGENT_PRESET: readonly AgentProviderModel[] = [
   {
     provider: "claude",
-    model: "claude-opus-4-5-20251101",
+    model: "claude-opus-4-6",
   },
   {
     provider: "codex",
-    model: "gpt-5.2-codex",
+    model: "gpt-5.3-codex",
   },
   {
     provider: "gemini",
