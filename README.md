@@ -60,7 +60,7 @@ Voratiq positions you as the architect and reviewer, and shifts implementation o
 In practice, the same spec goes to all agents, evals run automatically, and you pick the winner.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/voratiq/voratiq/main/assets/voratiq-workflow.svg" alt="Voratiq workflow" width="500">
+  <img src="https://raw.githubusercontent.com/voratiq/voratiq/main/assets/voratiq-workflow.svg" alt="Voratiq workflow" width="600">
 </p>
 
 Every run (diffs, logs, eval results, and agent summaries) is local, configurable, inspectable, and fully auditable.
