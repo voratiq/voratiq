@@ -147,20 +147,11 @@ describe("voratiq review", () => {
           [
             "# Review",
             "",
-            "## Summary",
-            "Looks good.",
-            "",
-            "## Agent Findings",
-            "- N/A",
-            "",
-            "## Evaluations",
-            "- N/A",
-            "",
-            "## Risks / Missing Artifacts",
-            "- N/A",
-            "",
-            "## Recommendations",
-            "- N/A",
+            "## Recommendation",
+            "**Preferred Agent(s)**: reviewer",
+            "**Rationale**: Looks good.",
+            "**Next Actions**:",
+            "voratiq apply --run 20251007-184454-vmtyf --agent reviewer",
             "",
           ].join("\n"),
           "utf8",
@@ -200,15 +191,17 @@ describe("voratiq review", () => {
         agentId: "reviewer",
       });
 
-      expect(result.body).toContain("Review saved: ");
-      expect(result.body).toContain(
-        `To integrate a solution:\n  voratiq apply --run ${runRecord.runId} --agent <agent-id>`,
-      );
+      expect(result.body).toContain("```markdown");
+      expect(result.body).toContain("## Recommendation");
+      expect(result.body).toContain("**Preferred Agent(s)**: reviewer");
+      expect(result.body).toContain("**Next Actions**:");
+      expect(result.body).toContain("Full review here: ");
+      expect(result.body).not.toContain("To integrate a solution:");
       expect(result.missingArtifacts).toEqual([]);
 
       const reviewOutputAbsolute = join(repoRoot, result.outputPath);
       await expect(readFile(reviewOutputAbsolute, "utf8")).resolves.toContain(
-        "## Summary",
+        "## Recommendation",
       );
 
       const recordPath = join(
