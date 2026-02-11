@@ -22,13 +22,15 @@ export function renderReviewTranscript(options: {
     sections.push([...previewLines]);
   }
 
-  sections.push([`Review saved: ${outputPath}`]);
+  sections.push([`Full review here: ${outputPath}`]);
 
   const hint = suppressHint
     ? undefined
-    : {
-        message: `To integrate a solution:\n  voratiq apply --run ${runId} --agent <agent-id>`,
-      };
+    : !previewLines || previewLines.length === 0
+      ? {
+          message: `To integrate a solution:\n  voratiq apply --run ${runId} --agent <agent-id>`,
+        }
+      : undefined;
 
   return renderTranscript({ sections, hint });
 }

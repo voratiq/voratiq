@@ -8,7 +8,10 @@ import {
   executeReviewCommand,
   type ReviewCommandResult as ReviewExecutionResult,
 } from "../commands/review/command.js";
-import { buildMarkdownPreviewLines } from "../commands/shared/preview.js";
+import {
+  buildMarkdownPreviewLines,
+  extractMarkdownSection,
+} from "../commands/shared/preview.js";
 import {
   ensureSandboxDependencies,
   resolveCliContext,
@@ -60,7 +63,12 @@ export async function runReviewCommand(
       resolve(root, execution.outputPath),
       "utf8",
     );
-    previewLines = buildMarkdownPreviewLines(reviewContent);
+    const recommendationSection = extractMarkdownSection(reviewContent, {
+      heading: "Recommendation",
+    });
+    previewLines = recommendationSection
+      ? buildMarkdownPreviewLines(recommendationSection)
+      : undefined;
   } catch {
     previewLines = undefined;
   }

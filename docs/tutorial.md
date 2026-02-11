@@ -130,30 +130,13 @@ Output (truncated):
 ```
 Generating review...
 
-# Review of Run 20260113-235501-hhkox
-
-## Specification
-**Path**: .voratiq/specs/add-run-branch.md
-**Summary**: Add a `--branch` flag to `voratiq run` that derives a branch name from the spec filename and checks out or creates that branch before any run record is created, with clean-worktree gating and tests for derivation/branch behavior/error paths.
-
-[... per-agent sections for all 12 agents, omitted for brevity ...]
-
-## Comparison
-The strongest candidates are **claude-opus-4-5-20251101** and **claude-sonnet-4-5-20250929**, both of which pass all evals and implement the feature fully. Opus uses a dedicated preflight module and explicit branch existence checks via `rev-parse`, which is more robust and portable than Sonnet's error-string parsing and path splitting; this makes Opus the safer default. All other agents have failing format/lint/typecheck gates or a spec mismatch (`--branch <name>` in Haiku), so they are not apply-ready.
-
-## Risks / Missing Artifacts
-No missing artifacts were detected in `artifact-information.json`; all diffs, summaries, logs, and eval outputs are present.
-
 ## Recommendation
 **Preferred Agent(s)**: claude-opus-4-5-20251101
 **Rationale**: Best spec alignment with clean, centralized preflight logic, robust branch existence detection, clear error propagation, and all evals passing.
 **Next Actions**:
 voratiq apply --run 20260113-235501-hhkox --agent claude-opus-4-5-20251101
 
-Review saved: .voratiq/reviews/sessions/20260114-000812-rfvvu/gpt-5-2-codex/artifacts/review.md
-
-To integrate a solution:
-  voratiq apply --run 20260113-235501-hhkox --agent <agent-id>
+Full review here: .voratiq/reviews/sessions/20260114-000812-rfvvu/gpt-5-2-codex/artifacts/review.md
 ```
 
 The agent review is a starting point. We reviewed the top candidates ourselves, and Opus had the best implementation: a dedicated preflight module, proper edge case handling, and focused tests.
