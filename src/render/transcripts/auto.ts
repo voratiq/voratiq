@@ -14,7 +14,6 @@ export interface AutoPhaseSummary {
 
 export interface AutoSummaryInput {
   totalDurationMs: number;
-  spec: AutoPhaseSummary & { outputPath?: string };
   run: AutoPhaseSummary & {
     runId?: string;
     runStatus?: RunStatus;
@@ -28,9 +27,7 @@ export interface AutoSummaryInput {
 export function renderAutoSummaryTranscript(input: AutoSummaryInput): string {
   const totalDuration = formatDurationLabel(input.totalDurationMs) ?? "—";
   const autoSucceeded =
-    input.spec.status !== "failed" &&
-    input.run.status !== "failed" &&
-    input.review.status !== "failed";
+    input.run.status !== "failed" && input.review.status !== "failed";
   const runStatus: RunStatus = autoSucceeded ? "succeeded" : "failed";
   const statusLabel = autoSucceeded ? "SUCCEEDED" : "FAILED";
   const statusStyle = getRunStatusStyle(runStatus);

@@ -4,7 +4,6 @@ import { CommanderError } from "commander";
 import { createAutoCommand, runAutoCommand } from "../../src/cli/auto.js";
 import * as reviewCli from "../../src/cli/review.js";
 import * as runCli from "../../src/cli/run.js";
-import * as specCli from "../../src/cli/spec.js";
 
 const ESC = String.fromCharCode(0x1b);
 const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
@@ -12,10 +11,6 @@ const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
 function stripAnsi(value: string): string {
   return value.replace(ANSI_PATTERN, "");
 }
-
-jest.mock("../../src/cli/spec.js", () => ({
-  runSpecCommand: jest.fn(),
-}));
 
 jest.mock("../../src/cli/run.js", () => ({
   runRunCommand: jest.fn(),
@@ -26,7 +21,6 @@ jest.mock("../../src/cli/review.js", () => ({
 }));
 
 describe("voratiq auto", () => {
-  const runSpecCommandMock = jest.mocked(specCli.runSpecCommand);
   const runRunCommandMock = jest.mocked(runCli.runRunCommand);
   const runReviewCommandMock = jest.mocked(reviewCli.runReviewCommand);
 
@@ -37,7 +31,6 @@ describe("voratiq auto", () => {
   beforeEach(() => {
     originalExitCode = process.exitCode;
     process.exitCode = undefined;
-    runSpecCommandMock.mockReset();
     runRunCommandMock.mockReset();
     runReviewCommandMock.mockReset();
   });
@@ -48,7 +41,7 @@ describe("voratiq auto", () => {
     stderrSpy?.mockRestore();
   });
 
-  it("enforces that one mode is selected", async () => {
+  it("requires --spec", async () => {
     stderrSpy = jest
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
@@ -58,7 +51,7 @@ describe("voratiq auto", () => {
     ).rejects.toBeInstanceOf(CommanderError);
   });
 
-  it("requires --spec-agent with --description", async () => {
+  it("does not accept legacy spec-generation flags", async () => {
     stderrSpy = jest
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
@@ -69,10 +62,20 @@ describe("voratiq auto", () => {
         "voratiq",
         "--description",
         "write a spec",
+        "--spec",
+        ".voratiq/specs/existing.md",
         "--review-agent",
         "reviewer",
       ]),
     ).rejects.toBeInstanceOf(CommanderError);
+  });
+
+  it("help reflects existing-spec contract", () => {
+    const help = createAutoCommand().helpInformation();
+    expect(help).toContain("--spec <path>");
+    expect(help).toContain("existing spec file");
+    expect(help).not.toContain("--description");
+    expect(help).not.toContain("--spec-agent");
   });
 
   it("runs review even when run reports agent failure", async () => {
@@ -93,15 +96,10 @@ describe("voratiq auto", () => {
         return true;
       });
 
-    runSpecCommandMock.mockResolvedValue({
-      body: "spec body",
-      outputPath: ".voratiq/specs/generated.md",
-    });
-
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-123",
-        spec: { path: ".voratiq/specs/generated.md" },
+        spec: { path: ".voratiq/specs/existing.md" },
         status: "failed",
         createdAt: new Date().toISOString(),
         baseRevisionSha: "deadbeef",
@@ -122,29 +120,16 @@ describe("voratiq auto", () => {
       body: "review body",
     });
 
-    const originalDescriptor = Object.getOwnPropertyDescriptor(
-      process.stdin,
-      "isTTY",
-    );
-    Object.defineProperty(process.stdin, "isTTY", {
-      value: false,
-      configurable: true,
-    });
-
     await runAutoCommand({
-      description: "write a spec",
-      specAgent: "spec-agent",
+      specPath: ".voratiq/specs/existing.md",
       reviewerAgent: "reviewer",
     });
 
-    if (originalDescriptor) {
-      Object.defineProperty(process.stdin, "isTTY", originalDescriptor);
-    }
-
-    expect(runSpecCommandMock).toHaveBeenCalledWith(
-      expect.objectContaining({ yes: true }),
+    expect(runRunCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specPath: ".voratiq/specs/existing.md",
+      }),
     );
-
     expect(runReviewCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
         runId: "run-123",
@@ -176,15 +161,10 @@ describe("voratiq auto", () => {
         return true;
       });
 
-    runSpecCommandMock.mockResolvedValue({
-      body: "spec body",
-      outputPath: ".voratiq/specs/generated.md",
-    });
-
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-123",
-        spec: { path: ".voratiq/specs/generated.md" },
+        spec: { path: ".voratiq/specs/existing.md" },
         status: "succeeded",
         createdAt: new Date().toISOString(),
         baseRevisionSha: "deadbeef",
@@ -198,8 +178,7 @@ describe("voratiq auto", () => {
     runReviewCommandMock.mockRejectedValue(new Error("review exploded"));
 
     await runAutoCommand({
-      description: "write a spec",
-      specAgent: "spec-agent",
+      specPath: ".voratiq/specs/existing.md",
       reviewerAgent: "reviewer",
     });
 
@@ -228,15 +207,10 @@ describe("voratiq auto", () => {
         return true;
       });
 
-    runSpecCommandMock.mockResolvedValue({
-      body: "Spec saved: .voratiq/specs/generated.md",
-      outputPath: ".voratiq/specs/generated.md",
-    });
-
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-xyz",
-        spec: { path: ".voratiq/specs/generated.md" },
+        spec: { path: ".voratiq/specs/existing.md" },
         status: "succeeded",
         createdAt: new Date().toISOString(),
         baseRevisionSha: "deadbeef",
@@ -257,51 +231,15 @@ describe("voratiq auto", () => {
     });
 
     await runAutoCommand({
-      description: "write a spec",
-      specAgent: "spec-agent",
+      specPath: ".voratiq/specs/existing.md",
       reviewerAgent: "reviewer",
     });
 
     const output = stripAnsi(stdout.join(""));
     expect(output.startsWith("\n")).toBe(true);
     expect(output).not.toContain("\n\n\n");
-    expect(output).toContain("Spec saved");
-    expect(output).toContain("\n\nRUN BODY");
+    expect(output).toContain("\nRUN BODY");
     expect(output).toContain("RUN BODY\n\nREVIEW BODY");
     expect(output).toContain("REVIEW BODY\n\nAuto SUCCEEDED");
-  });
-
-  it("aborts after spec failure (no run/review)", async () => {
-    const stdout: string[] = [];
-    const stderr: string[] = [];
-
-    stdoutSpy = jest
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
-
-    stderrSpy = jest
-      .spyOn(process.stderr, "write")
-      .mockImplementation((chunk: unknown) => {
-        stderr.push(String(chunk));
-        return true;
-      });
-
-    runSpecCommandMock.mockRejectedValue(new Error("spec exploded"));
-
-    await runAutoCommand({
-      description: "write a spec",
-      specAgent: "spec-agent",
-      reviewerAgent: "reviewer",
-    });
-
-    expect(runRunCommandMock).not.toHaveBeenCalled();
-    expect(runReviewCommandMock).not.toHaveBeenCalled();
-    expect(stdout.join("")).toContain("spec exploded");
-    expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
-    expect(process.exitCode).toBe(1);
-    expect(stderr.join("")).toHaveLength(0);
   });
 });
