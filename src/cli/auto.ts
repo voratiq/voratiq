@@ -1,4 +1,4 @@
-import { Command, Option } from "commander";
+import { Command } from "commander";
 
 import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
 import { renderCliError } from "../render/utils/errors.js";
@@ -8,14 +8,9 @@ import { toCliError } from "./errors.js";
 import { beginChainedCommandOutput, writeCommandOutput } from "./output.js";
 import { runReviewCommand } from "./review.js";
 import { runRunCommand } from "./run.js";
-import { runSpecCommand } from "./spec.js";
 
 export interface AutoCommandOptions {
-  description?: string;
-  specPath?: string;
-  specAgent?: string;
-  title?: string;
-  output?: string;
+  specPath: string;
   reviewerAgent: string;
   maxParallel?: number;
   branch?: boolean;
@@ -23,7 +18,6 @@ export interface AutoCommandOptions {
 
 export interface AutoCommandResult {
   exitCode: number;
-  specOutputPath?: string;
   runId?: string;
   reviewOutputPath?: string;
 }
@@ -52,11 +46,6 @@ export async function runAutoCommand(
   try {
     let exitCode = 0;
 
-    let specStartedAt: number | undefined;
-    let specStatus: "succeeded" | "failed" | "skipped" = "skipped";
-    let specOutputPath: string | undefined;
-    let specDetail: string | undefined;
-
     let runStartedAt: number | undefined;
     let runStatus: "succeeded" | "failed" | "skipped" = "skipped";
     let runId: string | undefined;
@@ -71,84 +60,41 @@ export async function runAutoCommand(
     let reviewOutputPath: string | undefined;
     let reviewDetail: string | undefined;
 
-    if (options.description) {
-      specStartedAt = now();
+    runStartedAt = now();
 
-      try {
-        if (!options.specAgent) {
-          throw new Error(
-            "Expected --spec-agent when --description is provided.",
-          );
-        }
-
-        const specResult = await runSpecCommand({
-          description: options.description,
-          agent: options.specAgent,
-          title: options.title,
-          output: options.output,
-          yes: true,
-          suppressHint: true,
-        });
-
-        specStatus = "succeeded";
-        specOutputPath = specResult.outputPath;
-
-        writeCommandOutput({ body: specResult.body });
-      } catch (error) {
-        specStatus = "failed";
-        specDetail = toCliError(error).headline;
-        exitCode = 1;
-        writeCommandOutput({ body: renderCliError(toCliError(error)) });
-      }
-    } else if (options.specPath) {
-      specStatus = "skipped";
-      specOutputPath = options.specPath;
-    } else {
-      specStatus = "failed";
-      specDetail = "Either --description or --spec must be provided.";
-      exitCode = 1;
-      writeCommandOutput({
-        body: renderCliError(toCliError(new Error(specDetail))),
+    try {
+      // For non-TTY, suppress run renderer blank lines and let the chained
+      // output system handle spacing. For TTY, let the run renderer handle
+      // its own spacing since cursor control requires precise line counts.
+      const suppressBlankLines = !process.stdout.isTTY;
+      const runResult = await runRunCommand({
+        specPath: options.specPath,
+        maxParallel: options.maxParallel,
+        branch: options.branch,
+        suppressHint: true,
+        suppressLeadingBlankLine: suppressBlankLines,
+        suppressTrailingBlankLine: suppressBlankLines,
+        stdout: chainedOutput.stdout,
+        stderr: chainedOutput.stderr,
       });
-    }
 
-    if (exitCode === 0 && specOutputPath) {
-      runStartedAt = now();
+      runStatus = "succeeded";
+      runId = runResult.report.runId;
+      runRecordStatus = runResult.report.status;
+      runCreatedAt = runResult.report.createdAt;
+      runSpecPath = runResult.report.spec?.path;
+      runBaseRevisionSha = runResult.report.baseRevisionSha;
 
-      try {
-        // For non-TTY, suppress run renderer blank lines and let the chained
-        // output system handle spacing. For TTY, let the run renderer handle
-        // its own spacing since cursor control requires precise line counts.
-        const suppressBlankLines = !process.stdout.isTTY;
-        const runResult = await runRunCommand({
-          specPath: specOutputPath,
-          maxParallel: options.maxParallel,
-          branch: options.branch,
-          suppressHint: true,
-          suppressLeadingBlankLine: suppressBlankLines,
-          suppressTrailingBlankLine: suppressBlankLines,
-          stdout: chainedOutput.stdout,
-          stderr: chainedOutput.stderr,
-        });
-
-        runStatus = "succeeded";
-        runId = runResult.report.runId;
-        runRecordStatus = runResult.report.status;
-        runCreatedAt = runResult.report.createdAt;
-        runSpecPath = runResult.report.spec?.path;
-        runBaseRevisionSha = runResult.report.baseRevisionSha;
-
-        if (runResult.exitCode === 1) {
-          exitCode = 1;
-        }
-
-        writeCommandOutput({ body: runResult.body });
-      } catch (error) {
-        runStatus = "failed";
-        runDetail = toCliError(error).headline;
+      if (runResult.exitCode === 1) {
         exitCode = 1;
-        writeCommandOutput({ body: renderCliError(toCliError(error)) });
       }
+
+      writeCommandOutput({ body: runResult.body });
+    } catch (error) {
+      runStatus = "failed";
+      runDetail = toCliError(error).headline;
+      exitCode = 1;
+      writeCommandOutput({ body: renderCliError(toCliError(error)) });
     }
 
     if (exitCode === 0 || runId) {
@@ -181,8 +127,6 @@ export async function runAutoCommand(
     }
 
     const overallDurationMs = now() - overallStart;
-    const specDurationMs =
-      specStartedAt !== undefined ? now() - specStartedAt : undefined;
     const runDurationMs =
       runStartedAt !== undefined ? now() - runStartedAt : undefined;
     const reviewDurationMs =
@@ -190,14 +134,6 @@ export async function runAutoCommand(
 
     const summaryBody = renderAutoSummaryTranscript({
       totalDurationMs: overallDurationMs,
-      spec: {
-        status: specStatus,
-        ...(typeof specDurationMs === "number"
-          ? { durationMs: specDurationMs }
-          : {}),
-        outputPath: specOutputPath,
-        ...(specDetail ? { detail: specDetail } : {}),
-      },
       run: {
         status: runStatus,
         ...(typeof runDurationMs === "number"
@@ -227,7 +163,6 @@ export async function runAutoCommand(
 
     return {
       exitCode,
-      specOutputPath,
       runId,
       reviewOutputPath,
     };
@@ -237,11 +172,7 @@ export async function runAutoCommand(
 }
 
 interface AutoCommandActionOptions {
-  description?: string;
   spec?: string;
-  specAgent?: string;
-  title?: string;
-  output?: string;
   reviewAgent: string;
   maxParallel?: number;
   branch?: boolean;
@@ -249,28 +180,12 @@ interface AutoCommandActionOptions {
 
 export function createAutoCommand(): Command {
   return new Command("auto")
-    .description(
-      "Generate a spec, run agents, and review results in one command",
-    )
-    .addOption(
-      new Option(
-        "--description <text>",
-        "Generate a spec from a description, then run and review",
-      ).conflicts("spec"),
-    )
-    .addOption(
-      new Option(
-        "--spec <path>",
-        "Use an existing spec path, then run and review",
-      ).conflicts("description"),
+    .description("Run agents and review results from an existing spec")
+    .requiredOption(
+      "--spec <path>",
+      "Path to an existing spec file to run and review",
     )
     .requiredOption("--review-agent <agent-id>", "Reviewer agent identifier")
-    .option("--spec-agent <agent-id>", "Spec generator agent identifier")
-    .option("--title <text>", "Optional spec title (description mode only)")
-    .option(
-      "--output <path>",
-      "Optional spec output path within .voratiq/specs/ (description mode only)",
-    )
     .option(
       "--max-parallel <count>",
       "Maximum number of agents to run concurrently",
@@ -278,47 +193,9 @@ export function createAutoCommand(): Command {
     )
     .option("--branch", "Checkout or create a branch named after the spec file")
     .allowExcessArguments(false)
-    .action(async (options: AutoCommandActionOptions, command: Command) => {
-      const hasDescription =
-        typeof options.description === "string" &&
-        options.description.length > 0;
-      const hasSpec =
-        typeof options.spec === "string" && options.spec.length > 0;
-
-      if (!hasDescription && !hasSpec) {
-        command.error(
-          "error: either --description <text> or --spec <path> must be provided",
-          {
-            exitCode: 1,
-          },
-        );
-      }
-
-      if (
-        hasDescription &&
-        (!options.specAgent || options.specAgent.length === 0)
-      ) {
-        command.error(
-          "error: --spec-agent <agent-id> is required with --description",
-          {
-            exitCode: 1,
-          },
-        );
-      }
-
-      if (hasSpec && (options.specAgent || options.title || options.output)) {
-        command.error(
-          "error: --spec-agent/--title/--output are only valid with --description",
-          { exitCode: 1 },
-        );
-      }
-
+    .action(async (options: AutoCommandActionOptions) => {
       await runAutoCommand({
-        description: options.description,
-        specPath: options.spec,
-        specAgent: options.specAgent,
-        title: options.title,
-        output: options.output,
+        specPath: options.spec!,
         reviewerAgent: options.reviewAgent,
         maxParallel: options.maxParallel,
         branch: options.branch,
