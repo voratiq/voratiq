@@ -22,12 +22,15 @@ export interface AutoSummaryInput {
     baseRevisionSha?: string;
   };
   review: AutoPhaseSummary & { outputPath?: string };
+  apply?: AutoPhaseSummary & { agentId?: string };
 }
 
 export function renderAutoSummaryTranscript(input: AutoSummaryInput): string {
   const totalDuration = formatDurationLabel(input.totalDurationMs) ?? "—";
   const autoSucceeded =
-    input.run.status !== "failed" && input.review.status !== "failed";
+    input.run.status !== "failed" &&
+    input.review.status !== "failed" &&
+    input.apply?.status !== "failed";
   const runStatus: RunStatus = autoSucceeded ? "succeeded" : "failed";
   const statusLabel = autoSucceeded ? "SUCCEEDED" : "FAILED";
   const statusStyle = getRunStatusStyle(runStatus);

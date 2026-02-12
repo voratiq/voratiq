@@ -34,6 +34,7 @@ export const SUMMARY_FILENAME = "summary.txt";
 export const CHAT_JSON_FILENAME = "chat.json";
 export const CHAT_JSONL_FILENAME = "chat.jsonl";
 export const REVIEW_FILENAME = "review.md";
+export const REVIEW_RECOMMENDATION_FILENAME = "recommendation.json";
 export const RUNTIME_DIRNAME = "runtime";
 export const ARTIFACTS_DIRNAME = "artifacts";
 export const MANIFEST_FILENAME = "manifest.json";

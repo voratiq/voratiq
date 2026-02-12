@@ -93,6 +93,14 @@ export function buildReviewPrompt(options: BuildReviewPromptOptions): string {
     "**Rationale**: <why these are best (or why none qualify); name the key trade-offs and what evidence supports the choice>",
     "**Next Actions**:",
     "<one line per recommendation, e.g. `voratiq apply --run <run-id> --agent <agent-id>`>",
+    "",
+    "## Recommendation Artifact (JSON)",
+    "In addition to the markdown recommendation above, write `recommendation.json` with this exact shape:",
+    `{"version":1,"preferred_agents":["<agent-id>"],"rationale":"<summary>","next_actions":["<action>"]}`,
+    "- `version` must be `1`",
+    "- `preferred_agents` must be an array of agent ids (or empty if no agent is recommended)",
+    "- `rationale` must be a string",
+    "- `next_actions` must be an array of action strings",
   ];
 
   appendConstraints(lines, {
@@ -101,6 +109,7 @@ export function buildReviewPrompt(options: BuildReviewPromptOptions): string {
   });
   appendOutputRequirements(lines, [
     `- Save the full review to \`${outputPath}\` in the workspace root.`,
+    "- Save the machine-readable recommendation to `recommendation.json` in the workspace root.",
   ]);
 
   return `${lines.join("\n")}\n`;
