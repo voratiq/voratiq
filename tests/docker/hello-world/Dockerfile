@@ -19,6 +19,7 @@ RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build
 RUN npm link
+RUN npm install -g @openai/codex@latest
 
 RUN chmod +x \
     tests/docker/hello-world/entrypoint.sh \
