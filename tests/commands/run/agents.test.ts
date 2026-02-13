@@ -12,12 +12,13 @@ import {
 } from "@jest/globals";
 
 import { runSandboxedAgent } from "../../../src/agents/runtime/harness.js";
-import { runAgentsWithLimit } from "../../../src/commands/run/agents.js";
 import { runPostProcessingAndEvaluations } from "../../../src/commands/run/agents/eval-runner.js";
+import { runPreparedAgent } from "../../../src/commands/run/agents/lifecycle.js";
 import { AgentRunContext } from "../../../src/commands/run/agents/run-context.js";
 import type { PreparedAgentExecution } from "../../../src/commands/run/agents/types.js";
 import { buildRunAgentWorkspacePaths } from "../../../src/commands/run/agents/workspace.js";
 import type { AgentExecutionResult } from "../../../src/commands/run/reports.js";
+import { runPreparedWithLimit } from "../../../src/competition/core.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
 import type { EvalDefinition } from "../../../src/configs/evals/types.js";
@@ -70,7 +71,7 @@ describe("executeAgentLifecycle integration", () => {
       manifestEnv: {},
     });
 
-    const [result] = await runAgentsWithLimit([execution], 1);
+    const [result] = await runPreparedExecutionsWithLimit([execution], 1);
 
     expect(progress.onRunning).toHaveBeenCalledTimes(1);
     expect(progress.onCompleted).toHaveBeenCalledTimes(1);
@@ -102,7 +103,7 @@ describe("executeAgentLifecycle integration", () => {
       manifestEnv: {},
     });
 
-    const [result] = await runAgentsWithLimit([execution], 1);
+    const [result] = await runPreparedExecutionsWithLimit([execution], 1);
 
     expect(result.record.status).toBe("failed");
     expect(result.record.error).toBe("unsupported_value: model (exit code 1)");
@@ -126,7 +127,7 @@ describe("executeAgentLifecycle integration", () => {
       warnings: [],
     });
 
-    const [result] = await runAgentsWithLimit([execution], 1);
+    const [result] = await runPreparedExecutionsWithLimit([execution], 1);
 
     expect(progress.onRunning).toHaveBeenCalledTimes(1);
     expect(progress.onCompleted).toHaveBeenCalledTimes(1);
@@ -161,7 +162,7 @@ describe("executeAgentLifecycle integration", () => {
       warnings: [],
     });
 
-    const [result] = await runAgentsWithLimit([execution], 1);
+    const [result] = await runPreparedExecutionsWithLimit([execution], 1);
 
     expect(result.record.diffStatistics).toBe(diffStatistics);
     expect(result.report.diffStatistics).toBe(diffStatistics);
@@ -207,7 +208,7 @@ describe("executeAgentLifecycle integration", () => {
       warnings: [],
     });
 
-    const results = await runAgentsWithLimit([first, second], 1);
+    const results = await runPreparedExecutionsWithLimit([first, second], 1);
     expect(results).toHaveLength(2);
 
     const failed = results.find(
@@ -334,4 +335,15 @@ function minimalSandboxSettings(): {
     network: { allowedDomains: [], deniedDomains: [] },
     filesystem: { denyRead: [], allowWrite: [], denyWrite: [] },
   };
+}
+
+async function runPreparedExecutionsWithLimit(
+  prepared: PreparedAgentExecution[],
+  limit: number,
+): Promise<AgentExecutionResult[]> {
+  return await runPreparedWithLimit({
+    prepared,
+    maxParallel: Math.max(1, limit),
+    executePrepared: (execution) => runPreparedAgent(execution),
+  });
 }
