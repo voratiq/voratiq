@@ -1,9 +1,12 @@
+import { executeCompetition } from "../../competition/core.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
 import type { EvalDefinition } from "../../configs/evals/types.js";
 import type { AgentRecordMutators } from "../../runs/records/mutators.js";
 import { toError } from "../../utils/errors.js";
-import { prepareAgents, runAgentsWithLimit } from "./agents.js";
+import { prepareAgents } from "./agents.js";
+import { runPreparedAgent } from "./agents/lifecycle.js";
+import type { PreparedAgentExecution } from "./agents/types.js";
 import type { AgentExecutionPhaseResult } from "./phases.js";
 import { type AgentExecutionResult, hasEvalFailures } from "./reports.js";
 
@@ -41,41 +44,42 @@ export async function executeAgents(
   let phaseResult: AgentExecutionPhaseResult | undefined;
 
   try {
-    for (const agent of agents) {
-      await mutators.recordAgentQueued(agent);
-    }
+    const sortedExecutions = await executeCompetition<
+      AgentDefinition,
+      PreparedAgentExecution,
+      AgentExecutionResult
+    >({
+      candidates: agents,
+      maxParallel: effectiveMaxParallel,
+      queueCandidate: async (candidate) => {
+        await mutators.recordAgentQueued(candidate);
+      },
+      prepareCandidates: async (queuedCandidates) =>
+        await prepareAgents({
+          agents: queuedCandidates,
+          baseRevisionSha,
+          runId,
+          root,
+          specContent,
+          evalPlan,
+          environment,
+        }),
+      onPreparationFailure: async (failure) => {
+        await mutators.recordAgentSnapshot(failure.record);
+      },
+      onPreparedCandidate: (execution) => {
+        execution.progress = {
+          onRunning: mutators.recordAgentSnapshot,
+          onCompleted: async (result) => {
+            await mutators.recordAgentSnapshot(result.record);
+          },
+        };
+      },
+      executePreparedCandidate: async (execution) =>
+        await runPreparedAgent(execution),
+      sortResults: compareExecutionsByAgentId,
+    });
 
-    const { ready: preparedAgents, failures: preparationFailures } =
-      await prepareAgents({
-        agents,
-        baseRevisionSha,
-        runId,
-        root,
-        specContent,
-        evalPlan,
-        environment,
-      });
-
-    for (const failure of preparationFailures) {
-      await mutators.recordAgentSnapshot(failure.record);
-    }
-
-    for (const execution of preparedAgents) {
-      execution.progress = {
-        onRunning: mutators.recordAgentSnapshot,
-        onCompleted: async (result) => {
-          await mutators.recordAgentSnapshot(result.record);
-        },
-      };
-    }
-
-    const executionResults =
-      preparedAgents.length > 0 && effectiveMaxParallel > 0
-        ? await runAgentsWithLimit(preparedAgents, effectiveMaxParallel)
-        : [];
-
-    const agentExecutions = [...preparationFailures, ...executionResults];
-    const sortedExecutions = sortExecutions(agentExecutions);
     const agentRecords = sortedExecutions.map((execution) => execution.record);
     const agentReports = sortedExecutions.map((execution) => execution.report);
 
@@ -107,10 +111,9 @@ export async function executeAgents(
   return phaseResult;
 }
 
-function sortExecutions(
-  executions: AgentExecutionResult[],
-): AgentExecutionResult[] {
-  return [...executions].sort((a, b) =>
-    a.record.agentId.localeCompare(b.record.agentId),
-  );
+function compareExecutionsByAgentId(
+  left: AgentExecutionResult,
+  right: AgentExecutionResult,
+): number {
+  return left.record.agentId.localeCompare(right.record.agentId);
 }
