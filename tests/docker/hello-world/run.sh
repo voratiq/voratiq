@@ -25,23 +25,10 @@ require_env_path() {
 CODEX_BIN="${CODEX_BIN:-}"
 CODEX_HOME="${CODEX_HOME:-}"
 
-require_env_path "${CODEX_BIN}" "Set CODEX_BIN=/path/to/codex before running this script."
 require_env_path "${CODEX_HOME}" "Set CODEX_HOME=/path/to/.codex before running this script."
 
-[[ -x "${CODEX_BIN}" ]] || die "Codex binary not executable at ${CODEX_BIN}."
 [[ -d "${CODEX_HOME}" ]] || die "Codex home directory not found at ${CODEX_HOME}."
 [[ -f "${CODEX_HOME}/auth.json" ]] || die "${CODEX_HOME}/auth.json missing (run 'codex login')."
-
-CODEX_ROOT=$(python3 - <<'PY'
-import os
-path = os.environ["CODEX_BIN"]
-abs_path = os.path.abspath(path)
-root = os.path.abspath(os.path.join(os.path.dirname(abs_path), os.pardir))
-print(root)
-PY
-)
-
-[[ -d "${CODEX_ROOT}" ]] || die "Unable to derive Codex root from ${CODEX_BIN}."
 
 command -v docker >/dev/null || die "docker CLI not found."
 
@@ -54,6 +41,5 @@ docker run --rm \
   --cap-add=SYS_ADMIN \
   --security-opt apparmor=unconfined \
   --security-opt seccomp=unconfined \
-  --mount type=bind,src="${CODEX_ROOT}",target=/codex/root,readonly \
   --mount type=bind,src="${CODEX_HOME}",target=/codex/home-src,readonly \
   "${IMAGE_TAG}"
