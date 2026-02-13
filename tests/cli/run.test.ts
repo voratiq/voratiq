@@ -10,7 +10,7 @@ import { join, relative } from "node:path";
 
 import * as authRuntime from "../../src/auth/runtime.js";
 import { runRunCommand } from "../../src/cli/run.js";
-import * as runAgentsModule from "../../src/commands/run/agents.js";
+import * as runAgentPreparationModule from "../../src/commands/run/agent-preparation.js";
 import { executeRunCommand } from "../../src/commands/run/command.js";
 import { DirtyWorkingTreeError } from "../../src/preflight/errors.js";
 import { buildRunRecordEnhanced } from "../../src/runs/records/enhanced.js";
@@ -205,7 +205,7 @@ suite("voratiq run (integration)", () => {
 
     const appendSpy = jest.spyOn(persistence, "appendRunRecord");
     const rewriteSpy = jest.spyOn(persistence, "rewriteRunRecord");
-    const prepareSpy = jest.spyOn(runAgentsModule, "prepareAgents");
+    const prepareSpy = jest.spyOn(runAgentPreparationModule, "prepareAgents");
 
     try {
       const report = await executeRunCommand({

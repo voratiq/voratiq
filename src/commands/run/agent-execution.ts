@@ -4,7 +4,7 @@ import type { EnvironmentConfig } from "../../configs/environment/types.js";
 import type { EvalDefinition } from "../../configs/evals/types.js";
 import type { AgentRecordMutators } from "../../runs/records/mutators.js";
 import { toError } from "../../utils/errors.js";
-import { prepareAgents } from "./agents.js";
+import { prepareAgents } from "./agent-preparation.js";
 import { runPreparedAgent } from "./agents/lifecycle.js";
 import type { PreparedAgentExecution } from "./agents/types.js";
 import type { AgentExecutionPhaseResult } from "./phases.js";

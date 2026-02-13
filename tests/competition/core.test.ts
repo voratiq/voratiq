@@ -1,6 +1,9 @@
 import { describe, expect, it, jest } from "@jest/globals";
 
-import { executeCompetition } from "../../src/competition/core.js";
+import {
+  executeCompetition,
+  runPreparedWithLimit,
+} from "../../src/competition/core.js";
 
 interface Candidate {
   id: string;
@@ -19,6 +22,73 @@ function sleep(ms: number): Promise<void> {
 }
 
 describe("competition core", () => {
+  it("runs prepared entries in parallel while preserving input result ordering", async () => {
+    const prepared = ["alpha", "beta", "gamma"] as const;
+    const completionOrder: string[] = [];
+    const delaysById: Record<string, number> = {
+      alpha: 25,
+      beta: 5,
+      gamma: 15,
+    };
+
+    const results = await runPreparedWithLimit({
+      prepared,
+      maxParallel: 3,
+      executePrepared: async (entry) => {
+        await sleep(delaysById[entry]);
+        completionOrder.push(entry);
+        return entry;
+      },
+    });
+
+    expect(completionOrder).toEqual(["beta", "gamma", "alpha"]);
+    expect(results).toEqual(["alpha", "beta", "gamma"]);
+  });
+
+  it("captures execution failures and continues through all prepared entries", async () => {
+    const prepared = ["one", "two", "three"] as const;
+    const executed: string[] = [];
+    const cleaned: string[] = [];
+    type PreparedResult = {
+      id: (typeof prepared)[number];
+      status: "succeeded" | "failed";
+      reason?: string;
+    };
+
+    const results = await runPreparedWithLimit<
+      (typeof prepared)[number],
+      PreparedResult
+    >({
+      prepared,
+      maxParallel: 2,
+      failurePolicy: "continue",
+      executePrepared: (entry) => {
+        executed.push(entry);
+        if (entry === "two") {
+          throw new Error("boom");
+        }
+        return { id: entry, status: "succeeded" };
+      },
+      onExecutionFailure: ({ prepared: entry, error }) => ({
+        id: entry,
+        status: "failed",
+        reason: error instanceof Error ? error.message : String(error),
+      }),
+      cleanupPrepared: (entry) => {
+        cleaned.push(entry);
+      },
+    });
+
+    expect(results).toEqual([
+      { id: "one", status: "succeeded" },
+      { id: "two", status: "failed", reason: "boom" },
+      { id: "three", status: "succeeded" },
+    ]);
+    expect(executed).toEqual(expect.arrayContaining(["one", "two", "three"]));
+    expect(cleaned).toEqual(expect.arrayContaining(["one", "two", "three"]));
+    expect(cleaned).toHaveLength(3);
+  });
+
   it("produces deterministic result ordering with an explicit comparator", async () => {
     const candidates: Candidate[] = [
       { id: "beta" },

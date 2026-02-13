@@ -1,8 +1,6 @@
-import { runPreparedWithLimit } from "../../competition/core.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
 import type { EvalDefinition } from "../../configs/evals/types.js";
-import { runPreparedAgent } from "./agents/lifecycle.js";
 import { prepareAgentForExecution } from "./agents/preparation.js";
 import type {
   AgentPreparationResult,
@@ -50,15 +48,4 @@ export async function prepareAgents(options: {
   }
 
   return { ready, failures };
-}
-
-export async function runAgentsWithLimit(
-  agents: PreparedAgentExecution[],
-  limit: number,
-): Promise<AgentExecutionResult[]> {
-  return await runPreparedWithLimit({
-    prepared: agents,
-    maxParallel: Math.max(1, limit),
-    executePrepared: (execution) => runPreparedAgent(execution),
-  });
 }
