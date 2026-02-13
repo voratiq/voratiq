@@ -52,6 +52,7 @@ providers:
     expect(claude.network.allowedDomains).toEqual([
       "api.anthropic.com",
       "console.anthropic.com",
+      "platform.claude.com",
     ]);
 
     const gemini = config.providers.gemini;
@@ -189,6 +190,7 @@ providers:
     expect(agentNetwork.allowedDomains).toEqual([
       "api.anthropic.com",
       "console.anthropic.com",
+      "platform.claude.com",
       "allowed.example.com",
     ]);
   });

@@ -121,6 +121,7 @@ describe("sandbox", () => {
         expect(settings.network.allowedDomains).toEqual([
           "api.anthropic.com",
           "console.anthropic.com",
+          "platform.claude.com",
           "allowed.example.com",
         ]);
         expect(settings.network.deniedDomains).toEqual(["blocked.example.com"]);
@@ -178,6 +179,7 @@ describe("sandbox", () => {
         expect(settings.network.allowedDomains).toEqual([
           "api.anthropic.com",
           "console.anthropic.com",
+          "platform.claude.com",
           "allowed.example.com",
         ]);
         expect(settings.network.allowAllUnixSockets).toBe(true);

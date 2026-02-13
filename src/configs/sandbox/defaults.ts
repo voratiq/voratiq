@@ -15,7 +15,11 @@ export const DEFAULT_SANDBOX_PROVIDERS: readonly SandboxProviderDefault[] = [
   {
     id: "claude",
     network: {
-      allowedDomains: ["api.anthropic.com", "console.anthropic.com"],
+      allowedDomains: [
+        "api.anthropic.com",
+        "console.anthropic.com",
+        "platform.claude.com",
+      ],
       deniedDomains: [],
       allowLocalBinding: false,
     },
