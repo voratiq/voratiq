@@ -1,10 +1,17 @@
+import { dirname, join } from "node:path";
+
 import { Command } from "commander";
 
+import { readReviewRecommendation } from "../commands/review/recommendation.js";
+import { resolveCliContext } from "../preflight/index.js";
 import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
 import { renderCliError } from "../render/utils/errors.js";
 import type { RunStatus } from "../status/index.js";
+import { normalizePathForDisplay, resolveDisplayPath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
-import { toCliError } from "./errors.js";
+import { REVIEW_RECOMMENDATION_FILENAME } from "../workspace/structure.js";
+import { runApplyCommand } from "./apply.js";
+import { CliError, toCliError } from "./errors.js";
 import { beginChainedCommandOutput, writeCommandOutput } from "./output.js";
 import { runReviewCommand } from "./review.js";
 import { runRunCommand } from "./run.js";
@@ -14,12 +21,15 @@ export interface AutoCommandOptions {
   reviewerAgent: string;
   maxParallel?: number;
   branch?: boolean;
+  apply?: boolean;
+  commit?: boolean;
 }
 
 export interface AutoCommandResult {
   exitCode: number;
   runId?: string;
   reviewOutputPath?: string;
+  appliedAgentId?: string;
 }
 
 interface AutoRuntimeOptions {
@@ -34,10 +44,127 @@ function parseMaxParallelOption(value: string): number {
   );
 }
 
+function assertAutoOptionCompatibility(options: AutoCommandOptions): void {
+  if (options.commit && !options.apply) {
+    throw new CliError(
+      "Option `--commit` requires `--apply`.",
+      [],
+      [
+        "Re-run with `--apply --commit`, or omit `--commit` to keep apply disabled.",
+      ],
+    );
+  }
+}
+
+interface AutoRecommendationLoadResult {
+  recommendationPath: string;
+  preferredAgents: readonly string[];
+}
+
+async function loadAutoRecommendation(options: {
+  reviewOutputPath: string;
+  runId: string;
+}): Promise<AutoRecommendationLoadResult> {
+  const recommendationPath = normalizePathForDisplay(
+    join(dirname(options.reviewOutputPath), REVIEW_RECOMMENDATION_FILENAME),
+  );
+  let resolutionRoot = process.cwd();
+  try {
+    const { root } = await resolveCliContext();
+    resolutionRoot = root;
+  } catch {
+    // Unit tests and non-repo contexts may not resolve CLI root.
+    // Fall back to cwd for compatibility.
+  }
+  const recommendationAbsolutePath =
+    resolveDisplayPath(resolutionRoot, recommendationPath) ??
+    recommendationPath;
+
+  try {
+    const recommendation = await readReviewRecommendation(
+      recommendationAbsolutePath,
+    );
+    return {
+      recommendationPath,
+      preferredAgents: recommendation.preferred_agents,
+    };
+  } catch (error) {
+    throw new CliError(
+      "Failed to load structured review recommendation.",
+      [
+        `Expected ${REVIEW_RECOMMENDATION_FILENAME} at ${recommendationPath}.`,
+        toCliError(error).headline,
+      ],
+      [
+        `Re-run review to regenerate artifacts: voratiq review --run ${options.runId} --agent <agent-id>`,
+      ],
+    );
+  }
+}
+
+function resolveRecommendedAgent(options: {
+  runId: string;
+  recommendationPath: string;
+  preferredAgents: readonly string[];
+  availableAgents: readonly string[];
+}): string {
+  const { runId, recommendationPath, preferredAgents, availableAgents } =
+    options;
+
+  const preferredUnique = Array.from(
+    new Set(preferredAgents.map((agentId) => agentId.trim()).filter(Boolean)),
+  );
+  if (preferredUnique.length === 0) {
+    throw new CliError(
+      "Recommendation is missing a preferred agent.",
+      [`No preferred agent is listed in ${recommendationPath}.`],
+      [
+        `Update ${REVIEW_RECOMMENDATION_FILENAME} to include exactly one preferred agent or apply manually: voratiq apply --run ${runId} --agent <agent-id>`,
+      ],
+    );
+  }
+
+  const availableSet = new Set(availableAgents);
+  const resolved = preferredUnique.filter((agentId) =>
+    availableSet.has(agentId),
+  );
+  const resolvedUnique = Array.from(new Set(resolved));
+
+  if (resolvedUnique.length === 0) {
+    throw new CliError(
+      "Recommendation did not resolve to a run agent.",
+      [
+        `Preferred agents: ${preferredUnique.join(", ")}`,
+        `Available agents: ${availableAgents.join(", ") || "(none recorded)"}`,
+      ],
+      [
+        `Review ${recommendationPath} and rerun auto apply, or apply manually: voratiq apply --run ${runId} --agent <agent-id>`,
+      ],
+    );
+  }
+
+  if (resolvedUnique.length > 1) {
+    throw new CliError(
+      "Recommendation is ambiguous; exactly one agent is required for auto apply.",
+      [
+        `Resolved agents: ${resolvedUnique.join(", ")}`,
+        `Source: ${recommendationPath}`,
+      ],
+      [
+        `Keep exactly one preferred agent in ${REVIEW_RECOMMENDATION_FILENAME}, or apply manually: voratiq apply --run ${runId} --agent <agent-id>`,
+      ],
+    );
+  }
+
+  return resolvedUnique[0];
+}
+
 export async function runAutoCommand(
   options: AutoCommandOptions,
   runtime: AutoRuntimeOptions = {},
 ): Promise<AutoCommandResult> {
+  assertAutoOptionCompatibility(options);
+
   const now = runtime.now ?? Date.now.bind(Date);
 
   const overallStart = now();
@@ -54,11 +181,17 @@ export async function runAutoCommand(
     let runCreatedAt: string | undefined;
     let runSpecPath: string | undefined;
     let runBaseRevisionSha: string | undefined;
+    let runAgentIds: string[] = [];
 
     let reviewStartedAt: number | undefined;
     let reviewStatus: "succeeded" | "failed" | "skipped" = "skipped";
     let reviewOutputPath: string | undefined;
     let reviewDetail: string | undefined;
+
+    let applyStartedAt: number | undefined;
+    let applyStatus: "succeeded" | "failed" | "skipped" = "skipped";
+    let applyAgentId: string | undefined;
+    let applyDetail: string | undefined;
 
     runStartedAt = now();
 
@@ -84,6 +217,7 @@ export async function runAutoCommand(
       runCreatedAt = runResult.report.createdAt;
       runSpecPath = runResult.report.spec?.path;
       runBaseRevisionSha = runResult.report.baseRevisionSha;
+      runAgentIds = runResult.report.agents.map((agent) => agent.agentId);
 
       if (runResult.exitCode === 1) {
         exitCode = 1;
@@ -126,11 +260,56 @@ export async function runAutoCommand(
       }
     }
 
+    if (
+      options.apply &&
+      runId &&
+      reviewStatus === "succeeded" &&
+      reviewOutputPath
+    ) {
+      applyStartedAt = now();
+      try {
+        const recommendationResult = await loadAutoRecommendation({
+          reviewOutputPath,
+          runId,
+        });
+        const recommendedAgentId = resolveRecommendedAgent({
+          runId,
+          recommendationPath: recommendationResult.recommendationPath,
+          preferredAgents: recommendationResult.preferredAgents,
+          availableAgents: runAgentIds,
+        });
+
+        const applyResult = await runApplyCommand({
+          runId,
+          agentId: recommendedAgentId,
+          commit: options.commit ?? false,
+        });
+
+        applyStatus = "succeeded";
+        applyAgentId = recommendedAgentId;
+
+        writeCommandOutput({
+          body: applyResult.body,
+          exitCode: applyResult.exitCode,
+        });
+        if (applyResult.exitCode === 1) {
+          exitCode = 1;
+        }
+      } catch (error) {
+        applyStatus = "failed";
+        applyDetail = toCliError(error).headline;
+        exitCode = 1;
+        writeCommandOutput({ body: renderCliError(toCliError(error)) });
+      }
+    }
+
     const overallDurationMs = now() - overallStart;
     const runDurationMs =
       runStartedAt !== undefined ? now() - runStartedAt : undefined;
     const reviewDurationMs =
       reviewStartedAt !== undefined ? now() - reviewStartedAt : undefined;
+    const applyDurationMs =
+      applyStartedAt !== undefined ? now() - applyStartedAt : undefined;
 
     const summaryBody = renderAutoSummaryTranscript({
       totalDurationMs: overallDurationMs,
@@ -154,6 +333,18 @@ export async function runAutoCommand(
         ...(reviewOutputPath ? { outputPath: reviewOutputPath } : {}),
         ...(reviewDetail ? { detail: reviewDetail } : {}),
       },
+      ...(options.apply
+        ? {
+            apply: {
+              status: applyStatus,
+              ...(typeof applyDurationMs === "number"
+                ? { durationMs: applyDurationMs }
+                : {}),
+              ...(applyAgentId ? { agentId: applyAgentId } : {}),
+              ...(applyDetail ? { detail: applyDetail } : {}),
+            },
+          }
+        : {}),
     });
 
     writeCommandOutput({
@@ -165,6 +356,7 @@ export async function runAutoCommand(
       exitCode,
       runId,
       reviewOutputPath,
+      ...(applyAgentId ? { appliedAgentId: applyAgentId } : {}),
     };
   } finally {
     chainedOutput.end();
@@ -176,6 +368,8 @@ interface AutoCommandActionOptions {
   reviewAgent: string;
   maxParallel?: number;
   branch?: boolean;
+  apply?: boolean;
+  commit?: boolean;
 }
 
 export function createAutoCommand(): Command {
@@ -192,6 +386,16 @@ export function createAutoCommand(): Command {
       parseMaxParallelOption,
     )
     .option("--branch", "Checkout or create a branch named after the spec file")
+    .option(
+      "--apply",
+      "Apply the structured review recommendation after review completes",
+      () => true,
+    )
+    .option(
+      "--commit",
+      "When applying, commit immediately using `voratiq apply --commit` behavior",
+      () => true,
+    )
     .allowExcessArguments(false)
     .action(async (options: AutoCommandActionOptions) => {
       await runAutoCommand({
@@ -199,6 +403,8 @@ export function createAutoCommand(): Command {
         reviewerAgent: options.reviewAgent,
         maxParallel: options.maxParallel,
         branch: options.branch,
+        apply: options.apply ?? false,
+        commit: options.commit ?? false,
       });
     });
 }

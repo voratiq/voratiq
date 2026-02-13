@@ -28,6 +28,7 @@ import { promoteWorkspaceFile } from "../../workspace/promotion.js";
 import {
   REVIEW_ARTIFACT_INFO_FILENAME,
   REVIEW_FILENAME,
+  REVIEW_RECOMMENDATION_FILENAME,
   VORATIQ_REVIEWS_DIR,
 } from "../../workspace/structure.js";
 import { RunNotFoundCliError } from "../errors.js";
@@ -39,6 +40,7 @@ import {
 } from "./errors.js";
 import { buildReviewManifest } from "./manifest.js";
 import { buildReviewPrompt } from "./prompt.js";
+import { parseReviewRecommendation } from "./recommendation.js";
 
 export interface ReviewCommandInput {
   root: string;
@@ -202,6 +204,13 @@ export async function executeReviewCommand(
       artifactRelativePath: REVIEW_FILENAME,
       deleteStaged: true,
     });
+    await promoteWorkspaceFile({
+      workspacePath: workspacePaths.workspacePath,
+      artifactsPath: workspacePaths.artifactsPath,
+      stagedRelativePath: REVIEW_RECOMMENDATION_FILENAME,
+      artifactRelativePath: REVIEW_RECOMMENDATION_FILENAME,
+      deleteStaged: true,
+    });
 
     await finalizeReviewRecord({
       root,
@@ -291,13 +300,22 @@ async function assertReviewOutputExists(
   workspacePaths: AgentWorkspacePaths,
   reviewId: string,
 ): Promise<void> {
-  const stagedPath = join(workspacePaths.workspacePath, REVIEW_FILENAME);
+  const reviewStagedPath = join(workspacePaths.workspacePath, REVIEW_FILENAME);
   try {
-    const contents = await readFile(stagedPath, "utf8");
-    if (contents.trim().length > 0) {
-      return;
+    const reviewContent = await readFile(reviewStagedPath, "utf8");
+    if (reviewContent.trim().length === 0) {
+      const stderrDisplay = normalizePathForDisplay(
+        relativeToRoot(root, workspacePaths.stderrPath),
+      );
+      throw new ReviewGenerationFailedError(
+        [`Missing output: ${REVIEW_FILENAME}`],
+        [`Review session: ${reviewId}`, `See stderr: ${stderrDisplay}`],
+      );
     }
   } catch (error) {
+    if (error instanceof ReviewGenerationFailedError) {
+      throw error;
+    }
     const detail = toErrorMessage(error);
     const stderrDisplay = normalizePathForDisplay(
       relativeToRoot(root, workspacePaths.stderrPath),
@@ -308,11 +326,49 @@ async function assertReviewOutputExists(
     );
   }
 
-  const stderrDisplay = normalizePathForDisplay(
-    relativeToRoot(root, workspacePaths.stderrPath),
+  const recommendationStagedPath = join(
+    workspacePaths.workspacePath,
+    REVIEW_RECOMMENDATION_FILENAME,
   );
-  throw new ReviewGenerationFailedError(
-    [`Missing output: ${REVIEW_FILENAME}`],
-    [`Review session: ${reviewId}`, `See stderr: ${stderrDisplay}`],
-  );
+
+  let recommendationContent: string;
+  try {
+    recommendationContent = await readFile(recommendationStagedPath, "utf8");
+  } catch (error) {
+    const detail = toErrorMessage(error);
+    const stderrDisplay = normalizePathForDisplay(
+      relativeToRoot(root, workspacePaths.stderrPath),
+    );
+    throw new ReviewGenerationFailedError(
+      [`Missing output: ${REVIEW_RECOMMENDATION_FILENAME}`],
+      [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
+    );
+  }
+
+  if (recommendationContent.trim().length === 0) {
+    const stderrDisplay = normalizePathForDisplay(
+      relativeToRoot(root, workspacePaths.stderrPath),
+    );
+    throw new ReviewGenerationFailedError(
+      [`Invalid output: ${REVIEW_RECOMMENDATION_FILENAME}`],
+      [
+        `Review session: ${reviewId}`,
+        "Recommendation artifact is empty.",
+        `See stderr: ${stderrDisplay}`,
+      ],
+    );
+  }
+
+  try {
+    parseReviewRecommendation(recommendationContent);
+  } catch (error) {
+    const detail = toErrorMessage(error);
+    const stderrDisplay = normalizePathForDisplay(
+      relativeToRoot(root, workspacePaths.stderrPath),
+    );
+    throw new ReviewGenerationFailedError(
+      [`Invalid output: ${REVIEW_RECOMMENDATION_FILENAME}`],
+      [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
+    );
+  }
 }

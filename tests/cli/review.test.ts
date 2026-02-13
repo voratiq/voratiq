@@ -13,10 +13,12 @@ import {
   type ReviewCommandOptions,
   runReviewCommand,
 } from "../../src/cli/review.js";
+import { parseReviewRecommendation } from "../../src/commands/review/recommendation.js";
 import * as preflight from "../../src/preflight/index.js";
 import { appendRunRecord } from "../../src/runs/records/persistence.js";
 import type { RunRecord } from "../../src/runs/records/types.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
+import { REVIEW_RECOMMENDATION_FILENAME } from "../../src/workspace/structure.js";
 import { silenceCommander } from "../support/commander.js";
 import {
   createAgentInvocationRecord,
@@ -141,6 +143,10 @@ describe("voratiq review", () => {
       runSandboxedAgentMock.mockReset();
       runSandboxedAgentMock.mockImplementation(async (options) => {
         const outputPath = join(options.paths.workspacePath, "review.md");
+        const recommendationPath = join(
+          options.paths.workspacePath,
+          REVIEW_RECOMMENDATION_FILENAME,
+        );
         await mkdir(dirname(outputPath), { recursive: true });
         await writeFile(
           outputPath,
@@ -154,6 +160,22 @@ describe("voratiq review", () => {
             "voratiq apply --run 20251007-184454-vmtyf --agent reviewer",
             "",
           ].join("\n"),
+          "utf8",
+        );
+        await writeFile(
+          recommendationPath,
+          `${JSON.stringify(
+            {
+              version: 1,
+              preferred_agents: ["reviewer"],
+              rationale: "Looks good.",
+              next_actions: [
+                "voratiq apply --run 20251007-184454-vmtyf --agent reviewer",
+              ],
+            },
+            null,
+            2,
+          )}\n`,
           "utf8",
         );
         return {
@@ -203,6 +225,21 @@ describe("voratiq review", () => {
       await expect(readFile(reviewOutputAbsolute, "utf8")).resolves.toContain(
         "## Recommendation",
       );
+      const recommendationOutputAbsolute = join(
+        dirname(reviewOutputAbsolute),
+        REVIEW_RECOMMENDATION_FILENAME,
+      );
+      const recommendationPayload = await readFile(
+        recommendationOutputAbsolute,
+        "utf8",
+      );
+      const recommendation = parseReviewRecommendation(recommendationPayload);
+      expect(recommendation.version).toBe(1);
+      expect(recommendation.preferred_agents).toEqual(["reviewer"]);
+      expect(recommendation.rationale).toBe("Looks good.");
+      expect(recommendation.next_actions).toEqual([
+        "voratiq apply --run 20251007-184454-vmtyf --agent reviewer",
+      ]);
 
       const recordPath = join(
         repoRoot,
