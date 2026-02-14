@@ -90,12 +90,7 @@ describe("status groupings", () => {
     });
 
     it("TERMINAL_SPEC_STATUSES excludes in-progress statuses", () => {
-      const inProgressSpecStatuses = [
-        "drafting",
-        "awaiting-feedback",
-        "refining",
-        "saving",
-      ];
+      const inProgressSpecStatuses = ["drafting", "saving"];
       for (const status of inProgressSpecStatuses) {
         expect(TERMINAL_SPEC_STATUSES).not.toContain(status);
       }

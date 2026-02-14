@@ -6,23 +6,14 @@ import {
 export interface BuildSpecPromptOptions {
   description: string;
   title?: string;
-  feedback?: string;
-  previousDraft?: string;
   outputPath: string;
   repoRootPath: string;
   workspacePath: string;
 }
 
 export function buildSpecPrompt(options: BuildSpecPromptOptions): string {
-  const {
-    description,
-    title,
-    feedback,
-    previousDraft,
-    outputPath,
-    repoRootPath,
-    workspacePath,
-  } = options;
+  const { description, title, outputPath, repoRootPath, workspacePath } =
+    options;
 
   const lines: string[] = [
     "Translate the user description into a concise, repo-grounded Markdown spec.",
@@ -55,26 +46,8 @@ export function buildSpecPrompt(options: BuildSpecPromptOptions): string {
     `- Save the full spec to \`${outputPath}\` in the workspace root.`,
   ]);
 
-  if (previousDraft && previousDraft.trim().length > 0) {
-    lines.push(
-      "",
-      "Previous draft to refine:",
-      "```markdown",
-      previousDraft.trimEnd(),
-      "```",
-    );
-  }
-
   if (title) {
     lines.push("", `Title to use: ${title}`);
-  }
-
-  if (feedback && feedback.trim().length > 0) {
-    lines.push(
-      "",
-      "Address this reviewer feedback without pausing for interaction:",
-      feedback.trim(),
-    );
   }
 
   lines.push("", "User description:", "```", description.trim(), "```");

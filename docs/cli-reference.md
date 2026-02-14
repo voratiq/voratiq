@@ -71,12 +71,12 @@ If `.voratiq/` already exists, `voratiq init` fills any missing files and direct
 
 ## voratiq spec
 
-Generate a structured spec from a task description via a (specific) sandboxed agent.
+Generate a structured spec from a task description via a sandboxed agent.
 
 ### Usage
 
 ```bash
-voratiq spec --description <text> --agent <agent-id> [--title <text>] [--output <path>] [-y, --yes]
+voratiq spec --description <text> --agent <agent-id> [--title <text>] [--output <path>]
 ```
 
 ### Flags
@@ -87,71 +87,23 @@ voratiq spec --description <text> --agent <agent-id> [--title <text>] [--output 
 | `--agent <agent-id>`   | Yes      | Agent to draft the spec (e.g., `claude-opus-4-5-20251101`)                 |
 | `--title <text>`       | No       | Spec title; agent infers if omitted                                        |
 | `--output <path>`      | No       | Output path; agent infers if omitted (default: `.voratiq/specs/<slug>.md`) |
-| `-y, --yes`            | No       | Auto-accept first draft and skip confirmation (required in non-TTY shells) |
 
 ### Behavior
 
-- TTY (interactive): drafts a spec, shows a preview, prompts `Save this specification? [Y/n]:`, and loops on feedback until accepted
-- Non-TTY: requires `--yes`; without it, exits with `Error: Non-interactive shell detected; re-run with --yes to accept defaults.`
+Invokes the specified agent in a sandbox to draft a structured Markdown spec from the provided description.
 
 ### Examples
 
-Interactive (TTY):
-
-````
+```bash
 $ voratiq spec --description "add dark mode toggle with localStorage persistence" --agent claude-opus-4-5-20251101
 
 Generating specification...
-
-```markdown
-# Add Dark Mode Toggle
-
-## Summary
-Implement a dark mode toggle in the settings page that persists
-user preference to localStorage.
-
-## Context
-- Settings page: `src/components/Settings.tsx`
-- No existing theme infrastructure
-
-## Acceptance Criteria
-- [ ] Toggle appears in settings page
-- [ ] Preference persists in localStorage
-- [ ] Theme applies on page load
-```
-
-Save this specification? [Y/n]: n
-
-What would you like to change?
-> add system preference detection via prefers-color-scheme
-
-Refining...
-
-```markdown
-# Add Dark Mode Toggle
-
-## Summary
-Implement a dark mode toggle in the settings page that respects
-system preferences and persists user choice to localStorage.
-
-## Context
-- Settings page: `src/components/Settings.tsx`
-- No existing theme infrastructure
-
-## Acceptance Criteria
-- [ ] Toggle appears in settings page
-- [ ] Respects `prefers-color-scheme` on first visit
-- [ ] User preference persists in localStorage and overrides system
-- [ ] Theme applies on page load
-```
-
-Save this specification? [Y/n]: y
 
 Spec saved: .voratiq/specs/add-dark-mode-toggle.md
 
 To begin a run:
   voratiq run --spec .voratiq/specs/add-dark-mode-toggle.md
-````
+```
 
 ### Errors
 
@@ -229,7 +181,7 @@ voratiq review --run <run-id> --agent <agent-id>
 
 ### Behavior
 
-Invokes the specified reviewer agent in headless mode. The agent reads run artifacts under `.voratiq/runs/sessions/<run-id>/` and writes its analysis to `.voratiq/reviews/sessions/<review-id>/<agent-id>/artifacts/review.md`. Execution is one-shot—there is no interactive accept/refine loop.
+Invokes the specified agent in a sandbox to analyze artifacts from a completed run and write a review.
 
 ### Examples
 
