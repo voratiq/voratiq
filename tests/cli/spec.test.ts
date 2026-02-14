@@ -3,10 +3,8 @@ import { dirname, join } from "node:path";
 
 import * as harness from "../../src/agents/runtime/harness.js";
 import * as sandboxRuntime from "../../src/agents/runtime/sandbox.js";
-import { CliError, NonInteractiveShellError } from "../../src/cli/errors.js";
+import { CliError } from "../../src/cli/errors.js";
 import { runSpecCommand } from "../../src/cli/spec.js";
-import { executeSpecCommand } from "../../src/commands/spec/command.js";
-import { buildDraftPreviewLines } from "../../src/commands/spec/preview.js";
 import * as preflight from "../../src/preflight/index.js";
 import { renderCliError } from "../../src/render/utils/errors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
@@ -84,7 +82,7 @@ describe("voratiq spec (CLI)", () => {
     await workspace?.cleanup();
   });
 
-  it("requires --yes in non-interactive shells", async () => {
+  it("runs in non-interactive shells without --yes", async () => {
     const originalDescriptor = Object.getOwnPropertyDescriptor(
       process.stdin,
       "isTTY",
@@ -94,16 +92,57 @@ describe("voratiq spec (CLI)", () => {
       configurable: true,
     });
 
+    try {
+      await expect(
+        runSpecCommand({
+          description: "Write a spec",
+          agent: "claude-haiku-4-5-20251001",
+        }),
+      ).resolves.toMatchObject({
+        outputPath: ".voratiq/specs/payment-flow.md",
+      });
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(process.stdin, "isTTY", originalDescriptor);
+      }
+    }
+  });
+
+  it("surfaces generation failures with actionable detail", async () => {
+    runSandboxedAgentMock.mockResolvedValueOnce({
+      exitCode: 1,
+      errorMessage: "agent crashed",
+      sandboxSettings: {
+        network: {
+          allowedDomains: [],
+          deniedDomains: [],
+        },
+        filesystem: {
+          denyRead: [],
+          allowWrite: [],
+          denyWrite: [],
+        },
+      },
+      manifestEnv: {},
+    });
+
+    let captured: unknown;
     await expect(
       runSpecCommand({
         description: "Write a spec",
         agent: "claude-haiku-4-5-20251001",
+      }).catch((error) => {
+        captured = error;
+        throw error;
       }),
-    ).rejects.toBeInstanceOf(NonInteractiveShellError);
+    ).rejects.toBeDefined();
 
-    if (originalDescriptor) {
-      Object.defineProperty(process.stdin, "isTTY", originalDescriptor);
-    }
+    const rendered = renderCliError(captured as CliError).replace(
+      ANSI_PATTERN,
+      "",
+    );
+    expect(rendered).toContain("Error: Specification generation failed.");
+    expect(rendered).toContain("agent crashed");
   });
 
   it("formats invalid agent errors with the desired copy", async () => {
@@ -112,7 +151,6 @@ describe("voratiq spec (CLI)", () => {
       runSpecCommand({
         description: "Do something",
         agent: "missing",
-        yes: true,
       }).catch((error) => {
         captured = error;
         throw error;
@@ -138,7 +176,6 @@ describe("voratiq spec (CLI)", () => {
         description: "Spec with bad path",
         agent: "claude-haiku-4-5-20251001",
         output: "../escape.md",
-        yes: true,
       }),
     ).rejects.toThrow(".voratiq/specs");
   });
@@ -154,20 +191,45 @@ describe("voratiq spec (CLI)", () => {
         agent: "claude-haiku-4-5-20251001",
         title: "Payment Flow",
         output: ".voratiq/specs/custom.md",
-        yes: true,
       }),
     ).rejects.toThrow("File already exists");
   });
 
-  it("promotes draft artifacts, updates records, and writes canonical output", async () => {
+  it("surfaces write failures when saving the final spec", async () => {
+    const oversizedFilename = `${"x".repeat(300)}.md`;
+
+    let captured: unknown;
+    await expect(
+      runSpecCommand({
+        description: "Design a payment flow",
+        agent: "claude-haiku-4-5-20251001",
+        title: "Payment Flow",
+        output: `.voratiq/specs/${oversizedFilename}`,
+      }).catch((error) => {
+        captured = error;
+        throw error;
+      }),
+    ).rejects.toBeDefined();
+
+    const rendered = renderCliError(captured as CliError).replace(
+      ANSI_PATTERN,
+      "",
+    );
+    expect(rendered).toContain("Error: Specification generation failed.");
+    expect(rendered).toMatch(
+      /name too long|enametoolong|permission denied|eacces|eperm/i,
+    );
+  });
+
+  it("promotes spec artifacts, updates records, and writes canonical output", async () => {
     const title = "Payment Flow";
 
     await runSpecCommand({
       description: "Design a payment flow",
       agent: "claude-haiku-4-5-20251001",
       title,
-      yes: true,
     });
+    expect(runSandboxedAgentMock).toHaveBeenCalledTimes(1);
 
     const indexPath = join(repoRoot, ".voratiq", "specs", "index.json");
     const indexPayload = JSON.parse(await readFile(indexPath, "utf8")) as {
@@ -189,17 +251,16 @@ describe("voratiq spec (CLI)", () => {
     const record = JSON.parse(await readFile(recordPath, "utf8")) as {
       slug: string;
       outputPath: string;
-      iterations: Array<{ accepted: boolean }>;
+      iterations?: unknown;
       agentId: string;
     };
 
     expect(record.slug).toBe("payment-flow");
     expect(record.outputPath).toBe(".voratiq/specs/payment-flow.md");
     expect(record.agentId).toBe("claude-haiku-4-5-20251001");
-    expect(record.iterations).toHaveLength(1);
-    expect(record.iterations[0]?.accepted).toBe(true);
+    expect(record.iterations).toBeUndefined();
 
-    const draftPath = join(
+    const artifactPath = join(
       repoRoot,
       ".voratiq",
       "specs",
@@ -207,8 +268,6 @@ describe("voratiq spec (CLI)", () => {
       sessionId,
       "claude-haiku-4-5-20251001",
       "artifacts",
-      "drafts",
-      "01",
       "spec.md",
     );
     const canonicalPath = join(
@@ -218,70 +277,11 @@ describe("voratiq spec (CLI)", () => {
       "payment-flow.md",
     );
 
-    await expect(readFile(draftPath, "utf8")).resolves.toContain(
+    await expect(readFile(artifactPath, "utf8")).resolves.toContain(
       "# Payment Flow",
     );
     await expect(readFile(canonicalPath, "utf8")).resolves.toContain(
       "# Payment Flow",
     );
-  });
-
-  it("shows the draft preview before confirmation and reuses it for feedback", async () => {
-    const confirmations: Array<{ message: string; prefaceLines?: string[] }> =
-      [];
-    const prompts: Array<{ message: string; prefaceLines?: string[] }> = [];
-
-    let iteration = 0;
-    runSandboxedAgentMock.mockImplementation(async (options) => {
-      const draftPath = join(options.paths.workspacePath, "spec.md");
-      await mkdir(dirname(draftPath), { recursive: true });
-      await writeFile(
-        draftPath,
-        iteration === 0
-          ? "# Draft\nDetails\nLine2\n"
-          : "# Draft refined\nBetter\n",
-        "utf8",
-      );
-      iteration += 1;
-      return {
-        exitCode: 0,
-        sandboxSettings: {
-          network: { allowedDomains: [], deniedDomains: [] },
-          filesystem: { denyRead: [], allowWrite: [], denyWrite: [] },
-        },
-        manifestEnv: {},
-      };
-    });
-
-    await executeSpecCommand({
-      root: repoRoot,
-      specsFilePath: join(repoRoot, ".voratiq", "specs", "index.json"),
-      description: "Design a payment flow",
-      agentId: "claude-haiku-4-5-20251001",
-      title: "Payment Flow",
-      outputPath: undefined,
-      assumeYes: false,
-      interactive: true,
-      confirm: async (options) => {
-        confirmations.push(options);
-        await Promise.resolve();
-        return confirmations.length === 2; // decline first, accept second
-      },
-      prompt: async (options) => {
-        prompts.push(options);
-        await Promise.resolve();
-        return "Add more detail";
-      },
-    });
-
-    const firstPreview = buildDraftPreviewLines("# Draft\nDetails\nLine2\n");
-    expect(confirmations[0]?.prefaceLines).toEqual(firstPreview);
-    expect(confirmations[0]?.message).toBe("Save this specification?");
-    expect(prompts[0]?.message).toBe(">");
-    expect(prompts[0]?.prefaceLines).toEqual([
-      "",
-      "What would you like to change?",
-    ]);
-    expect(iteration).toBe(2);
   });
 });

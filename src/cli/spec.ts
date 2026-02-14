@@ -7,8 +7,6 @@ import {
   resolveCliContext,
 } from "../preflight/index.js";
 import { renderSpecTranscript } from "../render/transcripts/spec.js";
-import { createConfirmationWorkflow } from "./confirmation.js";
-import { NonInteractiveShellError } from "./errors.js";
 import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface SpecCommandOptions {
@@ -16,7 +14,6 @@ export interface SpecCommandOptions {
   agent: string;
   title?: string;
   output?: string;
-  yes?: boolean;
   suppressHint?: boolean;
   writeOutput?: CommandOutputWriter;
 }
@@ -34,7 +31,6 @@ export async function runSpecCommand(
     agent,
     title,
     output,
-    yes,
     suppressHint,
     writeOutput = writeCommandOutput,
   } = options;
@@ -43,39 +39,24 @@ export async function runSpecCommand(
   checkPlatformSupport();
   ensureSandboxDependencies();
 
-  const confirmation = createConfirmationWorkflow({
-    assumeYes: Boolean(yes),
-    onUnavailable: () => {
-      throw new NonInteractiveShellError();
+  const result = await executeSpecCommand({
+    root,
+    specsFilePath: workspacePaths.specsFile,
+    description,
+    agentId: agent,
+    title,
+    outputPath: output,
+    onStatus: (message) => {
+      writeOutput({ alerts: [{ severity: "info", message }] });
     },
   });
 
-  try {
-    const result = await executeSpecCommand({
-      root,
-      specsFilePath: workspacePaths.specsFile,
-      description,
-      agentId: agent,
-      title,
-      outputPath: output,
-      assumeYes: Boolean(yes),
-      interactive: confirmation.interactive,
-      confirm: confirmation.confirm,
-      prompt: confirmation.prompt,
-      onStatus: (message) => {
-        writeOutput({ alerts: [{ severity: "info", message }] });
-      },
-    });
+  const body = renderSpecTranscript(result.outputPath, { suppressHint });
 
-    const body = renderSpecTranscript(result.outputPath, { suppressHint });
-
-    return {
-      body,
-      outputPath: result.outputPath,
-    };
-  } finally {
-    confirmation.close();
-  }
+  return {
+    body,
+    outputPath: result.outputPath,
+  };
 }
 
 export function createSpecCommand(): Command {
@@ -91,7 +72,6 @@ export function createSpecCommand(): Command {
       "--output <path>",
       "Optional output path within .voratiq/specs/ (defaults to <slug>.md)",
     )
-    .option("-y, --yes", "Assume yes for prompts (required in non-TTY shells)")
     .allowExcessArguments(false)
     .action(async (commandOptions: SpecCommandOptions) => {
       const result = await runSpecCommand(commandOptions);

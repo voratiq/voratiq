@@ -27,14 +27,6 @@ const repoRelativePathSchema = z
   .string()
   .superRefine((value, ctx) => validateRepoRelativePath(value, ctx));
 
-export const specIterationRecordSchema = z.object({
-  iteration: z.number().int().positive(),
-  createdAt: z.string(),
-  accepted: z.boolean(),
-});
-
-export type SpecIterationRecord = z.infer<typeof specIterationRecordSchema>;
-
 export const specRecordSchema = z.object({
   sessionId: z.string(),
   createdAt: z.string(),
@@ -44,7 +36,6 @@ export const specRecordSchema = z.object({
   title: z.string(),
   slug: z.string(),
   outputPath: repoRelativePathSchema,
-  iterations: z.array(specIterationRecordSchema),
   error: z.string().nullable().optional(),
 });
 

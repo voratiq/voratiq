@@ -117,8 +117,6 @@ export const TERMINAL_REVIEW_STATUSES: readonly ReviewStatus[] = [
 
 export const SPEC_RECORD_STATUS_VALUES = [
   "drafting",
-  "awaiting-feedback",
-  "refining",
   "saving",
   "saved",
   "aborted",

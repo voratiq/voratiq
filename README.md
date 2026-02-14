@@ -35,8 +35,7 @@ voratiq init --yes
 # Generate a spec
 voratiq spec \
   --description "add dark mode toggle with localStorage persistence" \
-  --agent <agent-id> \
-  --yes
+  --agent <agent-id>
 
 # Run agent ensemble against that spec
 voratiq run --spec .voratiq/specs/add-dark-mode-toggle.md

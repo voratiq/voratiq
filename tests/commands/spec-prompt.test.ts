@@ -28,18 +28,15 @@ describe("buildSpecPrompt", () => {
     );
   });
 
-  it("includes previous draft and feedback when refining", () => {
+  it("includes an explicit title when provided", () => {
     const prompt = buildSpecPrompt({
       description: "Define the onboarding flow.",
-      previousDraft: "# Draft\nOld details",
-      feedback: "Tighten scope",
+      title: "Onboarding Improvements",
       outputPath: "spec.md",
       repoRootPath: "/repo",
       workspacePath: "/repo/.voratiq/specs/sessions/123/workspace",
     });
 
-    expect(prompt).toContain("Previous draft to refine:");
-    expect(prompt).toContain("# Draft");
-    expect(prompt).toContain("Tighten scope");
+    expect(prompt).toContain("Title to use: Onboarding Improvements");
   });
 });
