@@ -182,10 +182,13 @@ export async function gitDiffShortStat(
 
 export async function gitDiff(options: GitDiffStatOptions): Promise<string> {
   const { cwd, baseRevision, targetRevision } = options;
-  return runGitCommand(["diff", "--no-color", baseRevision, targetRevision], {
-    cwd,
-    trim: false,
-  });
+  return runGitCommand(
+    ["diff", "--binary", "--no-color", baseRevision, targetRevision],
+    {
+      cwd,
+      trim: false,
+    },
+  );
 }
 
 export function getGitStderr(error: unknown): string | undefined {
