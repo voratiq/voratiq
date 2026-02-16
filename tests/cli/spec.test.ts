@@ -5,6 +5,7 @@ import * as harness from "../../src/agents/runtime/harness.js";
 import * as sandboxRuntime from "../../src/agents/runtime/sandbox.js";
 import { CliError } from "../../src/cli/errors.js";
 import { runSpecCommand } from "../../src/cli/spec.js";
+import { executeCompetitionWithAdapter } from "../../src/competition/command-adapter.js";
 import * as preflight from "../../src/preflight/index.js";
 import { renderCliError } from "../../src/render/utils/errors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
@@ -14,6 +15,9 @@ import {
 } from "../support/fixtures/run-workspace.js";
 
 const runSandboxedAgentMock = jest.mocked(harness.runSandboxedAgent);
+const executeCompetitionWithAdapterMock = jest.mocked(
+  executeCompetitionWithAdapter,
+);
 
 const ESC = String.fromCharCode(0x1b);
 const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
@@ -21,6 +25,18 @@ const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
 jest.mock("../../src/agents/runtime/harness.js", () => ({
   runSandboxedAgent: jest.fn(),
 }));
+
+jest.mock("../../src/competition/command-adapter.js", () => {
+  const actual = jest.requireActual<
+    typeof import("../../src/competition/command-adapter.js")
+  >("../../src/competition/command-adapter.js");
+  return {
+    ...actual,
+    executeCompetitionWithAdapter: jest.fn(
+      actual.executeCompetitionWithAdapter,
+    ),
+  };
+});
 
 describe("voratiq spec (CLI)", () => {
   let repoRoot: string;
@@ -52,6 +68,7 @@ describe("voratiq spec (CLI)", () => {
       .spyOn(preflight, "ensureSandboxDependencies")
       .mockImplementation(() => {});
 
+    executeCompetitionWithAdapterMock.mockClear();
     runSandboxedAgentMock.mockReset();
     runSandboxedAgentMock.mockImplementation(async (options) => {
       const draftPath = join(options.paths.workspacePath, "spec.md");
@@ -93,19 +110,92 @@ describe("voratiq spec (CLI)", () => {
     });
 
     try {
-      await expect(
-        runSpecCommand({
-          description: "Write a spec",
-          agent: "claude-haiku-4-5-20251001",
-        }),
-      ).resolves.toMatchObject({
+      const result = await runSpecCommand({
+        description: "Write a spec",
+        agent: "claude-haiku-4-5-20251001",
+      });
+      expect(result).toMatchObject({
         outputPath: ".voratiq/specs/payment-flow.md",
       });
+      expect(result.body).toContain(
+        "Spec saved: .voratiq/specs/payment-flow.md",
+      );
+      expect(result.body).toContain(
+        "To begin a run:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
+      );
     } finally {
       if (originalDescriptor) {
         Object.defineProperty(process.stdin, "isTTY", originalDescriptor);
       }
     }
+  });
+
+  it("records failed sessions with finalized error metadata", async () => {
+    runSandboxedAgentMock.mockResolvedValueOnce({
+      exitCode: 1,
+      errorMessage: "agent crashed",
+      sandboxSettings: {
+        network: {
+          allowedDomains: [],
+          deniedDomains: [],
+        },
+        filesystem: {
+          denyRead: [],
+          allowWrite: [],
+          denyWrite: [],
+        },
+      },
+      manifestEnv: {},
+    });
+
+    await expect(
+      runSpecCommand({
+        description: "Design a payment flow",
+        agent: "claude-haiku-4-5-20251001",
+        title: "Payment Flow",
+      }),
+    ).rejects.toBeDefined();
+
+    const indexPath = join(repoRoot, ".voratiq", "specs", "index.json");
+    const indexPayload = JSON.parse(await readFile(indexPath, "utf8")) as {
+      sessions: Array<{ sessionId: string; status: string }>;
+    };
+    const latest = indexPayload.sessions.at(-1);
+    expect(latest).toBeDefined();
+    expect(latest?.status).toBe("failed");
+
+    const sessionId = latest?.sessionId ?? "";
+    const recordPath = join(
+      repoRoot,
+      ".voratiq",
+      "specs",
+      "sessions",
+      sessionId,
+      "record.json",
+    );
+    const record = JSON.parse(await readFile(recordPath, "utf8")) as {
+      status: string;
+      error: string | null;
+      outputPath: string;
+      completedAt?: string;
+    };
+    expect(record.status).toBe("failed");
+    expect(record.error).toContain("agent crashed");
+    expect(record.outputPath).toBe(".voratiq/specs/payment-flow.md");
+    expect(record.completedAt).toEqual(expect.any(String));
+
+    const workspacePath = join(
+      repoRoot,
+      ".voratiq",
+      "specs",
+      "sessions",
+      sessionId,
+      "claude-haiku-4-5-20251001",
+      "workspace",
+    );
+    await expect(readFile(workspacePath, "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
   it("surfaces generation failures with actionable detail", async () => {
@@ -224,12 +314,26 @@ describe("voratiq spec (CLI)", () => {
   it("promotes spec artifacts, updates records, and writes canonical output", async () => {
     const title = "Payment Flow";
 
-    await runSpecCommand({
+    const result = await runSpecCommand({
       description: "Design a payment flow",
       agent: "claude-haiku-4-5-20251001",
       title,
     });
     expect(runSandboxedAgentMock).toHaveBeenCalledTimes(1);
+    expect(result.body).toContain("Spec saved: .voratiq/specs/payment-flow.md");
+    expect(result.body).toContain(
+      "To begin a run:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
+    );
+
+    expect(executeCompetitionWithAdapterMock).toHaveBeenCalledTimes(1);
+    expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxParallel: 1,
+        candidates: [
+          expect.objectContaining({ id: "claude-haiku-4-5-20251001" }),
+        ],
+      }),
+    );
 
     const indexPath = join(repoRoot, ".voratiq", "specs", "index.json");
     const indexPayload = JSON.parse(await readFile(indexPath, "utf8")) as {
@@ -283,5 +387,18 @@ describe("voratiq spec (CLI)", () => {
     await expect(readFile(canonicalPath, "utf8")).resolves.toContain(
       "# Payment Flow",
     );
+
+    const workspacePath = join(
+      repoRoot,
+      ".voratiq",
+      "specs",
+      "sessions",
+      sessionId,
+      "claude-haiku-4-5-20251001",
+      "workspace",
+    );
+    await expect(readFile(workspacePath, "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 });
