@@ -1,46 +1,21 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
-import { detectAgentProcessFailureDetail } from "../../agents/runtime/failures.js";
-import { runSandboxedAgent } from "../../agents/runtime/harness.js";
+import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import { loadAgentById } from "../../configs/agents/loader.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
-import {
-  appendReviewRecord,
-  finalizeReviewRecord,
-  flushReviewRecordBuffer,
-} from "../../reviews/records/persistence.js";
-import type { ReviewRecord } from "../../reviews/records/types.js";
 import type { RunRecordEnhanced } from "../../runs/records/enhanced.js";
 import { buildRunRecordView } from "../../runs/records/enhanced.js";
 import { RunRecordNotFoundError } from "../../runs/records/errors.js";
 import { fetchRunsSafely } from "../../runs/records/persistence.js";
 import { toErrorMessage } from "../../utils/errors.js";
-import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
-import {
-  type AgentWorkspacePaths,
-  resolveRunWorkspacePaths,
-  scaffoldAgentSessionWorkspace,
-} from "../../workspace/layout.js";
-import { promoteWorkspaceFile } from "../../workspace/promotion.js";
-import {
-  REVIEW_ARTIFACT_INFO_FILENAME,
-  REVIEW_FILENAME,
-  REVIEW_RECOMMENDATION_FILENAME,
-  VORATIQ_REVIEWS_DIR,
-} from "../../workspace/structure.js";
+import { resolveRunWorkspacePaths } from "../../workspace/layout.js";
 import { RunNotFoundCliError } from "../errors.js";
-import { pruneWorkspace } from "../shared/prune.js";
 import { generateSessionId } from "../shared/session-id.js";
+import { createReviewCompetitionAdapter } from "./competition-adapter.js";
 import {
   ReviewAgentNotFoundError,
   ReviewGenerationFailedError,
 } from "./errors.js";
-import { buildReviewManifest } from "./manifest.js";
-import { buildReviewPrompt } from "./prompt.js";
-import { parseReviewRecommendation } from "./recommendation.js";
 
 export interface ReviewCommandInput {
   root: string;
@@ -89,180 +64,44 @@ export async function executeReviewCommand(
   const reviewId = generateSessionId();
   const createdAt = new Date().toISOString();
 
-  const workspacePaths = await buildReviewWorkspace({
-    root,
-    reviewId,
-    agentId: agent.id,
-  });
-
-  const outputPath = normalizePathForDisplay(
-    relativeToRoot(root, workspacePaths.reviewPath),
-  );
-  const record: ReviewRecord = {
-    sessionId: reviewId,
-    runId,
-    createdAt,
-    status: "running",
-    agentId: agent.id,
-    outputPath,
-  };
-
-  await appendReviewRecord({
-    root,
-    reviewsFilePath,
-    record,
-  });
+  const competitors = [agent];
 
   const runWorkspaceAbsolute = resolveRunWorkspacePaths(root, runId).absolute;
 
-  let missingArtifacts: string[] = [];
-
-  try {
-    const buildManifestResult = await buildReviewManifest({
+  const reviewResults = await executeCompetitionWithAdapter({
+    candidates: competitors,
+    maxParallel: 1,
+    adapter: createReviewCompetitionAdapter({
       root,
+      reviewId,
+      createdAt,
+      reviewsFilePath,
       run: enhanced,
-    });
-    const manifest = buildManifestResult.manifest;
-    missingArtifacts = buildManifestResult.missingArtifacts;
-
-    const artifactInfoWorkspacePath = join(
-      workspacePaths.workspacePath,
-      REVIEW_ARTIFACT_INFO_FILENAME,
-    );
-    await writeFile(
-      artifactInfoWorkspacePath,
-      `${JSON.stringify(manifest, null, 2)}\n`,
-      {
-        encoding: "utf8",
-      },
-    );
-
-    const prompt = buildReviewPrompt({
-      runId: enhanced.runId,
-      runStatus: enhanced.status,
-      specPath: enhanced.spec.path,
-      baseRevisionSha: enhanced.baseRevisionSha,
-      createdAt: enhanced.createdAt,
-      completedAt: manifest.run.completedAt,
-      artifactInfoPath: REVIEW_ARTIFACT_INFO_FILENAME,
-      outputPath: REVIEW_FILENAME,
-      repoRootPath: root,
-      workspacePath: workspacePaths.workspacePath,
-    });
-
-    const result = await runSandboxedAgent({
-      root,
-      sessionId: reviewId,
-      agent,
-      prompt,
       environment,
-      paths: {
-        agentRoot: workspacePaths.agentRoot,
-        workspacePath: workspacePaths.workspacePath,
-        sandboxHomePath: workspacePaths.sandboxHomePath,
-        runtimeManifestPath: workspacePaths.runtimeManifestPath,
-        sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
-        runtimePath: workspacePaths.runtimePath,
-        artifactsPath: workspacePaths.artifactsPath,
-        stdoutPath: workspacePaths.stdoutPath,
-        stderrPath: workspacePaths.stderrPath,
-      },
-      captureChat: true,
-      extraWriteProtectedPaths: [runWorkspaceAbsolute],
-      extraReadProtectedPaths: [],
-    });
-
-    if (result.exitCode !== 0 || result.errorMessage) {
-      const detectedDetail =
-        result.watchdog?.trigger && result.errorMessage
-          ? result.errorMessage
-          : await detectAgentProcessFailureDetail({
-              provider: agent.provider,
-              stdoutPath: workspacePaths.stdoutPath,
-              stderrPath: workspacePaths.stderrPath,
-            });
-      const detail =
-        detectedDetail ??
-        result.errorMessage ??
-        `Agent exited with code ${result.exitCode ?? "unknown"}`;
-      throw new ReviewGenerationFailedError(
-        [detail],
-        [
-          `See stderr: ${normalizePathForDisplay(
-            relativeToRoot(root, workspacePaths.stderrPath),
-          )}`,
-        ],
-      );
-    }
-
-    await assertReviewOutputExists(root, workspacePaths, reviewId);
-
-    await promoteWorkspaceFile({
-      workspacePath: workspacePaths.workspacePath,
-      artifactsPath: workspacePaths.artifactsPath,
-      stagedRelativePath: REVIEW_FILENAME,
-      artifactRelativePath: REVIEW_FILENAME,
-      deleteStaged: true,
-    });
-    await promoteWorkspaceFile({
-      workspacePath: workspacePaths.workspacePath,
-      artifactsPath: workspacePaths.artifactsPath,
-      stagedRelativePath: REVIEW_RECOMMENDATION_FILENAME,
-      artifactRelativePath: REVIEW_RECOMMENDATION_FILENAME,
-      deleteStaged: true,
-    });
-
-    await finalizeReviewRecord({
-      root,
-      reviewsFilePath,
-      sessionId: reviewId,
-      status: "succeeded",
-    });
-  } catch (error) {
-    const detail =
-      error instanceof ReviewGenerationFailedError &&
-      error.detailLines.length > 0
-        ? error.detailLines.join("\n")
-        : toErrorMessage(error);
-    await finalizeReviewRecord({
-      root,
-      reviewsFilePath,
-      sessionId: reviewId,
-      status: "failed",
-      error: detail,
-    }).catch(() => {});
-
-    await flushReviewRecordBuffer({
-      reviewsFilePath,
-      sessionId: reviewId,
-    }).catch(() => {});
-    await pruneWorkspace(workspacePaths.workspacePath);
-
+      runWorkspaceAbsolute,
+    }),
+  }).catch((error) => {
     if (error instanceof ReviewGenerationFailedError) {
       throw error;
     }
-    throw new ReviewGenerationFailedError(
-      [detail],
-      [
-        `See stderr: ${normalizePathForDisplay(
-          relativeToRoot(root, workspacePaths.stderrPath),
-        )}`,
-      ],
-    );
-  }
 
-  await flushReviewRecordBuffer({
-    reviewsFilePath,
-    sessionId: reviewId,
+    const detail = toErrorMessage(error);
+    throw new ReviewGenerationFailedError([detail]);
   });
-  await pruneWorkspace(workspacePaths.workspacePath);
+
+  const selectedResult = reviewResults[0];
+  if (!selectedResult) {
+    throw new ReviewGenerationFailedError([
+      `Review session ${reviewId} did not produce any result.`,
+    ]);
+  }
 
   return {
     reviewId,
     runRecord: enhanced,
-    agentId: agent.id,
-    outputPath,
-    missingArtifacts,
+    agentId: selectedResult.agentId,
+    outputPath: selectedResult.outputPath,
+    missingArtifacts: [...selectedResult.missingArtifacts],
   };
 }
 
@@ -278,97 +117,5 @@ function resolveReviewAgent(options: {
       throw new ReviewAgentNotFoundError(error.agentId);
     }
     throw error;
-  }
-}
-
-async function buildReviewWorkspace(options: {
-  root: string;
-  reviewId: string;
-  agentId: string;
-}): Promise<AgentWorkspacePaths> {
-  const { root, reviewId, agentId } = options;
-  return await scaffoldAgentSessionWorkspace({
-    root,
-    domain: VORATIQ_REVIEWS_DIR,
-    sessionId: reviewId,
-    agentId,
-  });
-}
-
-async function assertReviewOutputExists(
-  root: string,
-  workspacePaths: AgentWorkspacePaths,
-  reviewId: string,
-): Promise<void> {
-  const reviewStagedPath = join(workspacePaths.workspacePath, REVIEW_FILENAME);
-  try {
-    const reviewContent = await readFile(reviewStagedPath, "utf8");
-    if (reviewContent.trim().length === 0) {
-      const stderrDisplay = normalizePathForDisplay(
-        relativeToRoot(root, workspacePaths.stderrPath),
-      );
-      throw new ReviewGenerationFailedError(
-        [`Missing output: ${REVIEW_FILENAME}`],
-        [`Review session: ${reviewId}`, `See stderr: ${stderrDisplay}`],
-      );
-    }
-  } catch (error) {
-    if (error instanceof ReviewGenerationFailedError) {
-      throw error;
-    }
-    const detail = toErrorMessage(error);
-    const stderrDisplay = normalizePathForDisplay(
-      relativeToRoot(root, workspacePaths.stderrPath),
-    );
-    throw new ReviewGenerationFailedError(
-      [`Missing output: ${REVIEW_FILENAME}`],
-      [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
-    );
-  }
-
-  const recommendationStagedPath = join(
-    workspacePaths.workspacePath,
-    REVIEW_RECOMMENDATION_FILENAME,
-  );
-
-  let recommendationContent: string;
-  try {
-    recommendationContent = await readFile(recommendationStagedPath, "utf8");
-  } catch (error) {
-    const detail = toErrorMessage(error);
-    const stderrDisplay = normalizePathForDisplay(
-      relativeToRoot(root, workspacePaths.stderrPath),
-    );
-    throw new ReviewGenerationFailedError(
-      [`Missing output: ${REVIEW_RECOMMENDATION_FILENAME}`],
-      [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
-    );
-  }
-
-  if (recommendationContent.trim().length === 0) {
-    const stderrDisplay = normalizePathForDisplay(
-      relativeToRoot(root, workspacePaths.stderrPath),
-    );
-    throw new ReviewGenerationFailedError(
-      [`Invalid output: ${REVIEW_RECOMMENDATION_FILENAME}`],
-      [
-        `Review session: ${reviewId}`,
-        "Recommendation artifact is empty.",
-        `See stderr: ${stderrDisplay}`,
-      ],
-    );
-  }
-
-  try {
-    parseReviewRecommendation(recommendationContent);
-  } catch (error) {
-    const detail = toErrorMessage(error);
-    const stderrDisplay = normalizePathForDisplay(
-      relativeToRoot(root, workspacePaths.stderrPath),
-    );
-    throw new ReviewGenerationFailedError(
-      [`Invalid output: ${REVIEW_RECOMMENDATION_FILENAME}`],
-      [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
-    );
   }
 }

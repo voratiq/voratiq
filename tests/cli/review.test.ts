@@ -6,19 +6,25 @@ import { promisify } from "node:util";
 
 import { Command } from "commander";
 
-import * as harness from "../../src/agents/runtime/harness.js";
-import * as sandboxRuntime from "../../src/agents/runtime/sandbox.js";
+import { runSandboxedAgent } from "../../src/agents/runtime/harness.js";
+import { checkPlatformSupport } from "../../src/agents/runtime/sandbox.js";
 import {
   createReviewCommand,
   type ReviewCommandOptions,
   runReviewCommand,
 } from "../../src/cli/review.js";
+import { RunNotFoundCliError } from "../../src/commands/errors.js";
+import { ReviewGenerationFailedError } from "../../src/commands/review/errors.js";
 import { parseReviewRecommendation } from "../../src/commands/review/recommendation.js";
-import * as preflight from "../../src/preflight/index.js";
+import { executeCompetitionWithAdapter } from "../../src/competition/command-adapter.js";
+import { ensureSandboxDependencies } from "../../src/preflight/index.js";
 import { appendRunRecord } from "../../src/runs/records/persistence.js";
 import type { RunRecord } from "../../src/runs/records/types.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
-import { REVIEW_RECOMMENDATION_FILENAME } from "../../src/workspace/structure.js";
+import {
+  REVIEW_ARTIFACT_INFO_FILENAME,
+  REVIEW_RECOMMENDATION_FILENAME,
+} from "../../src/workspace/structure.js";
 import { silenceCommander } from "../support/commander.js";
 import {
   createAgentInvocationRecord,
@@ -27,11 +33,48 @@ import {
 
 const execFileAsync = promisify(execFile);
 
-const runSandboxedAgentMock = jest.mocked(harness.runSandboxedAgent);
+const runSandboxedAgentMock = jest.mocked(runSandboxedAgent);
+const checkPlatformSupportMock = jest.mocked(checkPlatformSupport);
+const ensureSandboxDependenciesMock = jest.mocked(ensureSandboxDependencies);
+const executeCompetitionWithAdapterMock = jest.mocked(
+  executeCompetitionWithAdapter,
+);
 
 jest.mock("../../src/agents/runtime/harness.js", () => ({
   runSandboxedAgent: jest.fn(),
 }));
+
+jest.mock("../../src/agents/runtime/sandbox.js", () => {
+  const actual = jest.requireActual<
+    typeof import("../../src/agents/runtime/sandbox.js")
+  >("../../src/agents/runtime/sandbox.js");
+  return {
+    ...actual,
+    checkPlatformSupport: jest.fn(),
+  };
+});
+
+jest.mock("../../src/competition/command-adapter.js", () => {
+  const actual = jest.requireActual<
+    typeof import("../../src/competition/command-adapter.js")
+  >("../../src/competition/command-adapter.js");
+  return {
+    ...actual,
+    executeCompetitionWithAdapter: jest.fn(
+      actual.executeCompetitionWithAdapter,
+    ),
+  };
+});
+
+jest.mock("../../src/preflight/index.js", () => {
+  const actual = jest.requireActual<
+    typeof import("../../src/preflight/index.js")
+  >("../../src/preflight/index.js");
+  return {
+    ...actual,
+    ensureSandboxDependencies: jest.fn(),
+  };
+});
 
 describe("voratiq review", () => {
   describe("command options", () => {
@@ -116,8 +159,8 @@ describe("voratiq review", () => {
 
   describe("runReviewCommand", () => {
     let repoRoot: string;
-    let restorePlatformSpy: jest.SpyInstance | undefined;
-    let restoreDependenciesSpy: jest.SpyInstance | undefined;
+    let seenManifestPath: string | undefined;
+    let seenManifestPayload: string | undefined;
 
     beforeEach(async () => {
       repoRoot = await mkdtemp(join(tmpdir(), "voratiq-review-"));
@@ -133,12 +176,13 @@ describe("voratiq review", () => {
         },
       ]);
 
-      restorePlatformSpy = jest
-        .spyOn(sandboxRuntime, "checkPlatformSupport")
-        .mockImplementation(() => {});
-      restoreDependenciesSpy = jest
-        .spyOn(preflight, "ensureSandboxDependencies")
-        .mockImplementation(() => {});
+      checkPlatformSupportMock.mockReset();
+      checkPlatformSupportMock.mockImplementation(() => {});
+      ensureSandboxDependenciesMock.mockReset();
+      ensureSandboxDependenciesMock.mockImplementation(() => {});
+      executeCompetitionWithAdapterMock.mockClear();
+      seenManifestPath = undefined;
+      seenManifestPayload = undefined;
 
       runSandboxedAgentMock.mockReset();
       runSandboxedAgentMock.mockImplementation(async (options) => {
@@ -147,6 +191,11 @@ describe("voratiq review", () => {
           options.paths.workspacePath,
           REVIEW_RECOMMENDATION_FILENAME,
         );
+        seenManifestPath = join(
+          options.paths.workspacePath,
+          REVIEW_ARTIFACT_INFO_FILENAME,
+        );
+        seenManifestPayload = await readFile(seenManifestPath, "utf8");
         await mkdir(dirname(outputPath), { recursive: true });
         await writeFile(
           outputPath,
@@ -197,8 +246,6 @@ describe("voratiq review", () => {
     });
 
     afterEach(async () => {
-      restorePlatformSpy?.mockRestore();
-      restoreDependenciesSpy?.mockRestore();
       await rm(repoRoot, { recursive: true, force: true });
     });
 
@@ -217,9 +264,55 @@ describe("voratiq review", () => {
       expect(result.body).toContain("## Recommendation");
       expect(result.body).toContain("**Preferred Agent(s)**: reviewer");
       expect(result.body).toContain("**Next Actions**:");
-      expect(result.body).toContain("Full review here: ");
+      expect(result.body).toContain(`Full review here: ${result.outputPath}`);
       expect(result.body).not.toContain("To integrate a solution:");
       expect(result.missingArtifacts).toEqual([]);
+      expect(executeCompetitionWithAdapterMock).toHaveBeenCalledTimes(1);
+      const hasReviewerCandidate = (
+        executeCompetitionWithAdapterMock.mock.calls as unknown[]
+      ).some((call) => {
+        if (!Array.isArray(call) || call.length < 1) {
+          return false;
+        }
+        const args = (call as unknown[])[0];
+        if (!args || typeof args !== "object") {
+          return false;
+        }
+        const argsRecord = args as Record<string, unknown>;
+        if (argsRecord.maxParallel !== 1) {
+          return false;
+        }
+        if (!Array.isArray(argsRecord.candidates)) {
+          return false;
+        }
+        return argsRecord.candidates.some((candidate) => {
+          if (!candidate || typeof candidate !== "object") {
+            return false;
+          }
+          return (candidate as Record<string, unknown>).id === "reviewer";
+        });
+      });
+      expect(hasReviewerCandidate).toBe(true);
+
+      expect(seenManifestPath).toBeDefined();
+      expect(seenManifestPath).toContain(
+        join(
+          ".voratiq",
+          "reviews",
+          "sessions",
+          result.reviewId,
+          "reviewer",
+          "workspace",
+          REVIEW_ARTIFACT_INFO_FILENAME,
+        ),
+      );
+      expect(seenManifestPayload).toBeDefined();
+      const manifest = JSON.parse(seenManifestPayload ?? "{}") as {
+        run: { runId: string };
+        agents: Array<{ agentId: string }>;
+      };
+      expect(manifest.run.runId).toBe(runRecord.runId);
+      expect(manifest.agents.map((agent) => agent.agentId)).toEqual(["codex"]);
 
       const reviewOutputAbsolute = join(repoRoot, result.outputPath);
       await expect(readFile(reviewOutputAbsolute, "utf8")).resolves.toContain(
@@ -254,11 +347,30 @@ describe("voratiq review", () => {
         agentId: string;
         status: string;
         outputPath: string;
+        completedAt?: string;
       };
       expect(record.runId).toBe(runRecord.runId);
       expect(record.agentId).toBe("reviewer");
       expect(record.status).toBe("succeeded");
       expect(record.outputPath).toBe(result.outputPath);
+      expect(record.completedAt).toEqual(expect.any(String));
+
+      const indexPath = join(repoRoot, ".voratiq", "reviews", "index.json");
+      const indexPayload = JSON.parse(await readFile(indexPath, "utf8")) as {
+        sessions: Array<{ sessionId: string; status: string }>;
+      };
+      expect(indexPayload.sessions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            sessionId: result.reviewId,
+            status: "succeeded",
+          }),
+        ]),
+      );
+
+      await expect(
+        readFile(seenManifestPath ?? "", "utf8"),
+      ).rejects.toMatchObject({ code: "ENOENT" });
     });
 
     it("prints a warning when run artifacts are missing", async () => {
@@ -280,7 +392,7 @@ describe("voratiq review", () => {
       );
     });
 
-    it("throws a descriptive error when run is missing", async () => {
+    it("preserves run lookup error shape when run is missing", async () => {
       await writeFile(
         join(repoRoot, ".voratiq", "runs", "index.json"),
         "",
@@ -291,7 +403,16 @@ describe("voratiq review", () => {
         withRepoCwd(repoRoot, () =>
           runReviewCommand({ runId: "missing-run", agentId: "reviewer" }),
         ),
-      ).rejects.toThrow("Run missing-run not found.");
+      ).rejects.toBeInstanceOf(RunNotFoundCliError);
+
+      await expect(
+        withRepoCwd(repoRoot, () =>
+          runReviewCommand({ runId: "missing-run", agentId: "reviewer" }),
+        ),
+      ).rejects.toMatchObject({
+        headline: "Run missing-run not found.",
+        detailLines: ["To review past runs: voratiq list"],
+      });
     });
 
     it("throws when the run index contains invalid JSON", async () => {
@@ -303,6 +424,114 @@ describe("voratiq review", () => {
           runReviewCommand({ runId: "any-run", agentId: "reviewer" }),
         ),
       ).rejects.toThrow("Failed to parse .voratiq/runs/index.json:");
+    });
+
+    it("preserves reviewer process-failure error shape", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-vmtyf",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+
+      runSandboxedAgentMock.mockResolvedValueOnce({
+        exitCode: 1,
+        errorMessage: "review process failed",
+        sandboxSettings: {
+          network: {
+            allowedDomains: [],
+            deniedDomains: [],
+          },
+          filesystem: {
+            denyRead: [],
+            allowWrite: [],
+            denyWrite: [],
+          },
+        },
+        manifestEnv: {},
+      });
+
+      let caughtError: unknown;
+      try {
+        await runReviewInRepo(repoRoot, {
+          runId: runRecord.runId,
+          agentId: "reviewer",
+        });
+      } catch (error: unknown) {
+        caughtError = error;
+      }
+
+      expect(caughtError).toBeInstanceOf(ReviewGenerationFailedError);
+      const failure = caughtError as ReviewGenerationFailedError;
+      expect(failure).toBeInstanceOf(ReviewGenerationFailedError);
+      expect(failure.detailLines).toEqual(["review process failed"]);
+      expect(failure.hintLines).toHaveLength(1);
+      expect(failure.hintLines.at(0)).toContain("See stderr:");
+
+      const indexPath = join(repoRoot, ".voratiq", "reviews", "index.json");
+      const indexPayload = JSON.parse(await readFile(indexPath, "utf8")) as {
+        sessions: Array<{ sessionId: string; status: string }>;
+      };
+      expect(indexPayload.sessions).toHaveLength(1);
+      expect(indexPayload.sessions[0]?.status).toBe("failed");
+
+      const failedRecordPath = join(
+        repoRoot,
+        ".voratiq",
+        "reviews",
+        "sessions",
+        indexPayload.sessions[0]?.sessionId ?? "",
+        "record.json",
+      );
+      const failedRecord = JSON.parse(
+        await readFile(failedRecordPath, "utf8"),
+      ) as {
+        status: string;
+        error?: string;
+      };
+      expect(failedRecord.status).toBe("failed");
+      expect(failedRecord.error).toBe("review process failed");
+    });
+
+    it("preserves missing-output failure shape", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-vmtyf",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+
+      runSandboxedAgentMock.mockImplementationOnce(() =>
+        Promise.resolve({
+          exitCode: 0,
+          sandboxSettings: {
+            network: {
+              allowedDomains: [],
+              deniedDomains: [],
+            },
+            filesystem: {
+              denyRead: [],
+              allowWrite: [],
+              denyWrite: [],
+            },
+          },
+          manifestEnv: {},
+        }),
+      );
+
+      let caughtError: unknown;
+      try {
+        await runReviewInRepo(repoRoot, {
+          runId: runRecord.runId,
+          agentId: "reviewer",
+        });
+      } catch (error: unknown) {
+        caughtError = error;
+      }
+
+      expect(caughtError).toBeInstanceOf(ReviewGenerationFailedError);
+      const failure = caughtError as ReviewGenerationFailedError;
+      expect(failure).toBeInstanceOf(ReviewGenerationFailedError);
+      expect(failure.detailLines).toEqual(["Missing output: review.md"]);
+      expect(failure.hintLines).toHaveLength(3);
+      expect(failure.hintLines.at(0)).toMatch(/^Review session:/u);
+      expect(failure.hintLines.at(2)).toContain("See stderr:");
     });
   });
 });

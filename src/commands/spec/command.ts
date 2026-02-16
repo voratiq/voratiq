@@ -1,13 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { detectAgentProcessFailureDetail } from "../../agents/runtime/failures.js";
-import { runSandboxedAgent } from "../../agents/runtime/harness.js";
+import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import { loadAgentById } from "../../configs/agents/loader.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
-import type { EnvironmentConfig } from "../../configs/environment/types.js";
 import {
   appendSpecRecord,
   finalizeSpecRecord,
@@ -24,24 +22,18 @@ import {
   resolvePath,
 } from "../../utils/path.js";
 import { slugify } from "../../utils/slug.js";
-import {
-  type AgentWorkspacePaths,
-  scaffoldAgentSessionWorkspace,
-} from "../../workspace/layout.js";
-import { promoteWorkspaceFile } from "../../workspace/promotion.js";
-import {
-  getSpecsDirectoryPath,
-  VORATIQ_SPECS_DIR,
-} from "../../workspace/structure.js";
-import { pruneWorkspace } from "../shared/prune.js";
+import { getSpecsDirectoryPath } from "../../workspace/structure.js";
 import { generateSessionId } from "../shared/session-id.js";
+import {
+  createSpecCompetitionAdapter,
+  type SpecCompetitionExecution,
+} from "./competition-adapter.js";
 import {
   SpecAgentNotFoundError,
   SpecGenerationFailedError,
   SpecOutputExistsError,
   SpecOutputPathError,
 } from "./errors.js";
-import { buildSpecPrompt } from "./prompt.js";
 
 export interface ExecuteSpecCommandInput {
   root: string;
@@ -60,8 +52,6 @@ export interface ExecuteSpecCommandResult {
   record: SpecRecord;
   exitCode?: number;
 }
-
-const SPEC_ARTIFACT_FILENAME = "spec.md";
 
 export async function executeSpecCommand(
   input: ExecuteSpecCommandInput,
@@ -120,12 +110,6 @@ export async function executeSpecCommand(
   const sessionId = generateSessionId();
   const createdAt = new Date().toISOString();
 
-  const workspacePaths = await buildSpecWorkspace({
-    root,
-    sessionId,
-    agentId: agent.id,
-  });
-
   const record: SpecRecord = {
     sessionId,
     createdAt,
@@ -144,16 +128,52 @@ export async function executeSpecCommand(
 
   let latestRecord = record;
   onStatus?.("Generating specification...");
+  let generationResult: SpecCompetitionExecution;
 
-  const generationResult = await runSpecGeneration({
-    root,
-    agent,
-    environment,
-    description,
-    specTitle,
-    workspacePaths,
-    sessionId,
-  });
+  try {
+    const generationResults = await executeCompetitionWithAdapter({
+      candidates: [agent],
+      maxParallel: 1,
+      adapter: createSpecCompetitionAdapter({
+        root,
+        sessionId,
+        description,
+        specTitle,
+        environment,
+      }),
+    });
+
+    const selectedResult = generationResults[0];
+    if (!selectedResult) {
+      const detail = `Specification session ${sessionId} did not produce any result.`;
+      latestRecord = await finalizeSpecRecord({
+        root,
+        specsFilePath,
+        sessionId,
+        status: "failed",
+        error: detail,
+      });
+      await flushSpecRecordBuffer({ specsFilePath, sessionId });
+      throw new SpecGenerationFailedError([detail]);
+    }
+
+    generationResult = selectedResult;
+  } catch (error) {
+    if (error instanceof SpecGenerationFailedError) {
+      throw error;
+    }
+
+    const detail = toErrorMessage(error);
+    latestRecord = await finalizeSpecRecord({
+      root,
+      specsFilePath,
+      sessionId,
+      status: "failed",
+      error: detail,
+    });
+    await flushSpecRecordBuffer({ specsFilePath, sessionId });
+    throw new SpecGenerationFailedError([detail]);
+  }
 
   if (generationResult.status === "failed") {
     latestRecord = await finalizeSpecRecord({
@@ -164,7 +184,6 @@ export async function executeSpecCommand(
       error: generationResult.error ?? null,
     });
     await flushSpecRecordBuffer({ specsFilePath, sessionId });
-    await pruneWorkspace(workspacePaths.workspacePath);
     throw new SpecGenerationFailedError(
       generationResult.error ? [generationResult.error] : [],
     );
@@ -186,7 +205,6 @@ export async function executeSpecCommand(
       error: detail,
     });
     await flushSpecRecordBuffer({ specsFilePath, sessionId });
-    await pruneWorkspace(workspacePaths.workspacePath);
     throw new SpecGenerationFailedError([detail]);
   }
 
@@ -225,7 +243,6 @@ export async function executeSpecCommand(
       error: detail,
     });
     await flushSpecRecordBuffer({ specsFilePath, sessionId });
-    await pruneWorkspace(workspacePaths.workspacePath);
     throw new SpecGenerationFailedError([detail]);
   };
 
@@ -284,7 +301,6 @@ export async function executeSpecCommand(
   }
 
   await flushSpecRecordBuffer({ specsFilePath, sessionId });
-  await pruneWorkspace(workspacePaths.workspacePath);
 
   return {
     sessionId,
@@ -292,116 +308,6 @@ export async function executeSpecCommand(
     outputPath: latestRecord.outputPath,
     record: latestRecord,
   };
-}
-
-async function runSpecGeneration(options: {
-  root: string;
-  agent: AgentDefinition;
-  environment: EnvironmentConfig;
-  description: string;
-  specTitle?: string;
-  workspacePaths: AgentWorkspacePaths;
-  sessionId: string;
-}): Promise<{
-  specPath: string;
-  status: "generated" | "failed";
-  error?: string;
-}> {
-  const {
-    root,
-    agent,
-    environment,
-    description,
-    specTitle,
-    workspacePaths,
-    sessionId,
-  } = options;
-
-  const specRelativePath = SPEC_ARTIFACT_FILENAME;
-
-  const prompt = buildSpecPrompt({
-    description,
-    title: specTitle,
-    outputPath: specRelativePath,
-    repoRootPath: root,
-    workspacePath: workspacePaths.workspacePath,
-  });
-
-  try {
-    const result = await runSandboxedAgent({
-      root,
-      sessionId,
-      agent,
-      prompt,
-      environment,
-      paths: {
-        agentRoot: workspacePaths.agentRoot,
-        workspacePath: workspacePaths.workspacePath,
-        sandboxHomePath: workspacePaths.sandboxHomePath,
-        runtimeManifestPath: workspacePaths.runtimeManifestPath,
-        sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
-        runtimePath: workspacePaths.runtimePath,
-        artifactsPath: workspacePaths.artifactsPath,
-        stdoutPath: workspacePaths.stdoutPath,
-        stderrPath: workspacePaths.stderrPath,
-      },
-      captureChat: true,
-      extraWriteProtectedPaths: [],
-      extraReadProtectedPaths: [],
-    });
-
-    if (result.exitCode !== 0 || result.errorMessage) {
-      const detectedDetail =
-        result.watchdog?.trigger && result.errorMessage
-          ? result.errorMessage
-          : await detectAgentProcessFailureDetail({
-              provider: agent.provider,
-              stdoutPath: workspacePaths.stdoutPath,
-              stderrPath: workspacePaths.stderrPath,
-            });
-      const detail =
-        detectedDetail ??
-        result.errorMessage ??
-        `Agent exited with code ${result.exitCode ?? "unknown"}`;
-      return {
-        specPath: normalizePathForDisplay(
-          relativeToRoot(
-            root,
-            resolvePath(workspacePaths.workspacePath, specRelativePath),
-          ),
-        ),
-        status: "failed",
-        error: detail,
-      };
-    }
-
-    const promoteResult = await promoteWorkspaceFile({
-      workspacePath: workspacePaths.workspacePath,
-      artifactsPath: workspacePaths.artifactsPath,
-      stagedRelativePath: specRelativePath,
-      artifactRelativePath: SPEC_ARTIFACT_FILENAME,
-      deleteStaged: true,
-    });
-
-    return {
-      specPath: normalizePathForDisplay(
-        relativeToRoot(root, promoteResult.artifactPath),
-      ),
-      status: "generated",
-    };
-  } catch (error) {
-    const detail = toErrorMessage(error);
-    return {
-      specPath: normalizePathForDisplay(
-        relativeToRoot(
-          root,
-          resolvePath(workspacePaths.workspacePath, specRelativePath),
-        ),
-      ),
-      status: "failed",
-      error: detail,
-    };
-  }
 }
 
 function deriveTitle(
@@ -489,20 +395,6 @@ function resolveOutputPath(options: {
     const message = error instanceof Error ? error.message : String(error);
     throw new SpecOutputPathError(message);
   }
-}
-
-async function buildSpecWorkspace(options: {
-  root: string;
-  sessionId: string;
-  agentId: string;
-}) {
-  const { root, sessionId, agentId } = options;
-  return await scaffoldAgentSessionWorkspace({
-    root,
-    domain: VORATIQ_SPECS_DIR,
-    sessionId,
-    agentId,
-  });
 }
 
 async function findUniqueOutputPath(desiredPath: string): Promise<string> {
