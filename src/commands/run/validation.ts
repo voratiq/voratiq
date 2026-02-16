@@ -22,11 +22,16 @@ import { RunOptionValidationError } from "../../runs/records/errors.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { WorkspaceMissingEntryError } from "../../workspace/errors.js";
-import { NoAgentsEnabledError, RunPreflightError } from "./errors.js";
+import {
+  NoAgentsEnabledError,
+  type PreflightIssue,
+  RunPreflightError,
+} from "./errors.js";
 
 export interface ValidationInput {
   readonly root: string;
   readonly specAbsolutePath: string;
+  readonly resolvedAgentIds?: readonly string[];
   readonly maxParallel?: number;
 }
 
@@ -45,7 +50,12 @@ export interface ValidationResult {
 export async function validateAndPrepare(
   input: ValidationInput,
 ): Promise<ValidationResult> {
-  const { root, specAbsolutePath, maxParallel: requestedMaxParallel } = input;
+  const {
+    root,
+    specAbsolutePath,
+    resolvedAgentIds,
+    maxParallel: requestedMaxParallel,
+  } = input;
 
   if (
     requestedMaxParallel !== undefined &&
@@ -60,14 +70,40 @@ export async function validateAndPrepare(
   const specContent = await readFile(specAbsolutePath, "utf8");
 
   const baseRevisionSha = await getHeadRevision(root);
-  const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
-  const enabledAgents = agentDiagnostics.enabledAgents;
+  const preflightIssues: PreflightIssue[] = [];
+  let agents: readonly AgentDefinition[];
+  if (resolvedAgentIds) {
+    if (resolvedAgentIds.length === 0) {
+      throw new NoAgentsEnabledError();
+    }
 
-  if (enabledAgents.length === 0) {
-    throw new NoAgentsEnabledError();
+    const selectedAgentIds = new Set(resolvedAgentIds);
+    const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
+    preflightIssues.push(
+      ...agentDiagnostics.issues.filter((issue) =>
+        selectedAgentIds.has(issue.agentId),
+      ),
+    );
+
+    const catalogById = new Map(
+      agentDiagnostics.catalog.map((agent) => [agent.id, agent]),
+    );
+    agents = resolvedAgentIds.flatMap((agentId) => {
+      const agent = catalogById.get(agentId);
+      return agent ? [agent] : [];
+    });
+  } else {
+    const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
+    const enabledAgents = agentDiagnostics.enabledAgents;
+
+    if (enabledAgents.length === 0) {
+      throw new NoAgentsEnabledError();
+    }
+
+    preflightIssues.push(...agentDiagnostics.issues);
+    agents = agentDiagnostics.catalog;
   }
 
-  const preflightIssues = [...agentDiagnostics.issues];
   try {
     loadRepoSettings({ root });
   } catch (error) {
@@ -78,9 +114,9 @@ export async function validateAndPrepare(
   }
 
   const providerIssues = await verifyAgentProviders(
-    enabledAgents.map((entry) => ({
-      id: entry.id,
-      provider: entry.provider,
+    agents.map((agent) => ({
+      id: agent.id,
+      provider: agent.provider,
     })),
   );
 
@@ -88,8 +124,6 @@ export async function validateAndPrepare(
   if (preflightIssues.length > 0) {
     throw new RunPreflightError(preflightIssues);
   }
-
-  const agents: readonly AgentDefinition[] = agentDiagnostics.catalog;
 
   const environment = (() => {
     try {

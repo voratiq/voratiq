@@ -3,6 +3,7 @@ import type {
   EnvironmentInitSummary,
   EvalInitSummary,
   InitCommandResult,
+  OrchestrationInitSummary,
   SandboxInitSummary,
 } from "../../src/commands/init/types.js";
 import { renderInitTranscript } from "../../src/render/transcripts/init.js";
@@ -46,10 +47,16 @@ describe("renderInitTranscript", () => {
     configCreated: false,
   };
 
+  const baseOrchestration: OrchestrationInitSummary = {
+    configPath: ".voratiq/orchestration.yaml",
+    configCreated: false,
+  };
+
   it("renders agent and eval summaries with workspace creation", () => {
     const view: InitCommandResult = {
       workspaceResult: resultCreated,
       agentSummary: baseAgents,
+      orchestrationSummary: baseOrchestration,
       environmentSummary: baseEnvironment,
       evalSummary: baseEvals,
       sandboxSummary: baseSandbox,
@@ -60,11 +67,15 @@ describe("renderInitTranscript", () => {
 
     expect(lines[0]).toBe("Agents configured (claude, codex, gemini).");
     expect(lines[1]).toBe("To modify, edit `.voratiq/agents.yaml`.");
+    expect(lines[3]).toBe("Orchestration configured.");
+    expect(lines[4]).toBe("To modify, edit `.voratiq/orchestration.yaml`.");
     expect(output).toContain("Environment configured (node).");
     expect(output).toContain(
       "Evals configured (format, lint, typecheck, tests).",
     );
     expect(output).toContain("Sandbox configured.");
+    expect(output).toContain("Orchestration configured.");
+    expect(output).toContain("To modify, edit `.voratiq/orchestration.yaml`.");
     expect(output).toContain(colorize("Voratiq initialized.", "green"));
     expect(output).toContain("To begin a run:\n  voratiq run --spec <path>");
   });
@@ -80,6 +91,7 @@ describe("renderInitTranscript", () => {
     const view: InitCommandResult = {
       workspaceResult: resultCreated,
       agentSummary: agents,
+      orchestrationSummary: baseOrchestration,
       environmentSummary: baseEnvironment,
       evalSummary: baseEvals,
       sandboxSummary: baseSandbox,
@@ -110,6 +122,7 @@ describe("renderInitTranscript", () => {
     const view: InitCommandResult = {
       workspaceResult: resultCreated,
       agentSummary: agents,
+      orchestrationSummary: baseOrchestration,
       environmentSummary: baseEnvironment,
       evalSummary: baseEvals,
       sandboxSummary: baseSandbox,
@@ -131,6 +144,7 @@ describe("renderInitTranscript", () => {
     const view: InitCommandResult = {
       workspaceResult: result,
       agentSummary: baseAgents,
+      orchestrationSummary: baseOrchestration,
       environmentSummary: baseEnvironment,
       evalSummary: baseEvals,
       sandboxSummary: baseSandbox,

@@ -3,6 +3,7 @@ import type {
   EnvironmentInitSummary,
   EvalInitSummary,
   InitCommandResult,
+  OrchestrationInitSummary,
   SandboxInitSummary,
 } from "../../commands/init/types.js";
 import type { EvalSlug } from "../../configs/evals/types.js";
@@ -85,6 +86,7 @@ export function renderEvalCommandPreface({
 
 export function renderInitTranscript({
   agentSummary,
+  orchestrationSummary,
   environmentSummary,
   evalSummary,
   sandboxSummary,
@@ -92,6 +94,7 @@ export function renderInitTranscript({
   const sections: string[][] = [];
 
   sections.push(buildAgentsSection(agentSummary));
+  sections.push(buildOrchestrationSection(orchestrationSummary));
   sections.push(buildEnvironmentSection(environmentSummary));
   sections.push(buildEvalsSection(evalSummary));
   sections.push(buildSandboxSection(sandboxSummary));
@@ -154,6 +157,15 @@ function buildEvalsSection(summary: EvalInitSummary): string[] {
 
 function buildSandboxSection(summary: SandboxInitSummary): string[] {
   return ["Sandbox configured.", `To modify, edit \`${summary.configPath}\`.`];
+}
+
+function buildOrchestrationSection(
+  summary: OrchestrationInitSummary,
+): string[] {
+  return [
+    "Orchestration configured.",
+    `To modify, edit \`${summary.configPath}\`.`,
+  ];
 }
 
 function buildWorkspaceInitializedSection(): string {

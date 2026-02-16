@@ -34,11 +34,9 @@ node <<'NODE'
 import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
-import { sanitizeAgentIdFromModel } from "/app/dist/configs/agents/defaults.js";
 
 const configPath = path.resolve(".voratiq/agents.yaml");
 const desiredModel = "gpt-5.1-codex-mini";
-const desiredId = sanitizeAgentIdFromModel(desiredModel);
 const content = fs.readFileSync(configPath, "utf8");
 const doc = yaml.load(content);
 
@@ -51,7 +49,6 @@ if (!codexAgent) {
   throw new Error("Codex provider entry missing from .voratiq/agents.yaml");
 }
 
-codexAgent.id = desiredId;
 codexAgent.model = desiredModel;
 
 fs.writeFileSync(

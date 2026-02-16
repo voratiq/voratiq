@@ -30,6 +30,9 @@ Initializing Voratiq…
 Agents configured (claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929, claude-opus-4-5-20251101, gpt-5-codex, gpt-5-1-codex, gpt-5-1-codex-max, gpt-5-1-codex-max-xhigh, gpt-5-1-codex-mini, gpt-5-2, gpt-5-2-xhigh, gpt-5-2-codex, gpt-5-2-codex-xhigh, gemini-3-pro-preview, gemini-2-5-pro, gemini-2-5-flash).
 To modify, edit `.voratiq/agents.yaml`.
 
+Orchestration configured.
+To modify, edit `.voratiq/orchestration.yaml`.
+
 Environment configured (node).
 To modify, edit `.voratiq/environment.yaml`.
 
@@ -75,7 +78,7 @@ One note: avoid backticks in `--description` unless you escape them. Bash interp
 
 ## Run your agents (`run`)
 
-`run` executes all configured agents in parallel against a spec. Each agent runs in a sandboxed environment. Voratiq captures their outputs, diffs, and summaries, runs any configured evals, and records everything to run history.
+`run` executes the resolved run-stage agents in parallel against a spec. Each agent runs in a sandboxed environment. Voratiq captures their outputs, diffs, and summaries, runs any configured evals, and records everything to run history.
 
 Command:
 
@@ -116,7 +119,7 @@ All 12 agents completed successfully. We use `review` to compare implementations
 
 ## Review the run (`review`)
 
-`review` launches a sandboxed reviewer agent to analyze artifacts from a completed run and generate a comparison of all agent outputs. The `--agent` flag specifies which agent does the reviewing.
+`review` launches a sandboxed reviewer agent to analyze artifacts from a completed run and generate a comparison of all agent outputs. The reviewer resolves from `.voratiq/orchestration.yaml` stage config, or can be overridden with `--agent`.
 
 Command:
 

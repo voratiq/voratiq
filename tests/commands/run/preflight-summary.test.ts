@@ -147,4 +147,67 @@ describe("run preflight error summary", () => {
     expect(preflightError.detailLines).toHaveLength(1);
     expect(preflightError.detailLines[0]).toContain("Invalid settings file");
   });
+
+  it("does not block selected run agents on diagnostics issues from unselected enabled agents", async () => {
+    const diagnostics: AgentCatalogDiagnostics = {
+      enabledAgents: [
+        {
+          id: "selected-agent",
+          provider: "codex",
+          model: "model",
+          enabled: true,
+          binary: "/bin/true",
+        },
+        {
+          id: "unselected-broken-agent",
+          provider: "claude",
+          model: "model",
+          enabled: true,
+          binary: "/missing/broken",
+        },
+      ],
+      catalog: [
+        {
+          id: "selected-agent",
+          provider: "codex",
+          model: "model",
+          binary: "/bin/true",
+          argv: ["codex", "--model", "model"],
+        },
+        {
+          id: "unselected-broken-agent",
+          provider: "claude",
+          model: "model",
+          binary: "/missing/broken",
+          argv: ["claude", "--model", "model"],
+        },
+      ],
+      issues: [
+        {
+          agentId: "unselected-broken-agent",
+          message: 'binary "/missing/broken" is not executable (ENOENT)',
+        },
+      ],
+    };
+    loadAgentCatalogDiagnosticsMock.mockReturnValue(diagnostics);
+    verifyAgentProvidersMock.mockResolvedValue([]);
+
+    await mkdir(join(root, ".voratiq"), { recursive: true });
+    await writeFile(join(root, ".voratiq", "environment.yaml"), "{}\n", "utf8");
+    await writeFile(join(root, ".voratiq", "evals.yaml"), "{}\n", "utf8");
+
+    const result = await validateAndPrepare({
+      root,
+      specAbsolutePath: specPath,
+      resolvedAgentIds: ["selected-agent"],
+    });
+
+    expect(result.agents.map((agent) => agent.id)).toEqual(["selected-agent"]);
+    expect(verifyAgentProvidersMock).toHaveBeenCalledWith([
+      {
+        id: "selected-agent",
+        provider: "codex",
+      },
+    ]);
+  });
 });

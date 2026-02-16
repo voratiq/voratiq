@@ -1,5 +1,7 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 
+import { readAgentsConfig } from "../configs/agents/loader.js";
+import { buildDefaultOrchestrationTemplate } from "../configs/orchestration/bootstrap.js";
 import {
   ensureDirectoryExists,
   ensureFileExists,
@@ -16,6 +18,7 @@ import {
   VORATIQ_AGENTS_FILE,
   VORATIQ_ENVIRONMENT_FILE,
   VORATIQ_EVALS_FILE,
+  VORATIQ_ORCHESTRATION_FILE,
   VORATIQ_REVIEWS_DIR,
   VORATIQ_REVIEWS_FILE,
   VORATIQ_REVIEWS_SESSIONS_DIR,
@@ -67,6 +70,10 @@ export async function createWorkspace(
     VORATIQ_ENVIRONMENT_FILE,
   );
   const sandboxConfigPath = resolveWorkspacePath(root, VORATIQ_SANDBOX_FILE);
+  const orchestrationConfigPath = resolveWorkspacePath(
+    root,
+    VORATIQ_ORCHESTRATION_FILE,
+  );
 
   const [
     workspaceExists,
@@ -83,6 +90,7 @@ export async function createWorkspace(
     evalsConfigExists,
     environmentConfigExists,
     sandboxConfigExists,
+    orchestrationConfigExists,
   ] = await Promise.all([
     pathExists(workspaceDir),
     pathExists(runsDir),
@@ -98,6 +106,7 @@ export async function createWorkspace(
     pathExists(evalsConfigPath),
     pathExists(environmentConfigPath),
     pathExists(sandboxConfigPath),
+    pathExists(orchestrationConfigPath),
   ]);
 
   if (!workspaceExists) {
@@ -183,6 +192,17 @@ export async function createWorkspace(
     createdFiles.push(relativeToRoot(root, sandboxConfigPath));
   }
 
+  if (!orchestrationConfigExists) {
+    const agentsContent = await readFile(agentsConfigPath, "utf8");
+    const agentsConfig = readAgentsConfig(agentsContent);
+    const orchestrationTemplate =
+      buildDefaultOrchestrationTemplate(agentsConfig);
+    await writeFile(orchestrationConfigPath, orchestrationTemplate, {
+      encoding: "utf8",
+    });
+    createdFiles.push(relativeToRoot(root, orchestrationConfigPath));
+  }
+
   return { createdDirectories, createdFiles };
 }
 
@@ -210,6 +230,10 @@ export async function validateWorkspace(root: string): Promise<void> {
     VORATIQ_ENVIRONMENT_FILE,
   );
   const sandboxConfigPath = resolveWorkspacePath(root, VORATIQ_SANDBOX_FILE);
+  const orchestrationConfigPath = resolveWorkspacePath(
+    root,
+    VORATIQ_ORCHESTRATION_FILE,
+  );
 
   if (!(await isDirectory(workspaceDir))) {
     const missingEntries = [
@@ -226,6 +250,7 @@ export async function validateWorkspace(root: string): Promise<void> {
       relativeToRoot(root, agentsConfigPath),
       relativeToRoot(root, environmentConfigPath),
       relativeToRoot(root, sandboxConfigPath),
+      relativeToRoot(root, orchestrationConfigPath),
     ];
     throw new WorkspaceNotInitializedError(missingEntries);
   }
@@ -300,5 +325,13 @@ export async function validateWorkspace(root: string): Promise<void> {
     sandboxConfigPath,
     () =>
       new WorkspaceMissingEntryError(relativeToRoot(root, sandboxConfigPath)),
+  );
+
+  await ensureFileExists(
+    orchestrationConfigPath,
+    () =>
+      new WorkspaceMissingEntryError(
+        relativeToRoot(root, orchestrationConfigPath),
+      ),
   );
 }

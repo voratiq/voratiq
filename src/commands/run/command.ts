@@ -17,6 +17,7 @@ import {
   formatRunWorkspaceRelative,
 } from "../../workspace/layout.js";
 import { prepareRunWorkspace } from "../../workspace/run.js";
+import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { executeAgents } from "./agent-execution.js";
 import { generateRunId } from "./id.js";
 import { clearActiveRun, registerActiveRun } from "./lifecycle.js";
@@ -29,6 +30,7 @@ export interface RunCommandInput {
   runsFilePath: string;
   specAbsolutePath: string;
   specDisplayPath: string;
+  agentIds?: readonly string[];
   maxParallel?: number;
   renderer?: RunProgressRenderer;
 }
@@ -44,13 +46,22 @@ export async function executeRunCommand(
     runsFilePath,
     specAbsolutePath,
     specDisplayPath,
+    agentIds,
     maxParallel: requestedMaxParallel,
     renderer,
   } = input;
 
+  const resolution = resolveStageCompetitors({
+    root,
+    stageId: "run",
+    cliAgentIds: agentIds,
+    includeDefinitions: false,
+  });
+
   const validation = await validateAndPrepare({
     root,
     specAbsolutePath,
+    resolvedAgentIds: resolution.agentIds,
     maxParallel: requestedMaxParallel,
   });
 

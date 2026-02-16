@@ -8,15 +8,20 @@ import {
 } from "node:fs/promises";
 import { join, relative } from "node:path";
 
+import { Command } from "commander";
+
 import * as authRuntime from "../../src/auth/runtime.js";
-import { runRunCommand } from "../../src/cli/run.js";
+import { createRunCommand, runRunCommand } from "../../src/cli/run.js";
 import * as runAgentPreparationModule from "../../src/commands/run/agent-preparation.js";
 import { executeRunCommand } from "../../src/commands/run/command.js";
+import * as commandAdapter from "../../src/competition/command-adapter.js";
 import { DirtyWorkingTreeError } from "../../src/preflight/errors.js";
 import { buildRunRecordEnhanced } from "../../src/runs/records/enhanced.js";
 import * as persistence from "../../src/runs/records/persistence.js";
 import type { RunRecord } from "../../src/runs/records/types.js";
+import { HintedError } from "../../src/utils/errors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
+import { silenceCommander } from "../support/commander.js";
 import {
   createRunTestWorkspace,
   type RunTestWorkspace,
@@ -65,7 +70,42 @@ async function writeAgentsConfig(
     };
   });
   await workspace.writeAgentsConfig(agents);
+  await writeOrchestrationConfig(workspace.root, {
+    runAgentIds: agents
+      .filter((agent) => agent.enabled)
+      .map((agent) => agent.id),
+  });
 }
+
+describe("voratiq run command options", () => {
+  it("parses repeatable --agent preserving order", async () => {
+    let received: unknown;
+    const runCommand = silenceCommander(createRunCommand());
+    runCommand.exitOverride().action((options) => {
+      received = options;
+    });
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(runCommand);
+
+    await program.parseAsync([
+      "node",
+      "voratiq",
+      "run",
+      "--spec",
+      "specs/sample.md",
+      "--agent",
+      "gamma",
+      "--agent",
+      "alpha",
+    ]);
+
+    expect((received as { agent?: string[] }).agent).toEqual([
+      "gamma",
+      "alpha",
+    ]);
+  });
+});
 
 suite("voratiq run (integration)", () => {
   let workspace: RunTestWorkspace;
@@ -329,28 +369,328 @@ suite("voratiq run (integration)", () => {
     expect(indexPayload.sessions).toHaveLength(0);
   });
 
-  it("fails fast when all agents are disabled", async () => {
+  it(
+    "resolves run agents from orchestration when --agent override is omitted",
+    async () => {
+      await createWorkspace(repoRoot);
+      await writeAgentsConfig(workspace, agentScriptPath);
+      await writeOrchestrationConfig(repoRoot, {
+        runAgentIds: ["gemini", "claude"],
+      });
+
+      const specRelativePath = "specs/orchestrated-order.md";
+      const specPath = join(repoRoot, specRelativePath);
+      await mkdir(join(repoRoot, "specs"), { recursive: true });
+      await writeFile(specPath, "# Ordered run\n", "utf8");
+
+      const executeCompetitionSpy = jest.spyOn(
+        commandAdapter,
+        "executeCompetitionWithAdapter",
+      );
+      try {
+        const originalCwd = process.cwd();
+        process.chdir(repoRoot);
+        try {
+          await runRunCommand({ specPath: specRelativePath });
+        } finally {
+          process.chdir(originalCwd);
+        }
+
+        const lastCall = executeCompetitionSpy.mock.calls.at(-1);
+        expect(lastCall).toBeDefined();
+        const args = lastCall?.[0] as
+          | { candidates?: Array<{ id?: string }> }
+          | undefined;
+        expect(args?.candidates?.map((candidate) => candidate.id)).toEqual([
+          "gemini",
+          "claude",
+        ]);
+      } finally {
+        executeCompetitionSpy.mockRestore();
+      }
+    },
+    RUN_INTEGRATION_TIMEOUT_MS,
+  );
+
+  it("uses run --agent override instead of orchestration defaults", async () => {
+    await createWorkspace(repoRoot);
+    await writeAgentsConfig(workspace, agentScriptPath);
+    await writeOrchestrationConfig(repoRoot, {
+      runAgentIds: ["gemini"],
+    });
+
+    const specRelativePath = "specs/run-override.md";
+    const specPath = join(repoRoot, specRelativePath);
+    await mkdir(join(repoRoot, "specs"), { recursive: true });
+    await writeFile(specPath, "# Override run\n", "utf8");
+
+    const executeCompetitionSpy = jest.spyOn(
+      commandAdapter,
+      "executeCompetitionWithAdapter",
+    );
+    try {
+      const originalCwd = process.cwd();
+      process.chdir(repoRoot);
+      try {
+        await runRunCommand({
+          specPath: specRelativePath,
+          agentIds: ["codex", "claude"],
+        });
+      } finally {
+        process.chdir(originalCwd);
+      }
+
+      const lastCall = executeCompetitionSpy.mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      const args = lastCall?.[0] as
+        | { candidates?: Array<{ id?: string }> }
+        | undefined;
+      expect(args?.candidates?.map((candidate) => candidate.id)).toEqual([
+        "codex",
+        "claude",
+      ]);
+    } finally {
+      executeCompetitionSpy.mockRestore();
+    }
+  });
+
+  it("succeeds with empty run stage when --agent override is provided", async () => {
+    await createWorkspace(repoRoot);
+    await writeAgentsConfig(workspace, agentScriptPath);
+    await writeOrchestrationConfig(repoRoot, {
+      runAgentIds: [],
+    });
+
+    const specRelativePath = "specs/empty-run-with-cli-override.md";
+    const specPath = join(repoRoot, specRelativePath);
+    await mkdir(join(repoRoot, "specs"), { recursive: true });
+    await writeFile(specPath, "# Empty run stage with override\n", "utf8");
+
+    const executeCompetitionSpy = jest.spyOn(
+      commandAdapter,
+      "executeCompetitionWithAdapter",
+    );
+    try {
+      const originalCwd = process.cwd();
+      process.chdir(repoRoot);
+      try {
+        const result = await runRunCommand({
+          specPath: specRelativePath,
+          agentIds: ["codex"],
+        });
+        expect(result.report.agents.map((agent) => agent.agentId)).toEqual([
+          "codex",
+        ]);
+      } finally {
+        process.chdir(originalCwd);
+      }
+
+      const lastCall = executeCompetitionSpy.mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      const args = lastCall?.[0] as
+        | { candidates?: Array<{ id?: string }> }
+        | undefined;
+      expect(args?.candidates?.map((candidate) => candidate.id)).toEqual([
+        "codex",
+      ]);
+    } finally {
+      executeCompetitionSpy.mockRestore();
+    }
+  });
+
+  it("ignores multi-agent spec stage configuration when resolving run agents", async () => {
+    await createWorkspace(repoRoot);
+    await writeAgentsConfig(workspace, agentScriptPath);
+    await writeOrchestrationConfig(repoRoot, {
+      runAgentIds: ["claude"],
+      specAgentIds: ["gemini", "codex"],
+    });
+
+    const specRelativePath = "specs/spec-stage-does-not-affect-run.md";
+    const specPath = join(repoRoot, specRelativePath);
+    await mkdir(join(repoRoot, "specs"), { recursive: true });
+    await writeFile(specPath, "# Spec stage isolation\n", "utf8");
+
+    const executeCompetitionSpy = jest.spyOn(
+      commandAdapter,
+      "executeCompetitionWithAdapter",
+    );
+    try {
+      const originalCwd = process.cwd();
+      process.chdir(repoRoot);
+      try {
+        const result = await runRunCommand({ specPath: specRelativePath });
+        expect(result.report.agents.map((agent) => agent.agentId)).toEqual([
+          "claude",
+        ]);
+      } finally {
+        process.chdir(originalCwd);
+      }
+
+      const lastCall = executeCompetitionSpy.mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      const args = lastCall?.[0] as
+        | { candidates?: Array<{ id?: string }> }
+        | undefined;
+      expect(args?.candidates?.map((candidate) => candidate.id)).toEqual([
+        "claude",
+      ]);
+    } finally {
+      executeCompetitionSpy.mockRestore();
+    }
+  });
+
+  it("ignores multi-agent review stage configuration when resolving run agents", async () => {
+    await createWorkspace(repoRoot);
+    await writeAgentsConfig(workspace, agentScriptPath);
+    await writeOrchestrationConfig(repoRoot, {
+      runAgentIds: ["gemini"],
+      reviewAgentIds: ["codex", "claude"],
+    });
+
+    const specRelativePath = "specs/review-stage-does-not-affect-run.md";
+    const specPath = join(repoRoot, specRelativePath);
+    await mkdir(join(repoRoot, "specs"), { recursive: true });
+    await writeFile(specPath, "# Review stage isolation\n", "utf8");
+
+    const executeCompetitionSpy = jest.spyOn(
+      commandAdapter,
+      "executeCompetitionWithAdapter",
+    );
+    try {
+      const originalCwd = process.cwd();
+      process.chdir(repoRoot);
+      try {
+        const result = await runRunCommand({ specPath: specRelativePath });
+        expect(result.report.agents.map((agent) => agent.agentId)).toEqual([
+          "gemini",
+        ]);
+      } finally {
+        process.chdir(originalCwd);
+      }
+
+      const lastCall = executeCompetitionSpy.mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      const args = lastCall?.[0] as
+        | { candidates?: Array<{ id?: string }> }
+        | undefined;
+      expect(args?.candidates?.map((candidate) => candidate.id)).toEqual([
+        "gemini",
+      ]);
+    } finally {
+      executeCompetitionSpy.mockRestore();
+    }
+  });
+
+  it("fails when run stage resolves to no agents and no --agent override is provided", async () => {
+    await createWorkspace(repoRoot);
+    await writeAgentsConfig(workspace, agentScriptPath);
+    await writeOrchestrationConfig(repoRoot, {
+      runAgentIds: [],
+    });
+
+    const specRelativePath = "specs/empty-run-stage.md";
+    const specPath = join(repoRoot, specRelativePath);
+    await mkdir(join(repoRoot, "specs"), { recursive: true });
+    await writeFile(specPath, "# Empty run stage\n", "utf8");
+
+    const originalCwd = process.cwd();
+    process.chdir(repoRoot);
+
+    let capturedError: unknown;
+    try {
+      await runRunCommand({ specPath: specRelativePath });
+    } catch (error) {
+      capturedError = error;
+    } finally {
+      process.chdir(originalCwd);
+    }
+
+    expect(capturedError).toBeInstanceOf(HintedError);
+    const hinted = capturedError as HintedError;
+    expect(hinted.headline).toBe('No agent resolved for stage "run".');
+    expect(
+      hinted.hintLines.some((line) => line.includes("Provide --agent <id>")),
+    ).toBe(true);
+    expect(
+      hinted.hintLines.some((line) =>
+        line.includes("profiles.default.run.agents"),
+      ),
+    ).toBe(true);
+  });
+
+  it("fails clearly when run --agent references an unknown agent id", async () => {
+    await createWorkspace(repoRoot);
+    await writeAgentsConfig(workspace, agentScriptPath);
+
+    const specRelativePath = "specs/unknown-agent.md";
+    const specPath = join(repoRoot, specRelativePath);
+    await mkdir(join(repoRoot, "specs"), { recursive: true });
+    await writeFile(specPath, "# Unknown agent\n", "utf8");
+
+    const originalCwd = process.cwd();
+    process.chdir(repoRoot);
+    try {
+      await expect(
+        runRunCommand({
+          specPath: specRelativePath,
+          agentIds: ["missing-agent"],
+        }),
+      ).rejects.toThrow(
+        /Agent "missing-agent" is not defined in agents\.yaml/iu,
+      );
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
+  it("fails clearly when run --agent references a disabled agent id", async () => {
     await createWorkspace(repoRoot);
     await writeAgentsConfig(workspace, agentScriptPath, {
-      claude: { enabled: false },
       codex: { enabled: false },
-      gemini: { enabled: false },
     });
 
     const specPath = join(repoRoot, "specs", "disabled.md");
     await mkdir(join(repoRoot, "specs"), { recursive: true });
     await writeFile(specPath, "Disabled agents\n", "utf8");
 
-    await expect(
-      executeRunCommand({
-        root: repoRoot,
-        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
-        specAbsolutePath: specPath,
-        specDisplayPath: relative(repoRoot, specPath),
-      }),
-    ).rejects.toThrow(
-      "No agents enabled in `.voratiq/agents.yaml`. Set `enabled: true` on at least one agent.",
-    );
+    const originalCwd = process.cwd();
+    process.chdir(repoRoot);
+    try {
+      await expect(
+        runRunCommand({
+          specPath: relative(repoRoot, specPath),
+          agentIds: ["codex"],
+        }),
+      ).rejects.toThrow(/Agent "codex" is disabled in agents\.yaml/iu);
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
+  it("fails when run --agent includes duplicate ids", async () => {
+    await createWorkspace(repoRoot);
+    await writeAgentsConfig(workspace, agentScriptPath);
+
+    const specRelativePath = "specs/duplicate-agent-override.md";
+    const specPath = join(repoRoot, specRelativePath);
+    await mkdir(join(repoRoot, "specs"), { recursive: true });
+    await writeFile(specPath, "# Duplicate agent override\n", "utf8");
+
+    const originalCwd = process.cwd();
+    process.chdir(repoRoot);
+    try {
+      await expect(
+        runRunCommand({
+          specPath: specRelativePath,
+          agentIds: ["codex", "codex"],
+        }),
+      ).rejects.toMatchObject({
+        headline: 'Duplicate --agent values are not allowed for stage "run".',
+      });
+    } finally {
+      process.chdir(originalCwd);
+    }
   });
 
   it(
@@ -534,6 +874,48 @@ suite("voratiq run (integration)", () => {
     );
   });
 });
+
+async function writeOrchestrationConfig(
+  root: string,
+  options: {
+    runAgentIds?: readonly string[];
+    reviewAgentIds?: readonly string[];
+    specAgentIds?: readonly string[];
+  } = {},
+): Promise<void> {
+  const runAgentIds = options.runAgentIds ?? [];
+  const reviewAgentIds = options.reviewAgentIds ?? [];
+  const specAgentIds = options.specAgentIds ?? [];
+
+  const lines = ["profiles:", "  default:"];
+  appendOrchestrationStage(lines, "spec", specAgentIds);
+  appendOrchestrationStage(lines, "run", runAgentIds);
+  appendOrchestrationStage(lines, "review", reviewAgentIds);
+  lines.push("");
+
+  await writeFile(
+    join(root, ".voratiq", "orchestration.yaml"),
+    `${lines.join("\n")}\n`,
+    "utf8",
+  );
+}
+
+function appendOrchestrationStage(
+  lines: string[],
+  stageId: "run" | "review" | "spec",
+  agentIds: readonly string[],
+): void {
+  lines.push(`    ${stageId}:`);
+  if (agentIds.length === 0) {
+    lines.push("      agents: []");
+    return;
+  }
+
+  lines.push("      agents:");
+  for (const agentId of agentIds) {
+    lines.push(`        - id: ${JSON.stringify(agentId)}`);
+  }
+}
 
 async function createAgentScript(root: string): Promise<string> {
   const scriptPath = join(root, "fake-agent.js");

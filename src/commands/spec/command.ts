@@ -3,7 +3,6 @@ import { dirname } from "node:path";
 
 import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
-import { loadAgentById } from "../../configs/agents/loader.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import {
@@ -23,6 +22,7 @@ import {
 } from "../../utils/path.js";
 import { slugify } from "../../utils/slug.js";
 import { getSpecsDirectoryPath } from "../../workspace/structure.js";
+import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
 import {
   createSpecCompetitionAdapter,
@@ -39,7 +39,7 @@ export interface ExecuteSpecCommandInput {
   root: string;
   specsFilePath: string;
   description: string;
-  agentId: string;
+  agentId?: string;
   title?: string;
   outputPath?: string;
   onStatus?: (message: string) => void;
@@ -68,7 +68,17 @@ export async function executeSpecCommand(
 
   let agent: AgentDefinition;
   try {
-    agent = loadAgentById(agentId, { root });
+    const resolution = resolveStageCompetitors({
+      root,
+      stageId: "spec",
+      cliAgentIds: agentId ? [agentId] : undefined,
+      enforceSingleCompetitor: true,
+    });
+    const resolvedAgent = resolution.competitors[0];
+    if (!resolvedAgent) {
+      throw new Error("Expected a single resolved spec agent.");
+    }
+    agent = resolvedAgent;
   } catch (error) {
     if (error instanceof AgentNotFoundError) {
       throw new SpecAgentNotFoundError(error.agentId);

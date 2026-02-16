@@ -11,7 +11,7 @@ import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface SpecCommandOptions {
   description: string;
-  agent: string;
+  agent?: string;
   title?: string;
   output?: string;
   suppressHint?: boolean;
@@ -66,7 +66,7 @@ export function createSpecCommand(): Command {
       "--description <text>",
       "Human description to convert into a spec",
     )
-    .requiredOption("--agent <agent-id>", "Agent identifier to use")
+    .option("--agent <agent-id>", "Agent identifier to use")
     .option("--title <text>", "Optional spec title")
     .option(
       "--output <path>",

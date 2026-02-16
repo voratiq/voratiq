@@ -24,6 +24,7 @@ export const VORATIQ_AGENTS_FILE = "agents.yaml";
 export const VORATIQ_EVALS_FILE = "evals.yaml";
 export const VORATIQ_ENVIRONMENT_FILE = "environment.yaml";
 export const VORATIQ_SANDBOX_FILE = "sandbox.yaml";
+export const VORATIQ_ORCHESTRATION_FILE = "orchestration.yaml";
 
 export const WORKSPACE_DIRNAME = "workspace";
 export const EVALS_DIRNAME = "evals";

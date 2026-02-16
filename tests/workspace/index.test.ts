@@ -57,6 +57,7 @@ describe("workspace bootstrap", () => {
         normalizeForAssertion(join(".voratiq", "evals.yaml")),
         normalizeForAssertion(join(".voratiq", "environment.yaml")),
         normalizeForAssertion(join(".voratiq", "sandbox.yaml")),
+        normalizeForAssertion(join(".voratiq", "orchestration.yaml")),
       ]),
     );
 
@@ -107,6 +108,19 @@ describe("workspace bootstrap", () => {
     await createWorkspace(repoRoot);
     const sandboxPath = resolveWorkspacePath(repoRoot, "sandbox.yaml");
     await rm(sandboxPath, { force: true });
+
+    await expect(validateWorkspace(repoRoot)).rejects.toBeInstanceOf(
+      WorkspaceMissingEntryError,
+    );
+  });
+
+  it("fails validation when orchestration.yaml is missing", async () => {
+    await createWorkspace(repoRoot);
+    const orchestrationPath = resolveWorkspacePath(
+      repoRoot,
+      "orchestration.yaml",
+    );
+    await rm(orchestrationPath, { force: true });
 
     await expect(validateWorkspace(repoRoot)).rejects.toBeInstanceOf(
       WorkspaceMissingEntryError,
