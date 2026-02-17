@@ -19,6 +19,7 @@ import { writeCommandOutput } from "./output.js";
 export interface RunCommandOptions {
   specPath: string;
   agentIds?: string[];
+  agentOverrideFlag?: string;
   maxParallel?: number;
   branch?: boolean;
   suppressHint?: boolean;
@@ -40,6 +41,7 @@ export async function runRunCommand(
   const {
     specPath,
     agentIds,
+    agentOverrideFlag,
     maxParallel,
     branch,
     suppressHint,
@@ -73,6 +75,7 @@ export async function runRunCommand(
     specAbsolutePath: absolutePath,
     specDisplayPath: displayPath,
     agentIds,
+    agentOverrideFlag,
     maxParallel,
     renderer,
   });

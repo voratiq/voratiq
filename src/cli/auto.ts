@@ -18,7 +18,8 @@ import { runRunCommand } from "./run.js";
 
 export interface AutoCommandOptions {
   specPath: string;
-  reviewerAgent: string;
+  runAgentIds?: readonly string[];
+  reviewerAgent?: string;
   maxParallel?: number;
   branch?: boolean;
   apply?: boolean;
@@ -42,6 +43,10 @@ function parseMaxParallelOption(value: string): number {
     "Expected positive integer after --max-parallel",
     "--max-parallel must be greater than 0",
   );
+}
+
+function collectRunAgentOption(value: string, previous: string[]): string[] {
+  return [...previous, value];
 }
 
 function assertAutoOptionCompatibility(options: AutoCommandOptions): void {
@@ -202,6 +207,8 @@ export async function runAutoCommand(
       const suppressBlankLines = !process.stdout.isTTY;
       const runResult = await runRunCommand({
         specPath: options.specPath,
+        agentIds: options.runAgentIds ? [...options.runAgentIds] : undefined,
+        agentOverrideFlag: "--run-agent",
         maxParallel: options.maxParallel,
         branch: options.branch,
         suppressHint: true,
@@ -241,6 +248,7 @@ export async function runAutoCommand(
           const reviewResult = await runReviewCommand({
             runId,
             agentId: options.reviewerAgent,
+            agentOverrideFlag: "--review-agent",
             suppressHint: true,
           });
 
@@ -365,7 +373,8 @@ export async function runAutoCommand(
 
 interface AutoCommandActionOptions {
   spec?: string;
-  reviewAgent: string;
+  runAgent?: string[];
+  reviewAgent?: string;
   maxParallel?: number;
   branch?: boolean;
   apply?: boolean;
@@ -379,7 +388,16 @@ export function createAutoCommand(): Command {
       "--spec <path>",
       "Path to an existing spec file to run and review",
     )
-    .requiredOption("--review-agent <agent-id>", "Reviewer agent identifier")
+    .option(
+      "--run-agent <agent-id>",
+      "Run-stage agent override (repeatable; preserves CLI order; overrides orchestration stage config)",
+      collectRunAgentOption,
+      [],
+    )
+    .option(
+      "--review-agent <agent-id>",
+      "Reviewer agent identifier override (overrides orchestration stage config)",
+    )
     .option(
       "--max-parallel <count>",
       "Maximum number of agents to run concurrently",
@@ -396,10 +414,21 @@ export function createAutoCommand(): Command {
       "When applying, commit immediately using `voratiq apply --commit` behavior",
       () => true,
     )
+    .addHelpText(
+      "after",
+      [
+        "",
+        "Agent resolution precedence (per stage):",
+        "  1) CLI override flag",
+        "  2) profiles.default.<stage>.agents in .voratiq/orchestration.yaml",
+        "  3) fail fast (no implicit fallback)",
+      ].join("\n"),
+    )
     .allowExcessArguments(false)
     .action(async (options: AutoCommandActionOptions) => {
       await runAutoCommand({
         specPath: options.spec!,
+        runAgentIds: options.runAgent,
         reviewerAgent: options.reviewAgent,
         maxParallel: options.maxParallel,
         branch: options.branch,

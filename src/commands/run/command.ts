@@ -31,6 +31,7 @@ export interface RunCommandInput {
   specAbsolutePath: string;
   specDisplayPath: string;
   agentIds?: readonly string[];
+  agentOverrideFlag?: string;
   maxParallel?: number;
   renderer?: RunProgressRenderer;
 }
@@ -47,6 +48,7 @@ export async function executeRunCommand(
     specAbsolutePath,
     specDisplayPath,
     agentIds,
+    agentOverrideFlag,
     maxParallel: requestedMaxParallel,
     renderer,
   } = input;
@@ -55,6 +57,7 @@ export async function executeRunCommand(
     root,
     stageId: "run",
     cliAgentIds: agentIds,
+    cliOverrideFlag: agentOverrideFlag,
     includeDefinitions: false,
   });
 

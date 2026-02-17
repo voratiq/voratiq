@@ -23,6 +23,7 @@ export interface ReviewCommandInput {
   reviewsFilePath: string;
   runId: string;
   agentId?: string;
+  agentOverrideFlag?: string;
 }
 
 export interface ReviewCommandResult {
@@ -36,7 +37,14 @@ export interface ReviewCommandResult {
 export async function executeReviewCommand(
   input: ReviewCommandInput,
 ): Promise<ReviewCommandResult> {
-  const { root, runsFilePath, reviewsFilePath, runId, agentId } = input;
+  const {
+    root,
+    runsFilePath,
+    reviewsFilePath,
+    runId,
+    agentId,
+    agentOverrideFlag,
+  } = input;
 
   const { records } = await fetchRunsSafely({
     root,
@@ -59,7 +67,11 @@ export async function executeReviewCommand(
     workspaceRoot: root,
   });
 
-  const agent = resolveReviewAgent({ agentId, root });
+  const agent = resolveReviewAgent({
+    agentId,
+    root,
+    agentOverrideFlag,
+  });
   const environment = loadEnvironmentConfig({ root });
   const reviewId = generateSessionId();
   const createdAt = new Date().toISOString();
@@ -108,13 +120,15 @@ export async function executeReviewCommand(
 function resolveReviewAgent(options: {
   agentId?: string;
   root: string;
+  agentOverrideFlag?: string;
 }): AgentDefinition {
-  const { agentId, root } = options;
+  const { agentId, root, agentOverrideFlag } = options;
   try {
     const resolution = resolveStageCompetitors({
       root,
       stageId: "review",
       cliAgentIds: agentId ? [agentId] : undefined,
+      cliOverrideFlag: agentOverrideFlag,
       enforceSingleCompetitor: true,
     });
     const resolvedAgent = resolution.competitors[0];

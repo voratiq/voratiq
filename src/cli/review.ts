@@ -22,6 +22,7 @@ import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 export interface ReviewCommandOptions {
   runId: string;
   agentId?: string;
+  agentOverrideFlag?: string;
   suppressHint?: boolean;
   writeOutput?: CommandOutputWriter;
 }
@@ -38,6 +39,7 @@ export async function runReviewCommand(
   const {
     runId,
     agentId,
+    agentOverrideFlag,
     suppressHint,
     writeOutput = writeCommandOutput,
   } = options;
@@ -55,6 +57,7 @@ export async function runReviewCommand(
     reviewsFilePath: workspacePaths.reviewsFile,
     runId,
     agentId,
+    agentOverrideFlag,
   });
 
   let previewLines: string[] | undefined;

@@ -20,6 +20,7 @@ export interface ResolveStageCompetitorsInput {
   root: string;
   stageId: OrchestrationStageId;
   cliAgentIds?: readonly string[];
+  cliOverrideFlag?: string;
   enforceSingleCompetitor?: boolean;
   includeDefinitions?: boolean;
 }
@@ -43,12 +44,13 @@ export function resolveStageCompetitors(
     root,
     stageId,
     cliAgentIds,
+    cliOverrideFlag = "--agent",
     enforceSingleCompetitor = false,
     includeDefinitions = true,
   } = input;
 
   const normalizedCliAgentIds = normalizeAgentIds(cliAgentIds);
-  assertNoDuplicateCliAgentIds(stageId, normalizedCliAgentIds);
+  assertNoDuplicateCliAgentIds(stageId, normalizedCliAgentIds, cliOverrideFlag);
   const source = normalizedCliAgentIds.length > 0 ? "cli" : "orchestration";
   const resolvedAgentIds =
     source === "cli"
@@ -60,6 +62,7 @@ export function resolveStageCompetitors(
   assertResolvedAgentCount({
     stageId,
     agentIds: resolvedAgentIds,
+    cliOverrideFlag,
     enforceSingleCompetitor,
   });
 
@@ -91,6 +94,7 @@ function normalizeAgentIds(agentIds: readonly string[] | undefined): string[] {
 function assertNoDuplicateCliAgentIds(
   stageId: OrchestrationStageId,
   cliAgentIds: readonly string[],
+  cliOverrideFlag: string,
 ): void {
   if (cliAgentIds.length < 2) {
     return;
@@ -112,11 +116,11 @@ function assertNoDuplicateCliAgentIds(
 
   const duplicateList = Array.from(duplicates).join(", ");
   throw new HintedError(
-    `Duplicate --agent values are not allowed for stage "${stageId}".`,
+    `Duplicate ${cliOverrideFlag} values are not allowed for stage "${stageId}".`,
     {
       detailLines: [`Duplicate agent ids: ${duplicateList}.`],
       hintLines: [
-        "Pass each --agent id at most once, preserving your intended order.",
+        `Pass each ${cliOverrideFlag} id at most once, preserving your intended order.`,
       ],
     },
   );
@@ -148,9 +152,11 @@ function validateResolvedAgentIds(options: {
 function assertResolvedAgentCount(options: {
   stageId: OrchestrationStageId;
   agentIds: readonly string[];
+  cliOverrideFlag: string;
   enforceSingleCompetitor: boolean;
 }): void {
-  const { stageId, agentIds, enforceSingleCompetitor } = options;
+  const { stageId, agentIds, cliOverrideFlag, enforceSingleCompetitor } =
+    options;
   const stageAgentsPath = `profiles.default.${stageId}.agents`;
 
   if (agentIds.length === 0) {
@@ -163,7 +169,7 @@ function assertResolvedAgentCount(options: {
         `Checked ${stageAgentsPath} in ${ORCHESTRATION_CONFIG_DISPLAY_PATH}.`,
       ],
       hintLines: [
-        `Provide --agent <id> to run ${stageId} with an explicit agent.`,
+        `Provide ${cliOverrideFlag} <id> to run ${stageId} with an explicit agent.`,
         configInstruction,
       ],
     });
@@ -176,6 +182,7 @@ function assertResolvedAgentCount(options: {
   throw new HintedError(`Multiple agents resolved for stage "${stageId}".`, {
     detailLines: [`Multi-agent ${stageId} is not supported.`],
     hintLines: [
+      `Provide ${cliOverrideFlag} <id> to run ${stageId} with an explicit agent.`,
       `Configure exactly one agent in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`,
     ],
   });
