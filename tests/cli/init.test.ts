@@ -31,12 +31,15 @@ describe("voratiq init (cli)", () => {
       },
     });
     executeInitCommandMock.mockResolvedValue({
+      preset: "pro",
       workspaceResult: { createdDirectories: [], createdFiles: [] },
       agentSummary: {
         configPath: ".voratiq/agents.yaml",
         enabledAgents: [],
         agentCount: 0,
         zeroDetections: true,
+        detectedProviders: [],
+        providerEnablementPrompted: false,
         configCreated: false,
         configUpdated: false,
       },

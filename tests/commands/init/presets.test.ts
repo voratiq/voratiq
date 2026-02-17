@@ -1,3 +1,5 @@
+import type { SpawnSyncReturns } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -5,19 +7,43 @@ import { join } from "node:path";
 import { executeInitCommand } from "../../../src/commands/init/command.js";
 import { readAgentsConfig } from "../../../src/configs/agents/loader.js";
 import type { AgentConfigEntry } from "../../../src/configs/agents/types.js";
+import type { PromptOptions } from "../../../src/render/interactions/confirmation.js";
 import {
   buildAgentsTemplate,
   serializeAgentsConfigEntries,
 } from "../../../src/workspace/templates.js";
+
+jest.mock("node:child_process", () => {
+  const actual =
+    jest.requireActual<typeof import("node:child_process")>(
+      "node:child_process",
+    );
+  return {
+    ...actual,
+    spawnSync: jest.fn(),
+  };
+});
 
 describe("voratiq init preset application", () => {
   let repoRoot: string;
 
   beforeEach(async () => {
     repoRoot = await mkdtemp(join(tmpdir(), "voratiq-init-presets-"));
+    const spawnSyncMock = spawnSync as jest.MockedFunction<typeof spawnSync>;
+    spawnSyncMock.mockReset();
+    spawnSyncMock.mockReturnValue({
+      status: 1,
+      stdout: "",
+      stderr: "",
+      pid: 0,
+      signal: null,
+      output: ["", "", ""],
+    } as SpawnSyncReturns<string>);
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
+    (spawnSync as jest.MockedFunction<typeof spawnSync>).mockReset();
     await rm(repoRoot, { recursive: true, force: true });
   });
 
@@ -76,7 +102,7 @@ describe("voratiq init preset application", () => {
   });
 
   it("prompts for preset selection when interactive and config is missing", async () => {
-    const prompt = jest.fn().mockResolvedValue("2");
+    const prompt = createPromptMock("2");
 
     await executeInitCommand({
       root: repoRoot,
@@ -89,6 +115,15 @@ describe("voratiq init preset application", () => {
     const content = await readFile(agentsPath, "utf8");
     expect(content).toBe(buildAgentsTemplate("lite"));
     expect(prompt).toHaveBeenCalled();
+
+    const firstPromptCall = prompt.mock.calls[0]?.[0];
+    expect(firstPromptCall?.message).toBe("[1]");
+
+    const prefaceLines = firstPromptCall?.prefaceLines ?? [];
+    expect(prefaceLines).toContain("Which workspace preset would you like?");
+    expect(prefaceLines).toContain("  [1] Pro (flagship)");
+    expect(prefaceLines).toContain("  [2] Lite (faster/cheaper)");
+    expect(prefaceLines).toContain("  [3] Manual (configure yourself)");
   });
 
   it("does not prompt for preset selection when agents config exists", async () => {
@@ -96,7 +131,7 @@ describe("voratiq init preset application", () => {
     const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
     await writeFile(agentsPath, buildAgentsTemplate("lite"), "utf8");
 
-    const prompt = jest.fn().mockResolvedValue("1");
+    const prompt = createPromptMock("1");
 
     await executeInitCommand({
       root: repoRoot,
@@ -192,7 +227,7 @@ describe("voratiq init preset application", () => {
   });
 
   it("skips preset selection when preset is provided", async () => {
-    const prompt = jest.fn().mockResolvedValue("2");
+    const prompt = createPromptMock("2");
 
     await executeInitCommand({
       root: repoRoot,
@@ -208,3 +243,11 @@ describe("voratiq init preset application", () => {
     expect(prompt).not.toHaveBeenCalled();
   });
 });
+
+function createPromptMock(
+  response: string,
+): jest.Mock<Promise<string>, [PromptOptions]> {
+  return jest.fn<Promise<string>, [PromptOptions]>(() =>
+    Promise.resolve(response),
+  );
+}

@@ -11,12 +11,14 @@ export interface InitCommandInput {
   root: string;
   preset: AgentPreset;
   presetProvided?: boolean;
+  assumeYes?: boolean;
   interactive: boolean;
   confirm?: InitConfirmationHandler;
   prompt?: InitPromptHandler;
 }
 
 export interface InitCommandResult {
+  preset: AgentPreset;
   workspaceResult: CreateWorkspaceResult;
   agentSummary: AgentInitSummary;
   orchestrationSummary: OrchestrationInitSummary;
@@ -30,8 +32,15 @@ export interface AgentInitSummary {
   enabledAgents: string[];
   agentCount: number;
   zeroDetections: boolean;
+  detectedProviders: DetectedProviderSummary[];
+  providerEnablementPrompted: boolean;
   configCreated: boolean;
   configUpdated: boolean;
+}
+
+export interface DetectedProviderSummary {
+  provider: string;
+  binary: string;
 }
 
 export interface EvalInitSummary {
@@ -67,6 +76,7 @@ export type InitPromptHandler = (options: PromptOptions) => Promise<string>;
 
 export interface InitConfigureOptions {
   interactive: boolean;
+  assumeYes?: boolean;
   confirm?: InitConfirmationHandler;
   prompt?: InitPromptHandler;
 }

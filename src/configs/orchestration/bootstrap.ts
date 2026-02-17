@@ -1,3 +1,8 @@
+import {
+  type AgentPreset,
+  getAgentDefaultsForPreset,
+  sanitizeAgentIdFromModel,
+} from "../agents/defaults.js";
 import type { AgentConfigEntry, AgentsConfig } from "../agents/types.js";
 
 const ORCHESTRATION_BOOTSTRAP_STAGE_IDS = ["spec", "run", "review"] as const;
@@ -25,7 +30,7 @@ export function collectEnabledAgentIdsForBootstrap(
 }
 
 export function serializeDefaultOrchestrationYaml(
-  enabledAgentIds: readonly string[],
+  runStageAgentIds: readonly string[],
 ): string {
   const lines = ["profiles:", "  default:"];
 
@@ -35,12 +40,14 @@ export function serializeDefaultOrchestrationYaml(
   ] of ORCHESTRATION_BOOTSTRAP_STAGE_IDS.entries()) {
     lines.push(`    ${stageId}:`);
 
-    const stageAgents = stageId === "run" ? enabledAgentIds : [];
-    if (stageAgents.length === 0) {
+    const usePresetAgents = stageId === "run";
+    const agents = usePresetAgents ? runStageAgentIds : [];
+
+    if (agents.length === 0) {
       lines.push("      agents: []");
     } else {
       lines.push("      agents:");
-      for (const agentId of stageAgents) {
+      for (const agentId of agents) {
         lines.push(`        - id: ${formatYamlScalar(agentId)}`);
       }
     }
@@ -68,9 +75,67 @@ export function listEnabledAgentIdsForOrchestrationBootstrap(
   return collectEnabledAgentIdsForBootstrap(config.agents);
 }
 
+export function listPresetStageAgentIdsForOrchestrationBootstrap(
+  config: AgentsConfig,
+  preset: AgentPreset,
+): string[] {
+  if (preset === "manual") {
+    return [];
+  }
+
+  const enabledByProvider = groupEnabledAgentsByProvider(config.agents);
+  const seenAgentIds = new Set<string>();
+  const stageAgentIds: string[] = [];
+
+  for (const agentDefault of getAgentDefaultsForPreset(preset)) {
+    const candidates = enabledByProvider.get(agentDefault.provider);
+    if (!candidates || candidates.length === 0) {
+      continue;
+    }
+
+    const defaultId = sanitizeAgentIdFromModel(agentDefault.model);
+    const preferred = candidates.find((entry) => entry.id === defaultId);
+    const selectedId = preferred?.id ?? candidates[0]?.id;
+    if (!selectedId || seenAgentIds.has(selectedId)) {
+      continue;
+    }
+
+    seenAgentIds.add(selectedId);
+    stageAgentIds.push(selectedId);
+  }
+
+  return stageAgentIds;
+}
+
+function groupEnabledAgentsByProvider(
+  agents: readonly AgentConfigEntry[],
+): Map<string, AgentConfigEntry[]> {
+  const grouped = new Map<string, AgentConfigEntry[]>();
+
+  for (const entry of agents) {
+    if (entry.enabled === false) {
+      continue;
+    }
+
+    const existing = grouped.get(entry.provider);
+    if (existing) {
+      existing.push(entry);
+      continue;
+    }
+
+    grouped.set(entry.provider, [entry]);
+  }
+
+  return grouped;
+}
+
 export function buildDefaultOrchestrationTemplate(
   config: AgentsConfig,
+  preset: AgentPreset = "pro",
 ): string {
-  const enabledAgentIds = listEnabledAgentIdsForOrchestrationBootstrap(config);
-  return serializeDefaultOrchestrationYaml(enabledAgentIds);
+  const stageAgentIds = listPresetStageAgentIdsForOrchestrationBootstrap(
+    config,
+    preset,
+  );
+  return serializeDefaultOrchestrationYaml(stageAgentIds);
 }

@@ -4,7 +4,6 @@ import type {
   AgentConfigEntry,
   AgentsConfig,
 } from "../../configs/agents/types.js";
-import { renderAgentPromptPreface } from "../../render/transcripts/init.js";
 import { detectBinary } from "../../utils/binaries.js";
 import {
   isDefaultYamlTemplate,
@@ -23,7 +22,11 @@ import {
   serializeAgentsConfigEntries,
   type VendorTemplate,
 } from "../../workspace/templates.js";
-import type { AgentInitSummary, InitConfigureOptions } from "./types.js";
+import type {
+  AgentInitSummary,
+  DetectedProviderSummary,
+  InitConfigureOptions,
+} from "./types.js";
 
 export const AGENTS_CONFIG_DISPLAY_PATH =
   formatWorkspacePath(VORATIQ_AGENTS_FILE);
@@ -33,6 +36,7 @@ export async function configureAgents(
   preset: AgentPreset,
   options: InitConfigureOptions,
 ): Promise<AgentInitSummary> {
+  void options;
   const filePath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const defaultTemplate = buildAgentsTemplate(preset);
 
@@ -42,33 +46,40 @@ export async function configureAgents(
     defaultTemplate,
   );
   const configCreated = !loadResult.snapshot.exists;
+  let lifecycle: AgentLifecycleState | undefined;
+  let detectedProviders: DetectedProviderSummary[];
+
   if (preset === "manual") {
-    return buildAgentSummary(
-      loadResult.config.agents,
-      computeZeroDetections(loadResult.config.agents),
+    detectedProviders = collectSupportedProviderDetections();
+    return buildAgentSummary({
+      entries: loadResult.config.agents,
+      zeroDetections: detectedProviders.length === 0,
+      detectedProviders,
+      providerEnablementPrompted: false,
       configCreated,
-      false,
-    );
+      configUpdated: false,
+    });
   }
 
-  const canInteract = canConfirm(options);
-
-  if (!canInteract || (!defaultStatus && loadResult.snapshot.exists)) {
-    return buildAgentSummary(
-      loadResult.config.agents,
-      computeZeroDetections(loadResult.config.agents),
-      configCreated,
-      false,
-    );
-  }
-
-  const lifecycle = scanWorkspaceForAgentDefaults(
+  lifecycle = scanWorkspaceForAgentDefaults(
     loadResult.config,
     defaultStatus,
     getAgentDefaultsForPreset(preset),
   );
+  detectedProviders = collectDetectedProviders(lifecycle.templates);
 
-  const configChanged = await applyAgentOperatorChoices(lifecycle, options);
+  if (!defaultStatus && loadResult.snapshot.exists) {
+    return buildAgentSummary({
+      entries: loadResult.config.agents,
+      zeroDetections: detectedProviders.length === 0,
+      detectedProviders,
+      providerEnablementPrompted: false,
+      configCreated,
+      configUpdated: false,
+    });
+  }
+
+  const configChanged = applyProviderEnablementDecision(lifecycle, true);
 
   const snapshotResult = finalizeAgentConfigSnapshot(lifecycle);
 
@@ -80,12 +91,14 @@ export async function configureAgents(
     isDefaultTemplate: defaultStatus,
   });
 
-  return buildAgentSummary(
-    snapshotResult.entries,
-    lifecycle.zeroDetections,
+  return buildAgentSummary({
+    entries: snapshotResult.entries,
+    zeroDetections: lifecycle.zeroDetections,
+    detectedProviders,
+    providerEnablementPrompted: false,
     configCreated,
-    updated || configChanged,
-  );
+    configUpdated: updated || configChanged,
+  });
 }
 
 interface AgentLifecycleState {
@@ -96,7 +109,6 @@ interface AgentLifecycleState {
 
 interface AgentTemplateState {
   template: VendorTemplate;
-  existing?: AgentConfigEntry;
   entry: AgentConfigEntry;
   detectedBinary?: string;
 }
@@ -132,7 +144,6 @@ function scanWorkspaceForAgentDefaults(
 
     templateStates.push({
       template,
-      existing,
       entry,
       detectedBinary,
     });
@@ -146,7 +157,7 @@ function scanWorkspaceForAgentDefaults(
   }
 
   const zeroDetections = templateStates.every(
-    (state) => !hasBinary(state.entry.binary),
+    (state) => !hasBinary(state.detectedBinary),
   );
 
   return {
@@ -183,53 +194,51 @@ function cloneAgentEntry(entry: AgentConfigEntry): AgentConfigEntry {
   };
 }
 
-async function applyAgentOperatorChoices(
-  state: AgentLifecycleState,
-  options: InitConfigureOptions,
-): Promise<boolean> {
-  const confirm = options.confirm;
-  if (!confirm) {
-    state.zeroDetections = state.templates.every(
-      (templateState) => !hasBinary(templateState.entry.binary),
-    );
-    return false;
-  }
+function collectDetectedProviders(
+  templates: readonly AgentTemplateState[],
+): DetectedProviderSummary[] {
+  const rows: DetectedProviderSummary[] = [];
+  const seenProviders = new Set<string>();
 
-  let firstPrompt = true;
-  let changed = false;
-
-  for (const templateState of state.templates) {
-    const hasDetectedBinary = hasBinary(templateState.entry.binary);
-    if (!hasDetectedBinary) {
-      templateState.entry.enabled = false;
+  for (const templateState of templates) {
+    const binary = templateState.detectedBinary?.trim();
+    if (!binary) {
       continue;
     }
 
-    const initialEnabled = templateState.entry.enabled !== false;
-    const defaultValue =
-      templateState.existing !== undefined
-        ? templateState.existing.enabled !== false
-        : true;
-    const prefaceLines = renderAgentPromptPreface({
-      agentId: templateState.entry.id,
-      binaryPath: templateState.entry.binary ?? "",
-      detected: hasDetectedBinary,
-      firstPrompt,
+    const provider = templateState.template.provider;
+    if (seenProviders.has(provider)) {
+      continue;
+    }
+
+    seenProviders.add(provider);
+    rows.push({
+      provider,
+      binary,
     });
-    const shouldEnable = await confirm({
-      message: "Enable?",
-      defaultValue,
-      prefaceLines,
-    });
-    if (shouldEnable !== initialEnabled) {
+  }
+
+  return rows;
+}
+
+function applyProviderEnablementDecision(
+  state: AgentLifecycleState,
+  enableDetectedProviders: boolean,
+): boolean {
+  let changed = false;
+
+  for (const templateState of state.templates) {
+    const previousEnabled = templateState.entry.enabled !== false;
+    const hasDetectedBinary = hasBinary(templateState.detectedBinary);
+    const nextEnabled = hasDetectedBinary ? enableDetectedProviders : false;
+    if (nextEnabled !== previousEnabled) {
       changed = true;
     }
-    templateState.entry.enabled = shouldEnable;
-    firstPrompt = false;
+    templateState.entry.enabled = nextEnabled;
   }
 
   state.zeroDetections = state.templates.every(
-    (templateState) => !hasBinary(templateState.entry.binary),
+    (templateState) => !hasBinary(templateState.detectedBinary),
   );
 
   return changed;
@@ -257,12 +266,23 @@ function finalizeAgentConfigSnapshot(
   return { entries, serialized };
 }
 
-function buildAgentSummary(
-  entries: AgentConfigEntry[],
-  zeroDetections: boolean,
-  configCreated: boolean,
-  configUpdated: boolean,
-): AgentInitSummary {
+function buildAgentSummary(options: {
+  entries: AgentConfigEntry[];
+  zeroDetections: boolean;
+  detectedProviders: readonly DetectedProviderSummary[];
+  providerEnablementPrompted: boolean;
+  configCreated: boolean;
+  configUpdated: boolean;
+}): AgentInitSummary {
+  const {
+    entries,
+    zeroDetections,
+    detectedProviders,
+    providerEnablementPrompted,
+    configCreated,
+    configUpdated,
+  } = options;
+
   const enabledAgents = entries
     .filter((entry) => entry.enabled !== false)
     .map((entry) => entry.id);
@@ -272,6 +292,8 @@ function buildAgentSummary(
     enabledAgents,
     agentCount: entries.length,
     zeroDetections,
+    detectedProviders: [...detectedProviders],
+    providerEnablementPrompted,
     configCreated,
     configUpdated,
   };
@@ -281,10 +303,40 @@ function hasBinary(binary: string | undefined): boolean {
   return Boolean(binary && binary.trim().length > 0);
 }
 
-function computeZeroDetections(entries: AgentConfigEntry[]): boolean {
-  return !entries.some((entry) => hasBinary(entry.binary));
+function collectSupportedProviderDetections(): DetectedProviderSummary[] {
+  const providers = listSupportedProviders();
+  const detections: DetectedProviderSummary[] = [];
+
+  for (const provider of providers) {
+    const binary = detectBinary(provider);
+    const resolvedBinary = binary?.trim();
+    if (!resolvedBinary) {
+      continue;
+    }
+
+    detections.push({
+      provider,
+      binary: resolvedBinary,
+    });
+  }
+
+  return detections;
 }
 
-function canConfirm(options: InitConfigureOptions): boolean {
-  return Boolean(options.confirm);
+function listSupportedProviders(): string[] {
+  const providers: string[] = [];
+  const seen = new Set<string>();
+  const presets: readonly AgentPreset[] = ["pro", "lite"];
+
+  for (const preset of presets) {
+    for (const agentDefault of getAgentDefaultsForPreset(preset)) {
+      if (seen.has(agentDefault.provider)) {
+        continue;
+      }
+      seen.add(agentDefault.provider);
+      providers.push(agentDefault.provider);
+    }
+  }
+
+  return providers;
 }
