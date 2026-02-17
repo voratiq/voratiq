@@ -101,6 +101,7 @@ describe("CLI Context", () => {
         "/app/voratiq/.voratiq/specs": null,
         "/app/voratiq/.voratiq/specs/sessions": null,
         "/app/voratiq/.voratiq/agents.yaml": "",
+        "/app/voratiq/.voratiq/orchestration.yaml": "",
         "/app/voratiq/.voratiq/evals.yaml": "",
         "/app/voratiq/.voratiq/environment.yaml": "",
         "/app/voratiq/.voratiq/sandbox.yaml": "",

@@ -1,6 +1,5 @@
 import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
-import { loadAgentById } from "../../configs/agents/loader.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import type { RunRecordEnhanced } from "../../runs/records/enhanced.js";
@@ -10,6 +9,7 @@ import { fetchRunsSafely } from "../../runs/records/persistence.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { resolveRunWorkspacePaths } from "../../workspace/layout.js";
 import { RunNotFoundCliError } from "../errors.js";
+import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
 import { createReviewCompetitionAdapter } from "./competition-adapter.js";
 import {
@@ -22,7 +22,8 @@ export interface ReviewCommandInput {
   runsFilePath: string;
   reviewsFilePath: string;
   runId: string;
-  agentId: string;
+  agentId?: string;
+  agentOverrideFlag?: string;
 }
 
 export interface ReviewCommandResult {
@@ -36,7 +37,14 @@ export interface ReviewCommandResult {
 export async function executeReviewCommand(
   input: ReviewCommandInput,
 ): Promise<ReviewCommandResult> {
-  const { root, runsFilePath, reviewsFilePath, runId, agentId } = input;
+  const {
+    root,
+    runsFilePath,
+    reviewsFilePath,
+    runId,
+    agentId,
+    agentOverrideFlag,
+  } = input;
 
   const { records } = await fetchRunsSafely({
     root,
@@ -59,7 +67,11 @@ export async function executeReviewCommand(
     workspaceRoot: root,
   });
 
-  const agent = resolveReviewAgent({ agentId, root });
+  const agent = resolveReviewAgent({
+    agentId,
+    root,
+    agentOverrideFlag,
+  });
   const environment = loadEnvironmentConfig({ root });
   const reviewId = generateSessionId();
   const createdAt = new Date().toISOString();
@@ -106,12 +118,24 @@ export async function executeReviewCommand(
 }
 
 function resolveReviewAgent(options: {
-  agentId: string;
+  agentId?: string;
   root: string;
+  agentOverrideFlag?: string;
 }): AgentDefinition {
-  const { agentId, root } = options;
+  const { agentId, root, agentOverrideFlag } = options;
   try {
-    return loadAgentById(agentId, { root });
+    const resolution = resolveStageCompetitors({
+      root,
+      stageId: "review",
+      cliAgentIds: agentId ? [agentId] : undefined,
+      cliOverrideFlag: agentOverrideFlag,
+      enforceSingleCompetitor: true,
+    });
+    const resolvedAgent = resolution.competitors[0];
+    if (!resolvedAgent) {
+      throw new Error("Expected a single resolved review agent.");
+    }
+    return resolvedAgent;
   } catch (error) {
     if (error instanceof AgentNotFoundError) {
       throw new ReviewAgentNotFoundError(error.agentId);

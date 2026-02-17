@@ -4,137 +4,56 @@ title: Agent Configuration
 
 # Agent Configuration
 
-Defines which AI coding agents Voratiq runs and how each process is invoked.
+Register agents and their invocation details.
 
 ## Overview
 
-Voratiq reads `.voratiq/agents.yaml` to determine which AI coding agents to spawn and how to invoke them.
+`agents.yaml` is the local catalog of agents available to a repository. Each entry defines a stable id, a provider and model, and enough to invoke the agent (binary path, optional CLI args). Voratiq never runs an agent that isn't in this file.
 
-`voratiq init` seeds .voratiq/agents.yaml from a preset (pro, lite, or manual). In interactive mode, it detects supported agent CLIs on $PATH and prompts to enable them. Edit the file any time.
+`voratiq init` seeds the catalog from a preset (pro, lite, or manual) by detecting supported CLIs on `$PATH`. You can edit it at any time.
+
+This file defines what exists. Which agents run at which stage is determined by [orchestration configuration](./orchestration.md), which references agent ids from this catalog and requires them to be enabled.
 
 ## Schema
 
 Top-level structure:
 
-- `agents` (required) – array of agent entries evaluated top to bottom.
+- `agents` (required) - array of agent entries.
 
-Each agent entry supports:
+Each agent entry:
 
-- `id` (required) – unique identifier per entry (max 32 characters); use lowercase letters, digits, hyphens, or underscores.
-- `provider` (required) – agent type. Supported values: `claude`, `codex`, `gemini`.
-- `model` (required) – provider-specific model slug, e.g. `claude-sonnet-4-5-20250929`, `gpt-5.1-codex-max`, `gemini-2.5-pro`.
-- `enabled` (optional, default `true`) – set to `false` to keep a definition without executing it.
-- `binary` (optional, default empty string) – absolute path to the agent executable.
-- `extraArgs` (optional) – array of additional agent CLI arguments (non-empty; cannot include `--model` or `{{MODEL}}`).
+- `id` (required) - unique identifier (max 32 chars); lowercase letters, digits, `_`, `-`.
+- `provider` (required) - `claude`, `codex`, or `gemini`.
+- `model` (required) - provider model slug, e.g. `claude-opus-4-6`, `gpt-5.3-codex`, `gemini-2.5-pro`.
+- `enabled` (optional, default `true`) - set `false` to keep the entry in the catalog without making it available to orchestration.
+- `binary` (optional) - absolute path to the provider CLI executable.
+- `extraArgs` (optional) - additional CLI arguments; cannot include `--model` or `{{MODEL}}`.
 
-## `agents.yaml` Examples
-
-### Run Each Provider's Flagship Model
+## Example
 
 ```yaml
 agents:
-  - id: claude-sonnet-4-5-20250929
+  - id: claude-opus-4-6
     provider: claude
-    model: claude-sonnet-4-5-20250929
+    model: claude-opus-4-6
     enabled: true
     binary: /usr/local/bin/claude
 
-  - id: gpt-5-1-codex-max
+  - id: gpt-5-3-codex
     provider: codex
-    model: gpt-5.1-codex-max
+    model: gpt-5.3-codex
     enabled: true
     binary: /usr/local/bin/codex
 
-  - id: gemini-3-pro-preview
-    provider: gemini
-    model: gemini-3-pro-preview
-    enabled: true
-    binary: /usr/local/bin/gemini
-```
-
-Cross-provider comparison on the same spec.
-
-### Cheaper Models for CI
-
-```yaml
-agents:
-  - id: claude-haiku-4-5-20251001
-    provider: claude
-    model: claude-haiku-4-5-20251001
-    enabled: true
-    binary: /usr/local/bin/claude
-
-  - id: gpt-5-1-codex-mini
-    provider: codex
-    model: gpt-5.1-codex-mini
-    enabled: true
-    binary: /usr/local/bin/codex
-
-  - id: gemini-2-5-flash
-    provider: gemini
-    model: gemini-2.5-flash
-    enabled: true
-    binary: /usr/local/bin/gemini
-```
-
-Fast, low-cost validation before expensive runs.
-
-### Customize with Extra Arguments
-
-```yaml
-agents:
-  - id: gpt-5-1-codex
-    provider: codex
-    model: gpt-5.1-codex
-    enabled: true
-    binary: /usr/local/bin/codex
-
-  - id: gpt-5-1-codex-high
-    provider: codex
-    model: gpt-5.1-codex
-    enabled: true
-    binary: /usr/local/bin/codex
-    extraArgs:
-      - "--config"
-      - "model_reasoning_effort=high"
-```
-
-Optimize quality vs cost tradeoffs on the same model.
-
-### Compare Model Releases
-
-**Codex:**
-
-```yaml
-agents:
-  - id: gpt-5-codex
-    provider: codex
-    model: gpt-5-codex
-    enabled: true
-    binary: /usr/local/bin/codex
-
-  - id: gpt-5-1-codex
-    provider: codex
-    model: gpt-5.1-codex
-    enabled: true
-    binary: /usr/local/bin/codex
-```
-
-**Gemini:**
-
-```yaml
-agents:
   - id: gemini-2-5-pro
     provider: gemini
     model: gemini-2.5-pro
     enabled: true
     binary: /usr/local/bin/gemini
-
-  - id: gemini-3-pro-preview
-    provider: gemini
-    model: gemini-3-pro-preview
-    enabled: true
-    binary: /usr/local/bin/gemini
 ```
 
-See if a new release is worth migrating to.
+Three providers, one agent each. Orchestration decides which of these run at each stage.
+
+## Validation
+
+Agent ids must be unique across the catalog. `extraArgs` entries that contain forbidden model overrides (`--model`, `{{MODEL}}`) fail validation. Disabled agents remain in the file but cannot be referenced by orchestration.

@@ -37,12 +37,14 @@ Creates:
 - `specs/` and subdirectories for spec data (including `specs/sessions/`)
 - `reviews/` and subdirectories for review data (including `reviews/sessions/`)
 - `agents.yaml` seeded from the selected preset template
-- `evals.yaml` with common eval commands
+- `orchestration.yaml` with stage-to-agent assignments
 - `environment.yaml` with environment settings
+- `evals.yaml` with common eval commands
 - `sandbox.yaml` with sandbox policies
 - `index.json` files under `runs/`, `specs/`, and `reviews/`
 
 Detects common agent CLIs (`claude`, `codex`, `gemini`, etc.) on `$PATH` and pre-populates `agents.yaml`.
+Seeds orchestration defaults after agent setup as `run: [enabled agents]`, `spec: []`, `review: []`.
 
 Interactive mode (TTY) prompts for confirmation. Non-TTY environments require the `--yes` flag.
 
@@ -76,17 +78,15 @@ Generate a structured spec from a task description via a sandboxed agent.
 ### Usage
 
 ```bash
-voratiq spec --description <text> --agent <agent-id> [--title <text>] [--output <path>]
+voratiq spec --description <text> [--agent <agent-id>] [--title <text>] [--output <path>]
 ```
 
-### Flags
+### Options
 
-| Flag                   | Required | Description                                                                |
-| ---------------------- | -------- | -------------------------------------------------------------------------- |
-| `--description <text>` | Yes      | Task description for the spec                                              |
-| `--agent <agent-id>`   | Yes      | Agent to draft the spec (e.g., `claude-opus-4-5-20251101`)                 |
-| `--title <text>`       | No       | Spec title; agent infers if omitted                                        |
-| `--output <path>`      | No       | Output path; agent infers if omitted (default: `.voratiq/specs/<slug>.md`) |
+- `--description <text>`: Task description for the spec (required)
+- `--agent <agent-id>`: Agent to draft the spec (resolves from orchestration stage config if omitted)
+- `--title <text>`: Spec title; agent infers if omitted
+- `--output <path>`: Output path; agent infers if omitted (default: `.voratiq/specs/<slug>.md`)
 
 ### Behavior
 
@@ -109,46 +109,48 @@ To begin a run:
 
 - Missing required flags
 - Agent not found
+- No agent resolved for spec stage (stage config empty and no `--agent`)
+- Multiple agents resolved for spec stage (multi-agent spec is not supported)
 - Output path already exists
 - Specification generation failed
 
 ## `voratiq run`
 
-Execute enabled agents against a Markdown spec.
+Execute agents against a Markdown spec.
 
 ### Usage
 
 ```bash
-voratiq run --spec <path> [--max-parallel <count>] [--branch]
+voratiq run --spec <path> [--agent <agent-id>]... [--max-parallel <count>] [--branch]
 ```
 
 ### Options
 
 - `--spec <path>`: Path to the Markdown spec file (required)
-- `--max-parallel <count>`: Maximum number of agents to run concurrently (default: number of enabled agents)
+- `--agent <agent-id>`: Agent identifier override (repeatable; preserves CLI order). Resolves from orchestration stage config if omitted.
+- `--max-parallel <count>`: Maximum number of agents to run concurrently (default: number of resolved agents)
 - `--branch`: Checkout or create a branch named after the spec file
 
 ### Behavior
 
 1. Validates clean git tree, spec exists, agent/eval configs are valid
 2. Generates run ID, creates run workspace, initializes run record
-3. Spawns enabled agents in parallel, each in an isolated git worktree
+3. Spawns resolved agents in parallel, each in an isolated git worktree
 4. Runs evals in each agent's workspace after the agent completes
 5. Captures diffs, persists records, generates report
 
 Exits with code 1 if:
 
 - Preflight checks fail
-- No agents are enabled
+- No agents resolved for the stage
 - Any agent fails or errors
-- Any eval fails
 
-Note: the run itself completes, but the exit code indicates failure.
+Eval failures are quality signals displayed in the output but do not affect exit code.
 
 ### Examples
 
 ```bash
-# Run all enabled agents against a spec
+# Run agents against a spec (resolved from orchestration or --agent override)
 voratiq run --spec .voratiq/specs/fix-auth-bug.md
 
 # Limit concurrency to 2 agents at a time
@@ -159,7 +161,7 @@ voratiq run --spec .voratiq/specs/refactor.md --max-parallel 2
 
 - Git working tree is not clean
 - Spec file doesn't exist
-- No agents are enabled
+- No agents resolved for the stage (empty orchestration config and no `--agent` override)
 - Agent binary not found or not executable
 - Stale or missing agent credentials
 - Invalid agent/eval configuration
@@ -171,13 +173,13 @@ Run a reviewer agent headlessly against a recorded run.
 ### Usage
 
 ```bash
-voratiq review --run <run-id> --agent <agent-id>
+voratiq review --run <run-id> [--agent <agent-id>]
 ```
 
 ### Options
 
 - `--run <run-id>`: Run ID to review (required)
-- `--agent <agent-id>`: Reviewer agent identifier (required)
+- `--agent <agent-id>`: Reviewer agent identifier (resolves from orchestration stage config if omitted)
 
 ### Behavior
 
@@ -193,6 +195,8 @@ voratiq review --run 20251031-232802-abc123 --agent gpt-5-2-codex
 
 - Run ID not found
 - Run record is malformed
+- No agent resolved for review stage (stage config empty and no `--agent`)
+- Multiple agents resolved for review stage (multi-agent review is not supported)
 - Run artifacts are missing (warns but continues)
 
 ## `voratiq apply`

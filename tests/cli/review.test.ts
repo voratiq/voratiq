@@ -20,6 +20,7 @@ import { executeCompetitionWithAdapter } from "../../src/competition/command-ada
 import { ensureSandboxDependencies } from "../../src/preflight/index.js";
 import { appendRunRecord } from "../../src/runs/records/persistence.js";
 import type { RunRecord } from "../../src/runs/records/types.js";
+import { HintedError } from "../../src/utils/errors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
 import {
   REVIEW_ARTIFACT_INFO_FILENAME,
@@ -90,16 +91,26 @@ describe("voratiq review", () => {
       ).rejects.toThrow(/required option '--run <run-id>'/iu);
     });
 
-    it("requires --agent", async () => {
+    it("allows omitting --agent", async () => {
+      let received: unknown;
       const reviewCommand = silenceCommander(createReviewCommand());
-      reviewCommand.exitOverride().action(() => {});
+      reviewCommand.exitOverride().action((options) => {
+        received = options;
+      });
 
       const program = silenceCommander(new Command());
       program.exitOverride().addCommand(reviewCommand);
 
-      await expect(
-        program.parseAsync(["node", "voratiq", "review", "--run", "abc123"]),
-      ).rejects.toThrow(/required option '--agent <agent-id>'/iu);
+      await program.parseAsync([
+        "node",
+        "voratiq",
+        "review",
+        "--run",
+        "abc123",
+      ]);
+
+      expect((received as { run?: string }).run).toBe("abc123");
+      expect((received as { agent?: string }).agent).toBeUndefined();
     });
 
     it("parses --run", async () => {
@@ -118,8 +129,6 @@ describe("voratiq review", () => {
         "review",
         "--run",
         "20250101-abcde",
-        "--agent",
-        "reviewer",
       ]);
 
       expect((received as { run?: string }).run).toBe("20250101-abcde");
@@ -373,6 +382,147 @@ describe("voratiq review", () => {
       ).rejects.toMatchObject({ code: "ENOENT" });
     });
 
+    it("resolves reviewer from orchestration when --agent is omitted", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-vmtyf",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+      await writeOrchestrationConfig(repoRoot, {
+        reviewAgentIds: ["reviewer"],
+      });
+
+      const result = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+      });
+
+      expect(result.agentId).toBe("reviewer");
+      expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxParallel: 1,
+          candidates: [expect.objectContaining({ id: "reviewer" })],
+        }),
+      );
+    });
+
+    it("uses --agent override instead of orchestration review defaults", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-vmtyf",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+      await writeAgentsConfig(repoRoot, [
+        {
+          id: "reviewer",
+          provider: "codex",
+          model: "gpt-5.2-codex",
+          enabled: true,
+          binary: process.execPath,
+        },
+        {
+          id: "second-reviewer",
+          provider: "claude",
+          model: "claude-haiku-4-5-20251001",
+          enabled: true,
+          binary: process.execPath,
+        },
+      ]);
+      await writeOrchestrationConfig(repoRoot, {
+        reviewAgentIds: ["second-reviewer", "reviewer"],
+      });
+
+      const result = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+        agentId: "reviewer",
+      });
+
+      expect(result.agentId).toBe("reviewer");
+      expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxParallel: 1,
+          candidates: [expect.objectContaining({ id: "reviewer" })],
+        }),
+      );
+    });
+
+    it("fails without --agent when orchestration review agents are empty", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-vmtyf",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+      await writeOrchestrationConfig(repoRoot, {
+        reviewAgentIds: [],
+      });
+
+      let caught: unknown;
+      try {
+        await runReviewInRepo(repoRoot, {
+          runId: runRecord.runId,
+        });
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(HintedError);
+      const hinted = caught as HintedError;
+      expect(hinted.headline).toBe('No agent resolved for stage "review".');
+      expect(
+        hinted.hintLines.some((line) => line.includes("Provide --agent <id>")),
+      ).toBe(true);
+      expect(
+        hinted.hintLines.some((line) =>
+          line.includes("profiles.default.review.agents"),
+        ),
+      ).toBe(true);
+      expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
+    });
+
+    it("fails without --agent when orchestration review agents contain multiple ids", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-vmtyf",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+      await writeAgentsConfig(repoRoot, [
+        {
+          id: "reviewer",
+          provider: "codex",
+          model: "gpt-5.2-codex",
+          enabled: true,
+          binary: process.execPath,
+        },
+        {
+          id: "second-reviewer",
+          provider: "claude",
+          model: "claude-haiku-4-5-20251001",
+          enabled: true,
+          binary: process.execPath,
+        },
+      ]);
+      await writeOrchestrationConfig(repoRoot, {
+        reviewAgentIds: ["reviewer", "second-reviewer"],
+      });
+
+      let caught: unknown;
+      try {
+        await runReviewInRepo(repoRoot, {
+          runId: runRecord.runId,
+        });
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(HintedError);
+      const hinted = caught as HintedError;
+      expect(hinted.headline).toBe(
+        'Multiple agents resolved for stage "review".',
+      );
+      expect(hinted.detailLines).toContain(
+        "Multi-agent review is not supported.",
+      );
+      expect(hinted.hintLines).toContain(
+        "Configure exactly one agent in `.voratiq/orchestration.yaml`.",
+      );
+      expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
+    });
+
     it("prints a warning when run artifacts are missing", async () => {
       const runRecord = buildRunRecord({
         runId: "20251212-090000-zzz999",
@@ -593,6 +743,48 @@ async function writeAgentsConfig(
     .join("\n\n");
   const payload = `${header}${body}\n`;
   await writeFile(join(root, ".voratiq", "agents.yaml"), payload, "utf8");
+}
+
+async function writeOrchestrationConfig(
+  root: string,
+  options: {
+    runAgentIds?: readonly string[];
+    reviewAgentIds?: readonly string[];
+    specAgentIds?: readonly string[];
+  } = {},
+): Promise<void> {
+  const runAgentIds = options.runAgentIds ?? [];
+  const reviewAgentIds = options.reviewAgentIds ?? [];
+  const specAgentIds = options.specAgentIds ?? [];
+
+  const lines = ["profiles:", "  default:"];
+  appendOrchestrationStage(lines, "run", runAgentIds);
+  appendOrchestrationStage(lines, "review", reviewAgentIds);
+  appendOrchestrationStage(lines, "spec", specAgentIds);
+  lines.push("");
+
+  await writeFile(
+    join(root, ".voratiq", "orchestration.yaml"),
+    `${lines.join("\n")}\n`,
+    "utf8",
+  );
+}
+
+function appendOrchestrationStage(
+  lines: string[],
+  stageId: "run" | "review" | "spec",
+  agentIds: readonly string[],
+): void {
+  lines.push(`    ${stageId}:`);
+  if (agentIds.length === 0) {
+    lines.push("      agents: []");
+    return;
+  }
+
+  lines.push("      agents:");
+  for (const agentId of agentIds) {
+    lines.push(`        - id: ${JSON.stringify(agentId)}`);
+  }
 }
 
 async function writeRunRecord(root: string, record: RunRecord): Promise<void> {

@@ -19,8 +19,9 @@ export interface InitCommandInput {
 export interface InitCommandResult {
   workspaceResult: CreateWorkspaceResult;
   agentSummary: AgentInitSummary;
-  evalSummary: EvalInitSummary;
+  orchestrationSummary: OrchestrationInitSummary;
   environmentSummary: EnvironmentInitSummary;
+  evalSummary: EvalInitSummary;
   sandboxSummary: SandboxInitSummary;
 }
 
@@ -49,6 +50,11 @@ export interface EnvironmentInitSummary {
 }
 
 export interface SandboxInitSummary {
+  configPath: string;
+  configCreated: boolean;
+}
+
+export interface OrchestrationInitSummary {
   configPath: string;
   configCreated: boolean;
 }

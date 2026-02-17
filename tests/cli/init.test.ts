@@ -40,6 +40,10 @@ describe("voratiq init (cli)", () => {
         configCreated: false,
         configUpdated: false,
       },
+      orchestrationSummary: {
+        configPath: ".voratiq/orchestration.yaml",
+        configCreated: false,
+      },
       environmentSummary: {
         configPath: ".voratiq/environment.yaml",
         detectedEntries: [],

@@ -44,6 +44,21 @@ describe("CLI entrypoint error handling", () => {
     );
   });
 
+  it("renders missing orchestration config UX exactly", () => {
+    const cliError = toCliError(
+      new WorkspaceMissingEntryError(".voratiq/orchestration.yaml"),
+    );
+
+    const rendered = stripAnsi(renderCliError(cliError));
+    expect(rendered).toBe(
+      [
+        "Error: Missing workspace entry: .voratiq/orchestration.yaml",
+        "",
+        "Run `voratiq init` to configure the workspace.",
+      ].join("\n"),
+    );
+  });
+
   it("renders workspace not initialized details and hint", () => {
     const cliError = toCliError(
       new WorkspaceNotInitializedError([
@@ -131,3 +146,9 @@ describe("CLI entrypoint error handling", () => {
     expect(process.exitCode).toBe(0);
   });
 });
+
+function stripAnsi(value: string): string {
+  const esc = String.fromCharCode(27);
+  const ansiPattern = new RegExp(`${esc}\\[[0-9;]*m`, "g");
+  return value.replace(ansiPattern, "");
+}

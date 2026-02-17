@@ -69,6 +69,9 @@ async function writeAgentsConfig(
   agents: AgentConfigDefinition[],
 ): Promise<void> {
   await workspace.writeAgentsConfig(agents);
+  await writeOrchestrationConfig(workspace.root, {
+    runAgentIds: agents.map((agent) => agent.id),
+  });
 }
 
 async function withRepoCwd<T>(
@@ -445,4 +448,46 @@ console.error('stderr from gemini fixture');
   await writeFile(scriptPath, script, { encoding: "utf8" });
   await chmod(scriptPath, 0o755);
   return scriptPath;
+}
+
+async function writeOrchestrationConfig(
+  root: string,
+  options: {
+    runAgentIds?: readonly string[];
+    reviewAgentIds?: readonly string[];
+    specAgentIds?: readonly string[];
+  } = {},
+): Promise<void> {
+  const runAgentIds = options.runAgentIds ?? [];
+  const reviewAgentIds = options.reviewAgentIds ?? [];
+  const specAgentIds = options.specAgentIds ?? [];
+
+  const lines = ["profiles:", "  default:"];
+  appendOrchestrationStage(lines, "spec", specAgentIds);
+  appendOrchestrationStage(lines, "run", runAgentIds);
+  appendOrchestrationStage(lines, "review", reviewAgentIds);
+  lines.push("");
+
+  await writeFile(
+    join(root, ".voratiq", "orchestration.yaml"),
+    `${lines.join("\n")}\n`,
+    "utf8",
+  );
+}
+
+function appendOrchestrationStage(
+  lines: string[],
+  stageId: "run" | "review" | "spec",
+  agentIds: readonly string[],
+): void {
+  lines.push(`    ${stageId}:`);
+  if (agentIds.length === 0) {
+    lines.push("      agents: []");
+    return;
+  }
+
+  lines.push("      agents:");
+  for (const agentId of agentIds) {
+    lines.push(`        - id: ${JSON.stringify(agentId)}`);
+  }
 }

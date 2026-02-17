@@ -3,6 +3,7 @@ import type {
   AgentConfigEntry,
   AgentsConfig,
 } from "../../configs/agents/types.js";
+import { buildDefaultOrchestrationTemplate } from "../../configs/orchestration/bootstrap.js";
 import { renderPresetPromptPreface } from "../../render/transcripts/init.js";
 import {
   normalizeConfigText,
@@ -14,6 +15,7 @@ import {
   formatWorkspacePath,
   resolveWorkspacePath,
   VORATIQ_AGENTS_FILE,
+  VORATIQ_ORCHESTRATION_FILE,
   VORATIQ_SANDBOX_FILE,
 } from "../../workspace/structure.js";
 import {
@@ -30,6 +32,7 @@ import type {
   InitCommandInput,
   InitCommandResult,
   InitPromptHandler,
+  OrchestrationInitSummary,
   SandboxInitSummary,
 } from "./types.js";
 
@@ -41,6 +44,14 @@ export async function executeInitCommand(
   const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const agentsSnapshotBeforeInit = await readConfigSnapshot(agentsConfigPath);
   const agentsConfigMissing = !agentsSnapshotBeforeInit.exists;
+  const orchestrationConfigPath = resolveWorkspacePath(
+    root,
+    VORATIQ_ORCHESTRATION_FILE,
+  );
+  const orchestrationSnapshotBeforeInit = await readConfigSnapshot(
+    orchestrationConfigPath,
+  );
+  const orchestrationConfigMissing = !orchestrationSnapshotBeforeInit.exists;
 
   const resolvedPreset = await resolveAgentPreset({
     preset,
@@ -59,6 +70,10 @@ export async function executeInitCommand(
   const agentSummary = await configureAgents(root, resolvedPreset, {
     interactive,
     confirm,
+  });
+
+  const orchestrationSummary = await reconcileOrchestrationConfig(root, {
+    orchestrationConfigMissing,
   });
 
   const environmentSummary = await configureEnvironment(root, {
@@ -81,6 +96,7 @@ export async function executeInitCommand(
   return {
     workspaceResult,
     agentSummary,
+    orchestrationSummary,
     environmentSummary,
     evalSummary,
     sandboxSummary,
@@ -96,6 +112,36 @@ function buildSandboxSummary(
   );
   const configCreated = normalizedCreated.includes(configPath);
   return { configPath, configCreated };
+}
+
+async function reconcileOrchestrationConfig(
+  root: string,
+  options: { orchestrationConfigMissing: boolean },
+): Promise<OrchestrationInitSummary> {
+  const configPath = formatWorkspacePath(VORATIQ_ORCHESTRATION_FILE);
+  const { orchestrationConfigMissing } = options;
+  if (!orchestrationConfigMissing) {
+    return { configPath, configCreated: false };
+  }
+
+  const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
+  const agentsSnapshot = await readConfigSnapshot(agentsConfigPath);
+  const agentsConfig = readAgentsConfig(agentsSnapshot.content);
+  const nextContent = buildDefaultOrchestrationTemplate(agentsConfig);
+
+  const orchestrationConfigPath = resolveWorkspacePath(
+    root,
+    VORATIQ_ORCHESTRATION_FILE,
+  );
+  const orchestrationSnapshot = await readConfigSnapshot(
+    orchestrationConfigPath,
+  );
+  const baseline = orchestrationSnapshot.exists
+    ? orchestrationSnapshot.normalized
+    : "__missing__";
+  await writeConfigIfChanged(orchestrationConfigPath, nextContent, baseline);
+
+  return { configPath, configCreated: true };
 }
 
 async function applyAgentPresetTemplate(

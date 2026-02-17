@@ -14,6 +14,7 @@ import {
   validateAndPrepare,
   type ValidationResult,
 } from "../../../src/commands/run/validation.js";
+import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import {
   type AgentRecordMutators,
@@ -62,6 +63,10 @@ jest.mock("../../../src/commands/run/lifecycle.js", () => ({
   clearActiveRun: jest.fn(),
 }));
 
+jest.mock("../../../src/commands/shared/resolve-stage-competitors.js", () => ({
+  resolveStageCompetitors: jest.fn(),
+}));
+
 jest.mock("../../../src/commands/run/id.js", () => ({
   generateRunId: jest.fn(),
 }));
@@ -75,11 +80,25 @@ const rewriteRunRecordMock = jest.mocked(rewriteRunRecord);
 const toRunReportMock = jest.mocked(toRunReport);
 const registerActiveRunMock = jest.mocked(registerActiveRun);
 const clearActiveRunMock = jest.mocked(clearActiveRun);
+const resolveStageCompetitorsMock = jest.mocked(resolveStageCompetitors);
 const generateRunIdMock = jest.mocked(generateRunId);
 
 describe("executeRunCommand integration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resolveStageCompetitorsMock.mockReturnValue({
+      source: "orchestration",
+      agentIds: ["alpha"],
+      competitors: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+    });
   });
 
   it("wires together validation, agent execution, and run persistence", async () => {
@@ -214,6 +233,7 @@ describe("executeRunCommand integration", () => {
     expect(validateAndPrepareMock).toHaveBeenCalledWith({
       root: "/repo",
       specAbsolutePath: "/repo/spec.md",
+      resolvedAgentIds: ["alpha"],
       maxParallel: undefined,
     });
     expect(registerActiveRunMock).toHaveBeenCalledWith({

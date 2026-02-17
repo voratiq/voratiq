@@ -18,6 +18,8 @@ import { writeCommandOutput } from "./output.js";
 
 export interface RunCommandOptions {
   specPath: string;
+  agentIds?: string[];
+  agentOverrideFlag?: string;
   maxParallel?: number;
   branch?: boolean;
   suppressHint?: boolean;
@@ -38,6 +40,8 @@ export async function runRunCommand(
 ): Promise<RunCommandResult> {
   const {
     specPath,
+    agentIds,
+    agentOverrideFlag,
     maxParallel,
     branch,
     suppressHint,
@@ -70,6 +74,8 @@ export async function runRunCommand(
     runsFilePath: workspacePaths.runsFile,
     specAbsolutePath: absolutePath,
     specDisplayPath: displayPath,
+    agentIds,
+    agentOverrideFlag,
     maxParallel,
     renderer,
   });
@@ -104,8 +110,13 @@ export function deriveBranchNameFromSpecPath(specPath: string): string {
 
 interface RunCommandActionOptions {
   spec: string;
+  agent?: string[];
   maxParallel?: number;
   branch?: boolean;
+}
+
+function collectAgentOption(value: string, previous: string[]): string[] {
+  return [...previous, value];
 }
 
 function parseMaxParallelOption(value: string): number {
@@ -121,6 +132,12 @@ export function createRunCommand(): Command {
     .description("Execute configured agents against a spec")
     .requiredOption("--spec <path>", "Path to the specification to execute")
     .option(
+      "--agent <agent-id>",
+      "Agent identifier override (repeatable; preserves CLI order)",
+      collectAgentOption,
+      [],
+    )
+    .option(
       "--max-parallel <count>",
       "Maximum number of agents to run concurrently",
       parseMaxParallelOption,
@@ -130,6 +147,7 @@ export function createRunCommand(): Command {
     .action(async (options: RunCommandActionOptions) => {
       const runOptions: RunCommandOptions = {
         specPath: options.spec,
+        agentIds: options.agent,
         maxParallel: options.maxParallel,
         branch: options.branch,
       };

@@ -9,6 +9,7 @@ import * as applyCli from "../../src/cli/apply.js";
 import { createAutoCommand, runAutoCommand } from "../../src/cli/auto.js";
 import * as reviewCli from "../../src/cli/review.js";
 import * as runCli from "../../src/cli/run.js";
+import { HintedError } from "../../src/utils/errors.js";
 import { REVIEW_RECOMMENDATION_FILENAME } from "../../src/workspace/structure.js";
 
 const ESC = String.fromCharCode(0x1b);
@@ -86,10 +87,53 @@ describe("voratiq auto", () => {
     const help = createAutoCommand().helpInformation();
     expect(help).toContain("--spec <path>");
     expect(help).toContain("existing spec file");
+    expect(help).toContain("--run-agent <agent-id>");
+    expect(help).toContain("--review-agent <agent-id>");
     expect(help).toContain("--apply");
     expect(help).toContain("--commit");
     expect(help).not.toContain("--description");
     expect(help).not.toContain("--spec-agent");
+  });
+
+  it("parses repeatable --run-agent preserving order", async () => {
+    let received: unknown;
+    const command = createAutoCommand();
+    command.exitOverride().action((options) => {
+      received = options;
+    });
+
+    await command.parseAsync([
+      "node",
+      "voratiq",
+      "--spec",
+      ".voratiq/specs/existing.md",
+      "--run-agent",
+      "gamma",
+      "--run-agent",
+      "alpha",
+    ]);
+
+    expect((received as { runAgent?: string[] }).runAgent).toEqual([
+      "gamma",
+      "alpha",
+    ]);
+  });
+
+  it("allows omitting --review-agent", async () => {
+    let received: unknown;
+    const command = createAutoCommand();
+    command.exitOverride().action((options) => {
+      received = options;
+    });
+
+    await command.parseAsync([
+      "node",
+      "voratiq",
+      "--spec",
+      ".voratiq/specs/existing.md",
+    ]);
+
+    expect((received as { reviewAgent?: string }).reviewAgent).toBeUndefined();
   });
 
   it("fails usage when --commit is provided without --apply", async () => {
@@ -159,12 +203,14 @@ describe("voratiq auto", () => {
     expect(runRunCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
         specPath: ".voratiq/specs/existing.md",
+        agentOverrideFlag: "--run-agent",
       }),
     );
     expect(runReviewCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
         runId: "run-123",
         agentId: "reviewer",
+        agentOverrideFlag: "--review-agent",
         suppressHint: true,
       }),
     );
@@ -220,6 +266,187 @@ describe("voratiq auto", () => {
     expect(process.exitCode).toBe(1);
     expect(stderr.join("")).toHaveLength(0);
     expect(runApplyCommandMock).not.toHaveBeenCalled();
+  });
+
+  it("passes run-stage overrides to run and allows orchestration-backed review resolution", async () => {
+    runRunCommandMock.mockResolvedValue({
+      report: {
+        runId: "run-123",
+        spec: { path: ".voratiq/specs/existing.md" },
+        status: "succeeded",
+        createdAt: new Date().toISOString(),
+        baseRevisionSha: "deadbeef",
+        agents: [{ agentId: "alpha" } as never, { agentId: "beta" } as never],
+        hadAgentFailure: false,
+        hadEvalFailure: false,
+      },
+      body: "run body",
+    });
+    runReviewCommandMock.mockResolvedValue({
+      reviewId: "review-456",
+      runRecord: {} as never,
+      agentId: "reviewer",
+      outputPath: ".voratiq/reviews/review.md",
+      missingArtifacts: [],
+      body: "review body",
+    });
+
+    await runAutoCommand({
+      specPath: ".voratiq/specs/existing.md",
+      runAgentIds: ["beta", "alpha"],
+    });
+
+    expect(runRunCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specPath: ".voratiq/specs/existing.md",
+        agentIds: ["beta", "alpha"],
+        agentOverrideFlag: "--run-agent",
+      }),
+    );
+    expect(runReviewCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-123",
+        agentId: undefined,
+        agentOverrideFlag: "--review-agent",
+      }),
+    );
+  });
+
+  it("surfaces run-stage resolution failures with auto override guidance", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockRejectedValue(
+      new HintedError('No agent resolved for stage "run".', {
+        detailLines: [
+          "Resolved agents: (none).",
+          "Checked profiles.default.run.agents in .voratiq/orchestration.yaml.",
+        ],
+        hintLines: [
+          "Provide --run-agent <id> to run run with an explicit agent.",
+          "Configure at least one agent under profiles.default.run.agents in .voratiq/orchestration.yaml.",
+        ],
+      }),
+    );
+
+    await runAutoCommand({
+      specPath: ".voratiq/specs/existing.md",
+    });
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain('No agent resolved for stage "run".');
+    expect(output).toContain("--run-agent <id>");
+    expect(output).toContain("profiles.default.run.agents");
+    expect(output).toContain("Auto FAILED");
+    expect(runReviewCommandMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces duplicate --run-agent failures in auto output", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockRejectedValue(
+      new HintedError(
+        'Duplicate --run-agent values are not allowed for stage "run".',
+        {
+          detailLines: ["Duplicate agent ids: codex."],
+          hintLines: [
+            "Pass each --run-agent id at most once, preserving your intended order.",
+          ],
+        },
+      ),
+    );
+
+    await runAutoCommand({
+      specPath: ".voratiq/specs/existing.md",
+      runAgentIds: ["codex", "codex"],
+    });
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain(
+      'Duplicate --run-agent values are not allowed for stage "run".',
+    );
+    expect(output).toContain("Duplicate agent ids: codex.");
+    expect(output).toContain(
+      "Pass each --run-agent id at most once, preserving your intended order.",
+    );
+    expect(output).toContain("Auto FAILED");
+    expect(runReviewCommandMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces review-stage missing resolution when --review-agent is omitted", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockResolvedValue(buildRunResult(["codex"]));
+    runReviewCommandMock.mockRejectedValue(
+      new HintedError('No agent resolved for stage "review".', {
+        detailLines: [
+          "Resolved agents: (none).",
+          "Checked profiles.default.review.agents in .voratiq/orchestration.yaml.",
+        ],
+        hintLines: [
+          "Provide --review-agent <id> to run review with an explicit agent.",
+          "Configure exactly one agent under profiles.default.review.agents in .voratiq/orchestration.yaml.",
+        ],
+      }),
+    );
+
+    await runAutoCommand({
+      specPath: ".voratiq/specs/existing.md",
+    });
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain('No agent resolved for stage "review".');
+    expect(output).toContain("--review-agent <id>");
+    expect(output).toContain("profiles.default.review.agents");
+    expect(output).toContain("Auto FAILED");
+  });
+
+  it("surfaces temporary review single-agent guardrail failures", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockResolvedValue(buildRunResult(["codex"]));
+    runReviewCommandMock.mockRejectedValue(
+      new HintedError('Multiple agents resolved for stage "review".', {
+        detailLines: ["Multi-agent review is not supported."],
+        hintLines: [
+          "Provide --review-agent <id> to run review with an explicit agent.",
+          "Configure exactly one agent in `.voratiq/orchestration.yaml`.",
+        ],
+      }),
+    );
+
+    await runAutoCommand({
+      specPath: ".voratiq/specs/existing.md",
+    });
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain('Multiple agents resolved for stage "review".');
+    expect(output).toContain("Multi-agent review is not supported.");
+    expect(output).toContain("--review-agent <id>");
+    expect(output).toContain("Auto FAILED");
   });
 
   it("keeps single-blank separation between chained transcripts", async () => {

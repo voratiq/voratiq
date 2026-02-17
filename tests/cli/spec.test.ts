@@ -1,14 +1,17 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { Command } from "commander";
+
 import * as harness from "../../src/agents/runtime/harness.js";
 import * as sandboxRuntime from "../../src/agents/runtime/sandbox.js";
 import { CliError } from "../../src/cli/errors.js";
-import { runSpecCommand } from "../../src/cli/spec.js";
+import { createSpecCommand, runSpecCommand } from "../../src/cli/spec.js";
 import { executeCompetitionWithAdapter } from "../../src/competition/command-adapter.js";
 import * as preflight from "../../src/preflight/index.js";
 import { renderCliError } from "../../src/render/utils/errors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
+import { silenceCommander } from "../support/commander.js";
 import {
   createRunTestWorkspace,
   type RunTestWorkspace,
@@ -36,6 +39,67 @@ jest.mock("../../src/competition/command-adapter.js", () => {
       actual.executeCompetitionWithAdapter,
     ),
   };
+});
+
+describe("voratiq spec command options", () => {
+  it("requires --description", async () => {
+    const specCommand = silenceCommander(createSpecCommand());
+    specCommand.exitOverride().action(() => {});
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(specCommand);
+
+    await expect(
+      program.parseAsync(["node", "voratiq", "spec"]),
+    ).rejects.toThrow(/required option '--description <text>'/iu);
+  });
+
+  it("allows omitting --agent", async () => {
+    let received: unknown;
+    const specCommand = silenceCommander(createSpecCommand());
+    specCommand.exitOverride().action((options) => {
+      received = options;
+    });
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(specCommand);
+
+    await program.parseAsync([
+      "node",
+      "voratiq",
+      "spec",
+      "--description",
+      "Generate a spec",
+    ]);
+
+    expect((received as { description?: string }).description).toBe(
+      "Generate a spec",
+    );
+    expect((received as { agent?: string }).agent).toBeUndefined();
+  });
+
+  it("parses --agent when provided", async () => {
+    let received: unknown;
+    const specCommand = silenceCommander(createSpecCommand());
+    specCommand.exitOverride().action((options) => {
+      received = options;
+    });
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(specCommand);
+
+    await program.parseAsync([
+      "node",
+      "voratiq",
+      "spec",
+      "--description",
+      "Generate a spec",
+      "--agent",
+      "reviewer",
+    ]);
+
+    expect((received as { agent?: string }).agent).toBe("reviewer");
+  });
 });
 
 describe("voratiq spec (CLI)", () => {
@@ -128,6 +192,138 @@ describe("voratiq spec (CLI)", () => {
         Object.defineProperty(process.stdin, "isTTY", originalDescriptor);
       }
     }
+  });
+
+  it("resolves spec agent from orchestration when --agent is omitted", async () => {
+    await writeOrchestrationConfig(repoRoot, {
+      specAgentIds: ["claude-haiku-4-5-20251001"],
+    });
+
+    const result = await runSpecCommand({
+      description: "Write a spec",
+    });
+
+    expect(result).toMatchObject({
+      outputPath: ".voratiq/specs/payment-flow.md",
+    });
+    expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxParallel: 1,
+        candidates: [
+          expect.objectContaining({ id: "claude-haiku-4-5-20251001" }),
+        ],
+      }),
+    );
+  });
+
+  it("uses --agent override instead of orchestration spec defaults", async () => {
+    await workspace.writeAgentsConfig([
+      {
+        id: "claude-haiku-4-5-20251001",
+        model: "claude-haiku-4-5-20251001",
+        binary: workspace.srtStubPath,
+        provider: "claude",
+        enabled: true,
+      },
+      {
+        id: "codex-reviewer",
+        model: "gpt-5-2-codex",
+        binary: workspace.srtStubPath,
+        provider: "codex",
+        enabled: true,
+      },
+    ]);
+    await writeOrchestrationConfig(repoRoot, {
+      specAgentIds: ["codex-reviewer", "claude-haiku-4-5-20251001"],
+    });
+
+    const result = await runSpecCommand({
+      description: "Write a spec",
+      agent: "claude-haiku-4-5-20251001",
+    });
+
+    expect(result).toMatchObject({
+      outputPath: ".voratiq/specs/payment-flow.md",
+    });
+    expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxParallel: 1,
+        candidates: [
+          expect.objectContaining({ id: "claude-haiku-4-5-20251001" }),
+        ],
+      }),
+    );
+  });
+
+  it("fails without --agent when orchestration spec agents are empty", async () => {
+    await writeOrchestrationConfig(repoRoot, {
+      specAgentIds: [],
+    });
+
+    let captured: unknown;
+    await expect(
+      runSpecCommand({
+        description: "Write a spec",
+      }).catch((error) => {
+        captured = error;
+        throw error;
+      }),
+    ).rejects.toBeDefined();
+
+    const rendered = renderCliError(captured as CliError).replace(
+      ANSI_PATTERN,
+      "",
+    );
+    expect(rendered).toContain('Error: No agent resolved for stage "spec".');
+    expect(rendered).toContain("Provide --agent <id>");
+    expect(rendered).toContain("profiles.default.spec.agents");
+    expect(rendered).toContain(".voratiq/orchestration.yaml");
+    expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
+  });
+
+  it("fails without --agent when orchestration spec agents contain multiple ids", async () => {
+    await workspace.writeAgentsConfig([
+      {
+        id: "claude-haiku-4-5-20251001",
+        model: "claude-haiku-4-5-20251001",
+        binary: workspace.srtStubPath,
+        provider: "claude",
+        enabled: true,
+      },
+      {
+        id: "codex-reviewer",
+        model: "gpt-5-2-codex",
+        binary: workspace.srtStubPath,
+        provider: "codex",
+        enabled: true,
+      },
+    ]);
+    await writeOrchestrationConfig(repoRoot, {
+      specAgentIds: ["claude-haiku-4-5-20251001", "codex-reviewer"],
+    });
+
+    let captured: unknown;
+    await expect(
+      runSpecCommand({
+        description: "Write a spec",
+      }).catch((error) => {
+        captured = error;
+        throw error;
+      }),
+    ).rejects.toBeDefined();
+
+    const rendered = renderCliError(captured as CliError).replace(
+      ANSI_PATTERN,
+      "",
+    );
+    expect(rendered).toContain(
+      'Error: Multiple agents resolved for stage "spec".',
+    );
+    expect(rendered).toContain("Multi-agent spec is not supported.");
+    expect(rendered).toContain(
+      "Configure exactly one agent in `.voratiq/orchestration.yaml`.",
+    );
+    expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
   });
 
   it("records failed sessions with finalized error metadata", async () => {
@@ -402,3 +598,45 @@ describe("voratiq spec (CLI)", () => {
     });
   });
 });
+
+async function writeOrchestrationConfig(
+  root: string,
+  options: {
+    runAgentIds?: readonly string[];
+    reviewAgentIds?: readonly string[];
+    specAgentIds?: readonly string[];
+  } = {},
+): Promise<void> {
+  const runAgentIds = options.runAgentIds ?? [];
+  const reviewAgentIds = options.reviewAgentIds ?? [];
+  const specAgentIds = options.specAgentIds ?? [];
+
+  const lines = ["profiles:", "  default:"];
+  appendStage(lines, "run", runAgentIds);
+  appendStage(lines, "review", reviewAgentIds);
+  appendStage(lines, "spec", specAgentIds);
+  lines.push("");
+
+  await writeFile(
+    join(root, ".voratiq", "orchestration.yaml"),
+    `${lines.join("\n")}\n`,
+    "utf8",
+  );
+}
+
+function appendStage(
+  lines: string[],
+  stageId: "run" | "review" | "spec",
+  agentIds: readonly string[],
+): void {
+  lines.push(`    ${stageId}:`);
+  if (agentIds.length === 0) {
+    lines.push("      agents: []");
+    return;
+  }
+
+  lines.push("      agents:");
+  for (const agentId of agentIds) {
+    lines.push(`        - id: ${JSON.stringify(agentId)}`);
+  }
+}
