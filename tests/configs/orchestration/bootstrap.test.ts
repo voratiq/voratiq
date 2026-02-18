@@ -4,10 +4,11 @@ import type { AgentsConfig } from "../../../src/configs/agents/types.js";
 import {
   buildDefaultOrchestrationTemplate,
   listEnabledAgentIdsForOrchestrationBootstrap,
+  listPresetStageAgentIdsForOrchestrationBootstrap,
 } from "../../../src/configs/orchestration/bootstrap.js";
 
 describe("orchestration bootstrap generator", () => {
-  test("seeds staged defaults with spec/review empty and run enabled agents", () => {
+  test("seeds spec/review empty and seeds run from preset stage agents", () => {
     const config: AgentsConfig = {
       agents: [
         {
@@ -38,8 +39,11 @@ describe("orchestration bootstrap generator", () => {
       "zeta",
       "alpha",
     ]);
+    expect(
+      listPresetStageAgentIdsForOrchestrationBootstrap(config, "pro"),
+    ).toEqual(["zeta", "alpha"]);
 
-    const yaml = buildDefaultOrchestrationTemplate(config);
+    const yaml = buildDefaultOrchestrationTemplate(config, "pro");
     expect(yaml).toBe(
       [
         "profiles:",
@@ -51,6 +55,39 @@ describe("orchestration bootstrap generator", () => {
         "      agents:",
         "        - id: zeta",
         "        - id: alpha",
+        "",
+        "    review:",
+        "      agents: []",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  test("manual preset seeds empty run/review/spec", () => {
+    const config: AgentsConfig = {
+      agents: [
+        {
+          id: "codex",
+          provider: "codex",
+          model: "gpt-5",
+          enabled: true,
+          binary: "/usr/local/bin/codex",
+        },
+      ],
+    };
+
+    expect(
+      listPresetStageAgentIdsForOrchestrationBootstrap(config, "manual"),
+    ).toEqual([]);
+    expect(buildDefaultOrchestrationTemplate(config, "manual")).toBe(
+      [
+        "profiles:",
+        "  default:",
+        "    spec:",
+        "      agents: []",
+        "",
+        "    run:",
+        "      agents: []",
         "",
         "    review:",
         "      agents: []",

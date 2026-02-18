@@ -40,6 +40,7 @@ export async function runInitCommand(
       root,
       preset,
       presetProvided,
+      assumeYes,
       interactive: confirmation.interactive,
       confirm: confirmation.confirm,
       prompt: confirmation.prompt,
@@ -56,7 +57,7 @@ export async function runInitCommand(
 export function createInitCommand(): Command {
   const presetOption = new Option(
     "--preset <preset>",
-    "Select the agent preset",
+    "Select the workspace preset",
   )
     .choices(AGENT_PRESET_CHOICES)
     .default("pro");

@@ -39,7 +39,15 @@ import type {
 export async function executeInitCommand(
   input: InitCommandInput,
 ): Promise<InitCommandResult> {
-  const { root, preset, presetProvided, interactive, confirm, prompt } = input;
+  const {
+    root,
+    preset,
+    presetProvided,
+    assumeYes,
+    interactive,
+    confirm,
+    prompt,
+  } = input;
 
   const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const agentsSnapshotBeforeInit = await readConfigSnapshot(agentsConfigPath);
@@ -69,24 +77,23 @@ export async function executeInitCommand(
 
   const agentSummary = await configureAgents(root, resolvedPreset, {
     interactive,
+    assumeYes,
     confirm,
   });
 
   const orchestrationSummary = await reconcileOrchestrationConfig(root, {
     orchestrationConfigMissing,
+    preset: resolvedPreset,
   });
 
   const environmentSummary = await configureEnvironment(root, {
-    interactive,
-    confirm,
-    prompt,
+    interactive: false,
   });
 
   const evalSummary = await configureEvals(
     root,
     {
-      interactive,
-      confirm,
+      interactive: false,
     },
     environmentSummary.config,
   );
@@ -94,6 +101,7 @@ export async function executeInitCommand(
   const sandboxSummary = buildSandboxSummary(workspaceResult);
 
   return {
+    preset: resolvedPreset,
     workspaceResult,
     agentSummary,
     orchestrationSummary,
@@ -116,10 +124,13 @@ function buildSandboxSummary(
 
 async function reconcileOrchestrationConfig(
   root: string,
-  options: { orchestrationConfigMissing: boolean },
+  options: {
+    orchestrationConfigMissing: boolean;
+    preset: AgentPreset;
+  },
 ): Promise<OrchestrationInitSummary> {
   const configPath = formatWorkspacePath(VORATIQ_ORCHESTRATION_FILE);
-  const { orchestrationConfigMissing } = options;
+  const { orchestrationConfigMissing, preset } = options;
   if (!orchestrationConfigMissing) {
     return { configPath, configCreated: false };
   }
@@ -127,7 +138,7 @@ async function reconcileOrchestrationConfig(
   const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const agentsSnapshot = await readConfigSnapshot(agentsConfigPath);
   const agentsConfig = readAgentsConfig(agentsSnapshot.content);
-  const nextContent = buildDefaultOrchestrationTemplate(agentsConfig);
+  const nextContent = buildDefaultOrchestrationTemplate(agentsConfig, preset);
 
   const orchestrationConfigPath = resolveWorkspacePath(
     root,
