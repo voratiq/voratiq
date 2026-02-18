@@ -85,21 +85,23 @@ function validateStageAgentReferences(
 ): void {
   const agentsById = loadAgentsById(context);
 
-  for (const stageId of ORCHESTRATION_STAGE_IDS) {
-    const stage = config.profiles.default[stageId];
-    for (const stageAgent of stage.agents) {
-      const matchingAgent = agentsById.get(stageAgent.id);
+  for (const profile of Object.values(config.profiles)) {
+    for (const stageId of ORCHESTRATION_STAGE_IDS) {
+      const stage = profile[stageId];
+      for (const stageAgent of stage.agents) {
+        const matchingAgent = agentsById.get(stageAgent.id);
 
-      if (!matchingAgent) {
-        throw new OrchestrationSchemaValidationError(
-          `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: agent ${formatAgentId(stageAgent.id)} is not defined in .voratiq/agents.yaml.`,
-        );
-      }
+        if (!matchingAgent) {
+          throw new OrchestrationSchemaValidationError(
+            `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: agent ${formatAgentId(stageAgent.id)} is not defined in .voratiq/agents.yaml.`,
+          );
+        }
 
-      if (matchingAgent.enabled === false) {
-        throw new OrchestrationSchemaValidationError(
-          `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: agent ${formatAgentId(stageAgent.id)} is disabled in .voratiq/agents.yaml.`,
-        );
+        if (matchingAgent.enabled === false) {
+          throw new OrchestrationSchemaValidationError(
+            `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: agent ${formatAgentId(stageAgent.id)} is disabled in .voratiq/agents.yaml.`,
+          );
+        }
       }
     }
   }

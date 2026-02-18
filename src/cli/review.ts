@@ -23,6 +23,7 @@ export interface ReviewCommandOptions {
   runId: string;
   agentId?: string;
   agentOverrideFlag?: string;
+  profile?: string;
   suppressHint?: boolean;
   writeOutput?: CommandOutputWriter;
 }
@@ -40,6 +41,7 @@ export async function runReviewCommand(
     runId,
     agentId,
     agentOverrideFlag,
+    profile,
     suppressHint,
     writeOutput = writeCommandOutput,
   } = options;
@@ -58,6 +60,7 @@ export async function runReviewCommand(
     runId,
     agentId,
     agentOverrideFlag,
+    profileName: profile,
   });
 
   let previewLines: string[] | undefined;
@@ -95,18 +98,21 @@ export async function runReviewCommand(
 interface ReviewCommandActionOptions {
   run: string;
   agent?: string;
+  profile?: string;
 }
 
 export function createReviewCommand(): Command {
   return new Command("review")
-    .description("Generate a one-shot, headless review of run artifacts")
+    .description("Generate a review of run artifacts")
     .requiredOption("--run <run-id>", "Identifier of the recorded run")
     .option("--agent <agent-id>", "Reviewer agent identifier")
+    .option("--profile <name>", 'Orchestration profile (default: "default")')
     .allowExcessArguments(false)
     .action(async (options: ReviewCommandActionOptions) => {
       const result = await runReviewCommand({
         runId: options.run,
         agentId: options.agent,
+        profile: options.profile,
       });
 
       writeCommandOutput({

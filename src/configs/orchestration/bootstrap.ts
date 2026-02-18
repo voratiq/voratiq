@@ -1,7 +1,7 @@
 import {
   type AgentPreset,
+  getAgentDefaultId,
   getAgentDefaultsForPreset,
-  sanitizeAgentIdFromModel,
 } from "../agents/defaults.js";
 import type { AgentConfigEntry, AgentsConfig } from "../agents/types.js";
 
@@ -93,7 +93,7 @@ export function listPresetStageAgentIdsForOrchestrationBootstrap(
       continue;
     }
 
-    const defaultId = sanitizeAgentIdFromModel(agentDefault.model);
+    const defaultId = getAgentDefaultId(agentDefault);
     const preferred = candidates.find((entry) => entry.id === defaultId);
     const selectedId = preferred?.id ?? candidates[0]?.id;
     if (!selectedId || seenAgentIds.has(selectedId)) {
@@ -116,6 +116,9 @@ function groupEnabledAgentsByProvider(
     if (entry.enabled === false) {
       continue;
     }
+    if (!hasBinary(entry.binary)) {
+      continue;
+    }
 
     const existing = grouped.get(entry.provider);
     if (existing) {
@@ -127,6 +130,10 @@ function groupEnabledAgentsByProvider(
   }
 
   return grouped;
+}
+
+function hasBinary(binary: string | undefined): boolean {
+  return typeof binary === "string" && binary.trim().length > 0;
 }
 
 export function buildDefaultOrchestrationTemplate(

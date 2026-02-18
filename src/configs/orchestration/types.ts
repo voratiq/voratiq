@@ -47,13 +47,37 @@ export const orchestrationProfileSchema = z
 
 export type OrchestrationProfile = z.infer<typeof orchestrationProfileSchema>;
 
+export const ORCHESTRATION_PROFILE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
+export const ORCHESTRATION_PROFILE_NAME_MAX_LENGTH = 64;
+
+export const orchestrationProfileNameSchema = z
+  .string()
+  .max(
+    ORCHESTRATION_PROFILE_NAME_MAX_LENGTH,
+    `profile name must be ${ORCHESTRATION_PROFILE_NAME_MAX_LENGTH} characters or fewer`,
+  )
+  .regex(
+    ORCHESTRATION_PROFILE_NAME_PATTERN,
+    "profile name must match /^[a-z0-9][a-z0-9-]*$/",
+  );
+
+export const orchestrationProfilesSchema = z
+  .record(orchestrationProfileNameSchema, orchestrationProfileSchema)
+  .superRefine((profiles, ctx) => {
+    if (!Object.hasOwn(profiles, "default")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["default"],
+        message: "required",
+      });
+    }
+  });
+
+export type OrchestrationProfiles = z.infer<typeof orchestrationProfilesSchema>;
+
 export const orchestrationConfigSchema = z
   .object({
-    profiles: z
-      .object({
-        default: orchestrationProfileSchema,
-      })
-      .strict(),
+    profiles: orchestrationProfilesSchema,
   })
   .strict();
 

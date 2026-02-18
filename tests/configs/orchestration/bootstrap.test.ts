@@ -96,6 +96,31 @@ describe("orchestration bootstrap generator", () => {
     );
   });
 
+  test("run-stage seeding ignores enabled entries without binaries", () => {
+    const config: AgentsConfig = {
+      agents: [
+        {
+          id: "codex",
+          provider: "codex",
+          model: "gpt-5",
+          enabled: true,
+          binary: "",
+        },
+        {
+          id: "gemini",
+          provider: "gemini",
+          model: "gemini-2.5-pro",
+          enabled: true,
+          binary: "/usr/local/bin/gemini",
+        },
+      ],
+    };
+
+    expect(
+      listPresetStageAgentIdsForOrchestrationBootstrap(config, "pro"),
+    ).toEqual(["gemini"]);
+  });
+
   test("deduplicates enabled ids while preserving first declaration order", () => {
     const config: AgentsConfig = {
       agents: [

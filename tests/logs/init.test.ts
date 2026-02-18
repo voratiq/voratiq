@@ -4,11 +4,11 @@ import { colorize } from "../../src/utils/colors.js";
 
 describe("renderInitTranscript", () => {
   const noSupportedCliNote =
-    "No supported agent CLIs were detected, so providers remain disabled. Verify provider CLI installs/PATH. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
+    "No supported agent CLIs were detected, so no agents were added to the run stage. Verify provider CLI installs/PATH. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
   const manualPresetNote =
-    "Manual preset leaves providers disabled by default. Decide what to enable. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
+    "Manual preset creates empty orchestration stages. Decide what should run, then update .voratiq/orchestration.yaml.";
   const partialPresetNote =
-    "Some preset providers were not detected, so only detected providers were enabled. Verify installs/PATH for missing providers. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
+    "Some preset providers were not detected, so only detected providers were added to the run stage. Verify installs/PATH for missing providers. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
 
   const baseResult: InitCommandResult = {
     preset: "pro",

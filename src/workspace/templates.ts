@@ -2,8 +2,8 @@ import {
   AGENT_PRESET_CHOICES,
   type AgentDefault,
   type AgentPreset,
-  getAgentDefaultsForPreset,
-  sanitizeAgentIdFromModel,
+  getAgentDefaultId,
+  getSupportedAgentDefaults,
 } from "../configs/agents/defaults.js";
 import {
   type AgentConfigEntry,
@@ -18,6 +18,7 @@ export type { AgentPreset } from "../configs/agents/defaults.js";
 export {
   AGENT_PRESET_CHOICES,
   DEFAULT_AGENT_DEFAULTS,
+  getAgentDefaultId,
   MODEL_PLACEHOLDER,
   sanitizeAgentIdFromModel,
 } from "../configs/agents/defaults.js";
@@ -33,16 +34,17 @@ function formatScalar(value: string): string {
 }
 
 function serializeAgentEntry(entry: AgentConfigEntry): string {
-  const enabled = entry.enabled !== false;
   const binary = entry.binary ?? "";
   const extraArgs = entry.extraArgs ?? [];
   const lines = [
     `  - id: ${entry.id}`,
     `    provider: ${formatScalar(entry.provider)}`,
     `    model: ${formatScalar(entry.model)}`,
-    `    enabled: ${enabled ? "true" : "false"}`,
-    `    binary: ${formatScalar(binary)}`,
   ];
+  if (entry.enabled === false) {
+    lines.push("    enabled: false");
+  }
+  lines.push(`    binary: ${formatScalar(binary)}`);
 
   if (extraArgs.length > 0) {
     lines.push("    extraArgs:");
@@ -70,11 +72,15 @@ function buildAgentEntryFromTemplate(
   template: VendorTemplate,
 ): AgentConfigEntry {
   return agentConfigEntrySchema.parse({
-    id: sanitizeAgentIdFromModel(template.model),
+    id: getAgentDefaultId(template),
     provider: template.provider,
     model: template.model,
-    enabled: false,
+    enabled: true,
     binary: "",
+    extraArgs:
+      template.extraArgs && template.extraArgs.length > 0
+        ? [...template.extraArgs]
+        : undefined,
   });
 }
 
@@ -83,7 +89,8 @@ export function buildDefaultAgentsTemplate(): string {
 }
 
 export function buildAgentsTemplate(preset: AgentPreset): string {
-  const templates = getAgentDefaultsForPreset(preset);
+  void preset;
+  const templates = getSupportedAgentDefaults();
   const entries = templates.map((template) =>
     buildAgentEntryFromTemplate(template),
   );

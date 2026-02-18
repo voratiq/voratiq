@@ -34,6 +34,10 @@ interface EvalCommandPromptRenderOptions {
   firstPrompt: boolean;
 }
 
+interface RenderInitTranscriptOptions {
+  includeConfigurationHeading?: boolean;
+}
+
 export function renderEvalCommandPreface({
   commandName,
   commandText,
@@ -52,17 +56,23 @@ export function renderEvalCommandPreface({
   });
 }
 
-export function renderInitTranscript({
-  preset,
-  agentSummary,
-  orchestrationSummary,
-  environmentSummary,
-  evalSummary,
-  sandboxSummary,
-}: InitCommandResult): string {
+export function renderInitTranscript(
+  {
+    preset,
+    agentSummary,
+    orchestrationSummary,
+    environmentSummary,
+    evalSummary,
+    sandboxSummary,
+  }: InitCommandResult,
+  options: RenderInitTranscriptOptions = {},
+): string {
+  const { includeConfigurationHeading = true } = options;
   const sections: string[][] = [];
 
-  sections.push(["Configuring workspace…"]);
+  if (includeConfigurationHeading) {
+    sections.push(["Configuring workspace…"]);
+  }
   sections.push(
     buildConfigurationSummaryTable({
       orchestrationPath: orchestrationSummary.configPath,
@@ -132,11 +142,11 @@ function resolveConditionalInitNote({
   agentSummary,
 }: ConditionalInitNoteOptions): string | undefined {
   if (agentSummary.zeroDetections) {
-    return "No supported agent CLIs were detected, so providers remain disabled. Verify provider CLI installs/PATH. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
+    return "No supported agent CLIs were detected, so no agents were added to the run stage. Verify provider CLI installs/PATH. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
   }
 
   if (preset === "manual") {
-    return "Manual preset leaves providers disabled by default. Decide what to enable. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
+    return "Manual preset creates empty orchestration stages. Decide what should run, then update .voratiq/orchestration.yaml.";
   }
 
   const presetProviders = new Set(
@@ -149,7 +159,7 @@ function resolveConditionalInitNote({
   );
   for (const presetProvider of presetProviders) {
     if (!detectedProviders.has(presetProvider)) {
-      return "Some preset providers were not detected, so only detected providers were enabled. Verify installs/PATH for missing providers. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
+      return "Some preset providers were not detected, so only detected providers were added to the run stage. Verify installs/PATH for missing providers. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
     }
   }
 

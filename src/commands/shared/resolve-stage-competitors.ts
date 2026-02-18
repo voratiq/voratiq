@@ -6,7 +6,11 @@ import { readAgentsConfig } from "../../configs/agents/loader.js";
 import { loadAgentById } from "../../configs/agents/loader.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadOrchestrationConfig } from "../../configs/orchestration/loader.js";
-import type { OrchestrationStageId } from "../../configs/orchestration/types.js";
+import type {
+  OrchestrationConfig,
+  OrchestrationProfile,
+  OrchestrationStageId,
+} from "../../configs/orchestration/types.js";
 import { HintedError } from "../../utils/errors.js";
 import { readUtf8File } from "../../utils/fs.js";
 import {
@@ -21,6 +25,8 @@ export interface ResolveStageCompetitorsInput {
   stageId: OrchestrationStageId;
   cliAgentIds?: readonly string[];
   cliOverrideFlag?: string;
+  profileName?: string;
+  profileFlag?: string;
   enforceSingleCompetitor?: boolean;
   includeDefinitions?: boolean;
 }
@@ -36,6 +42,7 @@ export type StageCompetitorResolution = CompetitionPlan;
 const ORCHESTRATION_CONFIG_DISPLAY_PATH = formatWorkspacePath(
   VORATIQ_ORCHESTRATION_FILE,
 );
+const DEFAULT_PROFILE_NAME = "default";
 
 export function resolveStageCompetitors(
   input: ResolveStageCompetitorsInput,
@@ -45,6 +52,8 @@ export function resolveStageCompetitors(
     stageId,
     cliAgentIds,
     cliOverrideFlag = "--agent",
+    profileName,
+    profileFlag = "--profile",
     enforceSingleCompetitor = false,
     includeDefinitions = true,
   } = input;
@@ -52,17 +61,30 @@ export function resolveStageCompetitors(
   const normalizedCliAgentIds = normalizeAgentIds(cliAgentIds);
   assertNoDuplicateCliAgentIds(stageId, normalizedCliAgentIds, cliOverrideFlag);
   const source = normalizedCliAgentIds.length > 0 ? "cli" : "orchestration";
+  const selectedProfileName =
+    profileName === undefined ? DEFAULT_PROFILE_NAME : profileName.trim();
+  let selectedProfile: OrchestrationProfile | undefined;
+
+  if (source === "orchestration" || profileName !== undefined) {
+    const orchestrationConfig = loadOrchestrationConfig({ root });
+    selectedProfile = resolveOrchestrationProfile({
+      config: orchestrationConfig,
+      stageId,
+      profileName: selectedProfileName,
+      profileFlag,
+    });
+  }
+
   const resolvedAgentIds =
     source === "cli"
       ? normalizedCliAgentIds
-      : loadOrchestrationConfig({ root }).profiles.default[stageId].agents.map(
-          (agent) => agent.id,
-        );
+      : (selectedProfile?.[stageId].agents.map((agent) => agent.id) ?? []);
 
   assertResolvedAgentCount({
     stageId,
     agentIds: resolvedAgentIds,
     cliOverrideFlag,
+    selectedProfileName,
     enforceSingleCompetitor,
   });
 
@@ -79,6 +101,39 @@ export function resolveStageCompetitors(
     agentIds: [...resolvedAgentIds],
     competitors,
   };
+}
+
+function resolveOrchestrationProfile(options: {
+  config: OrchestrationConfig;
+  stageId: OrchestrationStageId;
+  profileName: string;
+  profileFlag: string;
+}): OrchestrationProfile {
+  const { config, stageId, profileName, profileFlag } = options;
+  const selectedProfile = config.profiles[profileName];
+  if (selectedProfile) {
+    return selectedProfile;
+  }
+
+  const availableProfileNames = Object.keys(config.profiles).sort();
+  const availableDisplay =
+    availableProfileNames.length > 0
+      ? availableProfileNames.join(", ")
+      : "(none configured)";
+  const fallbackProfile = availableProfileNames[0] ?? DEFAULT_PROFILE_NAME;
+
+  throw new HintedError(`Unknown orchestration profile "${profileName}".`, {
+    detailLines: [
+      `Requested profile: "${profileName}".`,
+      `Available profiles: ${availableDisplay}.`,
+      `Config file: ${ORCHESTRATION_CONFIG_DISPLAY_PATH}.`,
+    ],
+    hintLines: [
+      `Use ${profileFlag} <existing-profile> to select one of the configured profiles.`,
+      `Update ${ORCHESTRATION_CONFIG_DISPLAY_PATH} to add profile "${profileName}".`,
+      `Example: ${buildProfileSelectionExample(stageId, profileFlag, fallbackProfile)}`,
+    ],
+  });
 }
 
 function normalizeAgentIds(agentIds: readonly string[] | undefined): string[] {
@@ -153,19 +208,25 @@ function assertResolvedAgentCount(options: {
   stageId: OrchestrationStageId;
   agentIds: readonly string[];
   cliOverrideFlag: string;
+  selectedProfileName: string;
   enforceSingleCompetitor: boolean;
 }): void {
-  const { stageId, agentIds, cliOverrideFlag, enforceSingleCompetitor } =
-    options;
-  const stageAgentsPath = `profiles.default.${stageId}.agents`;
+  const {
+    stageId,
+    agentIds,
+    cliOverrideFlag,
+    selectedProfileName,
+    enforceSingleCompetitor,
+  } = options;
+  const stageAgentsPath = `profiles.${selectedProfileName}.${stageId}.agents`;
 
   if (agentIds.length === 0) {
     const configInstruction = enforceSingleCompetitor
       ? `Configure exactly one agent under ${stageAgentsPath} in ${ORCHESTRATION_CONFIG_DISPLAY_PATH}.`
       : `Configure at least one agent under ${stageAgentsPath} in ${ORCHESTRATION_CONFIG_DISPLAY_PATH}.`;
-    throw new HintedError(`No agent resolved for stage "${stageId}".`, {
+    throw new HintedError(`No agent found for stage "${stageId}".`, {
       detailLines: [
-        "Resolved agents: (none).",
+        "Agents: (none).",
         `Checked ${stageAgentsPath} in ${ORCHESTRATION_CONFIG_DISPLAY_PATH}.`,
       ],
       hintLines: [
@@ -179,11 +240,27 @@ function assertResolvedAgentCount(options: {
     return;
   }
 
-  throw new HintedError(`Multiple agents resolved for stage "${stageId}".`, {
+  throw new HintedError(`Multiple agents found for stage "${stageId}".`, {
     detailLines: [`Multi-agent ${stageId} is not supported.`],
     hintLines: [
       `Provide ${cliOverrideFlag} <id> to run ${stageId} with an explicit agent.`,
-      `Configure exactly one agent in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`,
+      `Configure exactly one agent under ${stageAgentsPath} in ${ORCHESTRATION_CONFIG_DISPLAY_PATH}.`,
     ],
   });
+}
+
+function buildProfileSelectionExample(
+  stageId: OrchestrationStageId,
+  profileFlag: string,
+  profileName: string,
+): string {
+  const escapedProfile = JSON.stringify(profileName);
+  switch (stageId) {
+    case "run":
+      return `voratiq run --spec <path> ${profileFlag} ${escapedProfile}`;
+    case "review":
+      return `voratiq review --run <run-id> ${profileFlag} ${escapedProfile}`;
+    case "spec":
+      return `voratiq spec --description <text> ${profileFlag} ${escapedProfile}`;
+  }
 }

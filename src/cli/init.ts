@@ -8,7 +8,7 @@ import type { AgentPreset } from "../workspace/templates.js";
 import { AGENT_PRESET_CHOICES } from "../workspace/templates.js";
 import { createConfirmationWorkflow } from "./confirmation.js";
 import { NonInteractiveShellError } from "./errors.js";
-import { writeCommandOutput } from "./output.js";
+import { writeCommandOutput, writeCommandPreface } from "./output.js";
 
 export interface RunInitCommandResult extends InitCommandResult {
   body: string;
@@ -34,19 +34,26 @@ export async function runInitCommand(
       throw new NonInteractiveShellError();
     },
   });
+  let wroteConfiguringPreface = false;
 
   try {
     const initResult = await executeInitCommand({
       root,
       preset,
       presetProvided,
+      onPresetResolved: () => {
+        writeCommandPreface("Configuring workspace…");
+        wroteConfiguringPreface = true;
+      },
       assumeYes,
       interactive: confirmation.interactive,
       confirm: confirmation.confirm,
       prompt: confirmation.prompt,
     });
 
-    const body = renderInitTranscript(initResult);
+    const body = renderInitTranscript(initResult, {
+      includeConfigurationHeading: !wroteConfiguringPreface,
+    });
 
     return { ...initResult, body };
   } finally {

@@ -12,6 +12,7 @@ import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 export interface SpecCommandOptions {
   description: string;
   agent?: string;
+  profile?: string;
   title?: string;
   output?: string;
   suppressHint?: boolean;
@@ -29,6 +30,7 @@ export async function runSpecCommand(
   const {
     description,
     agent,
+    profile,
     title,
     output,
     suppressHint,
@@ -44,6 +46,7 @@ export async function runSpecCommand(
     specsFilePath: workspacePaths.specsFile,
     description,
     agentId: agent,
+    profileName: profile,
     title,
     outputPath: output,
     onStatus: (message) => {
@@ -67,11 +70,9 @@ export function createSpecCommand(): Command {
       "Human description to convert into a spec",
     )
     .option("--agent <agent-id>", "Agent identifier to use")
+    .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option("--title <text>", "Optional spec title")
-    .option(
-      "--output <path>",
-      "Optional output path within .voratiq/specs/ (defaults to <slug>.md)",
-    )
+    .option("--output <path>", "Optional output path within .voratiq/specs/")
     .allowExcessArguments(false)
     .action(async (commandOptions: SpecCommandOptions) => {
       const result = await runSpecCommand(commandOptions);

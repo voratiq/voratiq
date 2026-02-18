@@ -89,10 +89,30 @@ describe("voratiq auto", () => {
     expect(help).toContain("existing spec file");
     expect(help).toContain("--run-agent <agent-id>");
     expect(help).toContain("--review-agent <agent-id>");
+    expect(help).toContain("--profile <name>");
     expect(help).toContain("--apply");
     expect(help).toContain("--commit");
     expect(help).not.toContain("--description");
     expect(help).not.toContain("--spec-agent");
+  });
+
+  it("parses --profile", async () => {
+    let received: unknown;
+    const command = createAutoCommand();
+    command.exitOverride().action((options) => {
+      received = options;
+    });
+
+    await command.parseAsync([
+      "node",
+      "voratiq",
+      "--spec",
+      ".voratiq/specs/existing.md",
+      "--profile",
+      "quality",
+    ]);
+
+    expect((received as { profile?: string }).profile).toBe("quality");
   });
 
   it("parses repeatable --run-agent preserving order", async () => {
@@ -294,6 +314,7 @@ describe("voratiq auto", () => {
     await runAutoCommand({
       specPath: ".voratiq/specs/existing.md",
       runAgentIds: ["beta", "alpha"],
+      profile: "quality",
     });
 
     expect(runRunCommandMock).toHaveBeenCalledWith(
@@ -301,6 +322,7 @@ describe("voratiq auto", () => {
         specPath: ".voratiq/specs/existing.md",
         agentIds: ["beta", "alpha"],
         agentOverrideFlag: "--run-agent",
+        profile: "quality",
       }),
     );
     expect(runReviewCommandMock).toHaveBeenCalledWith(
@@ -308,6 +330,7 @@ describe("voratiq auto", () => {
         runId: "run-123",
         agentId: undefined,
         agentOverrideFlag: "--review-agent",
+        profile: "quality",
       }),
     );
   });
@@ -322,7 +345,7 @@ describe("voratiq auto", () => {
       });
 
     runRunCommandMock.mockRejectedValue(
-      new HintedError('No agent resolved for stage "run".', {
+      new HintedError('No agent found for stage "run".', {
         detailLines: [
           "Resolved agents: (none).",
           "Checked profiles.default.run.agents in .voratiq/orchestration.yaml.",
@@ -339,7 +362,7 @@ describe("voratiq auto", () => {
     });
 
     const output = stripAnsi(stdout.join(""));
-    expect(output).toContain('No agent resolved for stage "run".');
+    expect(output).toContain('No agent found for stage "run".');
     expect(output).toContain("--run-agent <id>");
     expect(output).toContain("profiles.default.run.agents");
     expect(output).toContain("Auto FAILED");
@@ -395,7 +418,7 @@ describe("voratiq auto", () => {
 
     runRunCommandMock.mockResolvedValue(buildRunResult(["codex"]));
     runReviewCommandMock.mockRejectedValue(
-      new HintedError('No agent resolved for stage "review".', {
+      new HintedError('No agent found for stage "review".', {
         detailLines: [
           "Resolved agents: (none).",
           "Checked profiles.default.review.agents in .voratiq/orchestration.yaml.",
@@ -412,7 +435,7 @@ describe("voratiq auto", () => {
     });
 
     const output = stripAnsi(stdout.join(""));
-    expect(output).toContain('No agent resolved for stage "review".');
+    expect(output).toContain('No agent found for stage "review".');
     expect(output).toContain("--review-agent <id>");
     expect(output).toContain("profiles.default.review.agents");
     expect(output).toContain("Auto FAILED");
@@ -429,11 +452,11 @@ describe("voratiq auto", () => {
 
     runRunCommandMock.mockResolvedValue(buildRunResult(["codex"]));
     runReviewCommandMock.mockRejectedValue(
-      new HintedError('Multiple agents resolved for stage "review".', {
+      new HintedError('Multiple agents found for stage "review".', {
         detailLines: ["Multi-agent review is not supported."],
         hintLines: [
           "Provide --review-agent <id> to run review with an explicit agent.",
-          "Configure exactly one agent in `.voratiq/orchestration.yaml`.",
+          "Configure exactly one agent under profiles.default.review.agents in .voratiq/orchestration.yaml.",
         ],
       }),
     );
@@ -443,7 +466,7 @@ describe("voratiq auto", () => {
     });
 
     const output = stripAnsi(stdout.join(""));
-    expect(output).toContain('Multiple agents resolved for stage "review".');
+    expect(output).toContain('Multiple agents found for stage "review".');
     expect(output).toContain("Multi-agent review is not supported.");
     expect(output).toContain("--review-agent <id>");
     expect(output).toContain("Auto FAILED");

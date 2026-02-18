@@ -105,6 +105,29 @@ describe("voratiq run command options", () => {
       "alpha",
     ]);
   });
+
+  it("parses --profile when provided", async () => {
+    let received: unknown;
+    const runCommand = silenceCommander(createRunCommand());
+    runCommand.exitOverride().action((options) => {
+      received = options;
+    });
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(runCommand);
+
+    await program.parseAsync([
+      "node",
+      "voratiq",
+      "run",
+      "--spec",
+      "specs/sample.md",
+      "--profile",
+      "quality",
+    ]);
+
+    expect((received as { profile?: string }).profile).toBe("quality");
+  });
 });
 
 suite("voratiq run (integration)", () => {
@@ -412,11 +435,75 @@ suite("voratiq run (integration)", () => {
     RUN_INTEGRATION_TIMEOUT_MS,
   );
 
+  it("resolves run agents from the selected profile when --profile is provided", async () => {
+    await createWorkspace(repoRoot);
+    await writeAgentsConfig(workspace, agentScriptPath);
+    await writeOrchestrationConfig(repoRoot, {
+      profiles: {
+        default: {
+          runAgentIds: ["claude"],
+          reviewAgentIds: [],
+          specAgentIds: [],
+        },
+        quality: {
+          runAgentIds: ["gemini", "codex"],
+          reviewAgentIds: [],
+          specAgentIds: [],
+        },
+      },
+    });
+
+    const specRelativePath = "specs/profile-selection.md";
+    const specPath = join(repoRoot, specRelativePath);
+    await mkdir(join(repoRoot, "specs"), { recursive: true });
+    await writeFile(specPath, "# Profile selection\n", "utf8");
+
+    const executeCompetitionSpy = jest.spyOn(
+      commandAdapter,
+      "executeCompetitionWithAdapter",
+    );
+    try {
+      const originalCwd = process.cwd();
+      process.chdir(repoRoot);
+      try {
+        await runRunCommand({
+          specPath: specRelativePath,
+          profile: "quality",
+        });
+      } finally {
+        process.chdir(originalCwd);
+      }
+
+      const lastCall = executeCompetitionSpy.mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      const args = lastCall?.[0] as
+        | { candidates?: Array<{ id?: string }> }
+        | undefined;
+      expect(args?.candidates?.map((candidate) => candidate.id)).toEqual([
+        "gemini",
+        "codex",
+      ]);
+    } finally {
+      executeCompetitionSpy.mockRestore();
+    }
+  });
+
   it("uses run --agent override instead of orchestration defaults", async () => {
     await createWorkspace(repoRoot);
     await writeAgentsConfig(workspace, agentScriptPath);
     await writeOrchestrationConfig(repoRoot, {
-      runAgentIds: ["gemini"],
+      profiles: {
+        default: {
+          runAgentIds: ["gemini"],
+          reviewAgentIds: [],
+          specAgentIds: [],
+        },
+        quality: {
+          runAgentIds: ["claude"],
+          reviewAgentIds: [],
+          specAgentIds: [],
+        },
+      },
     });
 
     const specRelativePath = "specs/run-override.md";
@@ -435,6 +522,7 @@ suite("voratiq run (integration)", () => {
         await runRunCommand({
           specPath: specRelativePath,
           agentIds: ["codex", "claude"],
+          profile: "quality",
         });
       } finally {
         process.chdir(originalCwd);
@@ -608,7 +696,7 @@ suite("voratiq run (integration)", () => {
 
     expect(capturedError).toBeInstanceOf(HintedError);
     const hinted = capturedError as HintedError;
-    expect(hinted.headline).toBe('No agent resolved for stage "run".');
+    expect(hinted.headline).toBe('No agent found for stage "run".');
     expect(
       hinted.hintLines.some((line) => line.includes("Provide --agent <id>")),
     ).toBe(true);
@@ -881,16 +969,44 @@ async function writeOrchestrationConfig(
     runAgentIds?: readonly string[];
     reviewAgentIds?: readonly string[];
     specAgentIds?: readonly string[];
+    profiles?: Record<
+      string,
+      {
+        runAgentIds?: readonly string[];
+        reviewAgentIds?: readonly string[];
+        specAgentIds?: readonly string[];
+      }
+    >;
   } = {},
 ): Promise<void> {
-  const runAgentIds = options.runAgentIds ?? [];
-  const reviewAgentIds = options.reviewAgentIds ?? [];
-  const specAgentIds = options.specAgentIds ?? [];
+  const profiles =
+    options.profiles ??
+    ({
+      default: {
+        runAgentIds: options.runAgentIds ?? [],
+        reviewAgentIds: options.reviewAgentIds ?? [],
+        specAgentIds: options.specAgentIds ?? [],
+      },
+    } satisfies Record<
+      string,
+      {
+        runAgentIds?: readonly string[];
+        reviewAgentIds?: readonly string[];
+        specAgentIds?: readonly string[];
+      }
+    >);
 
-  const lines = ["profiles:", "  default:"];
-  appendOrchestrationStage(lines, "spec", specAgentIds);
-  appendOrchestrationStage(lines, "run", runAgentIds);
-  appendOrchestrationStage(lines, "review", reviewAgentIds);
+  const lines = ["profiles:"];
+  for (const [profileName, profileStages] of Object.entries(profiles)) {
+    lines.push(`  ${profileName}:`);
+    appendOrchestrationStage(lines, "spec", profileStages.specAgentIds ?? []);
+    appendOrchestrationStage(lines, "run", profileStages.runAgentIds ?? []);
+    appendOrchestrationStage(
+      lines,
+      "review",
+      profileStages.reviewAgentIds ?? [],
+    );
+  }
   lines.push("");
 
   await writeFile(

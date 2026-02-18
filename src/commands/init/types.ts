@@ -11,6 +11,7 @@ export interface InitCommandInput {
   root: string;
   preset: AgentPreset;
   presetProvided?: boolean;
+  onPresetResolved?: (preset: AgentPreset) => void;
   assumeYes?: boolean;
   interactive: boolean;
   confirm?: InitConfirmationHandler;

@@ -58,6 +58,31 @@ function withTempWorkspace(
 }
 
 describe("loadAgentCatalog", () => {
+  it("treats missing enabled as enabled", () => {
+    withTempWorkspace(
+      ({ createBinary }) => {
+        const codexBinary = createBinary("bin/codex");
+        const geminiBinary = createBinary("bin/gemini");
+        return `
+agents:
+  - id: codex
+    provider: codex
+    model: o4-mini
+    binary: ${codexBinary}
+  - id: gemini
+    provider: gemini
+    model: gemini-2.0
+    enabled: false
+    binary: ${geminiBinary}
+`;
+      },
+      (root) => {
+        const catalog = loadAgentCatalog({ root });
+        expect(catalog.map((entry) => entry.id)).toEqual(["codex"]);
+      },
+    );
+  });
+
   it("uses provider argv for built-in agents", () => {
     let codexBinaryPath = "";
     withTempWorkspace(

@@ -100,6 +100,29 @@ describe("voratiq spec command options", () => {
 
     expect((received as { agent?: string }).agent).toBe("reviewer");
   });
+
+  it("parses --profile when provided", async () => {
+    let received: unknown;
+    const specCommand = silenceCommander(createSpecCommand());
+    specCommand.exitOverride().action((options) => {
+      received = options;
+    });
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(specCommand);
+
+    await program.parseAsync([
+      "node",
+      "voratiq",
+      "spec",
+      "--description",
+      "Generate a spec",
+      "--profile",
+      "quality",
+    ]);
+
+    expect((received as { profile?: string }).profile).toBe("quality");
+  });
 });
 
 describe("voratiq spec (CLI)", () => {
@@ -216,6 +239,54 @@ describe("voratiq spec (CLI)", () => {
     );
   });
 
+  it("resolves spec agent from selected profile when --profile is provided", async () => {
+    await workspace.writeAgentsConfig([
+      {
+        id: "claude-haiku-4-5-20251001",
+        model: "claude-haiku-4-5-20251001",
+        binary: workspace.srtStubPath,
+        provider: "claude",
+        enabled: true,
+      },
+      {
+        id: "codex-reviewer",
+        model: "gpt-5-2-codex",
+        binary: workspace.srtStubPath,
+        provider: "codex",
+        enabled: true,
+      },
+    ]);
+    await writeOrchestrationConfig(repoRoot, {
+      profiles: {
+        default: {
+          runAgentIds: [],
+          reviewAgentIds: [],
+          specAgentIds: ["claude-haiku-4-5-20251001"],
+        },
+        quality: {
+          runAgentIds: [],
+          reviewAgentIds: [],
+          specAgentIds: ["codex-reviewer"],
+        },
+      },
+    });
+
+    const result = await runSpecCommand({
+      description: "Write a spec",
+      profile: "quality",
+    });
+
+    expect(result).toMatchObject({
+      outputPath: ".voratiq/specs/payment-flow.md",
+    });
+    expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxParallel: 1,
+        candidates: [expect.objectContaining({ id: "codex-reviewer" })],
+      }),
+    );
+  });
+
   it("uses --agent override instead of orchestration spec defaults", async () => {
     await workspace.writeAgentsConfig([
       {
@@ -234,12 +305,24 @@ describe("voratiq spec (CLI)", () => {
       },
     ]);
     await writeOrchestrationConfig(repoRoot, {
-      specAgentIds: ["codex-reviewer", "claude-haiku-4-5-20251001"],
+      profiles: {
+        default: {
+          runAgentIds: [],
+          reviewAgentIds: [],
+          specAgentIds: ["codex-reviewer", "claude-haiku-4-5-20251001"],
+        },
+        quality: {
+          runAgentIds: [],
+          reviewAgentIds: [],
+          specAgentIds: ["codex-reviewer"],
+        },
+      },
     });
 
     const result = await runSpecCommand({
       description: "Write a spec",
       agent: "claude-haiku-4-5-20251001",
+      profile: "quality",
     });
 
     expect(result).toMatchObject({
@@ -274,7 +357,7 @@ describe("voratiq spec (CLI)", () => {
       ANSI_PATTERN,
       "",
     );
-    expect(rendered).toContain('Error: No agent resolved for stage "spec".');
+    expect(rendered).toContain('Error: No agent found for stage "spec".');
     expect(rendered).toContain("Provide --agent <id>");
     expect(rendered).toContain("profiles.default.spec.agents");
     expect(rendered).toContain(".voratiq/orchestration.yaml");
@@ -317,11 +400,11 @@ describe("voratiq spec (CLI)", () => {
       "",
     );
     expect(rendered).toContain(
-      'Error: Multiple agents resolved for stage "spec".',
+      'Error: Multiple agents found for stage "spec".',
     );
     expect(rendered).toContain("Multi-agent spec is not supported.");
     expect(rendered).toContain(
-      "Configure exactly one agent in `.voratiq/orchestration.yaml`.",
+      "Configure exactly one agent under profiles.default.spec.agents in .voratiq/orchestration.yaml.",
     );
     expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
   });
@@ -605,16 +688,40 @@ async function writeOrchestrationConfig(
     runAgentIds?: readonly string[];
     reviewAgentIds?: readonly string[];
     specAgentIds?: readonly string[];
+    profiles?: Record<
+      string,
+      {
+        runAgentIds?: readonly string[];
+        reviewAgentIds?: readonly string[];
+        specAgentIds?: readonly string[];
+      }
+    >;
   } = {},
 ): Promise<void> {
-  const runAgentIds = options.runAgentIds ?? [];
-  const reviewAgentIds = options.reviewAgentIds ?? [];
-  const specAgentIds = options.specAgentIds ?? [];
+  const profiles =
+    options.profiles ??
+    ({
+      default: {
+        runAgentIds: options.runAgentIds ?? [],
+        reviewAgentIds: options.reviewAgentIds ?? [],
+        specAgentIds: options.specAgentIds ?? [],
+      },
+    } satisfies Record<
+      string,
+      {
+        runAgentIds?: readonly string[];
+        reviewAgentIds?: readonly string[];
+        specAgentIds?: readonly string[];
+      }
+    >);
 
-  const lines = ["profiles:", "  default:"];
-  appendStage(lines, "run", runAgentIds);
-  appendStage(lines, "review", reviewAgentIds);
-  appendStage(lines, "spec", specAgentIds);
+  const lines = ["profiles:"];
+  for (const [profileName, profileStages] of Object.entries(profiles)) {
+    lines.push(`  ${profileName}:`);
+    appendStage(lines, "run", profileStages.runAgentIds ?? []);
+    appendStage(lines, "review", profileStages.reviewAgentIds ?? []);
+    appendStage(lines, "spec", profileStages.specAgentIds ?? []);
+  }
   lines.push("");
 
   await writeFile(

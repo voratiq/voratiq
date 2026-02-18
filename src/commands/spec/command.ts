@@ -40,6 +40,7 @@ export interface ExecuteSpecCommandInput {
   specsFilePath: string;
   description: string;
   agentId?: string;
+  profileName?: string;
   title?: string;
   outputPath?: string;
   onStatus?: (message: string) => void;
@@ -61,6 +62,7 @@ export async function executeSpecCommand(
     specsFilePath,
     description,
     agentId,
+    profileName,
     title: providedTitle,
     outputPath: customOutputPath,
     onStatus,
@@ -72,6 +74,7 @@ export async function executeSpecCommand(
       root,
       stageId: "spec",
       cliAgentIds: agentId ? [agentId] : undefined,
+      profileName,
       enforceSingleCompetitor: true,
     });
     const resolvedAgent = resolution.competitors[0];

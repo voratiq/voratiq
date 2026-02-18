@@ -5,6 +5,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { executeInitCommand } from "../../../src/commands/init/command.js";
+import {
+  getAgentDefaultId,
+  getAgentDefaultsForPreset,
+  getSupportedAgentDefaults,
+} from "../../../src/configs/agents/defaults.js";
 import { readAgentsConfig } from "../../../src/configs/agents/loader.js";
 import type { AgentConfigEntry } from "../../../src/configs/agents/types.js";
 import type { PromptOptions } from "../../../src/render/interactions/confirmation.js";
@@ -58,6 +63,27 @@ describe("voratiq init preset application", () => {
     const content = await readFile(agentsPath, "utf8");
     expect(content).toBe(buildAgentsTemplate("lite"));
   });
+
+  it.each(["pro", "lite", "manual"] as const)(
+    "fresh init seeds full catalog with implicit enabled defaults for %s",
+    async (preset) => {
+      await executeInitCommand({
+        root: repoRoot,
+        preset,
+        interactive: false,
+      });
+
+      const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
+      const content = await readFile(agentsPath, "utf8");
+      const parsed = readAgentsConfig(content);
+      const expectedIds = getSupportedAgentDefaults().map((entry) =>
+        getAgentDefaultId(entry),
+      );
+
+      expect(parsed.agents.map((entry) => entry.id)).toEqual(expectedIds);
+      expect(content).not.toContain("enabled: true");
+    },
+  );
 
   it("switches from pro template to lite when safe", async () => {
     await mkdir(join(repoRoot, ".voratiq"), { recursive: true });
@@ -145,7 +171,7 @@ describe("voratiq init preset application", () => {
     expect(prompt).not.toHaveBeenCalled();
   });
 
-  it("switches managed pro to lite when only binary/enabled differ", async () => {
+  it("switches managed pro to lite without forcing enablement changes", async () => {
     await mkdir(join(repoRoot, ".voratiq"), { recursive: true });
     const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
 
@@ -153,7 +179,7 @@ describe("voratiq init preset application", () => {
     const managedEntries: AgentConfigEntry[] = proConfig.agents.map(
       (entry) => ({
         ...entry,
-        enabled: entry.provider !== "gemini",
+        enabled: true,
         binary: `/usr/local/bin/${entry.provider}`,
       }),
     );
@@ -179,26 +205,68 @@ describe("voratiq init preset application", () => {
       interactive: false,
     });
 
-    const liteConfig = readAgentsConfig(buildAgentsTemplate("lite"));
-    const expectedManagedLite: AgentConfigEntry[] = liteConfig.agents.map(
-      (entry) => {
-        const prior = managedEntries.find(
-          (priorEntry) => priorEntry.provider === entry.provider,
-        );
-        return {
-          ...entry,
-          enabled: prior ? prior.enabled !== false : false,
-          binary: prior?.binary ?? "",
-        };
-      },
+    const updated = readAgentsConfig(await readFile(agentsPath, "utf8"));
+    const expectedManagedById = new Map(
+      managedEntries.map((entry) => [entry.id, entry]),
     );
-    const expected = serializeAgentsConfigEntries([
-      ...expectedManagedLite,
-      userAgent,
-    ]);
 
-    const updated = await readFile(agentsPath, "utf8");
-    expect(updated).toBe(expected);
+    const managed = updated.agents.filter((entry) => entry.id !== userAgent.id);
+    expect(managed).toHaveLength(managedEntries.length);
+    for (const entry of managed) {
+      const prior = expectedManagedById.get(entry.id);
+      expect(prior).toBeDefined();
+      expect(entry.binary).toBe(`/usr/local/bin/${entry.provider}`);
+      expect(entry.enabled).toBe(prior?.enabled !== false);
+    }
+    expect(updated.agents.find((entry) => entry.id === userAgent.id)).toEqual(
+      userAgent,
+    );
+  });
+
+  it("preserves provider-disabled intent when migrating old managed preset files", async () => {
+    await mkdir(join(repoRoot, ".voratiq"), { recursive: true });
+    const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
+
+    const legacyManagedProEntries: AgentConfigEntry[] =
+      getAgentDefaultsForPreset("pro").map((agentDefault) => ({
+        id: getAgentDefaultId(agentDefault),
+        provider: agentDefault.provider,
+        model: agentDefault.model,
+        enabled: agentDefault.provider === "codex" ? false : true,
+        binary: `/usr/local/bin/${agentDefault.provider}`,
+        extraArgs:
+          agentDefault.extraArgs && agentDefault.extraArgs.length > 0
+            ? [...agentDefault.extraArgs]
+            : undefined,
+      }));
+
+    await writeFile(
+      agentsPath,
+      serializeAgentsConfigEntries(legacyManagedProEntries),
+      "utf8",
+    );
+
+    await executeInitCommand({
+      root: repoRoot,
+      preset: "lite",
+      presetProvided: true,
+      interactive: false,
+    });
+
+    const updated = readAgentsConfig(await readFile(agentsPath, "utf8"));
+    const priorIds = new Set(legacyManagedProEntries.map((entry) => entry.id));
+    const codexEntries = updated.agents.filter(
+      (entry) => entry.provider === "codex",
+    );
+    const migratedCodexVariants = codexEntries.filter(
+      (entry) => !priorIds.has(entry.id),
+    );
+
+    expect(codexEntries.length).toBeGreaterThan(0);
+    expect(migratedCodexVariants.length).toBeGreaterThan(0);
+    for (const entry of codexEntries) {
+      expect(entry.enabled).toBe(false);
+    }
   });
 
   it("does not overwrite when a managed agent's provider/model is customized", async () => {

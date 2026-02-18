@@ -1,4 +1,7 @@
-import { getAgentDefaultsForPreset } from "../../configs/agents/defaults.js";
+import {
+  getAgentDefaultId,
+  getSupportedAgentDefaults,
+} from "../../configs/agents/defaults.js";
 import { readAgentsConfig } from "../../configs/agents/loader.js";
 import type {
   AgentConfigEntry,
@@ -17,8 +20,7 @@ import {
 } from "../../workspace/structure.js";
 import {
   type AgentPreset,
-  buildAgentsTemplate,
-  sanitizeAgentIdFromModel,
+  buildDefaultAgentsTemplate,
   serializeAgentsConfigEntries,
   type VendorTemplate,
 } from "../../workspace/templates.js";
@@ -36,9 +38,10 @@ export async function configureAgents(
   preset: AgentPreset,
   options: InitConfigureOptions,
 ): Promise<AgentInitSummary> {
+  void preset;
   void options;
   const filePath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
-  const defaultTemplate = buildAgentsTemplate(preset);
+  const defaultTemplate = buildDefaultAgentsTemplate();
 
   const loadResult = await loadYamlConfig(filePath, readAgentsConfig);
   const defaultStatus = isDefaultYamlTemplate(
@@ -46,27 +49,12 @@ export async function configureAgents(
     defaultTemplate,
   );
   const configCreated = !loadResult.snapshot.exists;
-  let lifecycle: AgentLifecycleState | undefined;
-  let detectedProviders: DetectedProviderSummary[];
-
-  if (preset === "manual") {
-    detectedProviders = collectSupportedProviderDetections();
-    return buildAgentSummary({
-      entries: loadResult.config.agents,
-      zeroDetections: detectedProviders.length === 0,
-      detectedProviders,
-      providerEnablementPrompted: false,
-      configCreated,
-      configUpdated: false,
-    });
-  }
-
-  lifecycle = scanWorkspaceForAgentDefaults(
+  const lifecycle = scanWorkspaceForAgentDefaults(
     loadResult.config,
     defaultStatus,
-    getAgentDefaultsForPreset(preset),
+    getSupportedAgentDefaults(),
   );
-  detectedProviders = collectDetectedProviders(lifecycle.templates);
+  const detectedProviders = collectDetectedProviders(lifecycle.templates);
 
   if (!defaultStatus && loadResult.snapshot.exists) {
     return buildAgentSummary({
@@ -78,8 +66,6 @@ export async function configureAgents(
       configUpdated: false,
     });
   }
-
-  const configChanged = applyProviderEnablementDecision(lifecycle, true);
 
   const snapshotResult = finalizeAgentConfigSnapshot(lifecycle);
 
@@ -97,7 +83,7 @@ export async function configureAgents(
     detectedProviders,
     providerEnablementPrompted: false,
     configCreated,
-    configUpdated: updated || configChanged,
+    configUpdated: updated,
   });
 }
 
@@ -108,6 +94,7 @@ interface AgentLifecycleState {
 }
 
 interface AgentTemplateState {
+  templateId: string;
   template: VendorTemplate;
   entry: AgentConfigEntry;
   detectedBinary?: string;
@@ -125,24 +112,30 @@ function scanWorkspaceForAgentDefaults(
 
   const templateStates: AgentTemplateState[] = [];
   const templateIds = new Set<string>();
+  const detectedBinaryByProvider = new Map<string, string | undefined>();
   const templateEntries = templates.map((template) => ({
     template,
-    defaultId: sanitizeAgentIdFromModel(template.model),
+    templateId: getAgentDefaultId(template),
   }));
 
-  for (const { template, defaultId } of templateEntries) {
-    templateIds.add(defaultId);
+  for (const { template, templateId } of templateEntries) {
+    templateIds.add(templateId);
 
     const existing = isDefaultTemplate
       ? undefined
-      : templatesById.get(defaultId);
-    const detectedBinary = detectBinary(template.provider);
-    const baseEntry = existing ?? buildEntryFromTemplate(template, defaultId);
+      : templatesById.get(templateId);
+    let detectedBinary = detectedBinaryByProvider.get(template.provider);
+    if (!detectedBinaryByProvider.has(template.provider)) {
+      detectedBinary = detectBinary(template.provider);
+      detectedBinaryByProvider.set(template.provider, detectedBinary);
+    }
+    const baseEntry = existing ?? buildEntryFromTemplate(template, templateId);
     const entry = cloneAgentEntry(baseEntry);
-    entry.binary = detectedBinary ?? entry.binary ?? "";
+    entry.binary = detectedBinary ?? "";
     entry.enabled = entry.enabled !== false;
 
     templateStates.push({
+      templateId,
       template,
       entry,
       detectedBinary,
@@ -169,14 +162,18 @@ function scanWorkspaceForAgentDefaults(
 
 function buildEntryFromTemplate(
   template: VendorTemplate,
-  defaultId: string,
+  templateId: string,
 ): AgentConfigEntry {
   return {
-    id: defaultId,
+    id: templateId,
     provider: template.provider,
     model: template.model,
-    enabled: false,
+    enabled: true,
     binary: "",
+    extraArgs:
+      template.extraArgs && template.extraArgs.length > 0
+        ? [...template.extraArgs]
+        : undefined,
   };
 }
 
@@ -219,29 +216,6 @@ function collectDetectedProviders(
   }
 
   return rows;
-}
-
-function applyProviderEnablementDecision(
-  state: AgentLifecycleState,
-  enableDetectedProviders: boolean,
-): boolean {
-  let changed = false;
-
-  for (const templateState of state.templates) {
-    const previousEnabled = templateState.entry.enabled !== false;
-    const hasDetectedBinary = hasBinary(templateState.detectedBinary);
-    const nextEnabled = hasDetectedBinary ? enableDetectedProviders : false;
-    if (nextEnabled !== previousEnabled) {
-      changed = true;
-    }
-    templateState.entry.enabled = nextEnabled;
-  }
-
-  state.zeroDetections = state.templates.every(
-    (templateState) => !hasBinary(templateState.detectedBinary),
-  );
-
-  return changed;
 }
 
 function buildFinalAgentEntries(
@@ -301,42 +275,4 @@ function buildAgentSummary(options: {
 
 function hasBinary(binary: string | undefined): boolean {
   return Boolean(binary && binary.trim().length > 0);
-}
-
-function collectSupportedProviderDetections(): DetectedProviderSummary[] {
-  const providers = listSupportedProviders();
-  const detections: DetectedProviderSummary[] = [];
-
-  for (const provider of providers) {
-    const binary = detectBinary(provider);
-    const resolvedBinary = binary?.trim();
-    if (!resolvedBinary) {
-      continue;
-    }
-
-    detections.push({
-      provider,
-      binary: resolvedBinary,
-    });
-  }
-
-  return detections;
-}
-
-function listSupportedProviders(): string[] {
-  const providers: string[] = [];
-  const seen = new Set<string>();
-  const presets: readonly AgentPreset[] = ["pro", "lite"];
-
-  for (const preset of presets) {
-    for (const agentDefault of getAgentDefaultsForPreset(preset)) {
-      if (seen.has(agentDefault.provider)) {
-        continue;
-      }
-      seen.add(agentDefault.provider);
-      providers.push(agentDefault.provider);
-    }
-  }
-
-  return providers;
 }

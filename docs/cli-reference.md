@@ -26,25 +26,22 @@ voratiq init [--preset pro|lite|manual] [-y, --yes]
 ### Options
 
 - `-y, --yes`: Assume yes and accept defaults (suppresses prompts; useful for CI/scripts)
-- `--preset <preset>`: Select an agent preset (`pro|lite|manual`, default: `pro`)
+- `--preset <preset>`: Select a preset (`pro|lite|manual`, default: `pro`)
 
 ### Behavior
 
 Creates:
 
 - `.voratiq/` directory
-- `runs/` and subdirectories for run data (including `runs/sessions/`)
-- `specs/` and subdirectories for spec data (including `specs/sessions/`)
-- `reviews/` and subdirectories for review data (including `reviews/sessions/`)
-- `agents.yaml` seeded from the selected preset template
-- `orchestration.yaml` with stage-to-agent assignments
+- `specs/`, `runs/`, and `reviews/` directories
+- `agents.yaml` with the full supported agent catalog (binary paths filled for CLIs found on `$PATH`)
+- `orchestration.yaml` with stage-to-agent assignments based on the selected preset
 - `environment.yaml` with environment settings
 - `evals.yaml` with common eval commands
 - `sandbox.yaml` with sandbox policies
-- `index.json` files under `runs/`, `specs/`, and `reviews/`
+- `index.json` files under `specs/`, `runs/`, and `reviews/`
 
-Detects common agent CLIs (`claude`, `codex`, `gemini`, etc.) on `$PATH` and pre-populates `agents.yaml`.
-Seeds orchestration defaults after agent setup as `run: [enabled agents]`, `spec: []`, `review: []`.
+If `.voratiq/` already exists, `voratiq init` fills any missing files and directories.
 
 Interactive mode (TTY) prompts for confirmation. Non-TTY environments require the `--yes` flag.
 
@@ -69,22 +66,21 @@ voratiq init --preset manual --yes
 - Repository is not a git repo
 - Insufficient permissions to create files
 
-If `.voratiq/` already exists, `voratiq init` fills any missing files and directories.
-
-## voratiq spec
+## `voratiq spec`
 
 Generate a structured spec from a task description via a sandboxed agent.
 
 ### Usage
 
 ```bash
-voratiq spec --description <text> [--agent <agent-id>] [--title <text>] [--output <path>]
+voratiq spec --description <text> [--agent <agent-id>] [--profile <name>] [--title <text>] [--output <path>]
 ```
 
 ### Options
 
 - `--description <text>`: Task description for the spec (required)
-- `--agent <agent-id>`: Agent to draft the spec (resolves from orchestration stage config if omitted)
+- `--agent <agent-id>`: Agent to draft the spec (uses orchestration config if omitted)
+- `--profile <name>`: Orchestration profile used for `spec` stage resolution (default: `default`)
 - `--title <text>`: Spec title; agent infers if omitted
 - `--output <path>`: Output path; agent infers if omitted (default: `.voratiq/specs/<slug>.md`)
 
@@ -109,8 +105,8 @@ To begin a run:
 
 - Missing required flags
 - Agent not found
-- No agent resolved for spec stage (stage config empty and no `--agent`)
-- Multiple agents resolved for spec stage (multi-agent spec is not supported)
+- No agent found for spec stage (stage config empty and no `--agent`)
+- Multiple agents found for spec stage (multi-agent spec is not supported)
 - Output path already exists
 - Specification generation failed
 
@@ -121,28 +117,29 @@ Execute agents against a Markdown spec.
 ### Usage
 
 ```bash
-voratiq run --spec <path> [--agent <agent-id>]... [--max-parallel <count>] [--branch]
+voratiq run --spec <path> [--agent <agent-id>]... [--profile <name>] [--max-parallel <count>] [--branch]
 ```
 
 ### Options
 
 - `--spec <path>`: Path to the Markdown spec file (required)
-- `--agent <agent-id>`: Agent identifier override (repeatable; preserves CLI order). Resolves from orchestration stage config if omitted.
-- `--max-parallel <count>`: Maximum number of agents to run concurrently (default: number of resolved agents)
+- `--agent <agent-id>`: Agent identifier override (repeatable; preserves CLI order). Uses orchestration config if omitted.
+- `--profile <name>`: Orchestration profile used for `run` stage resolution (default: `default`)
+- `--max-parallel <count>`: Maximum number of agents to run concurrently (default: all agents)
 - `--branch`: Checkout or create a branch named after the spec file
 
 ### Behavior
 
 1. Validates clean git tree, spec exists, agent/eval configs are valid
 2. Generates run ID, creates run workspace, initializes run record
-3. Spawns resolved agents in parallel, each in an isolated git worktree
+3. Spawns agents, each in an isolated git worktree
 4. Runs evals in each agent's workspace after the agent completes
 5. Captures diffs, persists records, generates report
 
 Exits with code 1 if:
 
 - Preflight checks fail
-- No agents resolved for the stage
+- No agents found for the stage
 - Any agent fails or errors
 
 Eval failures are quality signals displayed in the output but do not affect exit code.
@@ -150,7 +147,7 @@ Eval failures are quality signals displayed in the output but do not affect exit
 ### Examples
 
 ```bash
-# Run agents against a spec (resolved from orchestration or --agent override)
+# Run agents against a spec
 voratiq run --spec .voratiq/specs/fix-auth-bug.md
 
 # Limit concurrency to 2 agents at a time
@@ -161,25 +158,26 @@ voratiq run --spec .voratiq/specs/refactor.md --max-parallel 2
 
 - Git working tree is not clean
 - Spec file doesn't exist
-- No agents resolved for the stage (empty orchestration config and no `--agent` override)
+- No agents found for the stage (empty orchestration config and no `--agent` override)
 - Agent binary not found or not executable
 - Stale or missing agent credentials
 - Invalid agent/eval configuration
 
 ## `voratiq review`
 
-Run a reviewer agent headlessly against a recorded run.
+Run a reviewer agent against a recorded run.
 
 ### Usage
 
 ```bash
-voratiq review --run <run-id> [--agent <agent-id>]
+voratiq review --run <run-id> [--agent <agent-id>] [--profile <name>]
 ```
 
 ### Options
 
 - `--run <run-id>`: Run ID to review (required)
-- `--agent <agent-id>`: Reviewer agent identifier (resolves from orchestration stage config if omitted)
+- `--agent <agent-id>`: Reviewer agent identifier (uses orchestration config if omitted)
+- `--profile <name>`: Orchestration profile used for `review` stage resolution (default: `default`)
 
 ### Behavior
 
@@ -195,8 +193,8 @@ voratiq review --run 20251031-232802-abc123 --agent gpt-5-2-codex
 
 - Run ID not found
 - Run record is malformed
-- No agent resolved for review stage (stage config empty and no `--agent`)
-- Multiple agents resolved for review stage (multi-agent review is not supported)
+- No agent found for review stage (stage config empty and no `--agent`)
+- Multiple agents found for review stage (multi-agent review is not supported)
 - Run artifacts are missing (warns but continues)
 
 ## `voratiq apply`
@@ -265,16 +263,13 @@ voratiq list [--limit <n>] [--spec <path>] [--run <run-id>] [--include-pruned]
 
 ### Behavior
 
-Reads `.voratiq/runs/index.json` plus per-run `record.json` files in `.voratiq/runs/sessions/<run-id>/record.json` and renders a table with run ID, status, spec path, and creation timestamp.
+Renders a table of recorded runs with run ID, status, spec path, and creation timestamp.
 
 ### Examples
 
 ```bash
-# List all runs (excluding pruned)
+# List recent runs (default: last 10, excludes pruned)
 voratiq list
-
-# List last 10 runs
-voratiq list --limit 10
 
 # List runs for a specific spec
 voratiq list --spec .voratiq/specs/fix-auth-bug.md
@@ -288,7 +283,7 @@ voratiq list --include-pruned
 
 ### Errors
 
-- `.voratiq/runs/index.json` or a per-run `record.json` is malformed
+- Run records are malformed
 
 ## `voratiq prune`
 
@@ -309,7 +304,7 @@ voratiq prune (--run <run-id> | --all) [--purge] [-y, --yes]
 
 ### Behavior
 
-1. Loads run record from `.voratiq/runs/sessions/<run-id>/record.json`
+1. Loads the run record
 2. Displays a summary of workspaces, artifacts, and branches slated for deletion and requests confirmation (unless `-y/--yes`)
 3. Deletes run worktrees and, when `--purge` is set, all associated configs and artifacts
 4. Updates run record, marking it as pruned
