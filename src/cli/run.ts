@@ -141,10 +141,7 @@ export function createRunCommand(): Command {
       collectAgentOption,
       [],
     )
-    .option(
-      "--profile <name>",
-      "Orchestration profile (default: \"default\")",
-    )
+    .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
       "--max-parallel <count>",
       "Maximum number of agents to run concurrently",

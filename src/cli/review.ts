@@ -106,10 +106,7 @@ export function createReviewCommand(): Command {
     .description("Generate a review of run artifacts")
     .requiredOption("--run <run-id>", "Identifier of the recorded run")
     .option("--agent <agent-id>", "Reviewer agent identifier")
-    .option(
-      "--profile <name>",
-      "Orchestration profile (default: \"default\")",
-    )
+    .option("--profile <name>", 'Orchestration profile (default: "default")')
     .allowExcessArguments(false)
     .action(async (options: ReviewCommandActionOptions) => {
       const result = await runReviewCommand({

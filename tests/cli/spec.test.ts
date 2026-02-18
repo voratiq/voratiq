@@ -357,7 +357,7 @@ describe("voratiq spec (CLI)", () => {
       ANSI_PATTERN,
       "",
     );
-    expect(rendered).toContain('Error: No agent resolved for stage "spec".');
+    expect(rendered).toContain('Error: No agent found for stage "spec".');
     expect(rendered).toContain("Provide --agent <id>");
     expect(rendered).toContain("profiles.default.spec.agents");
     expect(rendered).toContain(".voratiq/orchestration.yaml");
@@ -400,7 +400,7 @@ describe("voratiq spec (CLI)", () => {
       "",
     );
     expect(rendered).toContain(
-      'Error: Multiple agents resolved for stage "spec".',
+      'Error: Multiple agents found for stage "spec".',
     );
     expect(rendered).toContain("Multi-agent spec is not supported.");
     expect(rendered).toContain(

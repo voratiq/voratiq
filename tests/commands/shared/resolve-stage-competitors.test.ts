@@ -35,9 +35,7 @@ describe("resolveStageCompetitors", () => {
 
     expect(caught).toBeInstanceOf(HintedError);
     const hinted = caught as HintedError;
-    expect(hinted.headline).toBe(
-      'Multiple agents resolved for stage "review".',
-    );
+    expect(hinted.headline).toBe('Multiple agents found for stage "review".');
     expect(hinted.hintLines).toContain(
       "Provide --review-agent <id> to run review with an explicit agent.",
     );
@@ -72,7 +70,7 @@ describe("resolveStageCompetitors", () => {
 
       expect(caught).toBeInstanceOf(HintedError);
       const hinted = caught as HintedError;
-      expect(hinted.headline).toBe('No agent resolved for stage "run".');
+      expect(hinted.headline).toBe('No agent found for stage "run".');
       expect(hinted.hintLines).toContain(
         "Provide --run-agent <id> to run run with an explicit agent.",
       );

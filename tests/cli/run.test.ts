@@ -696,7 +696,7 @@ suite("voratiq run (integration)", () => {
 
     expect(capturedError).toBeInstanceOf(HintedError);
     const hinted = capturedError as HintedError;
-    expect(hinted.headline).toBe('No agent resolved for stage "run".');
+    expect(hinted.headline).toBe('No agent found for stage "run".');
     expect(
       hinted.hintLines.some((line) => line.includes("Provide --agent <id>")),
     ).toBe(true);

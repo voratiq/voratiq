@@ -548,7 +548,7 @@ describe("voratiq review", () => {
 
       expect(caught).toBeInstanceOf(HintedError);
       const hinted = caught as HintedError;
-      expect(hinted.headline).toBe('No agent resolved for stage "review".');
+      expect(hinted.headline).toBe('No agent found for stage "review".');
       expect(
         hinted.hintLines.some((line) => line.includes("Provide --agent <id>")),
       ).toBe(true);
@@ -596,9 +596,7 @@ describe("voratiq review", () => {
 
       expect(caught).toBeInstanceOf(HintedError);
       const hinted = caught as HintedError;
-      expect(hinted.headline).toBe(
-        'Multiple agents resolved for stage "review".',
-      );
+      expect(hinted.headline).toBe('Multiple agents found for stage "review".');
       expect(hinted.detailLines).toContain(
         "Multi-agent review is not supported.",
       );

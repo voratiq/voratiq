@@ -402,10 +402,7 @@ export function createAutoCommand(): Command {
       "--review-agent <agent-id>",
       "Reviewer agent identifier override (overrides orchestration stage config)",
     )
-    .option(
-      "--profile <name>",
-      "Orchestration profile (default: \"default\")",
-    )
+    .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
       "--max-parallel <count>",
       "Maximum number of agents to run concurrently",

@@ -70,15 +70,9 @@ export function createSpecCommand(): Command {
       "Human description to convert into a spec",
     )
     .option("--agent <agent-id>", "Agent identifier to use")
-    .option(
-      "--profile <name>",
-      "Orchestration profile (default: \"default\")",
-    )
+    .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option("--title <text>", "Optional spec title")
-    .option(
-      "--output <path>",
-      "Optional output path within .voratiq/specs/",
-    )
+    .option("--output <path>", "Optional output path within .voratiq/specs/")
     .allowExcessArguments(false)
     .action(async (commandOptions: SpecCommandOptions) => {
       const result = await runSpecCommand(commandOptions);
