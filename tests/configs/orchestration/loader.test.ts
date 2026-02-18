@@ -108,6 +108,42 @@ agents:
     ).toEqual(["gemini"]);
   });
 
+  test("treats missing enabled in agents.yaml as enabled during cross-validation", () => {
+    const orchestrationYaml = `
+profiles:
+  default:
+    run:
+      agents:
+        - id: codex
+    review:
+      agents:
+        - id: codex
+    spec:
+      agents:
+        - id: codex
+`;
+    const agentsYaml = `
+agents:
+  - id: codex
+    provider: codex
+    model: gpt-5
+    binary: /usr/local/bin/codex
+`;
+
+    const config = loadOrchestrationConfig({
+      root: ROOT,
+      filePath: ORCHESTRATION_FILE,
+      readFile: createReadFile({
+        [ORCHESTRATION_FILE]: orchestrationYaml,
+        [AGENTS_FILE]: agentsYaml,
+      }),
+    });
+
+    expect(config.profiles.default.run.agents.map((agent) => agent.id)).toEqual(
+      ["codex"],
+    );
+  });
+
   test("allows empty stage agent arrays for run and spec", () => {
     const orchestrationYaml = `
 profiles:
@@ -221,7 +257,7 @@ agents:
     expect(load).toThrow(/unknown key "unexpected"/u);
   });
 
-  test("fails when profiles contain non-default keys", () => {
+  test("loads multiple profiles when each profile has valid stage config", () => {
     const orchestrationYaml = `
 profiles:
   default:
@@ -234,7 +270,69 @@ profiles:
     spec:
       agents:
         - id: codex
-  experimental:
+  quality:
+    run:
+      agents:
+        - id: codex
+    review:
+      agents:
+        - id: codex
+    spec:
+      agents:
+        - id: codex
+  cost-optimized:
+    run:
+      agents:
+        - id: codex
+    review:
+      agents:
+        - id: codex
+    spec:
+      agents:
+        - id: codex
+`;
+    const agentsYaml = `
+agents:
+  - id: codex
+    provider: codex
+    model: gpt-5
+    enabled: true
+    binary: /usr/local/bin/codex
+`;
+
+    const config = loadOrchestrationConfig({
+      root: ROOT,
+      filePath: ORCHESTRATION_FILE,
+      readFile: createReadFile({
+        [ORCHESTRATION_FILE]: orchestrationYaml,
+        [AGENTS_FILE]: agentsYaml,
+      }),
+    });
+
+    expect(Object.keys(config.profiles).sort()).toEqual([
+      "cost-optimized",
+      "default",
+      "quality",
+    ]);
+    expect(config.profiles.quality.run.agents.map((agent) => agent.id)).toEqual(
+      ["codex"],
+    );
+  });
+
+  test("fails when profile name does not match the required pattern", () => {
+    const orchestrationYaml = `
+profiles:
+  default:
+    run:
+      agents:
+        - id: codex
+    review:
+      agents:
+        - id: codex
+    spec:
+      agents:
+        - id: codex
+  Quality_Profile:
     run:
       agents:
         - id: codex
@@ -264,7 +362,95 @@ agents:
         }),
       });
 
-    expect(load).toThrow(/profiles: unknown key "experimental"/u);
+    expect(load).toThrow(OrchestrationSchemaValidationError);
+    expect(load).toThrow(/profiles\.Quality_Profile/u);
+    expect(load).toThrow(/Invalid key in record/u);
+  });
+
+  test("fails when profile name exceeds max length", () => {
+    const profileName = "a".repeat(65);
+    const orchestrationYaml = `
+profiles:
+  default:
+    run:
+      agents:
+        - id: codex
+    review:
+      agents:
+        - id: codex
+    spec:
+      agents:
+        - id: codex
+  ${profileName}:
+    run:
+      agents:
+        - id: codex
+    review:
+      agents:
+        - id: codex
+    spec:
+      agents:
+        - id: codex
+`;
+    const agentsYaml = `
+agents:
+  - id: codex
+    provider: codex
+    model: gpt-5
+    enabled: true
+    binary: /usr/local/bin/codex
+`;
+
+    const load = () =>
+      loadOrchestrationConfig({
+        root: ROOT,
+        filePath: ORCHESTRATION_FILE,
+        readFile: createReadFile({
+          [ORCHESTRATION_FILE]: orchestrationYaml,
+          [AGENTS_FILE]: agentsYaml,
+        }),
+      });
+
+    expect(load).toThrow(OrchestrationSchemaValidationError);
+    expect(load).toThrow(/profiles\.[a]{65}/u);
+    expect(load).toThrow(/Invalid key in record/u);
+  });
+
+  test("fails when profiles.default is missing", () => {
+    const orchestrationYaml = `
+profiles:
+  quality:
+    run:
+      agents:
+        - id: codex
+    review:
+      agents:
+        - id: codex
+    spec:
+      agents:
+        - id: codex
+`;
+    const agentsYaml = `
+agents:
+  - id: codex
+    provider: codex
+    model: gpt-5
+    enabled: true
+    binary: /usr/local/bin/codex
+`;
+
+    const load = () =>
+      loadOrchestrationConfig({
+        root: ROOT,
+        filePath: ORCHESTRATION_FILE,
+        readFile: createReadFile({
+          [ORCHESTRATION_FILE]: orchestrationYaml,
+          [AGENTS_FILE]: agentsYaml,
+        }),
+      });
+
+    expect(load).toThrow(OrchestrationSchemaValidationError);
+    expect(load).toThrow(/profiles\.default/u);
   });
 
   test("fails on unknown stage keys", () => {

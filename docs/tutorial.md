@@ -14,7 +14,7 @@ Then, you need a git repo with a clean working tree, and 1 or more authenticated
 
 ## Initialize the workspace (`init`)
 
-`init` bootstraps the workspace by configuring agents, environment, and evals. It detects which agent CLIs are on your `$PATH` and creates the `.voratiq/` directory structure.
+`init` bootstraps the workspace by creating the `.voratiq/` configs and applying the selected preset.
 
 Command:
 
@@ -27,25 +27,22 @@ Output:
 ```
 Initializing Voratiq…
 
-Agents configured (claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929, claude-opus-4-5-20251101, gpt-5-codex, gpt-5-1-codex, gpt-5-1-codex-max, gpt-5-1-codex-max-xhigh, gpt-5-1-codex-mini, gpt-5-2, gpt-5-2-xhigh, gpt-5-2-codex, gpt-5-2-codex-xhigh, gemini-3-pro-preview, gemini-2-5-pro, gemini-2-5-flash).
-To modify, edit `.voratiq/agents.yaml`.
+Configuring workspace…
 
-Orchestration configured.
-To modify, edit `.voratiq/orchestration.yaml`.
+CONFIGURATION  FILE
+agents         .voratiq/agents.yaml
+orchestration  .voratiq/orchestration.yaml
+environment    .voratiq/environment.yaml
+evals          .voratiq/evals.yaml
+sandbox        .voratiq/sandbox.yaml
 
-Environment configured (node).
-To modify, edit `.voratiq/environment.yaml`.
-
-Evals configured (format, lint, typecheck, tests).
-To modify, edit `.voratiq/evals.yaml`.
-
-Sandbox configured.
-To modify, edit `.voratiq/sandbox.yaml`.
+To learn more about configuration:
+  https://github.com/voratiq/voratiq/tree/main/docs/configs
 
 Voratiq initialized.
 
-To begin a run:
-  voratiq run --spec <path>
+To generate a spec:
+  voratiq spec --description "<what you want to build>" --agent <agent-id>
 ```
 
 Check that the agents you want are in `agents.yaml` before continuing. If something's missing, add it now.
@@ -78,7 +75,7 @@ One note: avoid backticks in `--description` unless you escape them. Bash interp
 
 ## Run your agents (`run`)
 
-`run` executes the resolved run-stage agents in parallel against a spec. Each agent runs in a sandboxed environment. Voratiq captures their outputs, diffs, and summaries, runs any configured evals, and records everything to run history.
+`run` executes your configured agents against a spec. Each agent runs in its own sandboxed environment. Voratiq captures their outputs, diffs, and summaries, runs any configured evals, and records everything to run history.
 
 Command:
 
@@ -119,7 +116,7 @@ All 12 agents completed successfully. We use `review` to compare implementations
 
 ## Review the run (`review`)
 
-`review` launches a sandboxed reviewer agent to analyze artifacts from a completed run and generate a comparison of all agent outputs. The reviewer resolves from `.voratiq/orchestration.yaml` stage config, or can be overridden with `--agent`.
+`review` launches a sandboxed reviewer agent to analyze artifacts from a completed run and generate a comparison of all agent outputs. The reviewer comes from orchestration config, or you can override it with `--agent`.
 
 Command:
 
@@ -208,7 +205,7 @@ This was a straightforward task, so no additional cleanup or iteration was neede
 
 ## Clean up (`prune`)
 
-`prune` cleans up disk space by removing workspaces and large artifacts for a recorded run. The run record stays in history for auditability.
+`prune` cleans up disk space by removing workspaces and large artifacts for a recorded run.
 
 Command:
 
@@ -228,6 +225,6 @@ The run record stays in history for reference, but the heavy artifacts are gone.
 
 Here we used Voratiq to implement a real feature: a `--branch` flag for `voratiq run`.
 
-We wrote a high level description, generated a spec, ran 12 agents in parallel, reviewed the top candidates, and merged the best diff.
+We wrote a high-level description, generated a spec, ran 12 agents against the spec, reviewed the top candidates, and applied the best diff.
 
 Questions, comments, or just want to chat? Open an issue on [GitHub](https://github.com/voratiq/voratiq/issues) or reach out to [support@voratiq.com](mailto:support@voratiq.com).

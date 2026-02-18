@@ -32,6 +32,7 @@ export interface RunCommandInput {
   specDisplayPath: string;
   agentIds?: readonly string[];
   agentOverrideFlag?: string;
+  profileName?: string;
   maxParallel?: number;
   renderer?: RunProgressRenderer;
 }
@@ -49,6 +50,7 @@ export async function executeRunCommand(
     specDisplayPath,
     agentIds,
     agentOverrideFlag,
+    profileName,
     maxParallel: requestedMaxParallel,
     renderer,
   } = input;
@@ -58,6 +60,7 @@ export async function executeRunCommand(
     stageId: "run",
     cliAgentIds: agentIds,
     cliOverrideFlag: agentOverrideFlag,
+    profileName,
     includeDefinitions: false,
   });
 

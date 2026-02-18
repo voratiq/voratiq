@@ -157,6 +157,29 @@ describe("voratiq review", () => {
       expect((received as { agent?: string }).agent).toBe("reviewer");
     });
 
+    it("parses --profile", async () => {
+      let received: unknown;
+      const reviewCommand = silenceCommander(createReviewCommand());
+      reviewCommand.exitOverride().action((options) => {
+        received = options;
+      });
+
+      const program = silenceCommander(new Command());
+      program.exitOverride().addCommand(reviewCommand);
+
+      await program.parseAsync([
+        "node",
+        "voratiq",
+        "review",
+        "--run",
+        "20250101-abcde",
+        "--profile",
+        "quality",
+      ]);
+
+      expect((received as { profile?: string }).profile).toBe("quality");
+    });
+
     it("prints help text", () => {
       const command = silenceCommander(createReviewCommand());
       const help = command.helpInformation();
@@ -404,6 +427,56 @@ describe("voratiq review", () => {
       );
     });
 
+    it("resolves reviewer from selected profile when --profile is provided", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-vmtyf",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+      await writeAgentsConfig(repoRoot, [
+        {
+          id: "reviewer",
+          provider: "codex",
+          model: "gpt-5.2-codex",
+          enabled: true,
+          binary: process.execPath,
+        },
+        {
+          id: "second-reviewer",
+          provider: "claude",
+          model: "claude-haiku-4-5-20251001",
+          enabled: true,
+          binary: process.execPath,
+        },
+      ]);
+      await writeOrchestrationConfig(repoRoot, {
+        profiles: {
+          default: {
+            runAgentIds: [],
+            reviewAgentIds: ["reviewer"],
+            specAgentIds: [],
+          },
+          quality: {
+            runAgentIds: [],
+            reviewAgentIds: ["second-reviewer"],
+            specAgentIds: [],
+          },
+        },
+      });
+
+      const result = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+        profile: "quality",
+      });
+
+      expect(result.agentId).toBe("second-reviewer");
+      expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxParallel: 1,
+          candidates: [expect.objectContaining({ id: "second-reviewer" })],
+        }),
+      );
+    });
+
     it("uses --agent override instead of orchestration review defaults", async () => {
       const runRecord = buildRunRecord({
         runId: "20251007-184454-vmtyf",
@@ -426,12 +499,24 @@ describe("voratiq review", () => {
         },
       ]);
       await writeOrchestrationConfig(repoRoot, {
-        reviewAgentIds: ["second-reviewer", "reviewer"],
+        profiles: {
+          default: {
+            runAgentIds: [],
+            reviewAgentIds: ["second-reviewer", "reviewer"],
+            specAgentIds: [],
+          },
+          quality: {
+            runAgentIds: [],
+            reviewAgentIds: ["second-reviewer"],
+            specAgentIds: [],
+          },
+        },
       });
 
       const result = await runReviewInRepo(repoRoot, {
         runId: runRecord.runId,
         agentId: "reviewer",
+        profile: "quality",
       });
 
       expect(result.agentId).toBe("reviewer");
@@ -518,7 +603,7 @@ describe("voratiq review", () => {
         "Multi-agent review is not supported.",
       );
       expect(hinted.hintLines).toContain(
-        "Configure exactly one agent in `.voratiq/orchestration.yaml`.",
+        "Configure exactly one agent under profiles.default.review.agents in .voratiq/orchestration.yaml.",
       );
       expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
     });
@@ -751,16 +836,44 @@ async function writeOrchestrationConfig(
     runAgentIds?: readonly string[];
     reviewAgentIds?: readonly string[];
     specAgentIds?: readonly string[];
+    profiles?: Record<
+      string,
+      {
+        runAgentIds?: readonly string[];
+        reviewAgentIds?: readonly string[];
+        specAgentIds?: readonly string[];
+      }
+    >;
   } = {},
 ): Promise<void> {
-  const runAgentIds = options.runAgentIds ?? [];
-  const reviewAgentIds = options.reviewAgentIds ?? [];
-  const specAgentIds = options.specAgentIds ?? [];
+  const profiles =
+    options.profiles ??
+    ({
+      default: {
+        runAgentIds: options.runAgentIds ?? [],
+        reviewAgentIds: options.reviewAgentIds ?? [],
+        specAgentIds: options.specAgentIds ?? [],
+      },
+    } satisfies Record<
+      string,
+      {
+        runAgentIds?: readonly string[];
+        reviewAgentIds?: readonly string[];
+        specAgentIds?: readonly string[];
+      }
+    >);
 
-  const lines = ["profiles:", "  default:"];
-  appendOrchestrationStage(lines, "run", runAgentIds);
-  appendOrchestrationStage(lines, "review", reviewAgentIds);
-  appendOrchestrationStage(lines, "spec", specAgentIds);
+  const lines = ["profiles:"];
+  for (const [profileName, profileStages] of Object.entries(profiles)) {
+    lines.push(`  ${profileName}:`);
+    appendOrchestrationStage(lines, "run", profileStages.runAgentIds ?? []);
+    appendOrchestrationStage(
+      lines,
+      "review",
+      profileStages.reviewAgentIds ?? [],
+    );
+    appendOrchestrationStage(lines, "spec", profileStages.specAgentIds ?? []);
+  }
   lines.push("");
 
   await writeFile(

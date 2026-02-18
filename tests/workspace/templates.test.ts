@@ -1,5 +1,7 @@
 import {
   DEFAULT_AGENT_DEFAULTS,
+  getAgentDefaultId,
+  getSupportedAgentDefaults,
   LITE_AGENT_DEFAULTS,
 } from "../../src/configs/agents/defaults.js";
 import {
@@ -7,15 +9,14 @@ import {
   buildDefaultAgentsTemplate,
   buildDefaultSandboxTemplate,
   listAgentPresetTemplates,
-  sanitizeAgentIdFromModel,
   serializeAgentsConfigEntries,
 } from "../../src/workspace/templates.js";
 
 describe("buildDefaultAgentsTemplate", () => {
-  it("derives ids from model slugs", () => {
+  it("includes expected preset ids", () => {
     const yaml = buildDefaultAgentsTemplate();
     for (const agentDefault of DEFAULT_AGENT_DEFAULTS) {
-      const id = sanitizeAgentIdFromModel(agentDefault.model);
+      const id = getAgentDefaultId(agentDefault);
       expect(yaml).toContain(`id: ${id}`);
     }
   });
@@ -27,6 +28,27 @@ describe("buildAgentsTemplate", () => {
     for (const agentDefault of LITE_AGENT_DEFAULTS) {
       expect(yaml).toContain(`model: ${agentDefault.model}`);
     }
+  });
+
+  it("includes the full supported catalog for every preset", () => {
+    const presets = ["pro", "lite", "manual"] as const;
+    for (const preset of presets) {
+      const yaml = buildAgentsTemplate(preset);
+      for (const agentDefault of getSupportedAgentDefaults()) {
+        expect(yaml).toContain(`id: ${getAgentDefaultId(agentDefault)}`);
+        expect(yaml).toContain(`model: ${agentDefault.model}`);
+      }
+    }
+  });
+
+  it("includes default extraArgs for variant agents", () => {
+    const yaml = buildAgentsTemplate("pro");
+    expect(yaml).toContain("id: gpt-5-3-codex-high");
+    expect(yaml).toContain("id: gpt-5-2-codex-xhigh");
+    expect(yaml).toContain("extraArgs:");
+    expect(yaml).toContain("- --config");
+    expect(yaml).toContain('- "model_reasoning_effort=high"');
+    expect(yaml).toContain('- "model_reasoning_effort=xhigh"');
   });
 });
 
@@ -69,7 +91,6 @@ describe("serializeAgentsConfigEntries", () => {
       "  - id: claude",
       "    provider: claude",
       "    model: claude-sonnet-4-5-20250929",
-      "    enabled: true",
       "    binary: /opt/claude",
       "    extraArgs:",
       "      - --foo",
@@ -101,15 +122,15 @@ describe("listAgentPresetTemplates", () => {
 
   it("emits deterministic templates without binary paths", () => {
     const descriptors = listAgentPresetTemplates();
-
-    const manual = descriptors.find((d) => d.preset === "manual");
-    expect(manual?.template.trim()).toBe("agents: []");
-
-    const nonManual = descriptors.filter((d) => d.preset !== "manual");
-    for (const descriptor of nonManual) {
+    for (const descriptor of descriptors) {
       expect(descriptor.template).toContain('binary: ""');
+      expect(descriptor.template).not.toContain("enabled: true");
       expect(descriptor.template).not.toMatch(/binary:\s*\//);
       expect(descriptor.template).not.toMatch(/binary:\s*[A-Za-z]:\\/);
+
+      for (const agentDefault of getSupportedAgentDefaults()) {
+        expect(descriptor.template).toContain(`model: ${agentDefault.model}`);
+      }
     }
   });
 });

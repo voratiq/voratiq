@@ -20,6 +20,7 @@ export interface RunCommandOptions {
   specPath: string;
   agentIds?: string[];
   agentOverrideFlag?: string;
+  profile?: string;
   maxParallel?: number;
   branch?: boolean;
   suppressHint?: boolean;
@@ -42,6 +43,7 @@ export async function runRunCommand(
     specPath,
     agentIds,
     agentOverrideFlag,
+    profile,
     maxParallel,
     branch,
     suppressHint,
@@ -76,6 +78,7 @@ export async function runRunCommand(
     specDisplayPath: displayPath,
     agentIds,
     agentOverrideFlag,
+    profileName: profile,
     maxParallel,
     renderer,
   });
@@ -111,6 +114,7 @@ export function deriveBranchNameFromSpecPath(specPath: string): string {
 interface RunCommandActionOptions {
   spec: string;
   agent?: string[];
+  profile?: string;
   maxParallel?: number;
   branch?: boolean;
 }
@@ -138,6 +142,10 @@ export function createRunCommand(): Command {
       [],
     )
     .option(
+      "--profile <name>",
+      "Orchestration profile (default: \"default\")",
+    )
+    .option(
       "--max-parallel <count>",
       "Maximum number of agents to run concurrently",
       parseMaxParallelOption,
@@ -148,6 +156,7 @@ export function createRunCommand(): Command {
       const runOptions: RunCommandOptions = {
         specPath: options.spec,
         agentIds: options.agent,
+        profile: options.profile,
         maxParallel: options.maxParallel,
         branch: options.branch,
       };

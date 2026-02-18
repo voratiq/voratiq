@@ -6,8 +6,8 @@ import { join } from "node:path";
 
 import { executeInitCommand } from "../../../src/commands/init/command.js";
 import {
+  getAgentDefaultId,
   getAgentDefaultsForPreset,
-  sanitizeAgentIdFromModel,
 } from "../../../src/configs/agents/defaults.js";
 import { readAgentsConfig } from "../../../src/configs/agents/loader.js";
 import { buildDefaultOrchestrationTemplate } from "../../../src/configs/orchestration/bootstrap.js";
@@ -71,7 +71,7 @@ describe("init orchestration bootstrap", () => {
 
     const orchestration = readOrchestrationConfig(content);
     const expectedProIds = getAgentDefaultsForPreset("pro").map((agent) =>
-      sanitizeAgentIdFromModel(agent.model),
+      getAgentDefaultId(agent),
     );
     expect(orchestration.profiles.default.spec.agents).toEqual([]);
     expect(
@@ -101,7 +101,7 @@ describe("init orchestration bootstrap", () => {
       .filter(
         (agent) => agent.provider === "codex" || agent.provider === "gemini",
       )
-      .map((agent) => sanitizeAgentIdFromModel(agent.model));
+      .map((agent) => getAgentDefaultId(agent));
     const runIds = orchestration.profiles.default.run.agents.map(
       (agent) => agent.id,
     );
@@ -146,7 +146,7 @@ describe("init orchestration bootstrap", () => {
       .filter(
         (agent) => agent.provider === "codex" || agent.provider === "gemini",
       )
-      .map((agent) => sanitizeAgentIdFromModel(agent.model));
+      .map((agent) => getAgentDefaultId(agent));
 
     expect(orchestration.profiles.default.spec.agents).toEqual([]);
     expect(
@@ -196,7 +196,7 @@ describe("init orchestration bootstrap", () => {
       await readFile(orchestrationPath, "utf8"),
     );
     const expectedProIds = getAgentDefaultsForPreset("pro").map((agent) =>
-      sanitizeAgentIdFromModel(agent.model),
+      getAgentDefaultId(agent),
     );
 
     expect(orchestration.profiles.default.spec.agents).toEqual([]);

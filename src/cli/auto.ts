@@ -20,6 +20,7 @@ export interface AutoCommandOptions {
   specPath: string;
   runAgentIds?: readonly string[];
   reviewerAgent?: string;
+  profile?: string;
   maxParallel?: number;
   branch?: boolean;
   apply?: boolean;
@@ -137,7 +138,7 @@ function resolveRecommendedAgent(options: {
 
   if (resolvedUnique.length === 0) {
     throw new CliError(
-      "Recommendation did not resolve to a run agent.",
+      "Recommendation did not match any run agent.",
       [
         `Preferred agents: ${preferredUnique.join(", ")}`,
         `Available agents: ${availableAgents.join(", ") || "(none recorded)"}`,
@@ -152,7 +153,7 @@ function resolveRecommendedAgent(options: {
     throw new CliError(
       "Recommendation is ambiguous; exactly one agent is required for auto apply.",
       [
-        `Resolved agents: ${resolvedUnique.join(", ")}`,
+        `Matched agents: ${resolvedUnique.join(", ")}`,
         `Source: ${recommendationPath}`,
       ],
       [
@@ -209,6 +210,7 @@ export async function runAutoCommand(
         specPath: options.specPath,
         agentIds: options.runAgentIds ? [...options.runAgentIds] : undefined,
         agentOverrideFlag: "--run-agent",
+        profile: options.profile,
         maxParallel: options.maxParallel,
         branch: options.branch,
         suppressHint: true,
@@ -249,6 +251,7 @@ export async function runAutoCommand(
             runId,
             agentId: options.reviewerAgent,
             agentOverrideFlag: "--review-agent",
+            profile: options.profile,
             suppressHint: true,
           });
 
@@ -375,6 +378,7 @@ interface AutoCommandActionOptions {
   spec?: string;
   runAgent?: string[];
   reviewAgent?: string;
+  profile?: string;
   maxParallel?: number;
   branch?: boolean;
   apply?: boolean;
@@ -399,6 +403,10 @@ export function createAutoCommand(): Command {
       "Reviewer agent identifier override (overrides orchestration stage config)",
     )
     .option(
+      "--profile <name>",
+      "Orchestration profile (default: \"default\")",
+    )
+    .option(
       "--max-parallel <count>",
       "Maximum number of agents to run concurrently",
       parseMaxParallelOption,
@@ -420,7 +428,7 @@ export function createAutoCommand(): Command {
         "",
         "Agent resolution precedence (per stage):",
         "  1) CLI override flag",
-        "  2) profiles.default.<stage>.agents in .voratiq/orchestration.yaml",
+        "  2) orchestration profile stage config (.voratiq/orchestration.yaml)",
         "  3) fail fast (no implicit fallback)",
       ].join("\n"),
     )
@@ -430,6 +438,7 @@ export function createAutoCommand(): Command {
         specPath: options.spec!,
         runAgentIds: options.runAgent,
         reviewerAgent: options.reviewAgent,
+        profile: options.profile,
         maxParallel: options.maxParallel,
         branch: options.branch,
         apply: options.apply ?? false,

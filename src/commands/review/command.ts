@@ -24,6 +24,7 @@ export interface ReviewCommandInput {
   runId: string;
   agentId?: string;
   agentOverrideFlag?: string;
+  profileName?: string;
 }
 
 export interface ReviewCommandResult {
@@ -44,6 +45,7 @@ export async function executeReviewCommand(
     runId,
     agentId,
     agentOverrideFlag,
+    profileName,
   } = input;
 
   const { records } = await fetchRunsSafely({
@@ -71,6 +73,7 @@ export async function executeReviewCommand(
     agentId,
     root,
     agentOverrideFlag,
+    profileName,
   });
   const environment = loadEnvironmentConfig({ root });
   const reviewId = generateSessionId();
@@ -121,14 +124,16 @@ function resolveReviewAgent(options: {
   agentId?: string;
   root: string;
   agentOverrideFlag?: string;
+  profileName?: string;
 }): AgentDefinition {
-  const { agentId, root, agentOverrideFlag } = options;
+  const { agentId, root, agentOverrideFlag, profileName } = options;
   try {
     const resolution = resolveStageCompetitors({
       root,
       stageId: "review",
       cliAgentIds: agentId ? [agentId] : undefined,
       cliOverrideFlag: agentOverrideFlag,
+      profileName,
       enforceSingleCompetitor: true,
     });
     const resolvedAgent = resolution.competitors[0];

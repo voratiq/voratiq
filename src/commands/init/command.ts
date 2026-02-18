@@ -1,3 +1,8 @@
+import {
+  getAgentDefaultId,
+  getAgentDefaultsForPreset,
+  getSupportedAgentDefaults,
+} from "../../configs/agents/defaults.js";
 import { readAgentsConfig } from "../../configs/agents/loader.js";
 import type {
   AgentConfigEntry,
@@ -20,7 +25,6 @@ import {
 } from "../../workspace/structure.js";
 import {
   type AgentPreset,
-  buildAgentsTemplate,
   listAgentPresetTemplates,
   serializeAgentsConfigEntries,
 } from "../../workspace/templates.js";
@@ -43,6 +47,7 @@ export async function executeInitCommand(
     root,
     preset,
     presetProvided,
+    onPresetResolved,
     assumeYes,
     interactive,
     confirm,
@@ -68,6 +73,7 @@ export async function executeInitCommand(
     prompt,
     agentsConfigMissing,
   });
+  onPresetResolved?.(resolvedPreset);
 
   const workspaceResult = await createWorkspace(root);
   await applyAgentPresetTemplate(root, resolvedPreset, {
@@ -205,6 +211,13 @@ async function applyAgentPresetTemplate(
     return;
   }
 
+  const managedCatalogEntries = retargetManagedCatalogEntries(config);
+  if (managedCatalogEntries) {
+    const serialized = serializeAgentsConfigEntries(managedCatalogEntries);
+    await writeConfigIfChanged(filePath, serialized, snapshot.normalized);
+    return;
+  }
+
   const managedPreset = detectManagedAgentsPreset(config);
   if (!managedPreset) {
     return;
@@ -214,11 +227,7 @@ async function applyAgentPresetTemplate(
     return;
   }
 
-  const updatedEntries = retargetManagedAgentEntries(
-    config,
-    managedPreset,
-    preset,
-  );
+  const updatedEntries = retargetManagedAgentEntries(config, managedPreset);
   if (!updatedEntries) {
     return;
   }
@@ -299,24 +308,56 @@ interface ManagedAgentSignature {
   id: string;
   provider: string;
   model: string;
+  extraArgs?: string[];
+}
+
+function buildCatalogRoster(): ManagedAgentSignature[] {
+  return getSupportedAgentDefaults().map((agentDefault) => ({
+    id: getAgentDefaultId(agentDefault),
+    provider: agentDefault.provider,
+    model: agentDefault.model,
+    extraArgs:
+      agentDefault.extraArgs && agentDefault.extraArgs.length > 0
+        ? [...agentDefault.extraArgs]
+        : undefined,
+  }));
 }
 
 function buildPresetRoster(preset: AgentPreset): ManagedAgentSignature[] {
-  const template = buildAgentsTemplate(preset);
-  const parsed = readAgentsConfig(template);
-  return parsed.agents.map((entry) => ({
-    id: entry.id,
-    provider: entry.provider,
-    model: entry.model,
+  if (preset === "manual") {
+    return [];
+  }
+
+  return getAgentDefaultsForPreset(preset).map((agentDefault) => ({
+    id: getAgentDefaultId(agentDefault),
+    provider: agentDefault.provider,
+    model: agentDefault.model,
+    extraArgs:
+      agentDefault.extraArgs && agentDefault.extraArgs.length > 0
+        ? [...agentDefault.extraArgs]
+        : undefined,
   }));
 }
 
 function detectManagedAgentsPreset(
   config: AgentsConfig,
 ): ManagedPreset | undefined {
+  const catalogSignatures = new Map<string, ManagedAgentSignature>();
+  for (const signature of buildCatalogRoster()) {
+    catalogSignatures.set(signature.id, signature);
+  }
+
   const entriesById = new Map<string, AgentConfigEntry>();
   for (const entry of config.agents) {
     if (entriesById.has(entry.id)) {
+      return undefined;
+    }
+    const catalogSignature = catalogSignatures.get(entry.id);
+    if (
+      catalogSignature &&
+      (entry.provider !== catalogSignature.provider ||
+        entry.model !== catalogSignature.model)
+    ) {
       return undefined;
     }
     entriesById.set(entry.id, entry);
@@ -326,6 +367,17 @@ function detectManagedAgentsPreset(
   for (const preset of candidates) {
     const roster = buildPresetRoster(preset);
     if (roster.length === 0) {
+      continue;
+    }
+
+    const rosterIds = new Set(roster.map((signature) => signature.id));
+    const hasCatalogEntriesOutsideRoster = config.agents.some((entry) => {
+      if (!catalogSignatures.has(entry.id)) {
+        return false;
+      }
+      return !rosterIds.has(entry.id);
+    });
+    if (hasCatalogEntriesOutsideRoster) {
       continue;
     }
 
@@ -353,7 +405,6 @@ function detectManagedAgentsPreset(
 function retargetManagedAgentEntries(
   config: AgentsConfig,
   fromPreset: ManagedPreset,
-  toPreset: AgentPreset,
 ): AgentConfigEntry[] | undefined {
   const fromRoster = buildPresetRoster(fromPreset);
   const fromIds = new Set(fromRoster.map((entry) => entry.id));
@@ -367,12 +418,15 @@ function retargetManagedAgentEntries(
       priorByProvider.set(entry.provider, entry);
     }
   }
+  const priorById = new Map(
+    priorManagedAgents.map((entry) => [entry.id, entry]),
+  );
 
   const userDefinedAgents = config.agents.filter(
     (entry) => !fromIds.has(entry.id),
   );
 
-  const targetRoster = buildPresetRoster(toPreset);
+  const targetRoster = buildCatalogRoster();
   const targetIds = new Set(targetRoster.map((entry) => entry.id));
 
   // Avoid overwriting agents that were user-defined under the previous preset.
@@ -384,20 +438,81 @@ function retargetManagedAgentEntries(
 
   const nextManagedAgents: AgentConfigEntry[] = targetRoster.map(
     (signature) => {
+      const priorByIdentity = priorById.get(signature.id);
       const prior = priorByProvider.get(signature.provider);
       return {
         id: signature.id,
         provider: signature.provider,
         model: signature.model,
-        enabled: prior ? prior.enabled !== false : false,
+        enabled:
+          priorByIdentity !== undefined
+            ? priorByIdentity.enabled !== false
+            : prior?.enabled !== false,
         binary: prior?.binary ?? "",
         extraArgs:
-          prior?.extraArgs && prior.extraArgs.length > 0
-            ? [...prior.extraArgs]
-            : undefined,
+          prior?.id === signature.id
+            ? prior.extraArgs && prior.extraArgs.length > 0
+              ? [...prior.extraArgs]
+              : undefined
+            : signature.extraArgs && signature.extraArgs.length > 0
+              ? [...signature.extraArgs]
+              : undefined,
       };
     },
   );
 
   return [...nextManagedAgents, ...userDefinedAgents];
+}
+
+function retargetManagedCatalogEntries(
+  config: AgentsConfig,
+): AgentConfigEntry[] | undefined {
+  const catalogRoster = buildCatalogRoster();
+  const catalogById = new Map(
+    catalogRoster.map((signature) => [signature.id, signature]),
+  );
+  const catalogIds = new Set(catalogById.keys());
+
+  const entriesById = new Map<string, AgentConfigEntry>();
+  for (const entry of config.agents) {
+    if (entriesById.has(entry.id)) {
+      return undefined;
+    }
+    entriesById.set(entry.id, entry);
+  }
+
+  for (const signature of catalogRoster) {
+    const existing = entriesById.get(signature.id);
+    if (
+      !existing ||
+      existing.provider !== signature.provider ||
+      existing.model !== signature.model
+    ) {
+      return undefined;
+    }
+  }
+
+  const managedEntries: AgentConfigEntry[] = catalogRoster.map((signature) => {
+    const existing = entriesById.get(signature.id);
+    const binary = existing?.binary ?? "";
+    return {
+      id: signature.id,
+      provider: signature.provider,
+      model: signature.model,
+      enabled: existing?.enabled === false ? false : true,
+      binary,
+      extraArgs:
+        existing?.extraArgs && existing.extraArgs.length > 0
+          ? [...existing.extraArgs]
+          : signature.extraArgs && signature.extraArgs.length > 0
+            ? [...signature.extraArgs]
+            : undefined,
+    };
+  });
+
+  const userDefinedEntries = config.agents.filter(
+    (entry) => !catalogIds.has(entry.id),
+  );
+
+  return [...managedEntries, ...userDefinedEntries];
 }
