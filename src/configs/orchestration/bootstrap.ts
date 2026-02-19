@@ -62,7 +62,7 @@ export function serializeDefaultOrchestrationYaml(
 }
 
 function formatYamlScalar(value: string): string {
-  if (/^[a-z0-9_-]{1,32}$/u.test(value)) {
+  if (/^[a-z0-9_-]{1,64}$/u.test(value)) {
     return value;
   }
   const escaped = value.replaceAll('"', '\\"');

@@ -20,7 +20,7 @@ Top-level structure:
 
 Each agent entry:
 
-- `id` (required) - unique identifier (max 32 chars); lowercase letters, digits, `_`, `-`.
+- `id` (required) - unique identifier (max 64 chars); lowercase letters, digits, `_`, `-`.
 - `provider` (required) - `claude`, `codex`, or `gemini`.
 - `model` (required) - model identifier, e.g. `claude-opus-4-6`, `gpt-5.3-codex`, `gemini-2.5-pro`.
 - `enabled` (optional, default `true`) - set `false` to disable.

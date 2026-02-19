@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-export const agentIdSchema = z.string().regex(/^[a-z0-9_-]{1,32}$/u, {
-  message: "Agent id must match /^[a-z0-9_-]{1,32}$/",
+export const agentIdSchema = z.string().regex(/^[a-z0-9_-]{1,64}$/u, {
+  message: "Agent id must match /^[a-z0-9_-]{1,64}$/",
 });
 export type AgentId = z.infer<typeof agentIdSchema>;
 
