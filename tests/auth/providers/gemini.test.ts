@@ -72,7 +72,10 @@ describe("geminiAuthProvider.stage", () => {
       const sandboxHome = join(agentRoot, SANDBOX_DIRNAME);
       const sandboxGemini = join(sandboxHome, ".gemini");
       expect(stageResult.sandboxPath).toBe(sandboxHome);
-      expect(stageResult.env).toEqual({ HOME: sandboxHome });
+      expect(stageResult.env.HOME).toBe(sandboxHome);
+      expect(stageResult.env.TMPDIR).toBe(join(sandboxHome, "tmp"));
+      expect(stageResult.env.TEMP).toBe(stageResult.env.TMPDIR);
+      expect(stageResult.env.TMP).toBe(stageResult.env.TMPDIR);
 
       await expect(access(sandboxGemini)).resolves.toBeUndefined();
       const oauthPath = join(sandboxGemini, "oauth_creds.json");
@@ -177,7 +180,10 @@ describe("geminiAuthProvider optional files", () => {
         },
       });
 
-      expect(stageResult.env).toEqual({ HOME: stageResult.sandboxPath });
+      expect(stageResult.env.HOME).toBe(stageResult.sandboxPath);
+      expect(stageResult.env.TMPDIR).toBe(join(stageResult.sandboxPath, "tmp"));
+      expect(stageResult.env.TEMP).toBe(stageResult.env.TMPDIR);
+      expect(stageResult.env.TMP).toBe(stageResult.env.TMPDIR);
       const sandboxGemini = join(stageResult.sandboxPath, ".gemini");
       await expect(
         access(join(sandboxGemini, "installation_id")),
@@ -303,7 +309,10 @@ describe("geminiAuthProvider API key mode", () => {
 
       expect(stageResult.env.GEMINI_API_KEY).toBe("test-api-key");
       expect(stageResult.env.GOOGLE_API_KEY).toBe("test-api-key");
-      expect(stageResult.env.HOME).toBeDefined();
+      expect(stageResult.env.HOME).toBe(stageResult.sandboxPath);
+      expect(stageResult.env.TMPDIR).toBe(join(stageResult.sandboxPath, "tmp"));
+      expect(stageResult.env.TEMP).toBe(stageResult.env.TMPDIR);
+      expect(stageResult.env.TMP).toBe(stageResult.env.TMPDIR);
     } finally {
       if (previousKey === undefined) {
         delete process.env.GEMINI_API_KEY;

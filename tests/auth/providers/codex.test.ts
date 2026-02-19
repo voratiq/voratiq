@@ -56,6 +56,9 @@ describe("codexAuthProvider.stage", () => {
       expect(stageResult.sandboxPath).toBe(sandboxHome);
       expect(stageResult.env.CODEX_HOME).toBe(sandboxCodex);
       expect(stageResult.env.HOME).toBe(sandboxHome);
+      expect(stageResult.env.TMPDIR).toBe(join(sandboxHome, "tmp"));
+      expect(stageResult.env.TEMP).toBe(stageResult.env.TMPDIR);
+      expect(stageResult.env.TMP).toBe(stageResult.env.TMPDIR);
 
       await expect(access(sandboxCodex)).resolves.toBeUndefined();
       const stagedAuthPath = join(sandboxCodex, "auth.json");

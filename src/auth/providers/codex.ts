@@ -66,6 +66,7 @@ export const codexAuthProvider: AuthProvider = {
       codex: [".codex"],
       logs: ["Library", "Logs", "Codex"],
       support: ["Library", "Application Support", "Codex"],
+      tmp: ["tmp"],
     });
     await ensureDirectories(Object.values(sandboxPaths));
 
@@ -96,6 +97,9 @@ export const codexAuthProvider: AuthProvider = {
 
     const envResult = composeSandboxEnvResult(sandboxPaths.home, {
       CODEX_HOME: sandboxPaths.codex,
+      TMPDIR: sandboxPaths.tmp,
+      TEMP: sandboxPaths.tmp,
+      TMP: sandboxPaths.tmp,
     });
 
     return envResult;
