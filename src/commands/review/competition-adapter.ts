@@ -699,7 +699,10 @@ function assertNoCandidateIdentityLeak(options: {
     if (!token) {
       continue;
     }
-    if (promptLower.includes(token) || manifestLower.includes(token)) {
+    if (
+      containsBoundedToken(promptLower, token) ||
+      containsBoundedToken(manifestLower, token)
+    ) {
       leaks.push(token);
     }
   }
@@ -712,6 +715,15 @@ function assertNoCandidateIdentityLeak(options: {
         .join(", ")}${leaks.length > 5 ? ", ..." : ""}`,
     ]);
   }
+}
+
+function containsBoundedToken(text: string, token: string): boolean {
+  if (!token) {
+    return false;
+  }
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(?<![a-z0-9_-])${escaped}(?![a-z0-9_-])`, "iu");
+  return pattern.test(text);
 }
 
 function toRepoRelativeOrThrow(root: string, absolutePath: string): string {

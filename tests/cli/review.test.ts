@@ -596,6 +596,40 @@ describe("voratiq review", () => {
       });
     });
 
+    it("allows blinded review when reviewer id is a strict superset of a run candidate id", async () => {
+      await writeAgentsConfig(repoRoot, [
+        {
+          id: "gpt-5-3-codex-high",
+          provider: "codex",
+          model: "gpt-5.3-codex",
+          enabled: true,
+          binary: process.execPath,
+        },
+        {
+          id: "gpt-5-3-codex",
+          provider: "codex",
+          model: "gpt-5.3-codex",
+          enabled: true,
+          binary: process.execPath,
+        },
+      ]);
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-superset",
+        runAgentId: "gpt-5-3-codex",
+        runAgentModel: "gpt-5.3-codex",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+
+      await expect(
+        runReviewInRepo(repoRoot, {
+          runId: runRecord.runId,
+          agentId: "gpt-5-3-codex-high",
+        }),
+      ).resolves.toMatchObject({
+        agentId: "gpt-5-3-codex-high",
+      });
+    });
+
     it("resolves reviewer from orchestration when --agent is omitted", async () => {
       const runRecord = buildRunRecord({
         runId: "20251007-184454-vmtyf",
