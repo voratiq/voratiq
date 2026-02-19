@@ -211,6 +211,11 @@ const SUPPORTED_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     model: "gemini-2.5-flash",
   },
   {
+    id: "gemini-3-flash-preview",
+    provider: "gemini",
+    model: "gemini-3-flash-preview",
+  },
+  {
     id: "gemini-2-5-pro",
     provider: "gemini",
     model: "gemini-2.5-pro",
