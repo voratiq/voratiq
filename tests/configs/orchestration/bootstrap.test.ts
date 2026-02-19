@@ -145,4 +145,22 @@ describe("orchestration bootstrap generator", () => {
       "codex",
     ]);
   });
+
+  test("serializes 64-character agent ids without quotes", () => {
+    const agentId = "a".repeat(64);
+    const config: AgentsConfig = {
+      agents: [
+        {
+          id: agentId,
+          provider: "codex",
+          model: "gpt-5",
+          enabled: true,
+          binary: "/usr/local/bin/codex",
+        },
+      ],
+    };
+
+    const yaml = buildDefaultOrchestrationTemplate(config, "pro");
+    expect(yaml).toContain(`        - id: ${agentId}`);
+  });
 });
