@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 
 import {
   readReviewRecommendation,
@@ -477,48 +477,32 @@ interface AutoCommandActionOptions {
 
 export function createAutoCommand(): Command {
   return new Command("auto")
-    .description("Run agents and review results from an existing spec")
-    .requiredOption(
-      "--spec <path>",
-      "Path to an existing spec file to run and review",
+    .description(
+      "End-to-end pipeline to run agents, review results, and optionally apply",
     )
-    .option(
-      "--run-agent <agent-id>",
-      "Run-stage agent override (repeatable; preserves CLI order; overrides orchestration stage config)",
-      collectRunAgentOption,
-      [],
+    .requiredOption("--spec <path>", "Path to the spec file")
+    .addOption(
+      new Option(
+        "--run-agent <agent-id>",
+        "Override run-stage agents (repeatable)",
+      )
+        .default([], "")
+        .argParser(collectRunAgentOption),
     )
-    .option(
-      "--review-agent <agent-id>",
-      "Reviewer agent identifier override (overrides orchestration stage config)",
-    )
+    .option("--review-agent <agent-id>", "Override the review-stage agent")
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
       "--max-parallel <count>",
       "Maximum number of agents to run concurrently",
       parseMaxParallelOption,
     )
-    .option("--branch", "Checkout or create a branch named after the spec file")
+    .option("--branch", "Checkout or create a branch named after the spec")
     .option(
       "--apply",
-      "Apply the structured review recommendation after review completes",
+      "Apply the recommended agent's output after review",
       () => true,
     )
-    .option(
-      "--commit",
-      "When applying, commit immediately using `voratiq apply --commit` behavior",
-      () => true,
-    )
-    .addHelpText(
-      "after",
-      [
-        "",
-        "Agent resolution precedence (per stage):",
-        "  1) CLI override flag",
-        "  2) orchestration profile stage config (.voratiq/orchestration.yaml)",
-        "  3) fail fast (no implicit fallback)",
-      ].join("\n"),
-    )
+    .option("--commit", "Commit after applying (requires --apply)", () => true)
     .allowExcessArguments(false)
     .action(async (options: AutoCommandActionOptions) => {
       await runAutoCommand({

@@ -328,12 +328,10 @@ describe("voratiq review", () => {
       expect(result.body).toContain(
         "- `voratiq apply --run 20251007-184454-vmtyf --agent codex`",
       );
-      expect(result.body).toContain(`Full review here: ${result.outputPath}`);
+      expect(result.body).toContain(`Review: ${result.outputPath}`);
       expect(result.body).not.toContain("To integrate a solution:");
       expect(result.missingArtifacts).toEqual(["diff.patch"]);
-      expect(result.body).toContain(
-        "Warning: Missing artifacts: diff.patch. Review may be incomplete.",
-      );
+      expect(result.body).not.toContain("Warning: Missing artifacts:");
       expect(executeCompetitionWithAdapterMock).toHaveBeenCalledTimes(1);
       const hasReviewerCandidate = (
         executeCompetitionWithAdapterMock.mock.calls as unknown[]
@@ -831,7 +829,7 @@ describe("voratiq review", () => {
       expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
     });
 
-    it("prints a warning when run artifacts are missing", async () => {
+    it("omits missing-artifact warnings from transcript output", async () => {
       const runRecord = buildRunRecord({
         runId: "20251212-090000-zzz999",
         includeDiff: true,
@@ -845,9 +843,7 @@ describe("voratiq review", () => {
       });
 
       expect(result.missingArtifacts).toEqual(["diff.patch"]);
-      expect(result.body).toContain(
-        "Warning: Missing artifacts: diff.patch. Review may be incomplete.",
-      );
+      expect(result.body).not.toContain("Warning: Missing artifacts:");
     });
 
     it("preserves run lookup error shape when run is missing", async () => {

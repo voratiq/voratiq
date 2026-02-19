@@ -7,22 +7,15 @@ export function renderReviewTranscript(options: {
   missingArtifacts?: readonly string[];
   suppressHint?: boolean;
 }): string {
-  const { runId, outputPath, previewLines, missingArtifacts, suppressHint } =
-    options;
+  const { runId, outputPath, previewLines, suppressHint } = options;
 
   const sections: string[][] = [];
-
-  if (missingArtifacts && missingArtifacts.length > 0) {
-    sections.push([
-      `Warning: Missing artifacts: ${missingArtifacts.join(", ")}. Review may be incomplete.`,
-    ]);
-  }
 
   if (previewLines && previewLines.length > 0) {
     sections.push([...previewLines]);
   }
 
-  sections.push([`Full review here: ${outputPath}`]);
+  sections.push([`Review: ${outputPath}`]);
 
   const hint = suppressHint
     ? undefined

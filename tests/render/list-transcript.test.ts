@@ -3,7 +3,7 @@ import type { RunRecord } from "../../src/runs/records/types.js";
 import { createRunRecord } from "../support/factories/run-records.js";
 
 describe("renderListTranscript", () => {
-  it("renders the run list table followed by a review hint", () => {
+  it("renders the run list table", () => {
     const records: RunRecord[] = [
       buildRunRecord({
         runId: "20251016-133651-woeqr",
@@ -18,9 +18,7 @@ describe("renderListTranscript", () => {
     expect(output).toContain("STATUS");
     expect(output).toContain("SPEC");
     expect(output).toContain("20251016-133651-woeqr");
-    expect(output).toContain(
-      "To review a run in more detail:\n  voratiq review --run <run-id> --agent <agent-id>",
-    );
+    expect(output).not.toContain("To review a run in more detail:");
   });
 
   it("omits the hint when no records are provided", () => {
