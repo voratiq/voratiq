@@ -1,8 +1,8 @@
 import {
-  DEFAULT_AGENT_DEFAULTS,
   getAgentDefaultId,
   getSupportedAgentDefaults,
   LITE_AGENT_DEFAULTS,
+  PRO_AGENT_DEFAULTS,
 } from "../../src/configs/agents/defaults.js";
 import {
   buildAgentsTemplate,
@@ -15,7 +15,7 @@ import {
 describe("buildDefaultAgentsTemplate", () => {
   it("includes expected preset ids", () => {
     const yaml = buildDefaultAgentsTemplate();
-    for (const agentDefault of DEFAULT_AGENT_DEFAULTS) {
+    for (const agentDefault of PRO_AGENT_DEFAULTS) {
       const id = getAgentDefaultId(agentDefault);
       expect(yaml).toContain(`id: ${id}`);
     }

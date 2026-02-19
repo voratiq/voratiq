@@ -97,7 +97,7 @@ function generateAgentDefaults(
   }));
 }
 
-const SUPPORTED_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
+const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
   {
     id: "claude-haiku-4-5-20251001",
     provider: "claude",
@@ -107,6 +107,11 @@ const SUPPORTED_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     id: "claude-sonnet-4-5-20250929",
     provider: "claude",
     model: "claude-sonnet-4-5-20250929",
+  },
+  {
+    id: "claude-sonnet-4-6",
+    provider: "claude",
+    model: "claude-sonnet-4-6",
   },
   {
     id: "claude-opus-4-5-20251101",
@@ -119,14 +124,14 @@ const SUPPORTED_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     model: "claude-opus-4-6",
   },
   {
-    id: "claude-sonnet-4-6",
-    provider: "claude",
-    model: "claude-sonnet-4-6",
-  },
-  {
     id: "gpt-5-codex",
     provider: "codex",
     model: "gpt-5-codex",
+  },
+  {
+    id: "gpt-5-1-codex-mini",
+    provider: "codex",
+    model: "gpt-5.1-codex-mini",
   },
   {
     id: "gpt-5-1-codex",
@@ -143,11 +148,6 @@ const SUPPORTED_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     provider: "codex",
     model: "gpt-5.1-codex-max",
     extraArgs: ["--config", "model_reasoning_effort=xhigh"],
-  },
-  {
-    id: "gpt-5-1-codex-mini",
-    provider: "codex",
-    model: "gpt-5.1-codex-mini",
   },
   {
     id: "gpt-5-2",
@@ -206,9 +206,14 @@ const SUPPORTED_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     extraArgs: ["--config", "model_reasoning_effort=xhigh"],
   },
   {
-    id: "gemini-3-pro-preview",
+    id: "gemini-2-5-flash",
     provider: "gemini",
-    model: "gemini-3-pro-preview",
+    model: "gemini-2.5-flash",
+  },
+  {
+    id: "gemini-3-flash-preview",
+    provider: "gemini",
+    model: "gemini-3-flash-preview",
   },
   {
     id: "gemini-2-5-pro",
@@ -216,9 +221,9 @@ const SUPPORTED_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     model: "gemini-2.5-pro",
   },
   {
-    id: "gemini-2-5-flash",
+    id: "gemini-3-pro-preview",
     provider: "gemini",
-    model: "gemini-2.5-flash",
+    model: "gemini-3-pro-preview",
   },
 ] as const;
 
@@ -258,7 +263,7 @@ const LITE_AGENT_PRESET_ENTRIES: readonly AgentCatalogEntry[] = [
   },
 ] as const;
 
-export const DEFAULT_AGENT_DEFAULTS = generateAgentDefaults(
+export const PRO_AGENT_DEFAULTS = generateAgentDefaults(
   PRO_AGENT_PRESET_ENTRIES,
 );
 
@@ -266,12 +271,12 @@ export const LITE_AGENT_DEFAULTS = generateAgentDefaults(
   LITE_AGENT_PRESET_ENTRIES,
 );
 
-export const SUPPORTED_AGENT_DEFAULTS = generateAgentDefaults(
-  SUPPORTED_AGENT_CATALOG_ENTRIES,
+export const BUILTIN_AGENT_DEFAULTS = generateAgentDefaults(
+  DEFAULT_AGENT_CATALOG_ENTRIES,
 );
 
 interface AgentCatalogGuardrailInput {
-  readonly supportedCatalog: readonly AgentCatalogEntry[];
+  readonly builtinCatalog: readonly AgentCatalogEntry[];
   readonly presetCatalogs: readonly {
     readonly presetName: Exclude<AgentPreset, "manual">;
     readonly catalog: readonly AgentCatalogEntry[];
@@ -281,7 +286,7 @@ interface AgentCatalogGuardrailInput {
 export function assertAgentCatalogGuardrails(
   input: AgentCatalogGuardrailInput,
 ): void {
-  const supportedDefaults = generateAgentDefaults(input.supportedCatalog);
+  const supportedDefaults = generateAgentDefaults(input.builtinCatalog);
   const byId = new Map<string, AgentDefault>();
 
   for (const agentDefault of supportedDefaults) {
@@ -344,7 +349,7 @@ function stringListsEqual(
 }
 
 assertAgentCatalogGuardrails({
-  supportedCatalog: SUPPORTED_AGENT_CATALOG_ENTRIES,
+  builtinCatalog: DEFAULT_AGENT_CATALOG_ENTRIES,
   presetCatalogs: [
     { presetName: "pro", catalog: PRO_AGENT_PRESET_ENTRIES },
     { presetName: "lite", catalog: LITE_AGENT_PRESET_ENTRIES },
@@ -386,13 +391,11 @@ function buildAgentDefaultsByReference(
   return map;
 }
 
-const AGENT_DEFAULTS_BY_PROVIDER = buildAgentDefaultsByProvider(
-  DEFAULT_AGENT_DEFAULTS,
-);
+const AGENT_DEFAULTS_BY_PROVIDER =
+  buildAgentDefaultsByProvider(PRO_AGENT_DEFAULTS);
 
-const AGENT_DEFAULTS_BY_REFERENCE = buildAgentDefaultsByReference(
-  DEFAULT_AGENT_DEFAULTS,
-);
+const AGENT_DEFAULTS_BY_REFERENCE =
+  buildAgentDefaultsByReference(PRO_AGENT_DEFAULTS);
 
 export function getDefaultAgentIdByProvider(
   provider: string,
@@ -411,7 +414,7 @@ export function getAgentDefaultsForPreset(
 ): readonly AgentDefault[] {
   switch (preset) {
     case "pro":
-      return DEFAULT_AGENT_DEFAULTS;
+      return PRO_AGENT_DEFAULTS;
     case "lite":
       return LITE_AGENT_DEFAULTS;
     case "manual":
@@ -422,7 +425,7 @@ export function getAgentDefaultsForPreset(
 }
 
 export function getSupportedAgentDefaults(): readonly AgentDefault[] {
-  return SUPPORTED_AGENT_DEFAULTS;
+  return BUILTIN_AGENT_DEFAULTS;
 }
 
 function cloneAgentDefault(agentDefault: AgentDefault): AgentDefault {

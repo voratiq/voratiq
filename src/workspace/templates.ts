@@ -15,13 +15,7 @@ import {
 } from "../configs/evals/defaults.js";
 import { listSandboxProviderDefaults } from "../configs/sandbox/defaults.js";
 export type { AgentPreset } from "../configs/agents/defaults.js";
-export {
-  AGENT_PRESET_CHOICES,
-  DEFAULT_AGENT_DEFAULTS,
-  getAgentDefaultId,
-  MODEL_PLACEHOLDER,
-  sanitizeAgentIdFromModel,
-} from "../configs/agents/defaults.js";
+export { AGENT_PRESET_CHOICES } from "../configs/agents/defaults.js";
 
 export type VendorTemplate = AgentDefault;
 
