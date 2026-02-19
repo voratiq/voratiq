@@ -7,6 +7,7 @@ import {
   TERMINAL_REVIEW_STATUSES,
 } from "../../status/index.js";
 import { assertRepoRelativePath } from "../../utils/path.js";
+import { BLINDED_ALIAS_PATTERN } from "../candidates.js";
 
 export type { ReviewStatus };
 export { reviewStatusSchema, TERMINAL_REVIEW_STATUSES };
@@ -27,6 +28,12 @@ const repoRelativePathSchema = z
   .string()
   .superRefine((value, ctx) => validateRepoRelativePath(value, ctx));
 
+const blindedAliasSchema = z.string().regex(BLINDED_ALIAS_PATTERN, {
+  message: "Blinded alias must match /^r_[a-z0-9]{10,16}$/",
+});
+
+const blindedAliasMapSchema = z.record(blindedAliasSchema, agentIdSchema);
+
 export const reviewRecordSchema = z.object({
   sessionId: z.string(),
   runId: z.string(),
@@ -35,6 +42,12 @@ export const reviewRecordSchema = z.object({
   status: reviewStatusSchema,
   agentId: agentIdSchema,
   outputPath: repoRelativePathSchema,
+  blinded: z
+    .object({
+      enabled: z.literal(true),
+      aliasMap: blindedAliasMapSchema,
+    })
+    .optional(),
   error: z.string().nullable().optional(),
 });
 

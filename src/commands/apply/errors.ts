@@ -51,6 +51,61 @@ export class ApplyAgentNotFoundError extends ApplyError {
   }
 }
 
+export class ApplyAgentSelectorUnresolvedError extends ApplyError {
+  constructor(options: {
+    runId: string;
+    selector: string;
+    canonicalAgentIds: readonly string[];
+    aliases: readonly string[];
+  }) {
+    const { runId, selector, canonicalAgentIds, aliases } = options;
+    const canonicalPreview = canonicalAgentIds.slice(0, 20).join(", ");
+    const aliasPreview = aliases.slice(0, 20).join(", ");
+    super(
+      `Agent selector "${selector}" did not resolve for run ${runId}.`,
+      [
+        canonicalAgentIds.length > 0
+          ? `Canonical agent ids: ${canonicalPreview}${
+              canonicalAgentIds.length > 20 ? ", ..." : ""
+            }`
+          : "Canonical agent ids: (none recorded)",
+        aliases.length > 0
+          ? `Blinded aliases: ${aliasPreview}${aliases.length > 20 ? ", ..." : ""}`
+          : "Blinded aliases: (none found)",
+      ],
+      [
+        "Pass a canonical agent id or a blinded alias from a review of this run.",
+      ],
+    );
+    this.name = "ApplyAgentSelectorUnresolvedError";
+  }
+}
+
+export class ApplyAgentSelectorAmbiguousError extends ApplyError {
+  constructor(options: {
+    runId: string;
+    selector: string;
+    matches: Array<{ reviewId: string; agentId: string }>;
+  }) {
+    const { runId, selector, matches } = options;
+    const lines = matches
+      .slice(0, 10)
+      .map((match) => `- ${match.reviewId}: ${match.agentId}`);
+    super(
+      `Blinded alias "${selector}" is ambiguous for run ${runId}.`,
+      [
+        "This alias appears in multiple review sessions with different resolutions:",
+        ...lines,
+        matches.length > 10 ? "- ..." : "",
+      ].filter((line) => line.length > 0),
+      [
+        "Re-run with a canonical agent id, or consult the relevant review record to identify the intended candidate.",
+      ],
+    );
+    this.name = "ApplyAgentSelectorAmbiguousError";
+  }
+}
+
 export class ApplyAgentDiffNotRecordedError extends ApplyError {
   constructor(
     public readonly runId: string,

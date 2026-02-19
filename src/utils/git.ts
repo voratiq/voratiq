@@ -109,6 +109,34 @@ export async function createWorktree(
   );
 }
 
+export interface CreateDetachedWorktreeOptions {
+  root: string;
+  worktreePath: string;
+  baseRevision: string;
+}
+
+export async function createDetachedWorktree(
+  options: CreateDetachedWorktreeOptions,
+): Promise<void> {
+  const { root, worktreePath, baseRevision } = options;
+  await runGitCommand(
+    ["worktree", "add", "--detach", worktreePath, baseRevision],
+    {
+      cwd: root,
+    },
+  );
+}
+
+export async function removeWorktree(options: {
+  root: string;
+  worktreePath: string;
+}): Promise<void> {
+  const { root, worktreePath } = options;
+  await runGitCommand(["worktree", "remove", "--force", worktreePath], {
+    cwd: root,
+  });
+}
+
 export async function gitAddAll(cwd: string): Promise<void> {
   await runGitCommand(["add", "-A"], { cwd });
 }

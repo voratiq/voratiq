@@ -183,6 +183,15 @@ voratiq review --run <run-id> [--agent <agent-id>] [--profile <name>]
 
 Invokes the specified agent in a sandbox to analyze artifacts from a completed run and write a review.
 
+Review artifacts are written under:
+`.voratiq/reviews/sessions/<review-id>/<reviewer-agent-id>/artifacts/`
+
+- `review.md`: blinded narrative review content
+- `recommendation.json`: machine-readable recommendation containing:
+  - `preferred_agents`: blinded candidate ids (for example, `r_...`) from the reviewer
+  - `resolved_preferred_agents`: canonical run agent ids resolved by Voratiq
+  - `rationale`, `next_actions`
+
 ### Examples
 
 ```bash

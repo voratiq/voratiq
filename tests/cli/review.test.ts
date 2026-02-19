@@ -1,5 +1,12 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -40,6 +47,8 @@ const ensureSandboxDependenciesMock = jest.mocked(ensureSandboxDependencies);
 const executeCompetitionWithAdapterMock = jest.mocked(
   executeCompetitionWithAdapter,
 );
+
+let currentTestBaseRevisionSha: string | undefined;
 
 jest.mock("../../src/agents/runtime/harness.js", () => ({
   runSandboxedAgent: jest.fn(),
@@ -197,6 +206,13 @@ describe("voratiq review", () => {
     beforeEach(async () => {
       repoRoot = await mkdtemp(join(tmpdir(), "voratiq-review-"));
       await initGitRepository(repoRoot);
+      const baseSha = await execFileAsync("git", ["rev-parse", "HEAD"], {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+      currentTestBaseRevisionSha = baseSha.stdout.trim();
+      await mkdir(join(repoRoot, "specs"), { recursive: true });
+      await writeFile(join(repoRoot, "specs", "sample.md"), "# Spec\n", "utf8");
       await createWorkspace(repoRoot);
       await writeAgentsConfig(repoRoot, [
         {
@@ -228,6 +244,13 @@ describe("voratiq review", () => {
           REVIEW_ARTIFACT_INFO_FILENAME,
         );
         seenManifestPayload = await readFile(seenManifestPath, "utf8");
+        const manifest = JSON.parse(seenManifestPayload) as {
+          run?: { runId?: string };
+          candidates?: Array<{ candidateId?: string }>;
+        };
+        const runId = manifest.run?.runId ?? "unknown-run";
+        const candidateId =
+          manifest.candidates?.[0]?.candidateId ?? "r_invalidcandidate";
         await mkdir(dirname(outputPath), { recursive: true });
         await writeFile(
           outputPath,
@@ -235,10 +258,10 @@ describe("voratiq review", () => {
             "# Review",
             "",
             "## Recommendation",
-            "**Preferred Agent(s)**: reviewer",
-            "**Rationale**: Looks good.",
+            `**Preferred Candidate(s)**: ${candidateId}`,
+            `**Rationale**: Looks good via ${candidateId}.`,
             "**Next Actions**:",
-            "voratiq apply --run 20251007-184454-vmtyf --agent reviewer",
+            `voratiq apply --run ${runId} --agent ${candidateId}`,
             "",
           ].join("\n"),
           "utf8",
@@ -248,10 +271,12 @@ describe("voratiq review", () => {
           `${JSON.stringify(
             {
               version: 1,
-              preferred_agents: ["reviewer"],
-              rationale: "Looks good.",
+              preferred_agents: [candidateId],
+              resolved_preferred_agents: ["bogus-agent"],
+              rationale: `Looks good via ${candidateId}.`,
               next_actions: [
-                "voratiq apply --run 20251007-184454-vmtyf --agent reviewer",
+                `- \`voratiq apply --run ${runId} --agent ${candidateId}\``,
+                `note: keep ${candidateId} for traceability`,
               ],
             },
             null,
@@ -279,6 +304,7 @@ describe("voratiq review", () => {
 
     afterEach(async () => {
       await rm(repoRoot, { recursive: true, force: true });
+      currentTestBaseRevisionSha = undefined;
     });
 
     it("runs the reviewer agent and persists review artifacts", async () => {
@@ -294,11 +320,20 @@ describe("voratiq review", () => {
 
       expect(result.body).toContain("```markdown");
       expect(result.body).toContain("## Recommendation");
-      expect(result.body).toContain("**Preferred Agent(s)**: reviewer");
+      expect(result.body).not.toContain("## Resolved Recommendation");
+      expect(result.body).toContain("**Preferred Candidate(s)**: codex");
+      expect(result.body).toContain("**Preferred Candidate(s)**:");
+      expect(result.body).toContain("**Rationale**: Looks good via codex.");
       expect(result.body).toContain("**Next Actions**:");
+      expect(result.body).toContain(
+        "- `voratiq apply --run 20251007-184454-vmtyf --agent codex`",
+      );
       expect(result.body).toContain(`Full review here: ${result.outputPath}`);
       expect(result.body).not.toContain("To integrate a solution:");
-      expect(result.missingArtifacts).toEqual([]);
+      expect(result.missingArtifacts).toEqual(["diff.patch"]);
+      expect(result.body).toContain(
+        "Warning: Missing artifacts: diff.patch. Review may be incomplete.",
+      );
       expect(executeCompetitionWithAdapterMock).toHaveBeenCalledTimes(1);
       const hasReviewerCandidate = (
         executeCompetitionWithAdapterMock.mock.calls as unknown[]
@@ -326,6 +361,29 @@ describe("voratiq review", () => {
       });
       expect(hasReviewerCandidate).toBe(true);
 
+      const sandboxInvocation = runSandboxedAgentMock.mock.calls.at(-1)?.[0];
+      expect(sandboxInvocation).toBeDefined();
+      const extraReadProtectedPaths =
+        sandboxInvocation?.extraReadProtectedPaths ?? [];
+      const extraWriteProtectedPaths =
+        sandboxInvocation?.extraWriteProtectedPaths ?? [];
+      expect(extraReadProtectedPaths).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/\/\.voratiq\/runs$/u),
+          expect.stringMatching(/\/\.voratiq\/specs$/u),
+          expect.stringMatching(/\/\.voratiq\/agents\.yaml$/u),
+          expect.stringMatching(/\/\.voratiq\/orchestration\.yaml$/u),
+        ]),
+      );
+      expect(extraWriteProtectedPaths).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/\/\.voratiq\/runs$/u),
+          expect.stringMatching(/\/\.voratiq\/specs$/u),
+          expect.stringMatching(/\/\.voratiq\/agents\.yaml$/u),
+          expect.stringMatching(/\/\.voratiq\/orchestration\.yaml$/u),
+        ]),
+      );
+
       expect(seenManifestPath).toBeDefined();
       expect(seenManifestPath).toContain(
         join(
@@ -341,15 +399,24 @@ describe("voratiq review", () => {
       expect(seenManifestPayload).toBeDefined();
       const manifest = JSON.parse(seenManifestPayload ?? "{}") as {
         run: { runId: string };
-        agents: Array<{ agentId: string }>;
+        candidates: Array<{ candidateId: string }>;
       };
       expect(manifest.run.runId).toBe(runRecord.runId);
-      expect(manifest.agents.map((agent) => agent.agentId)).toEqual(["codex"]);
+      expect(manifest.candidates).toHaveLength(1);
+      expect(manifest.candidates[0]?.candidateId).toMatch(
+        /^r_[a-z0-9]{10,16}$/u,
+      );
 
       const reviewOutputAbsolute = join(repoRoot, result.outputPath);
       await expect(readFile(reviewOutputAbsolute, "utf8")).resolves.toContain(
         "## Recommendation",
       );
+      await expect(
+        readFile(reviewOutputAbsolute, "utf8"),
+      ).resolves.not.toContain("## Resolved Recommendation");
+      await expect(
+        readFile(reviewOutputAbsolute, "utf8"),
+      ).resolves.not.toContain("codex");
       const recommendationOutputAbsolute = join(
         dirname(reviewOutputAbsolute),
         REVIEW_RECOMMENDATION_FILENAME,
@@ -360,11 +427,64 @@ describe("voratiq review", () => {
       );
       const recommendation = parseReviewRecommendation(recommendationPayload);
       expect(recommendation.version).toBe(1);
-      expect(recommendation.preferred_agents).toEqual(["reviewer"]);
-      expect(recommendation.rationale).toBe("Looks good.");
-      expect(recommendation.next_actions).toEqual([
-        "voratiq apply --run 20251007-184454-vmtyf --agent reviewer",
+      expect(recommendation.preferred_agents).toEqual([
+        expect.stringMatching(/^r_[a-z0-9]{10,16}$/u),
       ]);
+      expect(recommendation.resolved_preferred_agents).toEqual(["codex"]);
+      expect(recommendation.resolved_preferred_agents).not.toContain(
+        "bogus-agent",
+      );
+      expect(recommendation.rationale).toMatch(
+        /^Looks good via r_[a-z0-9]{10,16}\.$/u,
+      );
+      expect(recommendation.next_actions).toEqual([
+        expect.stringMatching(
+          /^- `voratiq apply --run 20251007-184454-vmtyf --agent r_[a-z0-9]{10,16}`$/u,
+        ),
+        expect.stringMatching(
+          /^note: keep r_[a-z0-9]{10,16} for traceability$/u,
+        ),
+      ]);
+      const blindedAlias = recommendation.preferred_agents[0];
+      expect(blindedAlias).toBeDefined();
+      expect(result.body).toContain(
+        `note: keep ${blindedAlias} for traceability`,
+      );
+      expect(result.body).not.toContain("note: keep codex for traceability");
+
+      const recommendationArtifactFiles = (
+        await readdir(dirname(reviewOutputAbsolute))
+      )
+        .filter(
+          (file) =>
+            file === "review.md" ||
+            file === "review.blinded.md" ||
+            file === "review-resolution.json" ||
+            file === "recommendation.json",
+        )
+        .sort();
+      expect(recommendationArtifactFiles).toEqual([
+        "recommendation.json",
+        "review.md",
+      ]);
+      await expect(
+        readFile(
+          join(dirname(reviewOutputAbsolute), "review.blinded.md"),
+          "utf8",
+        ),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(
+        readFile(
+          join(dirname(reviewOutputAbsolute), "review-resolution.json"),
+          "utf8",
+        ),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(
+        readFile(
+          join(dirname(reviewOutputAbsolute), "recommendation-resolved.json"),
+          "utf8",
+        ),
+      ).rejects.toMatchObject({ code: "ENOENT" });
 
       const recordPath = join(
         repoRoot,
@@ -380,12 +500,22 @@ describe("voratiq review", () => {
         status: string;
         outputPath: string;
         completedAt?: string;
+        blinded?: {
+          enabled?: boolean;
+          aliasMap?: Record<string, string>;
+        };
       };
       expect(record.runId).toBe(runRecord.runId);
       expect(record.agentId).toBe("reviewer");
       expect(record.status).toBe("succeeded");
       expect(record.outputPath).toBe(result.outputPath);
       expect(record.completedAt).toEqual(expect.any(String));
+      expect(record.blinded?.enabled).toBe(true);
+      expect(record.blinded?.aliasMap).toBeDefined();
+      expect(Object.keys(record.blinded?.aliasMap ?? {})).toHaveLength(1);
+      expect(Object.values(record.blinded?.aliasMap ?? {})).toEqual(["codex"]);
+      expect(record.blinded).not.toHaveProperty("blindedOutputPath");
+      expect(record.blinded).not.toHaveProperty("resolutionPath");
 
       const indexPath = join(repoRoot, ".voratiq", "reviews", "index.json");
       const indexPayload = JSON.parse(await readFile(indexPath, "utf8")) as {
@@ -403,6 +533,67 @@ describe("voratiq review", () => {
       await expect(
         readFile(seenManifestPath ?? "", "utf8"),
       ).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("allows blinded review when reviewer/provider tokens overlap with run candidates", async () => {
+      await writeAgentsConfig(repoRoot, [
+        {
+          id: "gpt-5-1-codex-mini",
+          provider: "codex",
+          model: "gpt-5.1-codex-mini",
+          enabled: true,
+          binary: process.execPath,
+        },
+        {
+          id: "gpt-5-2-codex",
+          provider: "codex",
+          model: "gpt-5.2-codex",
+          enabled: true,
+          binary: process.execPath,
+        },
+      ]);
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-overlap",
+        runAgentId: "gpt-5-2-codex",
+        runAgentModel: "gpt-5.2-codex",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+
+      await expect(
+        runReviewInRepo(repoRoot, {
+          runId: runRecord.runId,
+          agentId: "gpt-5-1-codex-mini",
+        }),
+      ).resolves.toMatchObject({
+        agentId: "gpt-5-1-codex-mini",
+      });
+    });
+
+    it("allows blinded review when reviewer agent id equals a run candidate id", async () => {
+      await writeAgentsConfig(repoRoot, [
+        {
+          id: "gpt-5-1-codex-mini",
+          provider: "codex",
+          model: "gpt-5.1-codex-mini",
+          enabled: true,
+          binary: process.execPath,
+        },
+      ]);
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-same-agent",
+        runAgentId: "gpt-5-1-codex-mini",
+        runAgentModel: "gpt-5.1-codex-mini",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+
+      await expect(
+        runReviewInRepo(repoRoot, {
+          runId: runRecord.runId,
+          agentId: "gpt-5-1-codex-mini",
+        }),
+      ).resolves.toMatchObject({
+        agentId: "gpt-5-1-codex-mini",
+      });
     });
 
     it("resolves reviewer from orchestration when --agent is omitted", async () => {
@@ -619,9 +810,9 @@ describe("voratiq review", () => {
         agentId: "reviewer",
       });
 
-      expect(result.missingArtifacts).toEqual(["diff.patch", "chat.jsonl"]);
+      expect(result.missingArtifacts).toEqual(["diff.patch"]);
       expect(result.body).toContain(
-        "Warning: Missing artifacts: diff.patch, chat.jsonl. Review may be incomplete.",
+        "Warning: Missing artifacts: diff.patch. Review may be incomplete.",
       );
     });
 
@@ -907,13 +1098,24 @@ function buildRunRecord(options: {
   runId: string;
   includeDiff?: boolean;
   includeChatJsonl?: boolean;
+  baseRevisionSha?: string;
+  runAgentId?: string;
+  runAgentModel?: string;
 }): RunRecord {
-  const { runId, includeDiff = false, includeChatJsonl = false } = options;
+  const {
+    runId,
+    includeDiff = false,
+    includeChatJsonl = false,
+    baseRevisionSha,
+    runAgentId = "codex",
+    runAgentModel = "gpt-5.2-codex",
+  } = options;
 
   const artifacts = includeDiff || includeChatJsonl ? {} : undefined;
 
   const agentRecord = createAgentInvocationRecord({
-    agentId: "codex",
+    agentId: runAgentId,
+    model: runAgentModel,
     status: "succeeded",
     evals: [],
     artifacts: {
@@ -933,5 +1135,11 @@ function buildRunRecord(options: {
     agents: [agentRecord],
     status: "succeeded",
     deletedAt: null,
+    baseRevisionSha:
+      baseRevisionSha ??
+      currentTestBaseRevisionSha ??
+      (() => {
+        throw new Error("Missing test base revision sha.");
+      })(),
   });
 }

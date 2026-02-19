@@ -9,6 +9,7 @@ import * as applyCli from "../../src/cli/apply.js";
 import { createAutoCommand, runAutoCommand } from "../../src/cli/auto.js";
 import * as reviewCli from "../../src/cli/review.js";
 import * as runCli from "../../src/cli/run.js";
+import { appendReviewRecord } from "../../src/reviews/records/persistence.js";
 import { HintedError } from "../../src/utils/errors.js";
 import { REVIEW_RECOMMENDATION_FILENAME } from "../../src/workspace/structure.js";
 
@@ -527,7 +528,7 @@ describe("voratiq auto", () => {
     expect(runApplyCommandMock).not.toHaveBeenCalled();
   });
 
-  it("applies recommendation from recommendation.json", async () => {
+  it("prefers resolved_preferred_agents from recommendation.json", async () => {
     const stdout: string[] = [];
 
     stdoutSpy = jest
@@ -559,7 +560,8 @@ describe("voratiq auto", () => {
         ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
         {
           version: 1,
-          preferred_agents: ["agent-good"],
+          preferred_agents: ["wrong-agent"],
+          resolved_preferred_agents: ["agent-good"],
           rationale: "Best option",
           next_actions: ["voratiq apply --run run-123 --agent agent-good"],
         },
@@ -583,6 +585,98 @@ describe("voratiq auto", () => {
     const output = stripAnsi(stdout.join(""));
     expect(output).toContain("APPLY BODY");
     expect(output).toContain("Auto SUCCEEDED");
+  });
+
+  it("falls back to preferred_agents when resolved_preferred_agents is missing", async () => {
+    runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
+    runReviewCommandMock.mockResolvedValue({
+      reviewId: "review-123",
+      runRecord: {} as never,
+      agentId: "reviewer",
+      outputPath:
+        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
+      missingArtifacts: [],
+      body: "review body",
+    });
+    runApplyCommandMock.mockResolvedValue({
+      result: {} as never,
+      body: "APPLY BODY",
+    });
+
+    await withTempRepo(async (repoRoot) => {
+      await writeRecommendationArtifact(
+        repoRoot,
+        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
+        {
+          version: 1,
+          preferred_agents: ["agent-good"],
+          rationale: "Best option",
+          next_actions: ["voratiq apply --run run-123 --agent agent-good"],
+        },
+      );
+
+      await runAutoCommand({
+        specPath: ".voratiq/specs/existing.md",
+        reviewerAgent: "reviewer",
+        apply: true,
+      });
+    });
+
+    expect(runApplyCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-123",
+        agentId: "agent-good",
+      }),
+    );
+  });
+
+  it("resolves preferred_agents aliases via the review record alias map", async () => {
+    runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
+    runReviewCommandMock.mockResolvedValue({
+      reviewId: "review-123",
+      runRecord: {} as never,
+      agentId: "reviewer",
+      outputPath:
+        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
+      missingArtifacts: [],
+      body: "review body",
+    });
+    runApplyCommandMock.mockResolvedValue({
+      result: {} as never,
+      body: "APPLY BODY",
+    });
+
+    await withTempRepo(async (repoRoot) => {
+      await writeRecommendationArtifact(
+        repoRoot,
+        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
+        {
+          version: 1,
+          preferred_agents: ["r_aaaaaaaaaa"],
+          rationale: "Best option",
+          next_actions: ["voratiq apply --run run-123 --agent r_aaaaaaaaaa"],
+        },
+      );
+      await writeReviewAliasRecord({
+        repoRoot,
+        reviewId: "review-123",
+        runId: "run-123",
+        aliasMap: { r_aaaaaaaaaa: "agent-good" },
+      });
+
+      await runAutoCommand({
+        specPath: ".voratiq/specs/existing.md",
+        reviewerAgent: "reviewer",
+        apply: true,
+      });
+    });
+
+    expect(runApplyCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-123",
+        agentId: "agent-good",
+      }),
+    );
   });
 
   it("passes --commit through to apply when --apply is enabled", async () => {
@@ -791,6 +885,7 @@ async function writeRecommendationArtifact(
   recommendation: {
     version: 1;
     preferred_agents: string[];
+    resolved_preferred_agents?: string[];
     rationale: string;
     next_actions: string[];
   },
@@ -806,4 +901,31 @@ async function writeRecommendationArtifact(
     `${JSON.stringify(recommendation, null, 2)}\n`,
     "utf8",
   );
+}
+
+async function writeReviewAliasRecord(options: {
+  repoRoot: string;
+  reviewId: string;
+  runId: string;
+  aliasMap: Record<string, string>;
+}): Promise<void> {
+  const { repoRoot, reviewId, runId, aliasMap } = options;
+  const now = new Date().toISOString();
+  await appendReviewRecord({
+    root: repoRoot,
+    reviewsFilePath: join(repoRoot, ".voratiq", "reviews", "index.json"),
+    record: {
+      sessionId: reviewId,
+      runId,
+      createdAt: now,
+      completedAt: now,
+      status: "succeeded",
+      agentId: "reviewer",
+      outputPath: `.voratiq/reviews/sessions/${reviewId}/reviewer/artifacts/review.md`,
+      blinded: {
+        enabled: true,
+        aliasMap,
+      },
+    },
+  });
 }

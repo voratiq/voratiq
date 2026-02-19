@@ -6,6 +6,7 @@ export const reviewRecommendationSchema = z
   .object({
     version: z.literal(1),
     preferred_agents: z.array(z.string().min(1)),
+    resolved_preferred_agents: z.array(z.string().min(1)).optional(),
     rationale: z.string(),
     next_actions: z.array(z.string()),
   })

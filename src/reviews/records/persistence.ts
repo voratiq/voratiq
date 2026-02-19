@@ -10,17 +10,48 @@ import {
 import {
   createSessionPersistence,
   type SessionPersistencePaths,
+  type SessionRecordWarning,
 } from "../../sessions/persistence.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { isFileSystemError } from "../../utils/fs.js";
 import type { ReviewIndexEntry, ReviewRecord, ReviewStatus } from "./types.js";
 import { reviewRecordSchema, TERMINAL_REVIEW_STATUSES } from "./types.js";
 
+export type ReviewRecordPredicate = (record: ReviewRecord) => boolean;
+
+export interface ReviewRecordWarningMissing {
+  kind: "missing-record";
+  sessionId: string;
+  recordPath: string;
+  displayPath: string;
+}
+
+export interface ReviewRecordWarningParse {
+  kind: "parse-error";
+  sessionId: string;
+  recordPath: string;
+  displayPath: string;
+  details: string;
+}
+
+export type ReviewRecordWarning =
+  | ReviewRecordWarningMissing
+  | ReviewRecordWarningParse;
+
+export interface ReadReviewRecordsOptions {
+  root: string;
+  reviewsFilePath: string;
+  limit?: number;
+  predicate?: ReviewRecordPredicate;
+  onWarning?: (warning: ReviewRecordWarning) => void;
+}
+
 export interface RewriteReviewRecordOptions {
   root: string;
   reviewsFilePath: string;
   sessionId: string;
   mutate: (record: ReviewRecord) => ReviewRecord;
+  forceFlush?: boolean;
 }
 
 export interface AppendReviewRecordOptions {
@@ -68,6 +99,26 @@ const reviewPersistence = createSessionPersistence<
   },
 });
 
+export async function readReviewRecords(
+  options: ReadReviewRecordsOptions,
+): Promise<ReviewRecord[]> {
+  const { root, reviewsFilePath, limit, predicate, onWarning } = options;
+  const paths = buildReviewPaths(root, reviewsFilePath);
+
+  try {
+    return await reviewPersistence.readRecords({
+      paths,
+      limit,
+      predicate,
+      onWarning: onWarning
+        ? (warning) => onWarning(mapWarning(warning))
+        : undefined,
+    });
+  } catch (error) {
+    mapSessionError(error);
+  }
+}
+
 export async function appendReviewRecord(
   options: AppendReviewRecordOptions,
 ): Promise<void> {
@@ -84,11 +135,22 @@ export async function appendReviewRecord(
 export async function rewriteReviewRecord(
   options: RewriteReviewRecordOptions,
 ): Promise<ReviewRecord> {
-  const { root, reviewsFilePath, sessionId, mutate } = options;
+  const {
+    root,
+    reviewsFilePath,
+    sessionId,
+    mutate,
+    forceFlush = false,
+  } = options;
   const paths = buildReviewPaths(root, reviewsFilePath);
 
   try {
-    return await reviewPersistence.rewriteRecord({ paths, sessionId, mutate });
+    return await reviewPersistence.rewriteRecord({
+      paths,
+      sessionId,
+      mutate,
+      forceFlush,
+    });
   } catch (error) {
     mapSessionError(error);
   }
@@ -149,6 +211,24 @@ function buildReviewPaths(
     indexPath: reviewsFilePath,
     sessionsDir: join(reviewsRoot, "sessions"),
     lockPath: join(reviewsRoot, REVIEW_HISTORY_LOCK_FILENAME),
+  };
+}
+
+function mapWarning(warning: SessionRecordWarning): ReviewRecordWarning {
+  if (warning.kind === "missing-record") {
+    return {
+      kind: "missing-record",
+      sessionId: warning.sessionId,
+      recordPath: warning.recordPath,
+      displayPath: warning.displayPath,
+    };
+  }
+  return {
+    kind: "parse-error",
+    sessionId: warning.sessionId,
+    recordPath: warning.recordPath,
+    displayPath: warning.displayPath,
+    details: warning.details,
   };
 }
 
