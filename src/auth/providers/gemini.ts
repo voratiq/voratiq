@@ -75,10 +75,19 @@ export const geminiAuthProvider: AuthProvider = {
 
   async stage(options: StageOptions): Promise<StageResult> {
     const apiKey = resolveGeminiApiKey(options.runtime.env);
+    const sandboxPaths = createSandboxPaths(options.agentRoot, {
+      gemini: [".gemini"],
+      tmp: ["tmp"],
+    });
+    await ensureDirectories([...Object.values(sandboxPaths)]);
+
     if (apiKey) {
-      return composeSandboxEnvResult(options.agentRoot, {
+      return composeSandboxEnvResult(sandboxPaths.home, {
         GEMINI_API_KEY: apiKey,
         GOOGLE_API_KEY: apiKey,
+        TMPDIR: sandboxPaths.tmp,
+        TEMP: sandboxPaths.tmp,
+        TMP: sandboxPaths.tmp,
       });
     }
 
@@ -95,11 +104,6 @@ export const geminiAuthProvider: AuthProvider = {
         (cause) => new GeminiAuthProviderError(GEMINI_LOGIN_HINT, { cause }),
       );
     }
-
-    const sandboxPaths = createSandboxPaths(options.agentRoot, {
-      gemini: [".gemini"],
-    });
-    await ensureDirectories([...Object.values(sandboxPaths)]);
 
     const secretHandles = await stageRequiredFiles(
       geminiHome,
@@ -119,7 +123,11 @@ export const geminiAuthProvider: AuthProvider = {
 
     registerSandboxSecrets(sandboxPaths.home, secretHandles);
 
-    return composeSandboxEnvResult(sandboxPaths.home, {});
+    return composeSandboxEnvResult(sandboxPaths.home, {
+      TMPDIR: sandboxPaths.tmp,
+      TEMP: sandboxPaths.tmp,
+      TMP: sandboxPaths.tmp,
+    });
   },
 
   async teardown(options: TeardownOptions): Promise<void> {

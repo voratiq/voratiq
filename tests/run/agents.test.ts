@@ -175,6 +175,11 @@ suite("agent integrations", () => {
         expect(manifest.env.HOME).toContain(
           `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox`,
         );
+        expect(manifest.env.TMPDIR).toContain(
+          `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox/tmp`,
+        );
+        expect(manifest.env.TEMP).toBe(manifest.env.TMPDIR);
+        expect(manifest.env.TMP).toBe(manifest.env.TMPDIR);
         expect(manifest.argv.slice(-2)).toEqual([
           "--config",
           "model_reasoning_effort=high",
@@ -202,6 +207,11 @@ suite("agent integrations", () => {
         expect(homeEnv).toContain(
           `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox`,
         );
+        expect(manifest.env.TMPDIR).toContain(
+          `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox/tmp`,
+        );
+        expect(manifest.env.TEMP).toBe(manifest.env.TMPDIR);
+        expect(manifest.env.TMP).toBe(manifest.env.TMPDIR);
         expect(manifest.env.GEMINI_HOME).toBeUndefined();
 
         const stagedGeminiDir = join(
