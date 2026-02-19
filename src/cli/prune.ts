@@ -90,18 +90,18 @@ export function createPruneCommand(): Command {
   return new Command("prune")
     .description("Remove artifacts for a recorded run")
     .addOption(
-      new Option("--run <run-id>", "Identifier of the run to delete").conflicts(
+      new Option("--run <run-id>", "Identifier of the run to prune").conflicts(
         "all",
       ),
     )
     .addOption(
       new Option("--all", "Prune all non-pruned runs").conflicts("run"),
     )
-    .option("--purge", "Delete all associated configs and artifacts")
+    .option("--purge", "Also delete associated configs and artifacts")
     .option("-y, --yes", "Assume yes for all prompts")
     .addHelpText(
       "after",
-      "\nThis command removes agent workspaces, deletes agent branches, and marks runs as pruned. \nPass --purge to also delete all associated configs and artifacts.",
+      "\nRemoves agent workspaces, deletes agent branches, and marks runs as pruned.",
     )
     .allowExcessArguments(false)
     .action(async (options: PruneCommandActionOptions, command: Command) => {

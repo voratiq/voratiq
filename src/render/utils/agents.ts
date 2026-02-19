@@ -177,26 +177,21 @@ export function buildAgentSectionEvals(
   agentRoot?: string,
 ): string[] {
   const evalResults = agent.evals ?? [];
-  const rows =
-    evalResults.length === 0
-      ? [
-          {
-            slug: "none",
-            status: colorize("SKIPPED", getEvalStatusStyle("skipped").cli),
-            log: "—",
-          },
-        ]
-      : evalResults.map((evaluation) => ({
-          slug: evaluation.slug,
-          status: colorize(
-            evaluation.status.toUpperCase(),
-            getEvalStatusStyle(evaluation.status).cli,
-          ),
-          log:
-            evaluation.logPath !== undefined
-              ? relativizePath(evaluation.logPath, agentRoot)
-              : "—",
-        }));
+  if (evalResults.length === 0) {
+    return [];
+  }
+
+  const rows = evalResults.map((evaluation) => ({
+    slug: evaluation.slug,
+    status: colorize(
+      evaluation.status.toUpperCase(),
+      getEvalStatusStyle(evaluation.status).cli,
+    ),
+    log:
+      evaluation.logPath !== undefined
+        ? relativizePath(evaluation.logPath, agentRoot)
+        : "—",
+  }));
 
   const tableLines = renderTable({
     columns: [

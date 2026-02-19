@@ -47,11 +47,5 @@ export function renderListTranscript(records: readonly RunRecord[]): string {
     sections.push(tableOutput.split("\n"));
   }
 
-  return renderTranscript({
-    sections,
-    hint: {
-      message:
-        "To review a run in more detail:\n  voratiq review --run <run-id> --agent <agent-id>",
-    },
-  });
+  return renderTranscript({ sections });
 }

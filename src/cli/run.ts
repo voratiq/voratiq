@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 
 import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
 import { executeRunCommand } from "../commands/run/command.js";
@@ -134,12 +134,11 @@ function parseMaxParallelOption(value: string): number {
 export function createRunCommand(): Command {
   return new Command("run")
     .description("Execute configured agents against a spec")
-    .requiredOption("--spec <path>", "Path to the specification to execute")
-    .option(
-      "--agent <agent-id>",
-      "Agent identifier override (repeatable; preserves CLI order)",
-      collectAgentOption,
-      [],
+    .requiredOption("--spec <path>", "Path to the spec file")
+    .addOption(
+      new Option("--agent <agent-id>", "Override agents to run (repeatable)")
+        .default([], "")
+        .argParser(collectAgentOption),
     )
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
@@ -147,7 +146,7 @@ export function createRunCommand(): Command {
       "Maximum number of agents to run concurrently",
       parseMaxParallelOption,
     )
-    .option("--branch", "Checkout or create a branch named after the spec file")
+    .option("--branch", "Checkout or create a branch named after the spec")
     .allowExcessArguments(false)
     .action(async (options: RunCommandActionOptions) => {
       const runOptions: RunCommandOptions = {

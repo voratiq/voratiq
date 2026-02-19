@@ -87,7 +87,7 @@ describe("voratiq auto", () => {
   it("help reflects existing-spec contract and apply flags", () => {
     const help = createAutoCommand().helpInformation();
     expect(help).toContain("--spec <path>");
-    expect(help).toContain("existing spec file");
+    expect(help).toContain("Path to the spec file");
     expect(help).toContain("--run-agent <agent-id>");
     expect(help).toContain("--review-agent <agent-id>");
     expect(help).toContain("--profile <name>");

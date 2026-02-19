@@ -407,7 +407,7 @@ describe("createRunRenderer", () => {
       tty.write(formatCliOutput(transcript));
       const finalSnapshot = tty.snapshot();
       expect(transcript).toBe(
-        `To review results:\n  voratiq review --run ${context.runId} --agent <agent-id>`,
+        `To review results:\n  voratiq review --run ${context.runId}`,
       );
       expect(finalSnapshot).toContain("SUCCEEDED");
       expect(finalSnapshot).not.toContain("voratiq apply");
