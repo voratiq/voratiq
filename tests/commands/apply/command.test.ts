@@ -7,11 +7,14 @@ import { promisify } from "node:util";
 import { executeApplyCommand } from "../../../src/commands/apply/command.js";
 import {
   ApplyAgentDiffMissingOnDiskError,
+  ApplyAgentSelectorAmbiguousError,
+  ApplyAgentSelectorUnresolvedError,
   ApplyAgentSummaryEmptyError,
   ApplyAgentSummaryNotRecordedError,
   ApplyBaseMismatchError,
   ApplyPatchApplicationError,
 } from "../../../src/commands/apply/errors.js";
+import { appendReviewRecord } from "../../../src/reviews/records/persistence.js";
 import {
   appendRunRecord,
   rewriteRunRecord,
@@ -90,6 +93,171 @@ describe("executeApplyCommand", () => {
         ),
       ).toBe(false);
       expect(updatedRecord?.applyStatus?.detail ?? undefined).toBeUndefined();
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves blinded aliases to canonical agent ids via review records", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-alias-"));
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const { baseRevisionSha, diffContent, diffStatistics } =
+        await createDiffFixture({
+          repoRoot,
+          original: "console.log('hello');\n",
+          updated: "console.log('hello alias apply');\n",
+        });
+
+      const runId = "run-alias";
+      const agentId = "claude";
+      await writeRunRecord({
+        repoRoot,
+        runId,
+        agentId,
+        baseRevisionSha,
+        diffContent,
+        diffStatistics,
+      });
+
+      const alias = "r_aaaaaaaaaa";
+      await writeReviewRecord({
+        repoRoot,
+        reviewId: "review-alias-1",
+        runId,
+        aliasMap: { [alias]: agentId },
+      });
+
+      const result = await executeApplyCommand({
+        root: repoRoot,
+        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        reviewsFilePath: join(repoRoot, ".voratiq", "reviews", "index.json"),
+        runId,
+        agentId: alias,
+        ignoreBaseMismatch: false,
+      });
+
+      expect(result.agent.agentId).toBe(agentId);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("fails with valid canonical ids and aliases when selector is unresolved", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-unresolved-"));
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const { baseRevisionSha, diffContent, diffStatistics } =
+        await createDiffFixture({
+          repoRoot,
+          original: "console.log('hello');\n",
+          updated: "console.log('hello unresolved');\n",
+        });
+
+      const runId = "run-unresolved";
+      const agentId = "claude";
+      await writeRunRecord({
+        repoRoot,
+        runId,
+        agentId,
+        baseRevisionSha,
+        diffContent,
+        diffStatistics,
+      });
+
+      await expect(
+        executeApplyCommand({
+          root: repoRoot,
+          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          reviewsFilePath: join(repoRoot, ".voratiq", "reviews", "index.json"),
+          runId,
+          agentId: "r_bbbbbbbbbb",
+          ignoreBaseMismatch: false,
+        }),
+      ).rejects.toBeInstanceOf(ApplyAgentSelectorUnresolvedError);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("fails with ambiguity guidance when an alias collides across review sessions", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-ambig-"));
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const srcDir = join(repoRoot, "src");
+      await mkdir(srcDir, { recursive: true });
+
+      const fileA = join(srcDir, "artifact-a.ts");
+      const fileB = join(srcDir, "artifact-b.ts");
+      await writeFile(fileA, "console.log('a');\n", "utf8");
+      await writeFile(fileB, "console.log('b');\n", "utf8");
+      await runGit(repoRoot, ["add", "src/artifact-a.ts", "src/artifact-b.ts"]);
+      await runGit(repoRoot, ["commit", "-m", "seed artifacts"]);
+
+      const baseRevisionSha = await runGit(repoRoot, ["rev-parse", "HEAD"]);
+
+      await writeFile(fileA, "console.log('a apply');\n", "utf8");
+      const diffA = await runGit(repoRoot, ["diff"], { trim: false });
+      const diffStatsA = await runGit(repoRoot, ["diff", "--shortstat"]);
+      await runGit(repoRoot, ["checkout", "--", "src/artifact-a.ts"]);
+
+      await writeFile(fileB, "console.log('b apply');\n", "utf8");
+      const diffB = await runGit(repoRoot, ["diff"], { trim: false });
+      const diffStatsB = await runGit(repoRoot, ["diff", "--shortstat"]);
+      await runGit(repoRoot, ["checkout", "--", "src/artifact-b.ts"]);
+
+      const runId = "run-alias-ambiguous";
+      const agentA = "agent-a";
+      const agentB = "agent-b";
+
+      await writeRunRecordWithAgents({
+        repoRoot,
+        runId,
+        baseRevisionSha,
+        agents: [
+          {
+            agentId: agentA,
+            diffContent: diffA,
+            diffStatistics: diffStatsA,
+          },
+          {
+            agentId: agentB,
+            diffContent: diffB,
+            diffStatistics: diffStatsB,
+          },
+        ],
+      });
+
+      const alias = "r_cccccccccc";
+      await writeReviewRecord({
+        repoRoot,
+        reviewId: "review-ambig-1",
+        runId,
+        aliasMap: { [alias]: agentA },
+      });
+      await writeReviewRecord({
+        repoRoot,
+        reviewId: "review-ambig-2",
+        runId,
+        aliasMap: { [alias]: agentB },
+      });
+
+      await expect(
+        executeApplyCommand({
+          root: repoRoot,
+          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          reviewsFilePath: join(repoRoot, ".voratiq", "reviews", "index.json"),
+          runId,
+          agentId: alias,
+          ignoreBaseMismatch: false,
+        }),
+      ).rejects.toBeInstanceOf(ApplyAgentSelectorAmbiguousError);
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
@@ -839,6 +1007,34 @@ async function writeRunRecordWithAgents(options: {
 
   const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
   await appendRunRecord({ root: repoRoot, runsFilePath, record: runRecord });
+}
+
+async function writeReviewRecord(options: {
+  repoRoot: string;
+  reviewId: string;
+  runId: string;
+  aliasMap: Record<string, string>;
+}): Promise<void> {
+  const { repoRoot, reviewId, runId, aliasMap } = options;
+  const now = new Date().toISOString();
+  const reviewsFilePath = join(repoRoot, ".voratiq", "reviews", "index.json");
+  await appendReviewRecord({
+    root: repoRoot,
+    reviewsFilePath,
+    record: {
+      sessionId: reviewId,
+      runId,
+      createdAt: now,
+      completedAt: now,
+      status: "succeeded",
+      agentId: "reviewer",
+      outputPath: `.voratiq/reviews/sessions/${reviewId}/reviewer/artifacts/review.md`,
+      blinded: {
+        enabled: true,
+        aliasMap,
+      },
+    },
+  });
 }
 
 async function initGitRepository(root: string): Promise<void> {

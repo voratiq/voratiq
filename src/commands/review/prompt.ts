@@ -12,28 +12,56 @@ export interface BuildReviewPromptOptions {
   completedAt?: string;
   artifactInfoPath: string;
   outputPath: string;
+  baseSnapshotPath: string;
+  candidates: Array<{
+    candidateId: string;
+    diffPath: string;
+  }>;
   repoRootPath: string;
   workspacePath: string;
 }
 
-export function buildReviewPrompt(options: BuildReviewPromptOptions): string {
+export interface ReviewPromptBuildResult {
+  prompt: string;
+  leakageCheckPrompt: string;
+}
+
+export function buildReviewPrompt(
+  options: BuildReviewPromptOptions,
+): ReviewPromptBuildResult {
   const {
     runId,
     runStatus,
     specPath,
+    baseRevisionSha,
     artifactInfoPath,
     outputPath,
+    baseSnapshotPath,
+    candidates,
     repoRootPath,
     workspacePath,
   } = options;
 
+  const candidateList =
+    candidates.length === 0
+      ? ["- (no candidates recorded)"]
+      : candidates.map(
+          (candidate) =>
+            `- ${candidate.candidateId}: \`${candidate.diffPath}\``,
+        );
+
   const lines: string[] = [
-    "You are the reviewer for a completed Voratiq run. Compare each agent's implementation and recommend what to apply (if anything).",
+    "You are the reviewer for a completed Voratiq run. Compare each candidate's implementation evidence and recommend what to apply (if anything).",
     "",
     "Inputs:",
     `- Run id: ${runId}`,
     `- Status: ${runStatus}`,
     `- Spec path: ${specPath}`,
+    `- Base revision SHA: ${baseRevisionSha}`,
+    `- Base snapshot (read-only): \`${baseSnapshotPath}\``,
+    "",
+    "Candidate diffs (blinded):",
+    ...candidateList,
     "",
     `Run artifact information: \`${artifactInfoPath}\` (JSON, in the workspace root).`,
     "- Use it as the index of what exists and where.",
@@ -69,7 +97,7 @@ export function buildReviewPrompt(options: BuildReviewPromptOptions): string {
     "- R2: <requirement>",
     "- …",
     "",
-    "## Agent: <agent-id>",
+    "## Candidate: <candidate-id>",
     "**Status**: <status>",
     "**Assessment**: Strong foundation | Apply-now | Not recommended",
     "**Quality**: High | Medium | Low",
@@ -80,28 +108,30 @@ export function buildReviewPrompt(options: BuildReviewPromptOptions): string {
     "- …",
     "**Implementation Notes**: <decision-critical notes about correctness, design, and risks; cite artifacts>",
     "**Follow-up (if applied)**: <bounded TODOs needed after apply; include cleanup, missing tests, docs follow-ups>",
-    "<Repeat this section for each agent listed in the artifact information>",
+    "<Repeat this section for each candidate listed in the artifact information>",
     "",
     "## Comparison",
-    "<Synthesize differences and trade-offs across agents, explicitly calling out foundation vs cleanliness when relevant>",
+    "<Synthesize differences and trade-offs across candidates, explicitly calling out foundation vs cleanliness when relevant>",
     "",
     "## Risks / Missing Artifacts",
     "<List missing or unreadable artifacts; explain impact>",
     "",
     "## Recommendation",
-    "**Preferred Agent(s)**: <agent-id(s) or `none`>",
+    "**Preferred Candidate(s)**: <candidate-id(s) or `none`>",
     "**Rationale**: <why these are best (or why none qualify); name the key trade-offs and what evidence supports the choice>",
     "**Next Actions**:",
-    "<one line per recommendation, e.g. `voratiq apply --run <run-id> --agent <agent-id>`>",
+    "<one line per recommendation, e.g. `voratiq apply --run <run-id> --agent <candidate-id>`>",
     "",
     "## Recommendation Artifact (JSON)",
     "In addition to the markdown recommendation above, write `recommendation.json` with this exact shape:",
-    `{"version":1,"preferred_agents":["<agent-id>"],"rationale":"<summary>","next_actions":["<action>"]}`,
+    `{"version":1,"preferred_agents":["<candidate-id>"],"rationale":"<summary>","next_actions":["<action>"]}`,
     "- `version` must be `1`",
-    "- `preferred_agents` must be an array of agent ids (or empty if no agent is recommended)",
+    "- `preferred_agents` must be an array of preferred candidate ids (or empty if none are recommended)",
     "- `rationale` must be a string",
     "- `next_actions` must be an array of action strings",
   ];
+
+  const leakageCheckPrompt = `${lines.join("\n")}\n`;
 
   appendConstraints(lines, {
     readAccess: repoRootPath,
@@ -112,5 +142,8 @@ export function buildReviewPrompt(options: BuildReviewPromptOptions): string {
     "- Save the machine-readable recommendation to `recommendation.json` in the workspace root.",
   ]);
 
-  return `${lines.join("\n")}\n`;
+  return {
+    prompt: `${lines.join("\n")}\n`,
+    leakageCheckPrompt,
+  };
 }

@@ -96,6 +96,7 @@ describe("runApplyCommand", () => {
     expect(mockedExecuteApplyCommand).toHaveBeenCalledWith({
       root: "/repo",
       runsFilePath: "/repo/.voratiq/runs/index.json",
+      reviewsFilePath: "/repo/.voratiq/reviews/index.json",
       runId: "run-123",
       agentId: "claude",
       ignoreBaseMismatch: false,

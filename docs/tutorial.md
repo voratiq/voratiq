@@ -130,7 +130,7 @@ Output (truncated):
 Generating review...
 
 ## Recommendation
-**Preferred Agent(s)**: claude-opus-4-5-20251101
+**Preferred Candidate(s)**: claude-opus-4-5-20251101
 **Rationale**: Best spec alignment with clean, centralized preflight logic, robust branch existence detection, clear error propagation, and all evals passing.
 **Next Actions**:
 voratiq apply --run 20260113-235501-hhkox --agent claude-opus-4-5-20251101

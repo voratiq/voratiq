@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 
+import { readReviewRecords } from "../../reviews/records/persistence.js";
 import { buildRunRecordEnhanced } from "../../runs/records/enhanced.js";
 import { rewriteRunRecord } from "../../runs/records/persistence.js";
 import type { RunApplyStatus } from "../../runs/records/types.js";
@@ -16,6 +17,8 @@ import {
   ApplyAgentDiffMissingOnDiskError,
   ApplyAgentDiffNotRecordedError,
   ApplyAgentNotFoundError,
+  ApplyAgentSelectorAmbiguousError,
+  ApplyAgentSelectorUnresolvedError,
   ApplyAgentSummaryEmptyError,
   ApplyAgentSummaryMissingOnDiskError,
   ApplyAgentSummaryNotRecordedError,
@@ -29,6 +32,7 @@ import type { ApplyResult } from "./types.js";
 export interface ApplyCommandInput {
   root: string;
   runsFilePath: string;
+  reviewsFilePath?: string;
   runId: string;
   agentId: string;
   ignoreBaseMismatch: boolean;
@@ -41,8 +45,9 @@ export async function executeApplyCommand(
   const {
     root,
     runsFilePath,
+    reviewsFilePath,
     runId,
-    agentId,
+    agentId: selector,
     ignoreBaseMismatch,
     commit = false,
   } = input;
@@ -54,6 +59,14 @@ export async function executeApplyCommand(
     onDeleted: (record) => new ApplyRunDeletedError(record.runId),
   });
   const enhanced = buildRunRecordEnhanced(runRecord);
+
+  const agentId = await resolveApplyAgentSelector({
+    root,
+    runId,
+    selector,
+    canonicalAgentIds: runRecord.agents.map((agent) => agent.agentId),
+    reviewsFilePath,
+  });
 
   const agentRecord = runRecord.agents.find(
     (agent) => agent.agentId === agentId,
@@ -167,6 +180,76 @@ export async function executeApplyCommand(
     ignoredBaseMismatch,
     ...(appliedCommitSha ? { appliedCommitSha } : {}),
   };
+}
+
+async function resolveApplyAgentSelector(options: {
+  root: string;
+  runId: string;
+  selector: string;
+  canonicalAgentIds: readonly string[];
+  reviewsFilePath?: string;
+}): Promise<string> {
+  const { root, runId, selector, canonicalAgentIds, reviewsFilePath } = options;
+
+  if (canonicalAgentIds.includes(selector)) {
+    return selector;
+  }
+
+  const effectiveReviewsPath =
+    reviewsFilePath ?? `${root}/.voratiq/reviews/index.json`;
+
+  const reviewRecords = await readReviewRecords({
+    root,
+    reviewsFilePath: effectiveReviewsPath,
+    predicate: (record) => record.runId === runId,
+  }).catch(() => []);
+
+  const matches: Array<{ reviewId: string; agentId: string }> = [];
+  const aliases = new Set<string>();
+
+  for (const record of reviewRecords) {
+    const aliasMap = record.blinded?.aliasMap;
+    if (!aliasMap) {
+      continue;
+    }
+
+    for (const alias of Object.keys(aliasMap)) {
+      aliases.add(alias);
+    }
+
+    const resolved = aliasMap[selector];
+    if (resolved) {
+      matches.push({ reviewId: record.sessionId, agentId: resolved });
+    }
+  }
+
+  const uniqueResolved = Array.from(
+    new Set(matches.map((match) => match.agentId)),
+  );
+  if (uniqueResolved.length === 1) {
+    return uniqueResolved[0] ?? selector;
+  }
+
+  if (uniqueResolved.length === 0) {
+    throw new ApplyAgentSelectorUnresolvedError({
+      runId,
+      selector,
+      canonicalAgentIds,
+      aliases: Array.from(aliases).sort(),
+    });
+  }
+
+  const byKey = new Map<string, { reviewId: string; agentId: string }>();
+  for (const match of matches) {
+    byKey.set(`${match.reviewId}:${match.agentId}`, match);
+  }
+  throw new ApplyAgentSelectorAmbiguousError({
+    runId,
+    selector,
+    matches: Array.from(byKey.values()).sort((a, b) =>
+      a.reviewId.localeCompare(b.reviewId),
+    ),
+  });
 }
 
 async function applyPatch(options: {

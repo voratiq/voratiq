@@ -2,10 +2,14 @@ import { dirname, join } from "node:path";
 
 import { Command } from "commander";
 
-import { readReviewRecommendation } from "../commands/review/recommendation.js";
+import {
+  readReviewRecommendation,
+  type ReviewRecommendation,
+} from "../commands/review/recommendation.js";
 import { resolveCliContext } from "../preflight/index.js";
 import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
 import { renderCliError } from "../render/utils/errors.js";
+import { readReviewRecords } from "../reviews/records/persistence.js";
 import type { RunStatus } from "../status/index.js";
 import { normalizePathForDisplay, resolveDisplayPath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
@@ -75,9 +79,16 @@ async function loadAutoRecommendation(options: {
     join(dirname(options.reviewOutputPath), REVIEW_RECOMMENDATION_FILENAME),
   );
   let resolutionRoot = process.cwd();
+  let reviewsFilePath = join(
+    resolutionRoot,
+    ".voratiq",
+    "reviews",
+    "index.json",
+  );
   try {
-    const { root } = await resolveCliContext();
+    const { root, workspacePaths } = await resolveCliContext();
     resolutionRoot = root;
+    reviewsFilePath = workspacePaths.reviewsFile;
   } catch {
     // Unit tests and non-repo contexts may not resolve CLI root.
     // Fall back to cwd for compatibility.
@@ -90,9 +101,15 @@ async function loadAutoRecommendation(options: {
     const recommendation = await readReviewRecommendation(
       recommendationAbsolutePath,
     );
+    const preferredAgents = await resolvePreferredAgentsForAuto({
+      recommendation,
+      reviewOutputPath: options.reviewOutputPath,
+      root: resolutionRoot,
+      reviewsFilePath,
+    });
     return {
       recommendationPath,
-      preferredAgents: recommendation.preferred_agents,
+      preferredAgents,
     };
   } catch (error) {
     throw new CliError(
@@ -108,6 +125,81 @@ async function loadAutoRecommendation(options: {
   }
 }
 
+async function resolvePreferredAgentsForAuto(options: {
+  recommendation: ReviewRecommendation;
+  reviewOutputPath: string;
+  root: string;
+  reviewsFilePath: string;
+}): Promise<string[]> {
+  const { recommendation, reviewOutputPath, root, reviewsFilePath } = options;
+  if (recommendation.resolved_preferred_agents !== undefined) {
+    return normalizeAgentSelectors(recommendation.resolved_preferred_agents);
+  }
+
+  const preferredAgents = normalizeAgentSelectors(
+    recommendation.preferred_agents,
+  );
+  if (preferredAgents.length === 0) {
+    return [];
+  }
+
+  const aliasMap = await readReviewAliasMap({
+    reviewOutputPath,
+    root,
+    reviewsFilePath,
+  });
+  if (!aliasMap) {
+    return preferredAgents;
+  }
+
+  return normalizeAgentSelectors(
+    preferredAgents.map((agentId) => aliasMap[agentId] ?? agentId),
+  );
+}
+
+async function readReviewAliasMap(options: {
+  reviewOutputPath: string;
+  root: string;
+  reviewsFilePath: string;
+}): Promise<Record<string, string> | undefined> {
+  const { reviewOutputPath, root, reviewsFilePath } = options;
+  const reviewId = extractReviewIdFromOutputPath(reviewOutputPath);
+  if (!reviewId) {
+    return undefined;
+  }
+
+  try {
+    const records = await readReviewRecords({
+      root,
+      reviewsFilePath,
+      limit: 1,
+      predicate: (record) => record.sessionId === reviewId,
+    });
+    return records[0]?.blinded?.aliasMap;
+  } catch {
+    return undefined;
+  }
+}
+
+function extractReviewIdFromOutputPath(
+  reviewOutputPath: string,
+): string | undefined {
+  const segments = normalizePathForDisplay(reviewOutputPath).split("/");
+  for (let index = 0; index < segments.length - 2; index += 1) {
+    if (segments[index] === "reviews" && segments[index + 1] === "sessions") {
+      const reviewId = segments[index + 2];
+      return reviewId ? reviewId : undefined;
+    }
+  }
+  return undefined;
+}
+
+function normalizeAgentSelectors(selectors: readonly string[]): string[] {
+  return Array.from(
+    new Set(selectors.map((selector) => selector.trim()).filter(Boolean)),
+  );
+}
+
 function resolveRecommendedAgent(options: {
   runId: string;
   recommendationPath: string;
@@ -117,15 +209,13 @@ function resolveRecommendedAgent(options: {
   const { runId, recommendationPath, preferredAgents, availableAgents } =
     options;
 
-  const preferredUnique = Array.from(
-    new Set(preferredAgents.map((agentId) => agentId.trim()).filter(Boolean)),
-  );
+  const preferredUnique = normalizeAgentSelectors(preferredAgents);
   if (preferredUnique.length === 0) {
     throw new CliError(
       "Recommendation is missing a preferred agent.",
       [`No preferred agent is listed in ${recommendationPath}.`],
       [
-        `Update ${REVIEW_RECOMMENDATION_FILENAME} to include exactly one preferred agent or apply manually: voratiq apply --run ${runId} --agent <agent-id>`,
+        `Update ${recommendationPath} to include exactly one preferred agent or apply manually: voratiq apply --run ${runId} --agent <agent-id>`,
       ],
     );
   }
@@ -157,7 +247,7 @@ function resolveRecommendedAgent(options: {
         `Source: ${recommendationPath}`,
       ],
       [
-        `Keep exactly one preferred agent in ${REVIEW_RECOMMENDATION_FILENAME}, or apply manually: voratiq apply --run ${runId} --agent <agent-id>`,
+        `Keep exactly one preferred agent in ${recommendationPath}, or apply manually: voratiq apply --run ${runId} --agent <agent-id>`,
       ],
     );
   }
