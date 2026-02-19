@@ -31,7 +31,7 @@ describe("assertAgentCatalogGuardrails", () => {
   it("throws when supported catalog resolves duplicate ids", () => {
     expect(() =>
       assertAgentCatalogGuardrails({
-        supportedCatalog: [
+        builtinCatalog: [
           { provider: "codex", model: "gpt-5.2", id: "dup" },
           { provider: "codex", model: "gpt-5.3-codex", id: "dup" },
         ],
@@ -43,7 +43,7 @@ describe("assertAgentCatalogGuardrails", () => {
   it("throws when preset includes entry not present in supported catalog", () => {
     expect(() =>
       assertAgentCatalogGuardrails({
-        supportedCatalog: [{ provider: "claude", model: "claude-opus-4-6" }],
+        builtinCatalog: [{ provider: "claude", model: "claude-opus-4-6" }],
         presetCatalogs: [
           {
             presetName: "pro",
