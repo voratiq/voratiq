@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 
 import type { RunRecordEnhanced } from "../../runs/records/enhanced.js";
 import { isFileSystemError } from "../../utils/fs.js";
@@ -32,8 +32,16 @@ export async function resolveEligibleReviewCandidateAgents(options: {
       if (!stats.isFile() || stats.size <= 0) {
         continue;
       }
+
+      const diffContent = await readFile(diffSourceAbsolute);
+      if (diffContent.length <= 0) {
+        continue;
+      }
     } catch (error) {
-      if (isFileSystemError(error) && error.code === "ENOENT") {
+      if (
+        isFileSystemError(error) &&
+        (error.code === "ENOENT" || error.code === "EACCES")
+      ) {
         continue;
       }
       throw error;

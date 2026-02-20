@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -104,6 +104,62 @@ describe("review candidate eligibility", () => {
       );
       await mkdir(dirname(join(root, diffRel)), { recursive: true });
       await writeFile(join(root, diffRel), "", "utf8");
+
+      const record = createRunRecord({
+        runId,
+        agents: [
+          createAgentInvocationRecord({
+            agentId,
+            status: "succeeded",
+            artifacts: {
+              diffCaptured: true,
+              diffAttempted: true,
+              stdoutCaptured: false,
+              stderrCaptured: false,
+              summaryCaptured: false,
+            },
+          }),
+        ],
+      });
+
+      const run = buildRunRecordEnhanced(record);
+      const eligible = await resolveEligibleReviewCandidateAgents({
+        root,
+        run,
+      });
+
+      expect(eligible).toHaveLength(0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("excludes captured diffs that are not readable", async () => {
+    if (process.platform === "win32") {
+      return;
+    }
+    if (typeof process.getuid === "function" && process.getuid() === 0) {
+      return;
+    }
+
+    const root = await mkdtemp(join(tmpdir(), "voratiq-review-eligibility-"));
+    try {
+      const runId = "run-eligibility-unreadable-diff";
+      const agentId = "agent-unreadable";
+
+      const diffRel = join(
+        ".voratiq",
+        "runs",
+        "sessions",
+        runId,
+        agentId,
+        "artifacts",
+        "diff.patch",
+      );
+      const diffAbsolute = join(root, diffRel);
+      await mkdir(dirname(diffAbsolute), { recursive: true });
+      await writeFile(diffAbsolute, "diff --git a/a b/b\n", "utf8");
+      await chmod(diffAbsolute, 0o200);
 
       const record = createRunRecord({
         runId,

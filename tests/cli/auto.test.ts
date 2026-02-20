@@ -528,7 +528,7 @@ describe("voratiq auto", () => {
     expect(runApplyCommandMock).not.toHaveBeenCalled();
   });
 
-  it("prefers resolved_preferred_agents from recommendation.json", async () => {
+  it("prefers resolved_preferred_agent from recommendation.json", async () => {
     const stdout: string[] = [];
 
     stdoutSpy = jest
@@ -547,7 +547,7 @@ describe("voratiq auto", () => {
         ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
       missingArtifacts: [],
       // Intentionally conflicting markdown text to ensure auto does not parse it.
-      body: "## Recommendation\n**Preferred Agent(s)**: wrong-agent",
+      body: "## Recommendation\n**Preferred Candidate**: wrong-agent",
     });
     runApplyCommandMock.mockResolvedValue({
       result: {} as never,
@@ -559,9 +559,8 @@ describe("voratiq auto", () => {
         repoRoot,
         ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
         {
-          version: 1,
-          preferred_agents: ["wrong-agent"],
-          resolved_preferred_agents: ["agent-good"],
+          preferred_agent: "wrong-agent",
+          resolved_preferred_agent: "agent-good",
           rationale: "Best option",
           next_actions: ["voratiq apply --run run-123 --agent agent-good"],
         },
@@ -587,7 +586,7 @@ describe("voratiq auto", () => {
     expect(output).toContain("Auto SUCCEEDED");
   });
 
-  it("falls back to preferred_agents when resolved_preferred_agents is missing", async () => {
+  it("uses preferred_agent when resolved_preferred_agent is missing", async () => {
     runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
     runReviewCommandMock.mockResolvedValue({
       reviewId: "review-123",
@@ -608,8 +607,7 @@ describe("voratiq auto", () => {
         repoRoot,
         ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
         {
-          version: 1,
-          preferred_agents: ["agent-good"],
+          preferred_agent: "agent-good",
           rationale: "Best option",
           next_actions: ["voratiq apply --run run-123 --agent agent-good"],
         },
@@ -630,7 +628,7 @@ describe("voratiq auto", () => {
     );
   });
 
-  it("resolves preferred_agents aliases via the review record alias map", async () => {
+  it("resolves preferred_agent aliases via the review record alias map", async () => {
     runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
     runReviewCommandMock.mockResolvedValue({
       reviewId: "review-123",
@@ -651,8 +649,7 @@ describe("voratiq auto", () => {
         repoRoot,
         ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
         {
-          version: 1,
-          preferred_agents: ["r_aaaaaaaaaa"],
+          preferred_agent: "r_aaaaaaaaaa",
           rationale: "Best option",
           next_actions: ["voratiq apply --run run-123 --agent r_aaaaaaaaaa"],
         },
@@ -700,8 +697,7 @@ describe("voratiq auto", () => {
         repoRoot,
         ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
         {
-          version: 1,
-          preferred_agents: ["agent-good"],
+          preferred_agent: "agent-good",
           rationale: "Best option",
           next_actions: ["voratiq apply --run run-123 --agent agent-good"],
         },
@@ -758,7 +754,7 @@ describe("voratiq auto", () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it("fails safely when recommendation resolves to multiple agents", async () => {
+  it("fails safely when recommendation shape is invalid", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")
@@ -783,9 +779,8 @@ describe("voratiq auto", () => {
         repoRoot,
         ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
         {
-          version: 1,
-          preferred_agents: ["agent-a", "agent-b"],
-          rationale: "Tie",
+          preferred_agent: "   ",
+          rationale: "Invalid",
           next_actions: [],
         },
       );
@@ -798,7 +793,10 @@ describe("voratiq auto", () => {
     });
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
-    expect(stripAnsi(stdout.join(""))).toContain("Recommendation is ambiguous");
+    expect(stripAnsi(stdout.join(""))).toContain(
+      "Failed to load structured review recommendation.",
+    );
+    expect(stripAnsi(stdout.join(""))).toContain("preferred_agent");
     expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
     expect(process.exitCode).toBe(1);
   });
@@ -829,8 +827,7 @@ describe("voratiq auto", () => {
         repoRoot,
         ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
         {
-          version: 1,
-          preferred_agents: ["agent-good"],
+          preferred_agent: "agent-good",
           rationale: "Best option",
           next_actions: [],
         },
@@ -883,9 +880,8 @@ async function writeRecommendationArtifact(
   repoRoot: string,
   reviewOutputPath: string,
   recommendation: {
-    version: 1;
-    preferred_agents: string[];
-    resolved_preferred_agents?: string[];
+    preferred_agent: string;
+    resolved_preferred_agent?: string;
     rationale: string;
     next_actions: string[];
   },

@@ -123,7 +123,7 @@ async function resolveReviewPreviewRecommendation(options: {
     reviewsFilePath,
     reviewId,
   });
-  if (recommendation.resolved_preferred_agents !== undefined) {
+  if (recommendation.resolved_preferred_agent !== undefined) {
     return { recommendation, ...(aliasMap ? { aliasMap } : {}) };
   }
 
@@ -163,25 +163,20 @@ function formatResolvedRecommendationSnippet(
   aliasMap?: Record<string, string>,
 ): string {
   const preferredSource =
-    recommendation.resolved_preferred_agents ?? recommendation.preferred_agents;
-  const preferredAgents = Array.from(
-    new Set(preferredSource.map((agentId) => agentId.trim()).filter(Boolean)),
-  );
+    recommendation.resolved_preferred_agent ?? recommendation.preferred_agent;
+  const preferredAgent = preferredSource.trim();
   const nextActions = recommendation.next_actions
     .map((action) => action.trim())
     .filter(Boolean)
     .map((action) => canonicalizeApplyActionLine(action, aliasMap));
-  const rationaleSource =
+  const rationale =
     recommendation.rationale.trim().length > 0
       ? recommendation.rationale.trim()
       : "none";
-  const rationale = canonicalizeAliasTokens(rationaleSource, aliasMap);
 
   return [
     "## Recommendation",
-    `**Preferred Candidate(s)**: ${
-      preferredAgents.length > 0 ? preferredAgents.join(", ") : "none"
-    }`,
+    `**Preferred Candidate**: ${preferredAgent || "none"}`,
     `**Rationale**: ${rationale}`,
     "**Next Actions**:",
     ...(nextActions.length > 0 ? nextActions : ["none"]),
@@ -208,30 +203,6 @@ function canonicalizeApplyActionLine(
       return `${prefix}${quote}${canonical}${quote}`;
     },
   );
-}
-
-function canonicalizeAliasTokens(
-  content: string,
-  aliasMap?: Record<string, string>,
-): string {
-  if (!aliasMap) {
-    return content;
-  }
-  let output = content;
-  const entries = Object.entries(aliasMap).sort(
-    ([left], [right]) => right.length - left.length,
-  );
-
-  for (const [alias, canonical] of entries) {
-    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(
-      `(?<![a-z0-9_-])${escaped}(?![a-z0-9_-])`,
-      "giu",
-    );
-    output = output.replace(pattern, canonical);
-  }
-
-  return output;
 }
 
 interface ReviewCommandActionOptions {
