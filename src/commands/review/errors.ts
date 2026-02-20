@@ -31,3 +31,10 @@ export class ReviewGenerationFailedError extends ReviewError {
     this.name = "ReviewGenerationFailedError";
   }
 }
+
+export class ReviewNoEligibleCandidatesError extends ReviewError {
+  constructor() {
+    super("Review generation failed. No eligible candidates to review.");
+    this.name = "ReviewNoEligibleCandidatesError";
+  }
+}

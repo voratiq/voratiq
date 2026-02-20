@@ -14,6 +14,7 @@ import { generateSessionId } from "../shared/session-id.js";
 import { createReviewCompetitionAdapter } from "./competition-adapter.js";
 import {
   ReviewAgentNotFoundError,
+  ReviewError,
   ReviewGenerationFailedError,
 } from "./errors.js";
 
@@ -96,7 +97,7 @@ export async function executeReviewCommand(
       runWorkspaceAbsolute,
     }),
   }).catch((error) => {
-    if (error instanceof ReviewGenerationFailedError) {
+    if (error instanceof ReviewError) {
       throw error;
     }
 

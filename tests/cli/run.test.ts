@@ -873,7 +873,9 @@ suite("voratiq run (integration)", () => {
     );
     expect(summarylessAgent).toBeDefined();
     expect(summarylessAgent?.status).toBe("failed");
-    expect(summarylessAgent?.error).toContain("ENOENT");
+    expect(summarylessAgent?.error).toBe(
+      "Agent process failed. No change summary detected.",
+    );
     expect(summarylessAgent?.diffAttempted).toBe(false);
   });
 
