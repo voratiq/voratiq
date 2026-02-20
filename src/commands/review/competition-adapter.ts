@@ -56,7 +56,11 @@ import {
 } from "../../workspace/structure.js";
 import { pruneWorkspace } from "../shared/prune.js";
 import { resolveBlindedRecommendation } from "./blinded.js";
-import { ReviewGenerationFailedError } from "./errors.js";
+import { resolveEligibleReviewCandidateAgents } from "./eligibility.js";
+import {
+  ReviewGenerationFailedError,
+  ReviewNoEligibleCandidatesError,
+} from "./errors.js";
 import { buildBlindedReviewManifest } from "./manifest.js";
 import { buildReviewPrompt } from "./prompt.js";
 import { parseReviewRecommendation } from "./recommendation.js";
@@ -492,6 +496,15 @@ async function prepareBlindedReviewInputs(options: {
 }): Promise<BlindedReviewPreparation> {
   const { root, reviewId, reviewerAgentId, workspacePaths, run } = options;
 
+  const eligibleAgents = await resolveEligibleReviewCandidateAgents({
+    root,
+    run,
+  });
+
+  if (eligibleAgents.length === 0) {
+    throw new ReviewNoEligibleCandidatesError();
+  }
+
   const stagedInputsDir = join(workspacePaths.workspacePath, "inputs");
   await mkdir(stagedInputsDir, { recursive: true });
 
@@ -523,7 +536,8 @@ async function prepareBlindedReviewInputs(options: {
     diffRecorded: boolean;
   }> = [];
 
-  for (const agent of run.agents) {
+  for (const eligible of eligibleAgents) {
+    const agent = eligible.agent;
     const alias = generateBlindedCandidateAlias({ seen: seenAliases });
     seenAliases.add(alias);
     aliasMap[alias] = agent.agentId;
@@ -531,27 +545,13 @@ async function prepareBlindedReviewInputs(options: {
     const stagedDiffAbsolute = join(stagedCandidatesDir, alias, "diff.patch");
     await mkdir(dirname(stagedDiffAbsolute), { recursive: true });
 
-    const diffSource = agent.assets.diffPath
-      ? resolvePath(root, agent.assets.diffPath)
-      : undefined;
-    let diffCopied = false;
-    if (diffSource) {
-      try {
-        await copyFile(diffSource, stagedDiffAbsolute);
-        diffCopied = true;
-      } catch {
-        diffCopied = false;
-      }
-    }
-    if (!diffCopied) {
-      await writeFile(stagedDiffAbsolute, "", "utf8");
-    }
+    await copyFile(eligible.diffSourceAbsolute, stagedDiffAbsolute);
 
     stagedCandidates.push({
       candidateId: alias,
       agentId: agent.agentId,
       diffPath: toRepoRelativeOrThrow(root, stagedDiffAbsolute),
-      diffRecorded: Boolean(diffSource) && diffCopied,
+      diffRecorded: true,
     });
   }
 

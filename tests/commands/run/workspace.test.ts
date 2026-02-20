@@ -202,6 +202,31 @@ describe("collectAgentArtifacts", () => {
     await rm(workspaceSummary, { force: true });
     mockedGitHasStagedChanges.mockResolvedValue(true);
 
+    let caught: unknown;
+    try {
+      await collectAgentArtifacts({
+        baseRevisionSha: "base-sha",
+        workspacePaths,
+        root: repoRoot,
+        environment,
+        persona,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toBe(
+      "Agent process failed. No change summary detected.",
+    );
+    expect((caught as Error).message).not.toContain(workspacePath);
+  });
+
+  it("throws a summary error when staged changes exist but the summary is empty", async () => {
+    const workspaceSummary = join(workspacePath, WORKSPACE_SUMMARY_FILENAME);
+    await writeFile(workspaceSummary, "   \n", "utf8");
+    mockedGitHasStagedChanges.mockResolvedValue(true);
+
     await expect(
       collectAgentArtifacts({
         baseRevisionSha: "base-sha",
@@ -210,7 +235,7 @@ describe("collectAgentArtifacts", () => {
         environment,
         persona,
       }),
-    ).rejects.toThrow(/ENOENT/);
+    ).rejects.toThrow("Agent process failed. No change summary detected.");
   });
 
   it("fails with no-workspace-changes when the summary is missing and nothing was staged", async () => {

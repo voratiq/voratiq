@@ -330,7 +330,7 @@ describe("voratiq review", () => {
       );
       expect(result.body).toContain(`Review: ${result.outputPath}`);
       expect(result.body).not.toContain("To integrate a solution:");
-      expect(result.missingArtifacts).toEqual(["diff.patch"]);
+      expect(result.missingArtifacts).toEqual([]);
       expect(result.body).not.toContain("Warning: Missing artifacts:");
       expect(executeCompetitionWithAdapterMock).toHaveBeenCalledTimes(1);
       const hasReviewerCandidate = (
@@ -531,6 +531,140 @@ describe("voratiq review", () => {
       await expect(
         readFile(seenManifestPath ?? "", "utf8"),
       ).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("filters blinded review inputs to eligible candidates only", async () => {
+      const runId = "20251007-184454-mixed";
+      const runRecord = createRunRecord({
+        runId,
+        baseRevisionSha:
+          currentTestBaseRevisionSha ??
+          (() => {
+            throw new Error("Missing test base revision sha.");
+          })(),
+        agents: [
+          createAgentInvocationRecord({
+            agentId: "agent-ok",
+            model: "model-ok",
+            status: "succeeded",
+            evals: [],
+            artifacts: { diffCaptured: true, diffAttempted: true },
+          }),
+          createAgentInvocationRecord({
+            agentId: "agent-failed",
+            model: "model-failed",
+            status: "failed",
+            error:
+              "Agent process failed. ENOENT: open /tmp/voratiq/agent-failed/.summary.txt",
+            evals: [],
+            artifacts: { diffCaptured: true, diffAttempted: true },
+          }),
+          createAgentInvocationRecord({
+            agentId: "agent-missing-diff",
+            model: "model-missing",
+            status: "succeeded",
+            evals: [],
+            artifacts: { diffCaptured: true, diffAttempted: true },
+          }),
+          createAgentInvocationRecord({
+            agentId: "agent-empty-diff",
+            model: "model-empty",
+            status: "succeeded",
+            evals: [],
+            artifacts: { diffCaptured: true, diffAttempted: true },
+          }),
+          createAgentInvocationRecord({
+            agentId: "agent-nodiff",
+            model: "model-nodiff",
+            status: "succeeded",
+            evals: [],
+            artifacts: { diffCaptured: false, diffAttempted: true },
+          }),
+        ],
+      });
+      await writeRunRecord(repoRoot, runRecord);
+
+      await rm(
+        join(
+          repoRoot,
+          ".voratiq",
+          "runs",
+          "sessions",
+          runId,
+          "agent-missing-diff",
+          "artifacts",
+          "diff.patch",
+        ),
+        { force: true },
+      );
+      await writeFile(
+        join(
+          repoRoot,
+          ".voratiq",
+          "runs",
+          "sessions",
+          runId,
+          "agent-empty-diff",
+          "artifacts",
+          "diff.patch",
+        ),
+        "",
+        "utf8",
+      );
+
+      const result = await runReviewInRepo(repoRoot, {
+        runId,
+        agentId: "reviewer",
+      });
+
+      expect(result.missingArtifacts).toEqual([]);
+      expect(runSandboxedAgentMock).toHaveBeenCalledTimes(1);
+      expect(seenManifestPayload).toBeDefined();
+      expect(seenManifestPayload).not.toContain("agent-failed");
+      expect(seenManifestPayload).not.toContain("agent-missing-diff");
+      expect(seenManifestPayload).not.toContain("agent-empty-diff");
+
+      const manifest = JSON.parse(seenManifestPayload ?? "{}") as {
+        candidates: Array<{ candidateId: string }>;
+      };
+      expect(manifest.candidates).toHaveLength(1);
+
+      const sandboxInvocation = runSandboxedAgentMock.mock.calls.at(-1)?.[0];
+      const prompt = sandboxInvocation?.prompt ?? "";
+      expect(prompt.match(/^- r_[a-z0-9]{10,16}:/gmu)?.length ?? 0).toBe(1);
+    });
+
+    it("fails fast when no eligible candidates exist", async () => {
+      const runId = "20251007-184454-zero-eligible";
+      const runRecord = createRunRecord({
+        runId,
+        agents: [
+          createAgentInvocationRecord({
+            agentId: "agent-nodiff",
+            model: "model-nodiff",
+            status: "succeeded",
+            evals: [],
+            artifacts: { diffCaptured: false, diffAttempted: true },
+          }),
+          createAgentInvocationRecord({
+            agentId: "agent-failed",
+            model: "model-failed",
+            status: "failed",
+            error:
+              "Agent process failed. ENOENT: open /tmp/voratiq/agent-failed/.summary.txt",
+            evals: [],
+            artifacts: { diffCaptured: true, diffAttempted: true },
+          }),
+        ],
+      });
+      await writeRunRecord(repoRoot, runRecord);
+
+      await expect(
+        runReviewInRepo(repoRoot, { runId, agentId: "reviewer" }),
+      ).rejects.toThrow(
+        "Review generation failed. No eligible candidates to review.",
+      );
+      expect(runSandboxedAgentMock).not.toHaveBeenCalled();
     });
 
     it("allows blinded review when reviewer/provider tokens overlap with run candidates", async () => {
@@ -842,7 +976,7 @@ describe("voratiq review", () => {
         agentId: "reviewer",
       });
 
-      expect(result.missingArtifacts).toEqual(["diff.patch"]);
+      expect(result.missingArtifacts).toEqual([]);
       expect(result.body).not.toContain("Warning: Missing artifacts:");
     });
 
@@ -1011,7 +1145,11 @@ async function withRepoCwd<T>(
 }
 
 async function initGitRepository(root: string): Promise<void> {
-  await execFileAsync("git", ["init"], { cwd: root });
+  const templateDir = join(root, ".git-template");
+  await mkdir(templateDir, { recursive: true });
+  await execFileAsync("git", ["init", "--template", templateDir], {
+    cwd: root,
+  });
   await execFileAsync("git", ["config", "user.email", "test@example.com"], {
     cwd: root,
   });
@@ -1122,6 +1260,7 @@ function appendOrchestrationStage(
 async function writeRunRecord(root: string, record: RunRecord): Promise<void> {
   const runsFilePath = join(root, ".voratiq", "runs", "index.json");
   await appendRunRecord({ root, runsFilePath, record });
+  await writeRunDiffArtifacts(root, record);
 }
 
 function buildRunRecord(options: {
@@ -1134,7 +1273,7 @@ function buildRunRecord(options: {
 }): RunRecord {
   const {
     runId,
-    includeDiff = false,
+    includeDiff = true,
     includeChatJsonl = false,
     baseRevisionSha,
     runAgentId = "codex",
@@ -1172,4 +1311,31 @@ function buildRunRecord(options: {
         throw new Error("Missing test base revision sha.");
       })(),
   });
+}
+
+async function writeRunDiffArtifacts(
+  root: string,
+  record: RunRecord,
+): Promise<void> {
+  const diffPayload = "diff --git a/src/index.ts b/src/index.ts\n+test\n";
+  await Promise.all(
+    (record.agents ?? []).map(async (agent) => {
+      const diffCaptured = agent.artifacts?.diffCaptured ?? false;
+      if (!diffCaptured) {
+        return;
+      }
+      const diffPath = join(
+        root,
+        ".voratiq",
+        "runs",
+        "sessions",
+        record.runId,
+        agent.agentId,
+        "artifacts",
+        "diff.patch",
+      );
+      await mkdir(dirname(diffPath), { recursive: true });
+      await writeFile(diffPath, diffPayload, "utf8");
+    }),
+  );
 }

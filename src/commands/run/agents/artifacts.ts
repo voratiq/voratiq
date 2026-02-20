@@ -3,6 +3,7 @@ import { relative } from "node:path";
 
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import { toErrorMessage } from "../../../utils/errors.js";
+import { isFileSystemError } from "../../../utils/fs.js";
 import {
   gitAddAll,
   gitCommitAll,
@@ -185,6 +186,9 @@ interface HarvestSummaryResult {
   summary: string;
 }
 
+const NO_CHANGE_SUMMARY_DETAIL =
+  "Agent process failed. No change summary detected." as const;
+
 async function harvestSummary(
   options: HarvestSummaryOptions,
 ): Promise<HarvestSummaryResult> {
@@ -199,6 +203,9 @@ async function harvestSummary(
   } catch (error) {
     if (error instanceof AgentProcessError) {
       throw error;
+    }
+    if (isFileSystemError(error) && error.code === "ENOENT") {
+      throw new AgentProcessError({ detail: NO_CHANGE_SUMMARY_DETAIL });
     }
     throw new AgentProcessError({ detail: toErrorMessage(error) });
   }
@@ -220,7 +227,7 @@ async function promoteSummary(options: {
       const candidate = raw.toString("utf8").trim();
       if (!candidate) {
         throw new AgentProcessError({
-          detail: "Agent process failed. Summary is empty.",
+          detail: NO_CHANGE_SUMMARY_DETAIL,
         });
       }
       trimmed = candidate;
