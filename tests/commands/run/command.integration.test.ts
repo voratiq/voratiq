@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+import { teardownSessionAuth } from "../../../src/agents/runtime/registry.js";
 import { executeAgents } from "../../../src/commands/run/agent-execution.js";
 import { executeRunCommand } from "../../../src/commands/run/command.js";
 import { generateRunId } from "../../../src/commands/run/id.js";
@@ -71,6 +72,10 @@ jest.mock("../../../src/commands/run/id.js", () => ({
   generateRunId: jest.fn(),
 }));
 
+jest.mock("../../../src/agents/runtime/registry.js", () => ({
+  teardownSessionAuth: jest.fn(),
+}));
+
 const validateAndPrepareMock = jest.mocked(validateAndPrepare);
 const prepareRunWorkspaceMock = jest.mocked(prepareRunWorkspace);
 const initializeRunRecordMock = jest.mocked(initializeRunRecord);
@@ -82,10 +87,12 @@ const registerActiveRunMock = jest.mocked(registerActiveRun);
 const clearActiveRunMock = jest.mocked(clearActiveRun);
 const resolveStageCompetitorsMock = jest.mocked(resolveStageCompetitors);
 const generateRunIdMock = jest.mocked(generateRunId);
+const teardownSessionAuthMock = jest.mocked(teardownSessionAuth);
 
 describe("executeRunCommand integration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    teardownSessionAuthMock.mockResolvedValue(undefined);
     resolveStageCompetitorsMock.mockReturnValue({
       source: "orchestration",
       agentIds: ["alpha"],
@@ -413,5 +420,60 @@ describe("executeRunCommand integration", () => {
       executionResult.hadEvalFailure,
     );
     expect(report).toEqual(runReport);
+  });
+
+  it("tears down run auth exactly once when execution throws", async () => {
+    generateRunIdMock.mockReturnValue("run-fail");
+    validateAndPrepareMock.mockResolvedValue({
+      specContent: "Implement feature",
+      baseRevisionSha: "abc123",
+      agents: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+      evalPlan: [],
+      effectiveMaxParallel: 1,
+      environment: {},
+    });
+    prepareRunWorkspaceMock.mockResolvedValue({
+      runWorkspace: {
+        absolute: "/tmp/run-workspace",
+        relative: ".voratiq/runs/sessions/run-fail",
+      },
+    });
+    initializeRunRecordMock.mockResolvedValue({
+      initialRecord: {
+        runId: "run-fail",
+        baseRevisionSha: "abc123",
+        rootPath: ".",
+        spec: { path: "spec.md" },
+        status: "running",
+        createdAt: "2025-11-10T00:00:00.000Z",
+        agents: [],
+      },
+      recordPersisted: false,
+    });
+    createAgentRecordMutatorsMock.mockReturnValue({
+      recordAgentQueued: jest.fn(() => Promise.resolve()),
+      recordAgentSnapshot: jest.fn(() => Promise.resolve()),
+    });
+    executeAgentsMock.mockRejectedValue(new Error("post-processing failed"));
+
+    await expect(
+      executeRunCommand({
+        root: "/repo",
+        runsFilePath: "/repo/runs.json",
+        specAbsolutePath: "/repo/spec.md",
+        specDisplayPath: "spec.md",
+      }),
+    ).rejects.toThrow("post-processing failed");
+
+    expect(teardownSessionAuthMock).toHaveBeenCalledTimes(1);
+    expect(teardownSessionAuthMock).toHaveBeenCalledWith("run-fail");
   });
 });

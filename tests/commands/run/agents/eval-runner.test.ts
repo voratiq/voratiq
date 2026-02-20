@@ -74,5 +74,13 @@ describe("runPostProcessingAndEvaluations", () => {
       }),
     );
     expect(executeEvaluationsMock).toHaveBeenCalledTimes(1);
+    expect(executeEvaluationsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        envDirectoryGuard: expect.objectContaining({
+          includeHomeForPythonStack: true,
+          failOnDirectoryPreparationError: true,
+        }),
+      }),
+    );
   });
 });

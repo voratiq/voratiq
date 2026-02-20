@@ -80,6 +80,12 @@ export interface AgentRuntimeHarnessInput {
   /** Disable chat capture entirely. */
   readonly captureChat?: boolean;
 
+  /**
+   * When false, defer auth teardown to session-level cleanup.
+   * Defaults to true.
+   */
+  readonly teardownAuthOnExit?: boolean;
+
   /** Optional hook for immediate watchdog UI updates. */
   readonly onWatchdogTrigger?: (
     trigger: WatchdogTrigger,
