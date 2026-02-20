@@ -136,6 +136,30 @@ describe("executeAgentLifecycle integration", () => {
     expect(runPostProcessingAndEvaluationsMock).toHaveBeenCalledTimes(1);
   });
 
+  it("defers sandbox teardown until run-level cleanup", async () => {
+    const { execution } = await createPreparedExecution();
+    runSandboxedAgentMock.mockResolvedValue({
+      exitCode: 0,
+      signal: null,
+      sandboxSettings: minimalSandboxSettings(),
+      manifestEnv: {},
+    });
+    runPostProcessingAndEvaluationsMock.mockResolvedValue({
+      artifacts: {
+        summaryCaptured: false,
+        diffAttempted: false,
+        diffCaptured: false,
+      },
+      evaluations: [],
+      warnings: [],
+    });
+
+    await runPreparedExecutionsWithLimit([execution], 1);
+
+    const invocation = runSandboxedAgentMock.mock.calls.at(-1)?.[0];
+    expect(invocation?.teardownAuthOnExit).toBe(false);
+  });
+
   it("propagates diff statistics from artifact collection into agent records", async () => {
     const { execution } = await createPreparedExecution();
     runSandboxedAgentMock.mockResolvedValue({

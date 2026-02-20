@@ -41,6 +41,7 @@ export async function runSandboxedAgent(
     extraWriteProtectedPaths,
     extraReadProtectedPaths,
     captureChat = true,
+    teardownAuthOnExit = true,
     onWatchdogTrigger,
   } = input;
 
@@ -140,10 +141,12 @@ export async function runSandboxedAgent(
     );
   } finally {
     await rm(promptPath, { force: true }).catch(() => {});
-    await teardownRegisteredAuthContext(
-      sessionId ?? "runtime",
-      authContext,
-    ).catch(() => {});
+    if (teardownAuthOnExit || !sessionId) {
+      await teardownRegisteredAuthContext(
+        sessionId ?? "runtime",
+        authContext,
+      ).catch(() => {});
+    }
   }
 }
 

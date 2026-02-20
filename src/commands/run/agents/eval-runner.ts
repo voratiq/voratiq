@@ -55,6 +55,15 @@ export async function runPostProcessingAndEvaluations(
     logsDirectory: workspacePaths.evalsDirPath,
     env: manifestEnv,
     environment,
+    envDirectoryGuard: {
+      trustedAbsoluteRoots: [
+        workspacePaths.workspacePath,
+        workspacePaths.agentRoot,
+        workspacePaths.sandboxHomePath,
+      ],
+      includeHomeForPythonStack: true,
+      failOnDirectoryPreparationError: true,
+    },
   });
 
   return {

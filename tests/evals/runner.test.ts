@@ -1,6 +1,6 @@
-import { mkdtemp } from "node:fs/promises";
+import { access, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { executeEvaluations } from "../../src/evals/runner.js";
 import { spawnStreamingProcess } from "../../src/utils/process.js";
@@ -86,5 +86,98 @@ describe("executeEvaluations", () => {
     } finally {
       process.stderr.write = originalStderrWrite;
     }
+  });
+
+  it("creates missing trusted temp directories before spawning eval commands", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "voratiq-runner-"));
+    const logsDirectory = join(workspaceRoot, "logs");
+    const tmpPath = join(workspaceRoot, "sandbox", "tmp");
+
+    mockedSpawnStreamingProcess.mockResolvedValue({
+      exitCode: 0,
+      signal: null,
+    });
+
+    const { results, warnings } = await executeEvaluations({
+      evaluations: [{ slug: "tests", command: "uv run pytest" }],
+      cwd: workspaceRoot,
+      root: workspaceRoot,
+      logsDirectory,
+      env: { TMPDIR: tmpPath, TMP: tmpPath, TEMP: tmpPath },
+      environment: {},
+      envDirectoryGuard: {
+        trustedAbsoluteRoots: [workspaceRoot],
+        includeHomeForPythonStack: true,
+        failOnDirectoryPreparationError: true,
+      },
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.status).toBe("succeeded");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("requires python tooling");
+    await expect(access(tmpPath)).resolves.toBeUndefined();
+  });
+
+  it("skips untrusted absolute env directories and emits warnings", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "voratiq-runner-"));
+    const logsDirectory = join(workspaceRoot, "logs");
+    const outsideTmpPath = join(
+      dirname(tmpdir()),
+      `voratiq-untrusted-${Date.now()}`,
+      "tmp",
+    );
+
+    mockedSpawnStreamingProcess.mockResolvedValue({
+      exitCode: 0,
+      signal: null,
+    });
+
+    const { results, warnings } = await executeEvaluations({
+      evaluations: [{ slug: "tests", command: "echo ok" }],
+      cwd: workspaceRoot,
+      root: workspaceRoot,
+      logsDirectory,
+      env: { TMPDIR: outsideTmpPath },
+      environment: {},
+      envDirectoryGuard: {
+        trustedAbsoluteRoots: [workspaceRoot],
+      },
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.status).toBe("succeeded");
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("outside trusted roots"),
+      ]),
+    );
+  });
+
+  it("fails fast with an explicit error when trusted env prep cannot complete", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "voratiq-runner-"));
+    const logsDirectory = join(workspaceRoot, "logs");
+    const invalidTmpPath = join(workspaceRoot, "tmp-as-file");
+    await writeFile(invalidTmpPath, "not a directory", "utf8");
+
+    await expect(
+      executeEvaluations({
+        evaluations: [{ slug: "tests", command: "uv run pytest" }],
+        cwd: workspaceRoot,
+        root: workspaceRoot,
+        logsDirectory,
+        env: { TMPDIR: invalidTmpPath },
+        environment: {},
+        envDirectoryGuard: {
+          trustedAbsoluteRoots: [workspaceRoot],
+          includeHomeForPythonStack: true,
+          failOnDirectoryPreparationError: true,
+        },
+      }),
+    ).rejects.toThrow(
+      /Eval environment preparation failed for "tests": required eval env directory prep failed/u,
+    );
+
+    expect(mockedSpawnStreamingProcess).not.toHaveBeenCalled();
   });
 });

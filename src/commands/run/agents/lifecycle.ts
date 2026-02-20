@@ -98,6 +98,7 @@ export async function executeAgentLifecycle(
         stderrPath: workspacePaths.stderrPath,
       },
       captureChat: true,
+      teardownAuthOnExit: false,
       extraWriteProtectedPaths: [workspacePaths.evalsDirPath],
       extraReadProtectedPaths: [workspacePaths.evalsDirPath],
       onWatchdogTrigger,
