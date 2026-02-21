@@ -41,6 +41,18 @@ describe("review recommendation schema", () => {
       ),
     ).toThrow(/preferred_agent/u);
   });
+
+  it("rejects preferred_agent set to none", () => {
+    expect(() =>
+      parseReviewRecommendation(
+        JSON.stringify({
+          preferred_agent: "none",
+          rationale: "Best option",
+          next_actions: [],
+        }),
+      ),
+    ).toThrow(/must not be 'none'/u);
+  });
 });
 
 describe("recommendation ranking consistency", () => {

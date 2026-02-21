@@ -40,7 +40,9 @@ export async function resolveEligibleReviewCandidateAgents(options: {
     } catch (error) {
       if (
         isFileSystemError(error) &&
-        (error.code === "ENOENT" || error.code === "EACCES")
+        (error.code === "ENOENT" ||
+          error.code === "EACCES" ||
+          error.code === "EPERM")
       ) {
         continue;
       }

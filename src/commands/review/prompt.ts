@@ -43,17 +43,18 @@ export function buildReviewPrompt(
   const sortedCandidates = [...candidates].sort((left, right) =>
     left.candidateId.localeCompare(right.candidateId),
   );
+  if (sortedCandidates.length === 0) {
+    throw new Error(
+      "Review prompt requires at least one eligible candidate with readable artifacts.",
+    );
+  }
   const sortedCandidateIds = sortedCandidates.map(
     (candidate) => candidate.candidateId,
   );
 
-  const candidateList =
-    sortedCandidates.length === 0
-      ? ["- (no candidates recorded)"]
-      : sortedCandidates.map(
-          (candidate) =>
-            `- ${candidate.candidateId}: \`${candidate.diffPath}\``,
-        );
+  const candidateList = sortedCandidates.map(
+    (candidate) => `- ${candidate.candidateId}: \`${candidate.diffPath}\``,
+  );
 
   const lines: string[] = [
     "You are the reviewer for a completed Voratiq run. Compare each eligible candidate's implementation evidence and recommend exactly one top candidate.",
@@ -92,9 +93,7 @@ export function buildReviewPrompt(
     "- `## Ranking` must appear immediately before `## Recommendation`.",
     "- Candidate assessments must be listed in lexicographic candidate-id order.",
     "- Candidate IDs for this review set (lexicographic):",
-    ...(sortedCandidateIds.length === 0
-      ? ["  - (no candidates recorded)"]
-      : sortedCandidateIds.map((candidateId) => `  - ${candidateId}`)),
+    ...sortedCandidateIds.map((candidateId) => `  - ${candidateId}`),
     "- Inside each candidate assessment block, discuss only that candidate.",
     "- Put all cross-candidate comparisons only in `## Comparison`, `## Ranking`, and `## Recommendation`.",
     "- `## Ranking` must be a strict best-to-worst list of all candidates with no ties.",
