@@ -4,24 +4,19 @@ import { resolveBlindedRecommendation } from "../../../src/commands/review/blind
 import { ReviewGenerationFailedError } from "../../../src/commands/review/errors.js";
 
 describe("blinded review recommendation resolution", () => {
-  it("keeps blinded preferred agents and writes resolved canonical ids", () => {
+  it("keeps blinded preferred agent and writes resolved canonical id", () => {
     const aliasMap = { r_aaaaaaaaaa: "agent-a" };
     const resolution = resolveBlindedRecommendation({
       recommendation: {
-        version: 1,
-        preferred_agents: ["r_aaaaaaaaaa"],
+        preferred_agent: "r_aaaaaaaaaa",
         rationale: "none",
         next_actions: [],
       },
       aliasMap,
     });
 
-    expect(resolution.recommendation.preferred_agents).toEqual([
-      "r_aaaaaaaaaa",
-    ]);
-    expect(resolution.recommendation.resolved_preferred_agents).toEqual([
-      "agent-a",
-    ]);
+    expect(resolution.recommendation.preferred_agent).toBe("r_aaaaaaaaaa");
+    expect(resolution.recommendation.resolved_preferred_agent).toBe("agent-a");
     expect(resolution.warnings ?? []).toEqual([]);
   });
 
@@ -29,8 +24,7 @@ describe("blinded review recommendation resolution", () => {
     const aliasMap = { r_aaaaaaaaaa: "agent-a" };
     const resolution = resolveBlindedRecommendation({
       recommendation: {
-        version: 1,
-        preferred_agents: ["r_aaaaaaaaaa"],
+        preferred_agent: "r_aaaaaaaaaa",
         rationale: "Use candidate",
         next_actions: ["voratiq apply --run run-1 --agent r_aaaaaaaaaa"],
       },
@@ -46,8 +40,7 @@ describe("blinded review recommendation resolution", () => {
     const aliasMap = { r_aaaaaaaaaa: "agent-a" };
     const resolution = resolveBlindedRecommendation({
       recommendation: {
-        version: 1,
-        preferred_agents: ["r_aaaaaaaaaa"],
+        preferred_agent: "r_aaaaaaaaaa",
         rationale: "Prefer r_aaaaaaaaaa for safety.",
         next_actions: [],
       },
@@ -63,41 +56,17 @@ describe("blinded review recommendation resolution", () => {
     const aliasMap = { r_aaaaaaaaaa: "agent-a" };
     const resolution = resolveBlindedRecommendation({
       recommendation: {
-        version: 1,
-        preferred_agents: ["agent-a"],
+        preferred_agent: "agent-a",
         rationale: "already canonical",
         next_actions: [],
       },
       aliasMap,
     });
 
-    expect(resolution.recommendation.preferred_agents).toEqual(["agent-a"]);
-    expect(resolution.recommendation.resolved_preferred_agents).toEqual([
-      "agent-a",
-    ]);
+    expect(resolution.recommendation.preferred_agent).toBe("agent-a");
+    expect(resolution.recommendation.resolved_preferred_agent).toBe("agent-a");
     expect(resolution.warnings).toBeDefined();
     expect(resolution.warnings?.[0]).toContain("Canonical agent id");
-  });
-
-  it("deduplicates resolved preferred agents", () => {
-    const aliasMap = { r_aaaaaaaaaa: "agent-a", r_bbbbbbbbbb: "agent-a" };
-    const resolution = resolveBlindedRecommendation({
-      recommendation: {
-        version: 1,
-        preferred_agents: ["r_aaaaaaaaaa", "r_bbbbbbbbbb"],
-        rationale: "duplicates",
-        next_actions: [],
-      },
-      aliasMap,
-    });
-
-    expect(resolution.recommendation.preferred_agents).toEqual([
-      "r_aaaaaaaaaa",
-      "r_bbbbbbbbbb",
-    ]);
-    expect(resolution.recommendation.resolved_preferred_agents).toEqual([
-      "agent-a",
-    ]);
   });
 
   it("fails on unknown selectors", () => {
@@ -105,8 +74,7 @@ describe("blinded review recommendation resolution", () => {
     expect(() =>
       resolveBlindedRecommendation({
         recommendation: {
-          version: 1,
-          preferred_agents: ["r_bbbbbbbbbb"],
+          preferred_agent: "r_bbbbbbbbbb",
           rationale: "unknown",
           next_actions: [],
         },
@@ -115,23 +83,20 @@ describe("blinded review recommendation resolution", () => {
     ).toThrow(ReviewGenerationFailedError);
   });
 
-  it("overwrites reviewer-provided resolved_preferred_agents values", () => {
+  it("overwrites reviewer-provided resolved_preferred_agent values", () => {
     const aliasMap = { r_aaaaaaaaaa: "agent-a" };
     const resolution = resolveBlindedRecommendation({
       recommendation: {
-        version: 1,
-        preferred_agents: ["r_aaaaaaaaaa"],
-        resolved_preferred_agents: ["bogus-agent"],
+        preferred_agent: "r_aaaaaaaaaa",
+        resolved_preferred_agent: "bogus-agent",
         rationale: "tampered",
         next_actions: [],
       },
       aliasMap,
     });
 
-    expect(resolution.recommendation.resolved_preferred_agents).toEqual([
-      "agent-a",
-    ]);
-    expect(resolution.recommendation.resolved_preferred_agents).not.toContain(
+    expect(resolution.recommendation.resolved_preferred_agent).toBe("agent-a");
+    expect(resolution.recommendation.resolved_preferred_agent).not.toBe(
       "bogus-agent",
     );
   });

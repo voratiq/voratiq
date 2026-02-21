@@ -4,9 +4,8 @@ import { z } from "zod";
 
 export const reviewRecommendationSchema = z
   .object({
-    version: z.literal(1),
-    preferred_agents: z.array(z.string().min(1)),
-    resolved_preferred_agents: z.array(z.string().min(1)).optional(),
+    preferred_agent: z.string().trim().min(1),
+    resolved_preferred_agent: z.string().trim().min(1).optional(),
     rationale: z.string(),
     next_actions: z.array(z.string()),
   })
@@ -39,6 +38,27 @@ export function parseReviewRecommendation(
   }
 
   return validation.data;
+}
+
+export function assertRecommendationMatchesRanking(options: {
+  recommendation: ReviewRecommendation;
+  ranking: readonly string[];
+}): void {
+  const { recommendation, ranking } = options;
+  if (ranking.length === 0) {
+    throw new Error("Ranking must include at least one candidate.");
+  }
+
+  const topRanked = ranking[0];
+  if (!topRanked) {
+    throw new Error("Ranking is missing the #1 candidate.");
+  }
+
+  if (recommendation.preferred_agent !== topRanked) {
+    throw new Error(
+      `Recommendation preferred_agent (${recommendation.preferred_agent}) must match ranking #1 (${topRanked}).`,
+    );
+  }
 }
 
 export async function readReviewRecommendation(

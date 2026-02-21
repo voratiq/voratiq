@@ -62,8 +62,12 @@ import {
   ReviewNoEligibleCandidatesError,
 } from "./errors.js";
 import { buildBlindedReviewManifest } from "./manifest.js";
+import { validateReviewOutputContract } from "./output-validation.js";
 import { buildReviewPrompt } from "./prompt.js";
-import { parseReviewRecommendation } from "./recommendation.js";
+import {
+  assertRecommendationMatchesRanking,
+  parseReviewRecommendation,
+} from "./recommendation.js";
 
 export type ReviewCompetitionCandidate = AgentDefinition;
 
@@ -307,7 +311,10 @@ export function createReviewCompetitionAdapter(
         );
       }
 
-      await assertReviewOutputExists(root, workspacePaths, reviewId);
+      await assertReviewOutputExists(root, workspacePaths, reviewId, {
+        eligibleCandidateIds:
+          blinded?.stagedCandidates.map((entry) => entry.candidateId) ?? [],
+      });
 
       if (blinded) {
         await postProcessBlindedReviewOutputs({
@@ -413,10 +420,15 @@ async function assertReviewOutputExists(
   root: string,
   workspacePaths: AgentWorkspacePaths,
   reviewId: string,
+  options: {
+    eligibleCandidateIds: readonly string[];
+  },
 ): Promise<void> {
+  const { eligibleCandidateIds } = options;
   const reviewStagedPath = join(workspacePaths.workspacePath, REVIEW_FILENAME);
+  let reviewContent: string;
   try {
-    const reviewContent = await readFile(reviewStagedPath, "utf8");
+    reviewContent = await readFile(reviewStagedPath, "utf8");
     if (reviewContent.trim().length === 0) {
       const stderrDisplay = normalizePathForDisplay(
         relativeToRoot(root, workspacePaths.stderrPath),
@@ -473,8 +485,19 @@ async function assertReviewOutputExists(
     );
   }
 
+  if (eligibleCandidateIds.length === 0) {
+    throw new ReviewGenerationFailedError(
+      [`Invalid output: ${REVIEW_FILENAME}`],
+      [
+        `Review session: ${reviewId}`,
+        "No eligible candidate ids were available for review validation.",
+      ],
+    );
+  }
+
+  let parsedRecommendation: ReturnType<typeof parseReviewRecommendation>;
   try {
-    parseReviewRecommendation(recommendationContent);
+    parsedRecommendation = parseReviewRecommendation(recommendationContent);
   } catch (error) {
     const detail = toErrorMessage(error);
     const stderrDisplay = normalizePathForDisplay(
@@ -482,6 +505,26 @@ async function assertReviewOutputExists(
     );
     throw new ReviewGenerationFailedError(
       [`Invalid output: ${REVIEW_RECOMMENDATION_FILENAME}`],
+      [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
+    );
+  }
+
+  try {
+    const validatedOutput = validateReviewOutputContract({
+      reviewMarkdown: reviewContent,
+      eligibleCandidateIds,
+    });
+    assertRecommendationMatchesRanking({
+      recommendation: parsedRecommendation,
+      ranking: validatedOutput.ranking,
+    });
+  } catch (error) {
+    const detail = toErrorMessage(error);
+    const stderrDisplay = normalizePathForDisplay(
+      relativeToRoot(root, workspacePaths.stderrPath),
+    );
+    throw new ReviewGenerationFailedError(
+      [`Invalid output: ${REVIEW_FILENAME}`],
       [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
     );
   }

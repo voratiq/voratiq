@@ -68,7 +68,7 @@ function assertAutoOptionCompatibility(options: AutoCommandOptions): void {
 
 interface AutoRecommendationLoadResult {
   recommendationPath: string;
-  preferredAgents: readonly string[];
+  preferredAgent: string;
 }
 
 async function loadAutoRecommendation(options: {
@@ -101,7 +101,7 @@ async function loadAutoRecommendation(options: {
     const recommendation = await readReviewRecommendation(
       recommendationAbsolutePath,
     );
-    const preferredAgents = await resolvePreferredAgentsForAuto({
+    const preferredAgent = await resolvePreferredAgentForAuto({
       recommendation,
       reviewOutputPath: options.reviewOutputPath,
       root: resolutionRoot,
@@ -109,7 +109,7 @@ async function loadAutoRecommendation(options: {
     });
     return {
       recommendationPath,
-      preferredAgents,
+      preferredAgent,
     };
   } catch (error) {
     throw new CliError(
@@ -125,23 +125,18 @@ async function loadAutoRecommendation(options: {
   }
 }
 
-async function resolvePreferredAgentsForAuto(options: {
+async function resolvePreferredAgentForAuto(options: {
   recommendation: ReviewRecommendation;
   reviewOutputPath: string;
   root: string;
   reviewsFilePath: string;
-}): Promise<string[]> {
+}): Promise<string> {
   const { recommendation, reviewOutputPath, root, reviewsFilePath } = options;
-  if (recommendation.resolved_preferred_agents !== undefined) {
-    return normalizeAgentSelectors(recommendation.resolved_preferred_agents);
+  if (recommendation.resolved_preferred_agent !== undefined) {
+    return recommendation.resolved_preferred_agent.trim();
   }
 
-  const preferredAgents = normalizeAgentSelectors(
-    recommendation.preferred_agents,
-  );
-  if (preferredAgents.length === 0) {
-    return [];
-  }
+  const preferredAgent = recommendation.preferred_agent.trim();
 
   const aliasMap = await readReviewAliasMap({
     reviewOutputPath,
@@ -149,12 +144,10 @@ async function resolvePreferredAgentsForAuto(options: {
     reviewsFilePath,
   });
   if (!aliasMap) {
-    return preferredAgents;
+    return preferredAgent;
   }
 
-  return normalizeAgentSelectors(
-    preferredAgents.map((agentId) => aliasMap[agentId] ?? agentId),
-  );
+  return aliasMap[preferredAgent] ?? preferredAgent;
 }
 
 async function readReviewAliasMap(options: {
@@ -194,23 +187,17 @@ function extractReviewIdFromOutputPath(
   return undefined;
 }
 
-function normalizeAgentSelectors(selectors: readonly string[]): string[] {
-  return Array.from(
-    new Set(selectors.map((selector) => selector.trim()).filter(Boolean)),
-  );
-}
-
 function resolveRecommendedAgent(options: {
   runId: string;
   recommendationPath: string;
-  preferredAgents: readonly string[];
+  preferredAgent: string;
   availableAgents: readonly string[];
 }): string {
-  const { runId, recommendationPath, preferredAgents, availableAgents } =
+  const { runId, recommendationPath, preferredAgent, availableAgents } =
     options;
 
-  const preferredUnique = normalizeAgentSelectors(preferredAgents);
-  if (preferredUnique.length === 0) {
+  const normalizedPreferredAgent = preferredAgent.trim();
+  if (normalizedPreferredAgent.length === 0) {
     throw new CliError(
       "Recommendation is missing a preferred agent.",
       [`No preferred agent is listed in ${recommendationPath}.`],
@@ -221,16 +208,11 @@ function resolveRecommendedAgent(options: {
   }
 
   const availableSet = new Set(availableAgents);
-  const resolved = preferredUnique.filter((agentId) =>
-    availableSet.has(agentId),
-  );
-  const resolvedUnique = Array.from(new Set(resolved));
-
-  if (resolvedUnique.length === 0) {
+  if (!availableSet.has(normalizedPreferredAgent)) {
     throw new CliError(
       "Recommendation did not match any run agent.",
       [
-        `Preferred agents: ${preferredUnique.join(", ")}`,
+        `Preferred agent: ${normalizedPreferredAgent}`,
         `Available agents: ${availableAgents.join(", ") || "(none recorded)"}`,
       ],
       [
@@ -239,20 +221,7 @@ function resolveRecommendedAgent(options: {
     );
   }
 
-  if (resolvedUnique.length > 1) {
-    throw new CliError(
-      "Recommendation is ambiguous; exactly one agent is required for auto apply.",
-      [
-        `Matched agents: ${resolvedUnique.join(", ")}`,
-        `Source: ${recommendationPath}`,
-      ],
-      [
-        `Keep exactly one preferred agent in ${recommendationPath}, or apply manually: voratiq apply --run ${runId} --agent <agent-id>`,
-      ],
-    );
-  }
-
-  return resolvedUnique[0];
+  return normalizedPreferredAgent;
 }
 
 export async function runAutoCommand(
@@ -376,7 +345,7 @@ export async function runAutoCommand(
         const recommendedAgentId = resolveRecommendedAgent({
           runId,
           recommendationPath: recommendationResult.recommendationPath,
-          preferredAgents: recommendationResult.preferredAgents,
+          preferredAgent: recommendationResult.preferredAgent,
           availableAgents: runAgentIds,
         });
 

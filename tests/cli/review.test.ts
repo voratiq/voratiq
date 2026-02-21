@@ -257,8 +257,31 @@ describe("voratiq review", () => {
           [
             "# Review",
             "",
+            "## Specification",
+            "**Summary**: summary",
+            "",
+            "## Key Requirements",
+            "- R1: requirement",
+            "",
+            "## Candidate Assessments",
+            `### ${candidateId}`,
+            "**Status**: succeeded",
+            "**Assessment**: Strong foundation",
+            "**Quality**: High",
+            "**Eval Signal**: none",
+            "**Requirements Coverage**:",
+            "- R1: Met — Evidence: artifact",
+            "**Implementation Notes**: Looks good.",
+            "**Follow-up (if applied)**: none",
+            "",
+            "## Comparison",
+            "Only one candidate.",
+            "",
+            "## Ranking",
+            `1. ${candidateId}`,
+            "",
             "## Recommendation",
-            `**Preferred Candidate(s)**: ${candidateId}`,
+            `**Preferred Candidate**: ${candidateId}`,
             `**Rationale**: Looks good via ${candidateId}.`,
             "**Next Actions**:",
             `voratiq apply --run ${runId} --agent ${candidateId}`,
@@ -270,9 +293,8 @@ describe("voratiq review", () => {
           recommendationPath,
           `${JSON.stringify(
             {
-              version: 1,
-              preferred_agents: [candidateId],
-              resolved_preferred_agents: ["bogus-agent"],
+              preferred_agent: candidateId,
+              resolved_preferred_agent: "bogus-agent",
               rationale: `Looks good via ${candidateId}.`,
               next_actions: [
                 `- \`voratiq apply --run ${runId} --agent ${candidateId}\``,
@@ -321,9 +343,8 @@ describe("voratiq review", () => {
       expect(result.body).toContain("```markdown");
       expect(result.body).toContain("## Recommendation");
       expect(result.body).not.toContain("## Resolved Recommendation");
-      expect(result.body).toContain("**Preferred Candidate(s)**: codex");
-      expect(result.body).toContain("**Preferred Candidate(s)**:");
-      expect(result.body).toContain("**Rationale**: Looks good via codex.");
+      expect(result.body).toContain("**Preferred Candidate**: codex");
+      expect(result.body).toContain("**Preferred Candidate**:");
       expect(result.body).toContain("**Next Actions**:");
       expect(result.body).toContain(
         "- `voratiq apply --run 20251007-184454-vmtyf --agent codex`",
@@ -424,14 +445,9 @@ describe("voratiq review", () => {
         "utf8",
       );
       const recommendation = parseReviewRecommendation(recommendationPayload);
-      expect(recommendation.version).toBe(1);
-      expect(recommendation.preferred_agents).toEqual([
-        expect.stringMatching(/^r_[a-z0-9]{10,16}$/u),
-      ]);
-      expect(recommendation.resolved_preferred_agents).toEqual(["codex"]);
-      expect(recommendation.resolved_preferred_agents).not.toContain(
-        "bogus-agent",
-      );
+      expect(recommendation.preferred_agent).toMatch(/^r_[a-z0-9]{10,16}$/u);
+      expect(recommendation.resolved_preferred_agent).toBe("codex");
+      expect(recommendation.resolved_preferred_agent).not.toBe("bogus-agent");
       expect(recommendation.rationale).toMatch(
         /^Looks good via r_[a-z0-9]{10,16}\.$/u,
       );
@@ -443,8 +459,11 @@ describe("voratiq review", () => {
           /^note: keep r_[a-z0-9]{10,16} for traceability$/u,
         ),
       ]);
-      const blindedAlias = recommendation.preferred_agents[0];
+      const blindedAlias = recommendation.preferred_agent;
       expect(blindedAlias).toBeDefined();
+      expect(result.body).toContain(
+        `**Rationale**: Looks good via ${blindedAlias}.`,
+      );
       expect(result.body).toContain(
         `note: keep ${blindedAlias} for traceability`,
       );
@@ -632,6 +651,16 @@ describe("voratiq review", () => {
       const sandboxInvocation = runSandboxedAgentMock.mock.calls.at(-1)?.[0];
       const prompt = sandboxInvocation?.prompt ?? "";
       expect(prompt.match(/^- r_[a-z0-9]{10,16}:/gmu)?.length ?? 0).toBe(1);
+      expect(prompt).toContain("## Candidate Assessments");
+      expect(prompt).toContain("## Ranking");
+      expect(prompt).toContain("## Recommendation");
+      expect(prompt).toContain("must be a strict best-to-worst list");
+      expect(prompt).toContain(
+        "`## Ranking` must appear immediately before `## Recommendation`",
+      );
+      expect(prompt).toContain(
+        "`preferred_agent` must be exactly one candidate id and must match ranking #1",
+      );
     });
 
     it("fails fast when no eligible candidates exist", async () => {
@@ -1120,6 +1149,213 @@ describe("voratiq review", () => {
       expect(failure.hintLines).toHaveLength(3);
       expect(failure.hintLines.at(0)).toMatch(/^Review session:/u);
       expect(failure.hintLines.at(2)).toContain("See stderr:");
+    });
+
+    it("fails when review markdown section order is invalid", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-invalid-order",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+
+      runSandboxedAgentMock.mockImplementationOnce(async (options) => {
+        const outputPath = join(options.paths.workspacePath, "review.md");
+        const recommendationPath = join(
+          options.paths.workspacePath,
+          REVIEW_RECOMMENDATION_FILENAME,
+        );
+        const manifestPath = join(
+          options.paths.workspacePath,
+          REVIEW_ARTIFACT_INFO_FILENAME,
+        );
+        const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+          candidates?: Array<{ candidateId?: string }>;
+        };
+        const candidateId =
+          manifest.candidates?.[0]?.candidateId ?? "r_invalidcandidate";
+
+        await mkdir(dirname(outputPath), { recursive: true });
+        await writeFile(
+          outputPath,
+          [
+            "# Review",
+            "",
+            "## Specification",
+            "**Summary**: summary",
+            "",
+            "## Key Requirements",
+            "- R1: requirement",
+            "",
+            "## Candidate Assessments",
+            `### ${candidateId}`,
+            "Assessment text.",
+            "",
+            "## Comparison",
+            "Comparison text.",
+            "",
+            "## Recommendation",
+            `**Preferred Candidate**: ${candidateId}`,
+            "**Rationale**: rationale",
+            "**Next Actions**:",
+            "none",
+            "",
+            "## Ranking",
+            `1. ${candidateId}`,
+            "",
+          ].join("\n"),
+          "utf8",
+        );
+        await writeFile(
+          recommendationPath,
+          `${JSON.stringify(
+            {
+              preferred_agent: candidateId,
+              rationale: "rationale",
+              next_actions: [],
+            },
+            null,
+            2,
+          )}\n`,
+          "utf8",
+        );
+        return {
+          exitCode: 0,
+          sandboxSettings: {
+            network: {
+              allowedDomains: [],
+              deniedDomains: [],
+            },
+            filesystem: {
+              denyRead: [],
+              allowWrite: [],
+              denyWrite: [],
+            },
+          },
+          manifestEnv: {},
+        };
+      });
+
+      let caughtError: unknown;
+      try {
+        await runReviewInRepo(repoRoot, {
+          runId: runRecord.runId,
+          agentId: "reviewer",
+        });
+      } catch (error: unknown) {
+        caughtError = error;
+      }
+
+      expect(caughtError).toBeInstanceOf(ReviewGenerationFailedError);
+      const failure = caughtError as ReviewGenerationFailedError;
+      expect(failure.detailLines).toEqual(["Invalid output: review.md"]);
+      expect(
+        failure.hintLines.some((line) =>
+          line.includes("Section order is invalid"),
+        ),
+      ).toBe(true);
+    });
+
+    it("fails when ranking contains duplicates", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-invalid-ranking",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+
+      runSandboxedAgentMock.mockImplementationOnce(async (options) => {
+        const outputPath = join(options.paths.workspacePath, "review.md");
+        const recommendationPath = join(
+          options.paths.workspacePath,
+          REVIEW_RECOMMENDATION_FILENAME,
+        );
+        const manifestPath = join(
+          options.paths.workspacePath,
+          REVIEW_ARTIFACT_INFO_FILENAME,
+        );
+        const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+          candidates?: Array<{ candidateId?: string }>;
+        };
+        const candidateId =
+          manifest.candidates?.[0]?.candidateId ?? "r_invalidcandidate";
+
+        await mkdir(dirname(outputPath), { recursive: true });
+        await writeFile(
+          outputPath,
+          [
+            "# Review",
+            "",
+            "## Specification",
+            "**Summary**: summary",
+            "",
+            "## Key Requirements",
+            "- R1: requirement",
+            "",
+            "## Candidate Assessments",
+            `### ${candidateId}`,
+            "Assessment text.",
+            "",
+            "## Comparison",
+            "Comparison text.",
+            "",
+            "## Ranking",
+            `1. ${candidateId}`,
+            `2. ${candidateId}`,
+            "",
+            "## Recommendation",
+            `**Preferred Candidate**: ${candidateId}`,
+            "**Rationale**: rationale",
+            "**Next Actions**:",
+            "none",
+            "",
+          ].join("\n"),
+          "utf8",
+        );
+        await writeFile(
+          recommendationPath,
+          `${JSON.stringify(
+            {
+              preferred_agent: candidateId,
+              rationale: "rationale",
+              next_actions: [],
+            },
+            null,
+            2,
+          )}\n`,
+          "utf8",
+        );
+        return {
+          exitCode: 0,
+          sandboxSettings: {
+            network: {
+              allowedDomains: [],
+              deniedDomains: [],
+            },
+            filesystem: {
+              denyRead: [],
+              allowWrite: [],
+              denyWrite: [],
+            },
+          },
+          manifestEnv: {},
+        };
+      });
+
+      let caughtError: unknown;
+      try {
+        await runReviewInRepo(repoRoot, {
+          runId: runRecord.runId,
+          agentId: "reviewer",
+        });
+      } catch (error: unknown) {
+        caughtError = error;
+      }
+
+      expect(caughtError).toBeInstanceOf(ReviewGenerationFailedError);
+      const failure = caughtError as ReviewGenerationFailedError;
+      expect(failure.detailLines).toEqual(["Invalid output: review.md"]);
+      expect(
+        failure.hintLines.some((line) =>
+          line.includes("Ranking contains duplicate candidate ids"),
+        ),
+      ).toBe(true);
     });
   });
 });

@@ -188,8 +188,8 @@ Review artifacts are written under:
 
 - `review.md`: blinded narrative review content
 - `recommendation.json`: machine-readable recommendation containing:
-  - `preferred_agents`: blinded candidate ids (for example, `r_...`) from the reviewer
-  - `resolved_preferred_agents`: canonical run agent ids resolved by Voratiq
+  - `preferred_agent`: blinded candidate id (for example, `r_...`) from the reviewer
+  - `resolved_preferred_agent`: canonical run agent id resolved by Voratiq
   - `rationale`, `next_actions`
 
 ### Examples
