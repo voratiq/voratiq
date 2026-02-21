@@ -154,7 +154,7 @@ describe("voratiq auto", () => {
       ".voratiq/specs/existing.md",
     ]);
 
-    expect((received as { reviewAgent?: string }).reviewAgent).toBeUndefined();
+    expect((received as { reviewAgent?: string[] }).reviewAgent).toEqual([]);
   });
 
   it("fails usage when --commit is provided without --apply", async () => {
@@ -207,18 +207,16 @@ describe("voratiq auto", () => {
       exitCode: 1,
     });
 
-    runReviewCommandMock.mockResolvedValue({
-      reviewId: "review-456",
-      runRecord: {} as never,
-      agentId: "reviewer",
-      outputPath: ".voratiq/reviews/review.md",
-      missingArtifacts: [],
-      body: "review body",
-    });
+    runReviewCommandMock.mockResolvedValue(
+      buildReviewResult({
+        reviewId: "review-456",
+        outputPath: ".voratiq/reviews/review.md",
+      }),
+    );
 
     await runAutoCommand({
       specPath: ".voratiq/specs/existing.md",
-      reviewerAgent: "reviewer",
+      reviewerAgentIds: ["reviewer"],
     });
 
     expect(runRunCommandMock).toHaveBeenCalledWith(
@@ -230,9 +228,8 @@ describe("voratiq auto", () => {
     expect(runReviewCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
         runId: "run-123",
-        agentId: "reviewer",
+        agentIds: ["reviewer"],
         agentOverrideFlag: "--review-agent",
-        suppressHint: true,
       }),
     );
     expect(runApplyCommandMock).not.toHaveBeenCalled();
@@ -278,7 +275,7 @@ describe("voratiq auto", () => {
 
     await runAutoCommand({
       specPath: ".voratiq/specs/existing.md",
-      reviewerAgent: "reviewer",
+      reviewerAgentIds: ["reviewer"],
     });
 
     expect(stdout.join("")).toContain("Error:");
@@ -303,14 +300,12 @@ describe("voratiq auto", () => {
       },
       body: "run body",
     });
-    runReviewCommandMock.mockResolvedValue({
-      reviewId: "review-456",
-      runRecord: {} as never,
-      agentId: "reviewer",
-      outputPath: ".voratiq/reviews/review.md",
-      missingArtifacts: [],
-      body: "review body",
-    });
+    runReviewCommandMock.mockResolvedValue(
+      buildReviewResult({
+        reviewId: "review-456",
+        outputPath: ".voratiq/reviews/review.md",
+      }),
+    );
 
     await runAutoCommand({
       specPath: ".voratiq/specs/existing.md",
@@ -329,9 +324,28 @@ describe("voratiq auto", () => {
     expect(runReviewCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
         runId: "run-123",
-        agentId: undefined,
+        agentIds: undefined,
         agentOverrideFlag: "--review-agent",
         profile: "quality",
+      }),
+    );
+  });
+
+  it("passes --max-parallel through to review execution", async () => {
+    runRunCommandMock.mockResolvedValue(buildRunResult(["alpha"]));
+    runReviewCommandMock.mockResolvedValue(buildReviewResult());
+
+    await runAutoCommand({
+      specPath: ".voratiq/specs/existing.md",
+      reviewerAgentIds: ["reviewer"],
+      maxParallel: 2,
+    });
+
+    expect(runReviewCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-123",
+        agentIds: ["reviewer"],
+        maxParallel: 2,
       }),
     );
   });
@@ -426,7 +440,7 @@ describe("voratiq auto", () => {
         ],
         hintLines: [
           "Provide --review-agent <id> to run review with an explicit agent.",
-          "Configure exactly one agent under profiles.default.review.agents in .voratiq/orchestration.yaml.",
+          "Configure at least one agent under profiles.default.review.agents in .voratiq/orchestration.yaml.",
         ],
       }),
     );
@@ -442,7 +456,7 @@ describe("voratiq auto", () => {
     expect(output).toContain("Auto FAILED");
   });
 
-  it("surfaces temporary review single-agent guardrail failures", async () => {
+  it("surfaces mixed-outcome review transcript when review returns exitCode 1", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")
@@ -452,25 +466,68 @@ describe("voratiq auto", () => {
       });
 
     runRunCommandMock.mockResolvedValue(buildRunResult(["codex"]));
-    runReviewCommandMock.mockRejectedValue(
-      new HintedError('Multiple agents found for stage "review".', {
-        detailLines: ["Multi-agent review is not supported."],
-        hintLines: [
-          "Provide --review-agent <id> to run review with an explicit agent.",
-          "Configure exactly one agent under profiles.default.review.agents in .voratiq/orchestration.yaml.",
-        ],
+    runReviewCommandMock.mockResolvedValue({
+      ...buildReviewResult({
+        reviewId: "review-789",
+        outputPath:
+          ".voratiq/reviews/sessions/review-789/reviewer-a/artifacts/review.md",
+        body: [
+          "review-789 FAILED",
+          "",
+          "AGENT       STATUS",
+          "reviewer-a  SUCCEEDED",
+          "reviewer-b  FAILED",
+          "",
+          "Reviewer: reviewer-a",
+          "",
+          "```markdown",
+          "## Recommendation",
+          "**Preferred Candidate**: codex",
+          "**Rationale**: good",
+          "**Next Actions**:",
+          "voratiq apply --run run-123 --agent codex",
+          "```",
+          "",
+          "Review: .voratiq/reviews/sessions/review-789/reviewer-a/artifacts/review.md",
+          "",
+          "---",
+          "",
+          "Reviewer: reviewer-b FAILED",
+          "",
+          "Error: reviewer violated output contract",
+        ].join("\n"),
       }),
-    );
+      exitCode: 1,
+      reviews: [
+        {
+          agentId: "reviewer-a",
+          outputPath:
+            ".voratiq/reviews/sessions/review-789/reviewer-a/artifacts/review.md",
+          status: "succeeded",
+          missingArtifacts: [],
+        },
+        {
+          agentId: "reviewer-b",
+          outputPath:
+            ".voratiq/reviews/sessions/review-789/reviewer-b/artifacts/review.md",
+          status: "failed",
+          missingArtifacts: [],
+          error: "reviewer violated output contract",
+        },
+      ],
+    });
 
     await runAutoCommand({
       specPath: ".voratiq/specs/existing.md",
+      reviewerAgentIds: ["reviewer-a", "reviewer-b"],
     });
 
     const output = stripAnsi(stdout.join(""));
-    expect(output).toContain('Multiple agents found for stage "review".');
-    expect(output).toContain("Multi-agent review is not supported.");
-    expect(output).toContain("--review-agent <id>");
+    expect(output).toContain("review-789 FAILED");
+    expect(output).toContain("Reviewer: reviewer-b FAILED");
+    expect(output).toContain("Error: reviewer violated output contract");
     expect(output).toContain("Auto FAILED");
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
   });
 
   it("keeps single-blank separation between chained transcripts", async () => {
@@ -505,18 +562,17 @@ describe("voratiq auto", () => {
       body: "RUN BODY",
     });
 
-    runReviewCommandMock.mockResolvedValue({
-      reviewId: "review-xyz",
-      runRecord: {} as never,
-      agentId: "reviewer",
-      outputPath: ".voratiq/reviews/review.md",
-      missingArtifacts: [],
-      body: "REVIEW BODY",
-    });
+    runReviewCommandMock.mockResolvedValue(
+      buildReviewResult({
+        reviewId: "review-xyz",
+        outputPath: ".voratiq/reviews/review.md",
+        body: "REVIEW BODY",
+      }),
+    );
 
     await runAutoCommand({
       specPath: ".voratiq/specs/existing.md",
-      reviewerAgent: "reviewer",
+      reviewerAgentIds: ["reviewer"],
     });
 
     const output = stripAnsi(stdout.join(""));
@@ -539,16 +595,13 @@ describe("voratiq auto", () => {
       });
 
     runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
-    runReviewCommandMock.mockResolvedValue({
-      reviewId: "review-123",
-      runRecord: {} as never,
-      agentId: "reviewer",
-      outputPath:
-        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
-      missingArtifacts: [],
-      // Intentionally conflicting markdown text to ensure auto does not parse it.
-      body: "## Recommendation\n**Preferred Candidate**: wrong-agent",
-    });
+    runReviewCommandMock.mockResolvedValue(
+      buildReviewResult({
+        reviewId: "review-123",
+        // Intentionally conflicting markdown text to ensure auto does not parse it.
+        body: "## Recommendation\n**Preferred Candidate**: wrong-agent",
+      }),
+    );
     runApplyCommandMock.mockResolvedValue({
       result: {} as never,
       body: "APPLY BODY",
@@ -568,7 +621,7 @@ describe("voratiq auto", () => {
 
       await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
-        reviewerAgent: "reviewer",
+        reviewerAgentIds: ["reviewer"],
         apply: true,
       });
     });
@@ -586,17 +639,57 @@ describe("voratiq auto", () => {
     expect(output).toContain("Auto SUCCEEDED");
   });
 
-  it("uses preferred_agent when resolved_preferred_agent is missing", async () => {
+  it("fails auto --apply when review resolves multiple reviewers", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
     runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
     runReviewCommandMock.mockResolvedValue({
-      reviewId: "review-123",
-      runRecord: {} as never,
-      agentId: "reviewer",
-      outputPath:
-        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
-      missingArtifacts: [],
-      body: "review body",
+      ...buildReviewResult({
+        reviewId: "review-123",
+        outputPath:
+          ".voratiq/reviews/sessions/review-123/reviewer-a/artifacts/review.md",
+      }),
+      reviews: [
+        {
+          agentId: "reviewer-a",
+          outputPath:
+            ".voratiq/reviews/sessions/review-123/reviewer-a/artifacts/review.md",
+          status: "succeeded",
+          missingArtifacts: [],
+        },
+        {
+          agentId: "reviewer-b",
+          outputPath:
+            ".voratiq/reviews/sessions/review-123/reviewer-b/artifacts/review.md",
+          status: "succeeded",
+          missingArtifacts: [],
+        },
+      ],
     });
+
+    await runAutoCommand({
+      specPath: ".voratiq/specs/existing.md",
+      reviewerAgentIds: ["reviewer-a", "reviewer-b"],
+      apply: true,
+    });
+
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+    expect(stripAnsi(stdout.join(""))).toContain(
+      "Auto apply requires exactly one reviewer.",
+    );
+    expect(stripAnsi(stdout.join(""))).toContain("Resolved reviewers: 2.");
+    expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
+  });
+
+  it("uses preferred_agent when resolved_preferred_agent is missing", async () => {
+    runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
+    runReviewCommandMock.mockResolvedValue(buildReviewResult());
     runApplyCommandMock.mockResolvedValue({
       result: {} as never,
       body: "APPLY BODY",
@@ -615,7 +708,7 @@ describe("voratiq auto", () => {
 
       await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
-        reviewerAgent: "reviewer",
+        reviewerAgentIds: ["reviewer"],
         apply: true,
       });
     });
@@ -630,15 +723,7 @@ describe("voratiq auto", () => {
 
   it("resolves preferred_agent aliases via the review record alias map", async () => {
     runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
-    runReviewCommandMock.mockResolvedValue({
-      reviewId: "review-123",
-      runRecord: {} as never,
-      agentId: "reviewer",
-      outputPath:
-        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
-      missingArtifacts: [],
-      body: "review body",
-    });
+    runReviewCommandMock.mockResolvedValue(buildReviewResult());
     runApplyCommandMock.mockResolvedValue({
       result: {} as never,
       body: "APPLY BODY",
@@ -663,7 +748,7 @@ describe("voratiq auto", () => {
 
       await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
-        reviewerAgent: "reviewer",
+        reviewerAgentIds: ["reviewer"],
         apply: true,
       });
     });
@@ -678,15 +763,7 @@ describe("voratiq auto", () => {
 
   it("passes --commit through to apply when --apply is enabled", async () => {
     runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
-    runReviewCommandMock.mockResolvedValue({
-      reviewId: "review-123",
-      runRecord: {} as never,
-      agentId: "reviewer",
-      outputPath:
-        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
-      missingArtifacts: [],
-      body: "review body",
-    });
+    runReviewCommandMock.mockResolvedValue(buildReviewResult());
     runApplyCommandMock.mockResolvedValue({
       result: {} as never,
       body: "APPLY BODY",
@@ -705,7 +782,7 @@ describe("voratiq auto", () => {
 
       await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
-        reviewerAgent: "reviewer",
+        reviewerAgentIds: ["reviewer"],
         apply: true,
         commit: true,
       });
@@ -728,20 +805,12 @@ describe("voratiq auto", () => {
       });
 
     runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
-    runReviewCommandMock.mockResolvedValue({
-      reviewId: "review-123",
-      runRecord: {} as never,
-      agentId: "reviewer",
-      outputPath:
-        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
-      missingArtifacts: [],
-      body: "review body",
-    });
+    runReviewCommandMock.mockResolvedValue(buildReviewResult());
 
     await withTempRepo(async () => {
       await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
-        reviewerAgent: "reviewer",
+        reviewerAgentIds: ["reviewer"],
         apply: true,
       });
     });
@@ -764,15 +833,7 @@ describe("voratiq auto", () => {
       });
 
     runRunCommandMock.mockResolvedValue(buildRunResult(["agent-a", "agent-b"]));
-    runReviewCommandMock.mockResolvedValue({
-      reviewId: "review-123",
-      runRecord: {} as never,
-      agentId: "reviewer",
-      outputPath:
-        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
-      missingArtifacts: [],
-      body: "review body",
-    });
+    runReviewCommandMock.mockResolvedValue(buildReviewResult());
 
     await withTempRepo(async (repoRoot) => {
       await writeRecommendationArtifact(
@@ -787,7 +848,7 @@ describe("voratiq auto", () => {
 
       await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
-        reviewerAgent: "reviewer",
+        reviewerAgentIds: ["reviewer"],
         apply: true,
       });
     });
@@ -811,15 +872,7 @@ describe("voratiq auto", () => {
       });
 
     runRunCommandMock.mockResolvedValue(buildRunResult(["agent-a", "agent-b"]));
-    runReviewCommandMock.mockResolvedValue({
-      reviewId: "review-123",
-      runRecord: {} as never,
-      agentId: "reviewer",
-      outputPath:
-        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
-      missingArtifacts: [],
-      body: "review body",
-    });
+    runReviewCommandMock.mockResolvedValue(buildReviewResult());
 
     await withTempRepo(async (repoRoot) => {
       await writeRecommendationArtifact(
@@ -834,7 +887,7 @@ describe("voratiq auto", () => {
 
       await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
-        reviewerAgent: "reviewer",
+        reviewerAgentIds: ["reviewer"],
         apply: true,
       });
     });
@@ -858,15 +911,7 @@ describe("voratiq auto", () => {
       });
 
     runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
-    runReviewCommandMock.mockResolvedValue({
-      reviewId: "review-123",
-      runRecord: {} as never,
-      agentId: "reviewer",
-      outputPath:
-        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
-      missingArtifacts: [],
-      body: "review body",
-    });
+    runReviewCommandMock.mockResolvedValue(buildReviewResult());
     runApplyCommandMock.mockRejectedValue(new Error("apply exploded"));
 
     await withTempRepo(async (repoRoot) => {
@@ -882,7 +927,7 @@ describe("voratiq auto", () => {
 
       await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
-        reviewerAgent: "reviewer",
+        reviewerAgentIds: ["reviewer"],
         apply: true,
       });
     });
@@ -906,6 +951,38 @@ function buildRunResult(agentIds: readonly string[]) {
       hadEvalFailure: false,
     },
     body: "RUN BODY",
+  };
+}
+
+function buildReviewResult(
+  options: {
+    reviewId?: string;
+    agentId?: string;
+    outputPath?: string;
+    body?: string;
+  } = {},
+) {
+  const reviewId = options.reviewId ?? "review-123";
+  const agentId = options.agentId ?? "reviewer";
+  const outputPath =
+    options.outputPath ??
+    `.voratiq/reviews/sessions/${reviewId}/${agentId}/artifacts/review.md`;
+  const body = options.body ?? "review body";
+  return {
+    reviewId,
+    runRecord: {} as never,
+    reviews: [
+      {
+        agentId,
+        outputPath,
+        status: "succeeded" as const,
+        missingArtifacts: [],
+      },
+    ],
+    agentId,
+    outputPath,
+    missingArtifacts: [],
+    body,
   };
 }
 
@@ -963,8 +1040,15 @@ async function writeReviewAliasRecord(options: {
       createdAt: now,
       completedAt: now,
       status: "succeeded",
-      agentId: "reviewer",
-      outputPath: `.voratiq/reviews/sessions/${reviewId}/reviewer/artifacts/review.md`,
+      reviewers: [
+        {
+          agentId: "reviewer",
+          status: "succeeded",
+          outputPath: `.voratiq/reviews/sessions/${reviewId}/reviewer/artifacts/review.md`,
+          completedAt: now,
+          error: null,
+        },
+      ],
       blinded: {
         enabled: true,
         aliasMap,

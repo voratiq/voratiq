@@ -13,11 +13,17 @@ export interface BadgeStyle {
 const ESC = "\u001B[";
 
 const BRAND_COLOR = "164;203;153";
+const REVIEW_COLOR = "226;159;115";
 
 export const BADGE_STYLES = {
   run: {
     foreground: `${ESC}38;2;0;0;0m`,
     background: `${ESC}48;2;${BRAND_COLOR}m`,
+    bold: true,
+  },
+  review: {
+    foreground: `${ESC}38;2;0;0;0m`,
+    background: `${ESC}48;2;${REVIEW_COLOR}m`,
     bold: true,
   },
   agent: {
@@ -49,6 +55,10 @@ function applyBadgeStyle(text: string, style: BadgeStyle): string {
 
 export function formatRunBadge(text: string): string {
   return applyBadgeStyle(text, BADGE_STYLES.run);
+}
+
+export function formatReviewBadge(text: string): string {
+  return applyBadgeStyle(text, BADGE_STYLES.review);
 }
 
 export function formatAgentBadge(text: string): string {

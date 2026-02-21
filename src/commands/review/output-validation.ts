@@ -156,18 +156,6 @@ function validateRequiredSectionOrder(
     }
   }
 
-  const rankingPosition = requiredOrderIndices.get("Ranking");
-  const recommendationPosition = requiredOrderIndices.get("Recommendation");
-  if (
-    typeof rankingPosition !== "number" ||
-    typeof recommendationPosition !== "number" ||
-    recommendationPosition !== rankingPosition + 1
-  ) {
-    throw new Error(
-      "Section order is invalid. ## Ranking must appear immediately before ## Recommendation.",
-    );
-  }
-
   return requiredSections;
 }
 
@@ -277,20 +265,6 @@ function validateCandidateAssessments(options: {
     throw new Error(
       `Candidate assessments must be ordered lexicographically by candidate id. Expected: ${expectedSorted.join(", ")}. Received: ${assessmentIds.join(", ")}.`,
     );
-  }
-
-  for (const assessment of assessments) {
-    for (const candidateId of expectedSorted) {
-      if (candidateId === assessment.candidateId) {
-        continue;
-      }
-
-      if (containsBoundedToken(assessment.body, candidateId)) {
-        throw new Error(
-          `Candidate assessment for ${assessment.candidateId} references ${candidateId}. Move cross-candidate reasoning to ## Comparison, ## Ranking, or ## Recommendation.`,
-        );
-      }
-    }
   }
 }
 
@@ -459,13 +433,4 @@ function arraysEqual(
     }
   }
   return true;
-}
-
-function containsBoundedToken(text: string, token: string): boolean {
-  if (!text || !token) {
-    return false;
-  }
-  const escaped = token.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-  const pattern = new RegExp(`(?<![a-z0-9_-])${escaped}(?![a-z0-9_-])`, "u");
-  return pattern.test(text);
 }

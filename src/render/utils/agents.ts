@@ -44,6 +44,10 @@ export function formatAgentStatusLabel(status: AgentStatus): string {
   return colorize(status.toUpperCase(), statusColor);
 }
 
+export function formatAgentErrorLine(error: string): string {
+  return colorize(`Error: ${error}`, "red");
+}
+
 export function buildAgentSectionHeader(agent: AgentHeaderSource): string {
   const agentLabel = formatAgentBadge(agent.agentId);
   const status = agent.status;
@@ -114,7 +118,7 @@ export function buildAgentSection(agent: AgentSectionSource): string[] {
   }
 
   if (agent.error) {
-    lines.push("", ...indentLines([colorize(`Error: ${agent.error}`, "red")]));
+    lines.push("", ...indentLines([formatAgentErrorLine(agent.error)]));
   }
 
   const evalLines = buildAgentSectionEvals(agent, agentRoot);

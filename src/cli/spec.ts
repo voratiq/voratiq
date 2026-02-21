@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 
 import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
 import { executeSpecCommand } from "../commands/spec/command.js";
@@ -7,12 +7,14 @@ import {
   resolveCliContext,
 } from "../preflight/index.js";
 import { renderSpecTranscript } from "../render/transcripts/spec.js";
+import { parsePositiveInteger } from "../utils/validators.js";
 import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface SpecCommandOptions {
   description: string;
   agent?: string;
   profile?: string;
+  maxParallel?: number;
   title?: string;
   output?: string;
   suppressHint?: boolean;
@@ -31,6 +33,7 @@ export async function runSpecCommand(
     description,
     agent,
     profile,
+    maxParallel,
     title,
     output,
     suppressHint,
@@ -47,6 +50,7 @@ export async function runSpecCommand(
     description,
     agentId: agent,
     profileName: profile,
+    maxParallel,
     title,
     outputPath: output,
     onStatus: (message) => {
@@ -63,6 +67,13 @@ export async function runSpecCommand(
 }
 
 export function createSpecCommand(): Command {
+  const parseMaxParallelOption = (value: string): number =>
+    parsePositiveInteger(
+      value,
+      "Expected positive integer after --max-parallel",
+      "--max-parallel must be greater than 0",
+    );
+
   return new Command("spec")
     .description("Generate a structured spec via a sandboxed agent")
     .requiredOption(
@@ -71,6 +82,12 @@ export function createSpecCommand(): Command {
     )
     .option("--agent <agent-id>", "Agent identifier to use")
     .option("--profile <name>", 'Orchestration profile (default: "default")')
+    .addOption(
+      new Option(
+        "--max-parallel <count>",
+        "Maximum number of spec agents to run concurrently",
+      ).argParser(parseMaxParallelOption),
+    )
     .option("--title <text>", "Optional spec title")
     .option("--output <path>", "Optional output path within .voratiq/specs/")
     .allowExcessArguments(false)

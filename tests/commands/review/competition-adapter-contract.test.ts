@@ -78,8 +78,28 @@ const subject: AdapterContractSubject<ReviewCompetitionExecution> = {
           ready: queued.map((candidate) => ({
             candidate,
             workspacePaths: toWorkspacePaths(candidate.id),
+            outputPath: normalizeOutputPath(candidate.id),
             prompt: `prompt:${candidate.id}`,
             missingArtifacts: [],
+            blinded: {
+              enabled: true,
+              aliasMap: { r_aaaaaaaaaa: "agent-a" },
+              stagedSpecPath:
+                ".voratiq/reviews/sessions/review-id/.shared/inputs/spec.md",
+              baseSnapshotPath:
+                ".voratiq/reviews/sessions/review-id/.shared/inputs/base",
+              stagedCandidates: [
+                {
+                  candidateId: "r_aaaaaaaaaa",
+                  agentId: "agent-a",
+                  diffPath:
+                    ".voratiq/reviews/sessions/review-id/.shared/inputs/candidates/r_aaaaaaaaaa/diff.patch",
+                  diffRecorded: true,
+                },
+              ],
+              extraWriteProtectedPaths: [],
+              extraReadProtectedPaths: [],
+            },
           })),
           failures: [],
         }),

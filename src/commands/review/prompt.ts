@@ -90,7 +90,7 @@ export function buildReviewPrompt(
     "",
     "Output contract (must follow exactly):",
     "- Include all sections below in the same order.",
-    "- `## Ranking` must appear immediately before `## Recommendation`.",
+    "- `## Ranking` must appear before `## Recommendation`.",
     "- Candidate assessments must be listed in lexicographic candidate-id order.",
     "- Candidate IDs for this review set (lexicographic):",
     ...sortedCandidateIds.map((candidateId) => `  - ${candidateId}`),

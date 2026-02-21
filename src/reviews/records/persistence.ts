@@ -170,12 +170,40 @@ export async function finalizeReviewRecord(options: {
     root,
     reviewsFilePath,
     sessionId,
-    mutate: (existing) => ({
-      ...existing,
-      status,
-      error: error ?? existing.error ?? null,
-      completedAt: completedAt ?? new Date().toISOString(),
-    }),
+    mutate: (existing) => {
+      const finalizedAt = completedAt ?? new Date().toISOString();
+      const sessionError = error ?? existing.error ?? null;
+      const reviewers =
+        status === "running"
+          ? existing.reviewers
+          : existing.reviewers.map((reviewer) => {
+              if (reviewer.status !== "running") {
+                return reviewer;
+              }
+              if (status === "succeeded") {
+                return {
+                  ...reviewer,
+                  status: "succeeded" as const,
+                  completedAt: reviewer.completedAt ?? finalizedAt,
+                  error: null,
+                };
+              }
+              return {
+                ...reviewer,
+                status,
+                completedAt: reviewer.completedAt ?? finalizedAt,
+                error: reviewer.error ?? sessionError,
+              };
+            });
+
+      return {
+        ...existing,
+        status,
+        error: sessionError,
+        completedAt: finalizedAt,
+        reviewers,
+      };
+    },
   });
 }
 
