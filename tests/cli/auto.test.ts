@@ -801,6 +801,53 @@ describe("voratiq auto", () => {
     expect(process.exitCode).toBe(1);
   });
 
+  it("fails safely when recommendation preferred_agent is none", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockResolvedValue(buildRunResult(["agent-a", "agent-b"]));
+    runReviewCommandMock.mockResolvedValue({
+      reviewId: "review-123",
+      runRecord: {} as never,
+      agentId: "reviewer",
+      outputPath:
+        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
+      missingArtifacts: [],
+      body: "review body",
+    });
+
+    await withTempRepo(async (repoRoot) => {
+      await writeRecommendationArtifact(
+        repoRoot,
+        ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
+        {
+          preferred_agent: "none",
+          rationale: "Invalid",
+          next_actions: [],
+        },
+      );
+
+      await runAutoCommand({
+        specPath: ".voratiq/specs/existing.md",
+        reviewerAgent: "reviewer",
+        apply: true,
+      });
+    });
+
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+    expect(stripAnsi(stdout.join(""))).toContain(
+      "Failed to load structured review recommendation.",
+    );
+    expect(stripAnsi(stdout.join(""))).toContain("preferred_agent");
+    expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
+    expect(process.exitCode).toBe(1);
+  });
+
   it("propagates apply failures", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
