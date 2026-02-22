@@ -601,6 +601,18 @@ function toReviewFailureDetail(error: unknown): string {
   return toErrorMessage(error);
 }
 
+function formatReviewValidationFailure(reason: string): string {
+  const normalizedReason = reason.replace(/\s+/gu, " ").trim();
+  const firstSentence =
+    normalizedReason.match(/^(.+?\.)\s/u)?.[1] ?? normalizedReason;
+  const condensedReason = firstSentence.replace(/:\s.+$/u, "");
+  const withoutTrailingPeriod = condensedReason.replace(/\.+$/u, "");
+  const reasonSentence = withoutTrailingPeriod.length
+    ? withoutTrailingPeriod
+    : "Unknown validation error";
+  return `Invalid \`${REVIEW_FILENAME}\`. ${reasonSentence}.`;
+}
+
 async function assertReviewOutputExists(
   root: string,
   workspacePaths: AgentWorkspacePaths,
@@ -704,14 +716,9 @@ async function assertReviewOutputExists(
       ranking: validatedOutput.ranking,
     });
   } catch (error) {
-    const detail = toErrorMessage(error);
-    const stderrDisplay = normalizePathForDisplay(
-      relativeToRoot(root, workspacePaths.stderrPath),
-    );
-    throw new ReviewGenerationFailedError(
-      [`Invalid output: ${REVIEW_FILENAME}`],
-      [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
-    );
+    throw new ReviewGenerationFailedError([
+      formatReviewValidationFailure(toErrorMessage(error)),
+    ]);
   }
 }
 

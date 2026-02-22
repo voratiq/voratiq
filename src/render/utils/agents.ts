@@ -12,6 +12,7 @@ import {
   getEvalStatusStyle,
 } from "../../status/colors.js";
 import { colorize } from "../../utils/colors.js";
+import { formatErrorMessage } from "../../utils/output.js";
 import { formatAgentBadge } from "./badges.js";
 import { renderTable } from "./table.js";
 
@@ -45,7 +46,7 @@ export function formatAgentStatusLabel(status: AgentStatus): string {
 }
 
 export function formatAgentErrorLine(error: string): string {
-  return colorize(`Error: ${error}`, "red");
+  return formatErrorMessage(error);
 }
 
 export function buildAgentSectionHeader(agent: AgentHeaderSource): string {

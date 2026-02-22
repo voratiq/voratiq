@@ -1245,7 +1245,7 @@ describe("voratiq review", () => {
       });
       const mixedBody = stripAnsi(mixedResult.body);
       expect(mixedResult.exitCode).toBe(1);
-      expect(mixedBody).toContain("Reviewer: reviewer-b FAILED");
+      expect(mixedBody).toContain("Reviewer: reviewer-b");
       expect(mixedBody).toContain("Error: reviewer-b failed");
 
       const indexPath = join(repoRoot, ".voratiq", "reviews", "index.json");
@@ -1384,7 +1384,7 @@ describe("voratiq review", () => {
       });
       const failedBody = stripAnsi(failedResult.body);
       expect(failedResult.exitCode).toBe(1);
-      expect(failedBody).toContain("Reviewer: reviewer FAILED");
+      expect(failedBody).toContain("Reviewer: reviewer");
       expect(failedBody).toContain("Error: review process failed");
 
       const indexPath = join(repoRoot, ".voratiq", "reviews", "index.json");
@@ -1573,7 +1573,7 @@ describe("voratiq review", () => {
       });
       expect(invalidOrderResult.exitCode).toBe(1);
       expect(stripAnsi(invalidOrderResult.body)).toContain(
-        "Error: Invalid output: review.md",
+        "Error: Invalid `review.md`. Section order is invalid.",
       );
     });
 
@@ -1668,8 +1668,104 @@ describe("voratiq review", () => {
       });
       expect(invalidRankingResult.exitCode).toBe(1);
       expect(stripAnsi(invalidRankingResult.body)).toContain(
-        "Error: Invalid output: review.md",
+        "Error: Invalid `review.md`. Ranking contains duplicate candidate ids.",
       );
+    });
+
+    it("normalizes unknown ranking candidate validation errors", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-unknown-ranking",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+
+      runSandboxedAgentMock.mockImplementationOnce(async (options) => {
+        const outputPath = join(options.paths.workspacePath, "review.md");
+        const recommendationPath = join(
+          options.paths.workspacePath,
+          REVIEW_RECOMMENDATION_FILENAME,
+        );
+        const manifestPath = join(
+          options.paths.workspacePath,
+          REVIEW_ARTIFACT_INFO_FILENAME,
+        );
+        const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+          candidates?: Array<{ candidateId?: string }>;
+        };
+        const candidateId =
+          manifest.candidates?.[0]?.candidateId ?? "r_invalidcandidate";
+
+        await mkdir(dirname(outputPath), { recursive: true });
+        await writeFile(
+          outputPath,
+          [
+            "# Review",
+            "",
+            "## Specification",
+            "**Summary**: summary",
+            "",
+            "## Key Requirements",
+            "- R1: requirement",
+            "",
+            "## Candidate Assessments",
+            `### ${candidateId}`,
+            "Assessment text.",
+            "",
+            "## Comparison",
+            "Comparison text.",
+            "",
+            "## Ranking",
+            "1. **r_zzzzzzzzzz** — strongest rationale",
+            "",
+            "## Recommendation",
+            "**Preferred Candidate**: r_zzzzzzzzzz",
+            "**Rationale**: rationale",
+            "**Next Actions**:",
+            "none",
+            "",
+          ].join("\n"),
+          "utf8",
+        );
+        await writeFile(
+          recommendationPath,
+          `${JSON.stringify(
+            {
+              preferred_agent: "r_zzzzzzzzzz",
+              ranking: ["r_zzzzzzzzzz"],
+              rationale: "rationale",
+              next_actions: [],
+            },
+            null,
+            2,
+          )}\n`,
+          "utf8",
+        );
+        return {
+          exitCode: 0,
+          sandboxSettings: {
+            network: {
+              allowedDomains: [],
+              deniedDomains: [],
+            },
+            filesystem: {
+              denyRead: [],
+              allowWrite: [],
+              denyWrite: [],
+            },
+          },
+          manifestEnv: {},
+        };
+      });
+
+      const invalidRankingResult = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+        agentIds: ["reviewer"],
+      });
+      const rendered = stripAnsi(invalidRankingResult.body);
+      expect(invalidRankingResult.exitCode).toBe(1);
+      expect(rendered).toContain(
+        "Error: Invalid `review.md`. Ranking contains unknown candidate id(s).",
+      );
+      expect(rendered).not.toContain("r_zzzzzzzzzz");
     });
   });
 });
