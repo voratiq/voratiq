@@ -132,12 +132,14 @@ describe("review transcript contract", () => {
       if (path.endsWith("/reviewer-a/artifacts/recommendation.json")) {
         return Promise.resolve({
           preferred_agent: "r_aaaaaaaaaa",
+          ranking: ["r_aaaaaaaaaa", "r_bbbbbbbbbb"],
           rationale: "Reviewer A rationale.",
           next_actions: ["voratiq apply --run run-123 --agent r_aaaaaaaaaa"],
         });
       }
       return Promise.resolve({
         preferred_agent: "r_bbbbbbbbbb",
+        ranking: ["r_bbbbbbbbbb", "r_aaaaaaaaaa"],
         rationale: "Reviewer B rationale for r_bbbbbbbbbb.",
         next_actions: [
           "voratiq apply --run run-123 --agent r_bbbbbbbbbb",

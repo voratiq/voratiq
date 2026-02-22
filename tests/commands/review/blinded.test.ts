@@ -9,6 +9,7 @@ describe("blinded review recommendation resolution", () => {
     const resolution = resolveBlindedRecommendation({
       recommendation: {
         preferred_agent: "r_aaaaaaaaaa",
+        ranking: ["r_aaaaaaaaaa"],
         rationale: "none",
         next_actions: [],
       },
@@ -17,6 +18,7 @@ describe("blinded review recommendation resolution", () => {
 
     expect(resolution.recommendation.preferred_agent).toBe("r_aaaaaaaaaa");
     expect(resolution.recommendation.resolved_preferred_agent).toBe("agent-a");
+    expect(resolution.recommendation.ranking).toEqual(["r_aaaaaaaaaa"]);
     expect(resolution.warnings ?? []).toEqual([]);
   });
 
@@ -25,6 +27,7 @@ describe("blinded review recommendation resolution", () => {
     const resolution = resolveBlindedRecommendation({
       recommendation: {
         preferred_agent: "r_aaaaaaaaaa",
+        ranking: ["r_aaaaaaaaaa"],
         rationale: "Use candidate",
         next_actions: ["voratiq apply --run run-1 --agent r_aaaaaaaaaa"],
       },
@@ -41,6 +44,7 @@ describe("blinded review recommendation resolution", () => {
     const resolution = resolveBlindedRecommendation({
       recommendation: {
         preferred_agent: "r_aaaaaaaaaa",
+        ranking: ["r_aaaaaaaaaa"],
         rationale: "Prefer r_aaaaaaaaaa for safety.",
         next_actions: [],
       },
@@ -57,6 +61,7 @@ describe("blinded review recommendation resolution", () => {
     const resolution = resolveBlindedRecommendation({
       recommendation: {
         preferred_agent: "agent-a",
+        ranking: ["agent-a"],
         rationale: "already canonical",
         next_actions: [],
       },
@@ -75,6 +80,7 @@ describe("blinded review recommendation resolution", () => {
       resolveBlindedRecommendation({
         recommendation: {
           preferred_agent: "r_bbbbbbbbbb",
+          ranking: ["r_bbbbbbbbbb"],
           rationale: "unknown",
           next_actions: [],
         },
@@ -88,6 +94,7 @@ describe("blinded review recommendation resolution", () => {
     const resolution = resolveBlindedRecommendation({
       recommendation: {
         preferred_agent: "r_aaaaaaaaaa",
+        ranking: ["r_aaaaaaaaaa"],
         resolved_preferred_agent: "bogus-agent",
         rationale: "tampered",
         next_actions: [],

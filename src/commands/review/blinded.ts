@@ -17,6 +17,12 @@ export function resolveBlindedRecommendation(options: {
     aliasMap,
   });
 
+  // Validate ranking selectors against the alias map/canonical ids, but keep
+  // reviewer-authored values unchanged in stored recommendation artifacts.
+  recommendation.ranking.forEach((candidateId) =>
+    resolveCandidateId({ candidateId, aliasMap }),
+  );
+
   return {
     recommendation: {
       ...recommendation,
@@ -62,4 +68,22 @@ function resolvePreferredAgent(options: {
     `Unknown candidate selector: ${preferredAgent}`,
     "Use a blinded candidate id (r_...) or a known canonical agent id.",
   ]);
+}
+
+function resolveCandidateId(options: {
+  candidateId: string;
+  aliasMap: Record<string, string>;
+}): string {
+  const { candidateId, aliasMap } = options;
+  if (isBlindedCandidateAlias(candidateId)) {
+    const canonical = aliasMap[candidateId];
+    if (!canonical) {
+      throw new ReviewGenerationFailedError([
+        `Unknown blinded candidate id in ranking: ${candidateId}`,
+        "Ensure ranking only includes candidate ids listed in the prompt.",
+      ]);
+    }
+    return canonical;
+  }
+  return candidateId;
 }

@@ -10,6 +10,7 @@ describe("review recommendation schema", () => {
     const parsed = parseReviewRecommendation(
       JSON.stringify({
         preferred_agent: "r_aaaaaaaaaa",
+        ranking: ["r_aaaaaaaaaa"],
         rationale: "Best option",
         next_actions: ["voratiq apply --run run-1 --agent r_aaaaaaaaaa"],
       }),
@@ -23,6 +24,7 @@ describe("review recommendation schema", () => {
     expect(() =>
       parseReviewRecommendation(
         JSON.stringify({
+          ranking: ["r_aaaaaaaaaa"],
           rationale: "Best option",
           next_actions: [],
         }),
@@ -35,6 +37,7 @@ describe("review recommendation schema", () => {
       parseReviewRecommendation(
         JSON.stringify({
           preferred_agent: "   ",
+          ranking: ["r_aaaaaaaaaa"],
           rationale: "Best option",
           next_actions: [],
         }),
@@ -47,6 +50,7 @@ describe("review recommendation schema", () => {
       parseReviewRecommendation(
         JSON.stringify({
           preferred_agent: "none",
+          ranking: ["r_aaaaaaaaaa"],
           rationale: "Best option",
           next_actions: [],
         }),
@@ -58,6 +62,7 @@ describe("review recommendation schema", () => {
     const parsed = parseReviewRecommendation(
       JSON.stringify({
         preferred_agent: "r_aaaaaaaaaa",
+        ranking: ["r_aaaaaaaaaa"],
         rationale: "Best option",
         next_actions: ["voratiq apply --run run-1 --agent r_aaaaaaaaaa"],
         notes: "non-contract metadata",
@@ -74,6 +79,7 @@ describe("recommendation ranking consistency", () => {
       assertRecommendationMatchesRanking({
         recommendation: {
           preferred_agent: "r_aaaaaaaaaa",
+          ranking: ["r_aaaaaaaaaa", "r_bbbbbbbbbb"],
           resolved_preferred_agent: "agent-a",
           rationale: "Best option",
           next_actions: [],
@@ -88,6 +94,7 @@ describe("recommendation ranking consistency", () => {
       assertRecommendationMatchesRanking({
         recommendation: {
           preferred_agent: "r_bbbbbbbbbb",
+          ranking: ["r_aaaaaaaaaa", "r_bbbbbbbbbb"],
           rationale: "Best option",
           next_actions: [],
         },
@@ -101,6 +108,7 @@ describe("recommendation ranking consistency", () => {
       assertRecommendationMatchesRanking({
         recommendation: {
           preferred_agent: "r_bbbbbbbbbb",
+          ranking: ["r_bbbbbbbbbb"],
           rationale: "Best option",
           next_actions: [],
         },
