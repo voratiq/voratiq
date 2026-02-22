@@ -10,6 +10,12 @@ export const reviewRecommendationSchema = z.object({
     .refine((value) => value.toLowerCase() !== "none", {
       message: "must not be 'none'",
     }),
+  ranking: z
+    .array(z.string().trim().min(1))
+    .min(1)
+    .refine((ranking) => new Set(ranking).size === ranking.length, {
+      message: "must not contain duplicate candidate ids",
+    }),
   resolved_preferred_agent: z.string().trim().min(1).optional(),
   rationale: z.string(),
   next_actions: z.array(z.string()),
@@ -62,6 +68,22 @@ export function assertRecommendationMatchesRanking(options: {
     throw new Error(
       `Recommendation preferred_agent (${recommendation.preferred_agent}) must match ranking #1 (${topRanked}).`,
     );
+  }
+
+  if (recommendation.ranking.length !== ranking.length) {
+    throw new Error(
+      `Recommendation ranking must include exactly ${ranking.length} entries.`,
+    );
+  }
+
+  for (let index = 0; index < ranking.length; index += 1) {
+    const expected = ranking[index];
+    const received = recommendation.ranking[index];
+    if (expected !== received) {
+      throw new Error(
+        `Recommendation ranking mismatch at position ${index + 1}: expected ${expected}, received ${received}.`,
+      );
+    }
   }
 }
 

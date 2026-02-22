@@ -358,6 +358,7 @@ describe("voratiq review", () => {
           `${JSON.stringify(
             {
               preferred_agent: candidateId,
+              ranking: [candidateId],
               resolved_preferred_agent: "bogus-agent",
               rationale: `Looks good via ${candidateId}.`,
               next_actions: [
@@ -510,6 +511,9 @@ describe("voratiq review", () => {
       );
       const recommendation = parseReviewRecommendation(recommendationPayload);
       expect(recommendation.preferred_agent).toMatch(/^r_[a-z0-9]{10,16}$/u);
+      expect(recommendation.ranking).toEqual([
+        expect.stringMatching(/^r_[a-z0-9]{10,16}$/u),
+      ]);
       expect(recommendation.resolved_preferred_agent).toBe("codex");
       expect(recommendation.resolved_preferred_agent).not.toBe("bogus-agent");
       expect(recommendation.rationale).toMatch(
@@ -523,12 +527,10 @@ describe("voratiq review", () => {
           /^note: keep r_[a-z0-9]{10,16} for traceability$/u,
         ),
       ]);
-      const blindedAlias = recommendation.preferred_agent;
-      expect(blindedAlias).toBeDefined();
       expect(result.body).toContain("**Rationale**: Looks good via codex.");
       expect(result.body).toContain("note: keep codex for traceability");
       expect(result.body).not.toContain(
-        `note: keep ${blindedAlias} for traceability`,
+        `note: keep ${recommendation.preferred_agent} for traceability`,
       );
 
       const recommendationArtifactFiles = (
@@ -1539,6 +1541,7 @@ describe("voratiq review", () => {
           `${JSON.stringify(
             {
               preferred_agent: candidateId,
+              ranking: [candidateId],
               rationale: "rationale",
               next_actions: [],
             },
@@ -1633,6 +1636,7 @@ describe("voratiq review", () => {
           `${JSON.stringify(
             {
               preferred_agent: candidateId,
+              ranking: [candidateId],
               rationale: "rationale",
               next_actions: [],
             },
@@ -1942,6 +1946,7 @@ async function writeValidReviewArtifacts(options: {
     `${JSON.stringify(
       {
         preferred_agent: candidateId,
+        ranking: [candidateId],
         resolved_preferred_agent: "bogus-agent",
         rationale,
         next_actions: [
