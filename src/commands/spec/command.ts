@@ -22,6 +22,7 @@ import {
 } from "../../utils/path.js";
 import { slugify } from "../../utils/slug.js";
 import { getSpecsDirectoryPath } from "../../workspace/structure.js";
+import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
 import {
@@ -41,6 +42,7 @@ export interface ExecuteSpecCommandInput {
   description: string;
   agentId?: string;
   profileName?: string;
+  maxParallel?: number;
   title?: string;
   outputPath?: string;
   onStatus?: (message: string) => void;
@@ -63,6 +65,7 @@ export async function executeSpecCommand(
     description,
     agentId,
     profileName,
+    maxParallel: requestedMaxParallel,
     title: providedTitle,
     outputPath: customOutputPath,
     onStatus,
@@ -89,6 +92,10 @@ export async function executeSpecCommand(
     throw error;
   }
   const environment = loadEnvironmentConfig({ root });
+  const effectiveMaxParallel = resolveEffectiveMaxParallel({
+    competitorCount: 1,
+    requestedMaxParallel,
+  });
 
   const specTitle =
     providedTitle && providedTitle.trim().length > 0
@@ -140,13 +147,13 @@ export async function executeSpecCommand(
   });
 
   let latestRecord = record;
-  onStatus?.("Generating specification...");
+  onStatus?.("Generating specification…");
   let generationResult: SpecCompetitionExecution;
 
   try {
     const generationResults = await executeCompetitionWithAdapter({
       candidates: [agent],
-      maxParallel: 1,
+      maxParallel: effectiveMaxParallel,
       adapter: createSpecCompetitionAdapter({
         root,
         sessionId,

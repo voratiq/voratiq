@@ -123,6 +123,29 @@ describe("voratiq spec command options", () => {
 
     expect((received as { profile?: string }).profile).toBe("quality");
   });
+
+  it("parses --max-parallel when provided", async () => {
+    let received: unknown;
+    const specCommand = silenceCommander(createSpecCommand());
+    specCommand.exitOverride().action((options) => {
+      received = options;
+    });
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(specCommand);
+
+    await program.parseAsync([
+      "node",
+      "voratiq",
+      "spec",
+      "--description",
+      "Generate a spec",
+      "--max-parallel",
+      "2",
+    ]);
+
+    expect((received as { maxParallel?: number }).maxParallel).toBe(2);
+  });
 });
 
 describe("voratiq spec (CLI)", () => {
@@ -679,6 +702,20 @@ describe("voratiq spec (CLI)", () => {
     await expect(readFile(workspacePath, "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
+  });
+
+  it("clamps spec max-parallel to the single-agent guard", async () => {
+    await runSpecCommand({
+      description: "Design a payment flow",
+      agent: "claude-haiku-4-5-20251001",
+      maxParallel: 8,
+    });
+
+    expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxParallel: 1,
+      }),
+    );
   });
 });
 

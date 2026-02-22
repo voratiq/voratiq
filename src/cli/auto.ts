@@ -23,7 +23,7 @@ import { runRunCommand } from "./run.js";
 export interface AutoCommandOptions {
   specPath: string;
   runAgentIds?: readonly string[];
-  reviewerAgent?: string;
+  reviewerAgentIds?: readonly string[];
   profile?: string;
   maxParallel?: number;
   branch?: boolean;
@@ -51,6 +51,10 @@ function parseMaxParallelOption(value: string): number {
 }
 
 function collectRunAgentOption(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
+function collectReviewAgentOption(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
 
@@ -252,6 +256,7 @@ export async function runAutoCommand(
     let reviewStatus: "succeeded" | "failed" | "skipped" = "skipped";
     let reviewOutputPath: string | undefined;
     let reviewDetail: string | undefined;
+    let reviewResultCount = 0;
 
     let applyStartedAt: number | undefined;
     let applyStatus: "succeeded" | "failed" | "skipped" = "skipped";
@@ -308,14 +313,22 @@ export async function runAutoCommand(
         try {
           const reviewResult = await runReviewCommand({
             runId,
-            agentId: options.reviewerAgent,
+            agentIds: options.reviewerAgentIds
+              ? [...options.reviewerAgentIds]
+              : undefined,
             agentOverrideFlag: "--review-agent",
             profile: options.profile,
-            suppressHint: true,
+            maxParallel: options.maxParallel,
           });
 
           reviewStatus = "succeeded";
           reviewOutputPath = reviewResult.outputPath;
+          reviewResultCount = reviewResult.reviews?.length ?? 1;
+          if (reviewResult.exitCode === 1) {
+            reviewStatus = "failed";
+            reviewDetail = "One or more reviewers failed.";
+            exitCode = 1;
+          }
 
           writeCommandOutput({
             body: reviewResult.body,
@@ -338,6 +351,16 @@ export async function runAutoCommand(
     ) {
       applyStartedAt = now();
       try {
+        if (reviewResultCount > 1) {
+          throw new CliError(
+            "Auto apply requires exactly one reviewer.",
+            [`Resolved reviewers: ${reviewResultCount}.`],
+            [
+              "Re-run with a single --review-agent <id>, or configure one agent under profiles.<name>.review.agents.",
+            ],
+          );
+        }
+
         const recommendationResult = await loadAutoRecommendation({
           reviewOutputPath,
           runId,
@@ -436,7 +459,7 @@ export async function runAutoCommand(
 interface AutoCommandActionOptions {
   spec?: string;
   runAgent?: string[];
-  reviewAgent?: string;
+  reviewAgent?: string[];
   profile?: string;
   maxParallel?: number;
   branch?: boolean;
@@ -458,7 +481,14 @@ export function createAutoCommand(): Command {
         .default([], "")
         .argParser(collectRunAgentOption),
     )
-    .option("--review-agent <agent-id>", "Override the review-stage agent")
+    .addOption(
+      new Option(
+        "--review-agent <agent-id>",
+        "Override review-stage agents (repeatable)",
+      )
+        .default([], "")
+        .argParser(collectReviewAgentOption),
+    )
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
       "--max-parallel <count>",
@@ -477,7 +507,7 @@ export function createAutoCommand(): Command {
       await runAutoCommand({
         specPath: options.spec!,
         runAgentIds: options.runAgent,
-        reviewerAgent: options.reviewAgent,
+        reviewerAgentIds: options.reviewAgent,
         profile: options.profile,
         maxParallel: options.maxParallel,
         branch: options.branch,

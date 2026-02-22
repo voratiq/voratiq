@@ -28,7 +28,7 @@ Each profile has three stage blocks: `spec`, `run`, and `review`. Each stage blo
 - `agents` (required) - array of agent references.
 - `agents[].id` (required) - an agent id from `agents.yaml`.
 
-`spec` and `review` require exactly one agent at runtime unless overridden with `--agent`. `run` accepts multiple.
+`spec` requires exactly one agent at runtime unless overridden with `--agent`. `run` and `review` accept multiple agents.
 
 ## Example
 

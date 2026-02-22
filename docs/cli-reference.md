@@ -91,14 +91,7 @@ Invokes the specified agent in a sandbox to draft a structured Markdown spec fro
 ### Examples
 
 ```bash
-$ voratiq spec --description "add dark mode toggle with localStorage persistence" --agent claude-opus-4-5-20251101
-
-Generating specification...
-
-Spec saved: .voratiq/specs/add-dark-mode-toggle.md
-
-To begin a run:
-  voratiq run --spec .voratiq/specs/add-dark-mode-toggle.md
+voratiq spec --description "add dark mode toggle with localStorage persistence" --agent claude-opus-4-5-20251101
 ```
 
 ### Errors
@@ -112,7 +105,7 @@ To begin a run:
 
 ## `voratiq run`
 
-Execute agents against a Markdown spec.
+Execute agents against a spec.
 
 ### Usage
 
@@ -165,23 +158,24 @@ voratiq run --spec .voratiq/specs/refactor.md --max-parallel 2
 
 ## `voratiq review`
 
-Run a reviewer agent against a recorded run.
+Run one or more reviewer agents against a recorded run.
 
 ### Usage
 
 ```bash
-voratiq review --run <run-id> [--agent <agent-id>] [--profile <name>]
+voratiq review --run <run-id> [--agent <agent-id>]... [--profile <name>] [--max-parallel <count>]
 ```
 
 ### Options
 
 - `--run <run-id>`: Run ID to review (required)
-- `--agent <agent-id>`: Reviewer agent identifier (uses orchestration config if omitted)
+- `--agent <agent-id>`: Reviewer agent identifier override (repeatable; preserves CLI order). Uses orchestration config if omitted.
 - `--profile <name>`: Orchestration profile used for `review` stage resolution (default: `default`)
+- `--max-parallel <count>`: Maximum number of reviewers to run concurrently (default: all reviewers)
 
 ### Behavior
 
-Invokes the specified agent in a sandbox to analyze artifacts from a completed run and write a review.
+Invokes one or more reviewer agents in sandboxes to analyze artifacts from a completed run and write independent recommendations.
 
 Review artifacts are written under:
 `.voratiq/reviews/sessions/<review-id>/<reviewer-agent-id>/artifacts/`
@@ -189,13 +183,13 @@ Review artifacts are written under:
 - `review.md`: blinded narrative review content
 - `recommendation.json`: machine-readable recommendation containing:
   - `preferred_agent`: blinded candidate id (for example, `r_...`) from the reviewer
-  - `resolved_preferred_agent`: canonical run agent id resolved by Voratiq
+  - `resolved_preferred_agent`: original agent id resolved by Voratiq
   - `rationale`, `next_actions`
 
 ### Examples
 
 ```bash
-voratiq review --run 20251031-232802-abc123 --agent gpt-5-2-codex
+voratiq review --run 20251031-232802-abc123 --agent gpt-5-2-codex --agent claude-opus-4-5-20251101
 ```
 
 ### Errors
@@ -203,7 +197,8 @@ voratiq review --run 20251031-232802-abc123 --agent gpt-5-2-codex
 - Run ID not found
 - Run record is malformed
 - No agent found for review stage (stage config empty and no `--agent`)
-- Multiple agents found for review stage (multi-agent review is not supported)
+- Reviewer authentication fails (aborts before any reviewer starts)
+- Any reviewer output contract violation (fails the overall review command)
 - Run artifacts are missing (warns but continues)
 
 ## `voratiq apply`

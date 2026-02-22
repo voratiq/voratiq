@@ -2,20 +2,18 @@ import { readFile } from "node:fs/promises";
 
 import { z } from "zod";
 
-export const reviewRecommendationSchema = z
-  .object({
-    preferred_agent: z
-      .string()
-      .trim()
-      .min(1)
-      .refine((value) => value.toLowerCase() !== "none", {
-        message: "must not be 'none'",
-      }),
-    resolved_preferred_agent: z.string().trim().min(1).optional(),
-    rationale: z.string(),
-    next_actions: z.array(z.string()),
-  })
-  .strict();
+export const reviewRecommendationSchema = z.object({
+  preferred_agent: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((value) => value.toLowerCase() !== "none", {
+      message: "must not be 'none'",
+    }),
+  resolved_preferred_agent: z.string().trim().min(1).optional(),
+  rationale: z.string(),
+  next_actions: z.array(z.string()),
+});
 
 export type ReviewRecommendation = z.infer<typeof reviewRecommendationSchema>;
 

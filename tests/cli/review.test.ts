@@ -13,6 +13,7 @@ import { promisify } from "node:util";
 
 import { Command } from "commander";
 
+import { verifyAgentProviders } from "../../src/agents/runtime/auth.js";
 import { runSandboxedAgent } from "../../src/agents/runtime/harness.js";
 import { checkPlatformSupport } from "../../src/agents/runtime/sandbox.js";
 import {
@@ -21,7 +22,6 @@ import {
   runReviewCommand,
 } from "../../src/cli/review.js";
 import { RunNotFoundCliError } from "../../src/commands/errors.js";
-import { ReviewGenerationFailedError } from "../../src/commands/review/errors.js";
 import { parseReviewRecommendation } from "../../src/commands/review/recommendation.js";
 import { executeCompetitionWithAdapter } from "../../src/competition/command-adapter.js";
 import { ensureSandboxDependencies } from "../../src/preflight/index.js";
@@ -47,6 +47,13 @@ const ensureSandboxDependenciesMock = jest.mocked(ensureSandboxDependencies);
 const executeCompetitionWithAdapterMock = jest.mocked(
   executeCompetitionWithAdapter,
 );
+const verifyAgentProvidersMock = jest.mocked(verifyAgentProviders);
+
+function stripAnsi(value: string): string {
+  const esc = String.fromCharCode(27);
+  const ansiPattern = new RegExp(`${esc}\\[[0-9;]*m`, "g");
+  return value.replace(ansiPattern, "");
+}
 
 let currentTestBaseRevisionSha: string | undefined;
 
@@ -75,6 +82,10 @@ jest.mock("../../src/competition/command-adapter.js", () => {
     ),
   };
 });
+
+jest.mock("../../src/agents/runtime/auth.js", () => ({
+  verifyAgentProviders: jest.fn(),
+}));
 
 jest.mock("../../src/preflight/index.js", () => {
   const actual = jest.requireActual<
@@ -119,7 +130,7 @@ describe("voratiq review", () => {
       ]);
 
       expect((received as { run?: string }).run).toBe("abc123");
-      expect((received as { agent?: string }).agent).toBeUndefined();
+      expect((received as { agent?: string[] }).agent).toEqual([]);
     });
 
     it("parses --run", async () => {
@@ -163,7 +174,58 @@ describe("voratiq review", () => {
         "reviewer",
       ]);
 
-      expect((received as { agent?: string }).agent).toBe("reviewer");
+      expect((received as { agent?: string[] }).agent).toEqual(["reviewer"]);
+    });
+
+    it("parses repeatable --agent preserving order", async () => {
+      let received: unknown;
+      const reviewCommand = silenceCommander(createReviewCommand());
+      reviewCommand.exitOverride().action((options) => {
+        received = options;
+      });
+
+      const program = silenceCommander(new Command());
+      program.exitOverride().addCommand(reviewCommand);
+
+      await program.parseAsync([
+        "node",
+        "voratiq",
+        "review",
+        "--run",
+        "20250101-abcde",
+        "--agent",
+        "gamma",
+        "--agent",
+        "alpha",
+      ]);
+
+      expect((received as { agent?: string[] }).agent).toEqual([
+        "gamma",
+        "alpha",
+      ]);
+    });
+
+    it("parses --max-parallel", async () => {
+      let received: unknown;
+      const reviewCommand = silenceCommander(createReviewCommand());
+      reviewCommand.exitOverride().action((options) => {
+        received = options;
+      });
+
+      const program = silenceCommander(new Command());
+      program.exitOverride().addCommand(reviewCommand);
+
+      await program.parseAsync([
+        "node",
+        "voratiq",
+        "review",
+        "--run",
+        "20250101-abcde",
+        "--max-parallel",
+        "2",
+      ]);
+
+      expect((received as { maxParallel?: number }).maxParallel).toBe(2);
     });
 
     it("parses --profile", async () => {
@@ -229,6 +291,8 @@ describe("voratiq review", () => {
       ensureSandboxDependenciesMock.mockReset();
       ensureSandboxDependenciesMock.mockImplementation(() => {});
       executeCompetitionWithAdapterMock.mockClear();
+      verifyAgentProvidersMock.mockReset();
+      verifyAgentProvidersMock.mockResolvedValue([]);
       seenManifestPath = undefined;
       seenManifestPayload = undefined;
 
@@ -337,7 +401,7 @@ describe("voratiq review", () => {
 
       const result = await runReviewInRepo(repoRoot, {
         runId: runRecord.runId,
-        agentId: "reviewer",
+        agentIds: ["reviewer"],
       });
 
       expect(result.body).toContain("```markdown");
@@ -461,13 +525,11 @@ describe("voratiq review", () => {
       ]);
       const blindedAlias = recommendation.preferred_agent;
       expect(blindedAlias).toBeDefined();
-      expect(result.body).toContain(
-        `**Rationale**: Looks good via ${blindedAlias}.`,
-      );
-      expect(result.body).toContain(
+      expect(result.body).toContain("**Rationale**: Looks good via codex.");
+      expect(result.body).toContain("note: keep codex for traceability");
+      expect(result.body).not.toContain(
         `note: keep ${blindedAlias} for traceability`,
       );
-      expect(result.body).not.toContain("note: keep codex for traceability");
 
       const recommendationArtifactFiles = (
         await readdir(dirname(reviewOutputAbsolute))
@@ -513,9 +575,13 @@ describe("voratiq review", () => {
       );
       const record = JSON.parse(await readFile(recordPath, "utf8")) as {
         runId: string;
-        agentId: string;
         status: string;
-        outputPath: string;
+        reviewers: Array<{
+          agentId: string;
+          status: string;
+          outputPath: string;
+          completedAt?: string;
+        }>;
         completedAt?: string;
         blinded?: {
           enabled?: boolean;
@@ -523,10 +589,14 @@ describe("voratiq review", () => {
         };
       };
       expect(record.runId).toBe(runRecord.runId);
-      expect(record.agentId).toBe("reviewer");
       expect(record.status).toBe("succeeded");
-      expect(record.outputPath).toBe(result.outputPath);
       expect(record.completedAt).toEqual(expect.any(String));
+      expect(record.reviewers).toHaveLength(1);
+      expect(record.reviewers[0]).toMatchObject({
+        agentId: "reviewer",
+        status: "succeeded",
+        outputPath: result.outputPath,
+      });
       expect(record.blinded?.enabled).toBe(true);
       expect(record.blinded?.aliasMap).toBeDefined();
       expect(Object.keys(record.blinded?.aliasMap ?? {})).toHaveLength(1);
@@ -633,7 +703,7 @@ describe("voratiq review", () => {
 
       const result = await runReviewInRepo(repoRoot, {
         runId,
-        agentId: "reviewer",
+        agentIds: ["reviewer"],
       });
 
       expect(result.missingArtifacts).toEqual([]);
@@ -656,7 +726,7 @@ describe("voratiq review", () => {
       expect(prompt).toContain("## Recommendation");
       expect(prompt).toContain("must be a strict best-to-worst list");
       expect(prompt).toContain(
-        "`## Ranking` must appear immediately before `## Recommendation`",
+        "`## Ranking` must appear before `## Recommendation`",
       );
       expect(prompt).toContain(
         "`preferred_agent` must be exactly one candidate id and must match ranking #1",
@@ -689,7 +759,7 @@ describe("voratiq review", () => {
       await writeRunRecord(repoRoot, runRecord);
 
       await expect(
-        runReviewInRepo(repoRoot, { runId, agentId: "reviewer" }),
+        runReviewInRepo(repoRoot, { runId, agentIds: ["reviewer"] }),
       ).rejects.toThrow(
         "Review generation failed. No eligible candidates to review.",
       );
@@ -723,7 +793,7 @@ describe("voratiq review", () => {
       await expect(
         runReviewInRepo(repoRoot, {
           runId: runRecord.runId,
-          agentId: "gpt-5-1-codex-mini",
+          agentIds: ["gpt-5-1-codex-mini"],
         }),
       ).resolves.toMatchObject({
         agentId: "gpt-5-1-codex-mini",
@@ -750,7 +820,7 @@ describe("voratiq review", () => {
       await expect(
         runReviewInRepo(repoRoot, {
           runId: runRecord.runId,
-          agentId: "gpt-5-1-codex-mini",
+          agentIds: ["gpt-5-1-codex-mini"],
         }),
       ).resolves.toMatchObject({
         agentId: "gpt-5-1-codex-mini",
@@ -784,7 +854,7 @@ describe("voratiq review", () => {
       await expect(
         runReviewInRepo(repoRoot, {
           runId: runRecord.runId,
-          agentId: "gpt-5-3-codex-high",
+          agentIds: ["gpt-5-3-codex-high"],
         }),
       ).resolves.toMatchObject({
         agentId: "gpt-5-3-codex-high",
@@ -901,7 +971,7 @@ describe("voratiq review", () => {
 
       const result = await runReviewInRepo(repoRoot, {
         runId: runRecord.runId,
-        agentId: "reviewer",
+        agentIds: ["reviewer"],
         profile: "quality",
       });
 
@@ -946,7 +1016,7 @@ describe("voratiq review", () => {
       expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
     });
 
-    it("fails without --agent when orchestration review agents contain multiple ids", async () => {
+    it("fans out without --agent when orchestration review agents contain multiple ids", async () => {
       const runRecord = buildRunRecord({
         runId: "20251007-184454-vmtyf",
       });
@@ -971,25 +1041,265 @@ describe("voratiq review", () => {
         reviewAgentIds: ["reviewer", "second-reviewer"],
       });
 
-      let caught: unknown;
-      try {
-        await runReviewInRepo(repoRoot, {
-          runId: runRecord.runId,
-        });
-      } catch (error) {
-        caught = error;
-      }
+      const result = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+      });
 
-      expect(caught).toBeInstanceOf(HintedError);
-      const hinted = caught as HintedError;
-      expect(hinted.headline).toBe('Multiple agents found for stage "review".');
-      expect(hinted.detailLines).toContain(
-        "Multi-agent review is not supported.",
+      expect(result.reviews).toHaveLength(2);
+      expect(result.reviews.map((review) => review.agentId)).toEqual([
+        "reviewer",
+        "second-reviewer",
+      ]);
+      expect(result.body).toContain("Reviewer: reviewer");
+      expect(result.body).toContain("Reviewer: second-reviewer");
+      expect(result.body.indexOf("Reviewer: reviewer")).toBeLessThan(
+        result.body.indexOf("Reviewer: second-reviewer"),
       );
-      expect(hinted.hintLines).toContain(
-        "Configure exactly one agent under profiles.default.review.agents in .voratiq/orchestration.yaml.",
+      expect(result.body).toContain("---");
+      expect(result.body).toContain(
+        `Review: .voratiq/reviews/sessions/${result.reviewId}/reviewer/artifacts/review.md`,
       );
-      expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
+      expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxParallel: 2,
+          candidates: [
+            expect.objectContaining({ id: "reviewer" }),
+            expect.objectContaining({ id: "second-reviewer" }),
+          ],
+        }),
+      );
+    });
+
+    it("renders deterministic multi-review blocks from each reviewer artifact path", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-deterministic",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+      await writeAgentsConfig(repoRoot, [
+        {
+          id: "reviewer",
+          provider: "codex",
+          model: "gpt-5.2-codex",
+          enabled: true,
+          binary: process.execPath,
+        },
+        {
+          id: "second-reviewer",
+          provider: "claude",
+          model: "claude-haiku-4-5-20251001",
+          enabled: true,
+          binary: process.execPath,
+        },
+      ]);
+      await writeOrchestrationConfig(repoRoot, {
+        reviewAgentIds: ["reviewer", "second-reviewer"],
+      });
+
+      runSandboxedAgentMock.mockImplementation(async (options) => {
+        const manifestPath = join(
+          options.paths.workspacePath,
+          REVIEW_ARTIFACT_INFO_FILENAME,
+        );
+        const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+          run?: { runId?: string };
+          candidates?: Array<{ candidateId?: string }>;
+        };
+        const runId = manifest.run?.runId ?? "unknown-run";
+        const candidateId =
+          manifest.candidates?.[0]?.candidateId ?? "r_invalidcandidate";
+        const reviewerId = options.agent.id;
+        const rationale =
+          reviewerId === "reviewer"
+            ? "Primary reviewer rationale."
+            : "Secondary reviewer rationale.";
+
+        await writeValidReviewArtifacts({
+          workspacePath: options.paths.workspacePath,
+          runId,
+          candidateId,
+          rationale,
+        });
+
+        return {
+          exitCode: 0,
+          sandboxSettings: {
+            network: {
+              allowedDomains: [],
+              deniedDomains: [],
+            },
+            filesystem: {
+              denyRead: [],
+              allowWrite: [],
+              denyWrite: [],
+            },
+          },
+          manifestEnv: {},
+        };
+      });
+
+      const result = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+      });
+
+      const reviewerOnePath = `.voratiq/reviews/sessions/${result.reviewId}/reviewer/artifacts/review.md`;
+      const reviewerTwoPath = `.voratiq/reviews/sessions/${result.reviewId}/second-reviewer/artifacts/review.md`;
+
+      expect(result.body).toMatch(
+        /Reviewer: reviewer[\s\S]*\*\*Rationale\*\*: Primary reviewer rationale\.[\s\S]*Review: .+/u,
+      );
+      expect(result.body).toMatch(
+        /Reviewer: second-reviewer[\s\S]*\*\*Rationale\*\*: Secondary reviewer rationale\.[\s\S]*Review: .+/u,
+      );
+      expect(result.body).toContain(`Review: ${reviewerOnePath}`);
+      expect(result.body).toContain(`Review: ${reviewerTwoPath}`);
+      expect(result.body.match(/\n---\n/gu)?.length ?? 0).toBe(3);
+      expect(result.body.indexOf(`Review: ${reviewerOnePath}`)).toBeLessThan(
+        result.body.indexOf(`Review: ${reviewerTwoPath}`),
+      );
+    });
+
+    it("persists mixed reviewer outcomes and leaves no reviewer running", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-mixed-reviewers",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+      await writeAgentsConfig(repoRoot, [
+        {
+          id: "reviewer-a",
+          provider: "codex",
+          model: "gpt-5.2-codex",
+          enabled: true,
+          binary: process.execPath,
+        },
+        {
+          id: "reviewer-b",
+          provider: "claude",
+          model: "claude-haiku-4-5-20251001",
+          enabled: true,
+          binary: process.execPath,
+        },
+      ]);
+
+      runSandboxedAgentMock.mockImplementation(async (options) => {
+        const manifestPath = join(
+          options.paths.workspacePath,
+          REVIEW_ARTIFACT_INFO_FILENAME,
+        );
+        const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+          run?: { runId?: string };
+          candidates?: Array<{ candidateId?: string }>;
+        };
+        const runId = manifest.run?.runId ?? "unknown-run";
+        const candidateId =
+          manifest.candidates?.[0]?.candidateId ?? "r_invalidcandidate";
+
+        if (options.agent.id === "reviewer-a") {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          await writeValidReviewArtifacts({
+            workspacePath: options.paths.workspacePath,
+            runId,
+            candidateId,
+            rationale: "Reviewer A completed successfully.",
+          });
+          return {
+            exitCode: 0,
+            sandboxSettings: {
+              network: {
+                allowedDomains: [],
+                deniedDomains: [],
+              },
+              filesystem: {
+                denyRead: [],
+                allowWrite: [],
+                denyWrite: [],
+              },
+            },
+            manifestEnv: {},
+          };
+        }
+
+        return {
+          exitCode: 1,
+          errorMessage: "reviewer-b failed",
+          sandboxSettings: {
+            network: {
+              allowedDomains: [],
+              deniedDomains: [],
+            },
+            filesystem: {
+              denyRead: [],
+              allowWrite: [],
+              denyWrite: [],
+            },
+          },
+          manifestEnv: {},
+        };
+      });
+
+      const mixedResult = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+        agentIds: ["reviewer-a", "reviewer-b"],
+        maxParallel: 2,
+      });
+      const mixedBody = stripAnsi(mixedResult.body);
+      expect(mixedResult.exitCode).toBe(1);
+      expect(mixedBody).toContain("Reviewer: reviewer-b FAILED");
+      expect(mixedBody).toContain("Error: reviewer-b failed");
+
+      const indexPath = join(repoRoot, ".voratiq", "reviews", "index.json");
+      const indexPayload = JSON.parse(await readFile(indexPath, "utf8")) as {
+        sessions: Array<{ sessionId: string; status: string }>;
+      };
+      const reviewId = indexPayload.sessions[0]?.sessionId;
+      expect(reviewId).toEqual(expect.any(String));
+
+      const recordPath = join(
+        repoRoot,
+        ".voratiq",
+        "reviews",
+        "sessions",
+        reviewId ?? "",
+        "record.json",
+      );
+      const record = JSON.parse(await readFile(recordPath, "utf8")) as {
+        status: string;
+        reviewers: Array<{
+          agentId: string;
+          status: string;
+          outputPath: string;
+        }>;
+      };
+
+      expect(record.status).toBe("failed");
+      expect(record.reviewers).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            agentId: "reviewer-a",
+            status: "succeeded",
+          }),
+          expect.objectContaining({
+            agentId: "reviewer-b",
+            status: "failed",
+          }),
+        ]),
+      );
+      expect(
+        record.reviewers.some((reviewer) => reviewer.status === "running"),
+      ).toBe(false);
+
+      const reviewerAArtifact = join(
+        repoRoot,
+        ".voratiq",
+        "reviews",
+        "sessions",
+        reviewId ?? "",
+        "reviewer-a",
+        "artifacts",
+        "review.md",
+      );
+      await expect(readFile(reviewerAArtifact, "utf8")).resolves.toContain(
+        "## Recommendation",
+      );
     });
 
     it("omits missing-artifact warnings from transcript output", async () => {
@@ -1002,7 +1312,7 @@ describe("voratiq review", () => {
 
       const result = await runReviewInRepo(repoRoot, {
         runId: runRecord.runId,
-        agentId: "reviewer",
+        agentIds: ["reviewer"],
       });
 
       expect(result.missingArtifacts).toEqual([]);
@@ -1018,13 +1328,13 @@ describe("voratiq review", () => {
 
       await expect(
         withRepoCwd(repoRoot, () =>
-          runReviewCommand({ runId: "missing-run", agentId: "reviewer" }),
+          runReviewCommand({ runId: "missing-run", agentIds: ["reviewer"] }),
         ),
       ).rejects.toBeInstanceOf(RunNotFoundCliError);
 
       await expect(
         withRepoCwd(repoRoot, () =>
-          runReviewCommand({ runId: "missing-run", agentId: "reviewer" }),
+          runReviewCommand({ runId: "missing-run", agentIds: ["reviewer"] }),
         ),
       ).rejects.toMatchObject({
         headline: "Run missing-run not found.",
@@ -1038,7 +1348,7 @@ describe("voratiq review", () => {
 
       await expect(
         withRepoCwd(repoRoot, () =>
-          runReviewCommand({ runId: "any-run", agentId: "reviewer" }),
+          runReviewCommand({ runId: "any-run", agentIds: ["reviewer"] }),
         ),
       ).rejects.toThrow("Failed to parse .voratiq/runs/index.json:");
     });
@@ -1066,22 +1376,14 @@ describe("voratiq review", () => {
         manifestEnv: {},
       });
 
-      let caughtError: unknown;
-      try {
-        await runReviewInRepo(repoRoot, {
-          runId: runRecord.runId,
-          agentId: "reviewer",
-        });
-      } catch (error: unknown) {
-        caughtError = error;
-      }
-
-      expect(caughtError).toBeInstanceOf(ReviewGenerationFailedError);
-      const failure = caughtError as ReviewGenerationFailedError;
-      expect(failure).toBeInstanceOf(ReviewGenerationFailedError);
-      expect(failure.detailLines).toEqual(["review process failed"]);
-      expect(failure.hintLines).toHaveLength(1);
-      expect(failure.hintLines.at(0)).toContain("See stderr:");
+      const failedResult = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+        agentIds: ["reviewer"],
+      });
+      const failedBody = stripAnsi(failedResult.body);
+      expect(failedResult.exitCode).toBe(1);
+      expect(failedBody).toContain("Reviewer: reviewer FAILED");
+      expect(failedBody).toContain("Error: review process failed");
 
       const indexPath = join(repoRoot, ".voratiq", "reviews", "index.json");
       const indexPayload = JSON.parse(await readFile(indexPath, "utf8")) as {
@@ -1132,23 +1434,51 @@ describe("voratiq review", () => {
         }),
       );
 
-      let caughtError: unknown;
-      try {
-        await runReviewInRepo(repoRoot, {
-          runId: runRecord.runId,
-          agentId: "reviewer",
-        });
-      } catch (error: unknown) {
-        caughtError = error;
-      }
+      const missingOutputResult = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+        agentIds: ["reviewer"],
+      });
+      expect(missingOutputResult.exitCode).toBe(1);
+      expect(stripAnsi(missingOutputResult.body)).toContain(
+        "Error: Reviewer process failed. No review output detected.",
+      );
+    });
 
-      expect(caughtError).toBeInstanceOf(ReviewGenerationFailedError);
-      const failure = caughtError as ReviewGenerationFailedError;
-      expect(failure).toBeInstanceOf(ReviewGenerationFailedError);
-      expect(failure.detailLines).toEqual(["Missing output: review.md"]);
-      expect(failure.hintLines).toHaveLength(3);
-      expect(failure.hintLines.at(0)).toMatch(/^Review session:/u);
-      expect(failure.hintLines.at(2)).toContain("See stderr:");
+    it("preserves missing recommendation-output failure shape", async () => {
+      const runRecord = buildRunRecord({
+        runId: "20251007-184454-missing-recommendation",
+      });
+      await writeRunRecord(repoRoot, runRecord);
+
+      runSandboxedAgentMock.mockImplementationOnce(async (options) => {
+        const outputPath = join(options.paths.workspacePath, "review.md");
+        await mkdir(dirname(outputPath), { recursive: true });
+        await writeFile(outputPath, "## Recommendation\n", "utf8");
+        return {
+          exitCode: 0,
+          sandboxSettings: {
+            network: {
+              allowedDomains: [],
+              deniedDomains: [],
+            },
+            filesystem: {
+              denyRead: [],
+              allowWrite: [],
+              denyWrite: [],
+            },
+          },
+          manifestEnv: {},
+        };
+      });
+
+      const result = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+        agentIds: ["reviewer"],
+      });
+      expect(result.exitCode).toBe(1);
+      expect(stripAnsi(result.body)).toContain(
+        "Error: Reviewer process failed. No recommendation output detected.",
+      );
     });
 
     it("fails when review markdown section order is invalid", async () => {
@@ -1234,24 +1564,14 @@ describe("voratiq review", () => {
         };
       });
 
-      let caughtError: unknown;
-      try {
-        await runReviewInRepo(repoRoot, {
-          runId: runRecord.runId,
-          agentId: "reviewer",
-        });
-      } catch (error: unknown) {
-        caughtError = error;
-      }
-
-      expect(caughtError).toBeInstanceOf(ReviewGenerationFailedError);
-      const failure = caughtError as ReviewGenerationFailedError;
-      expect(failure.detailLines).toEqual(["Invalid output: review.md"]);
-      expect(
-        failure.hintLines.some((line) =>
-          line.includes("Section order is invalid"),
-        ),
-      ).toBe(true);
+      const invalidOrderResult = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+        agentIds: ["reviewer"],
+      });
+      expect(invalidOrderResult.exitCode).toBe(1);
+      expect(stripAnsi(invalidOrderResult.body)).toContain(
+        "Error: Invalid output: review.md",
+      );
     });
 
     it("fails when ranking contains duplicates", async () => {
@@ -1338,24 +1658,14 @@ describe("voratiq review", () => {
         };
       });
 
-      let caughtError: unknown;
-      try {
-        await runReviewInRepo(repoRoot, {
-          runId: runRecord.runId,
-          agentId: "reviewer",
-        });
-      } catch (error: unknown) {
-        caughtError = error;
-      }
-
-      expect(caughtError).toBeInstanceOf(ReviewGenerationFailedError);
-      const failure = caughtError as ReviewGenerationFailedError;
-      expect(failure.detailLines).toEqual(["Invalid output: review.md"]);
-      expect(
-        failure.hintLines.some((line) =>
-          line.includes("Ranking contains duplicate candidate ids"),
-        ),
-      ).toBe(true);
+      const invalidRankingResult = await runReviewInRepo(repoRoot, {
+        runId: runRecord.runId,
+        agentIds: ["reviewer"],
+      });
+      expect(invalidRankingResult.exitCode).toBe(1);
+      expect(stripAnsi(invalidRankingResult.body)).toContain(
+        "Error: Invalid output: review.md",
+      );
     });
   });
 });
@@ -1573,5 +1883,74 @@ async function writeRunDiffArtifacts(
       await mkdir(dirname(diffPath), { recursive: true });
       await writeFile(diffPath, diffPayload, "utf8");
     }),
+  );
+}
+
+async function writeValidReviewArtifacts(options: {
+  workspacePath: string;
+  runId: string;
+  candidateId: string;
+  rationale: string;
+}): Promise<void> {
+  const { workspacePath, runId, candidateId, rationale } = options;
+  const reviewPath = join(workspacePath, "review.md");
+  const recommendationPath = join(
+    workspacePath,
+    REVIEW_RECOMMENDATION_FILENAME,
+  );
+
+  await mkdir(dirname(reviewPath), { recursive: true });
+  await writeFile(
+    reviewPath,
+    [
+      "# Review",
+      "",
+      "## Specification",
+      "**Summary**: summary",
+      "",
+      "## Key Requirements",
+      "- R1: requirement",
+      "",
+      "## Candidate Assessments",
+      `### ${candidateId}`,
+      "**Status**: succeeded",
+      "**Assessment**: Strong foundation",
+      "**Quality**: High",
+      "**Eval Signal**: none",
+      "**Requirements Coverage**:",
+      "- R1: Met — Evidence: artifact",
+      "**Implementation Notes**: Looks good.",
+      "**Follow-up (if applied)**: none",
+      "",
+      "## Comparison",
+      "Only one candidate.",
+      "",
+      "## Ranking",
+      `1. ${candidateId}`,
+      "",
+      "## Recommendation",
+      `**Preferred Candidate**: ${candidateId}`,
+      `**Rationale**: ${rationale}`,
+      "**Next Actions**:",
+      `voratiq apply --run ${runId} --agent ${candidateId}`,
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await writeFile(
+    recommendationPath,
+    `${JSON.stringify(
+      {
+        preferred_agent: candidateId,
+        resolved_preferred_agent: "bogus-agent",
+        rationale,
+        next_actions: [
+          `- \`voratiq apply --run ${runId} --agent ${candidateId}\``,
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
   );
 }

@@ -34,14 +34,36 @@ const blindedAliasSchema = z.string().regex(BLINDED_ALIAS_PATTERN, {
 
 const blindedAliasMapSchema = z.record(blindedAliasSchema, agentIdSchema);
 
+export const reviewRecordReviewerSchema = z.object({
+  agentId: agentIdSchema,
+  status: reviewStatusSchema,
+  outputPath: repoRelativePathSchema,
+  completedAt: z.string().optional(),
+  error: z.string().nullable().optional(),
+});
+
 export const reviewRecordSchema = z.object({
   sessionId: z.string(),
   runId: z.string(),
   createdAt: z.string(),
   completedAt: z.string().optional(),
   status: reviewStatusSchema,
-  agentId: agentIdSchema,
-  outputPath: repoRelativePathSchema,
+  reviewers: z
+    .array(reviewRecordReviewerSchema)
+    .min(1)
+    .superRefine((reviewers, ctx) => {
+      const seen = new Set<string>();
+      for (const reviewer of reviewers) {
+        if (seen.has(reviewer.agentId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Duplicate reviewer agent id: ${reviewer.agentId}`,
+          });
+          return;
+        }
+        seen.add(reviewer.agentId);
+      }
+    }),
   blinded: z
     .object({
       enabled: z.literal(true),

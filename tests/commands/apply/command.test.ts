@@ -1027,8 +1027,15 @@ async function writeReviewRecord(options: {
       createdAt: now,
       completedAt: now,
       status: "succeeded",
-      agentId: "reviewer",
-      outputPath: `.voratiq/reviews/sessions/${reviewId}/reviewer/artifacts/review.md`,
+      reviewers: [
+        {
+          agentId: "reviewer",
+          status: "succeeded",
+          outputPath: `.voratiq/reviews/sessions/${reviewId}/reviewer/artifacts/review.md`,
+          completedAt: now,
+          error: null,
+        },
+      ],
       blinded: {
         enabled: true,
         aliasMap,

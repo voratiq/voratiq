@@ -53,6 +53,19 @@ describe("review recommendation schema", () => {
       ),
     ).toThrow(/must not be 'none'/u);
   });
+
+  it("accepts extra metadata keys", () => {
+    const parsed = parseReviewRecommendation(
+      JSON.stringify({
+        preferred_agent: "r_aaaaaaaaaa",
+        rationale: "Best option",
+        next_actions: ["voratiq apply --run run-1 --agent r_aaaaaaaaaa"],
+        notes: "non-contract metadata",
+      }),
+    );
+
+    expect(parsed.preferred_agent).toBe("r_aaaaaaaaaa");
+  });
 });
 
 describe("recommendation ranking consistency", () => {

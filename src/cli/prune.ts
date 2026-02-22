@@ -11,7 +11,7 @@ import {
   renderPruneTranscript,
 } from "../render/transcripts/prune.js";
 import { createConfirmationWorkflow } from "./confirmation.js";
-import { NonInteractiveShellError } from "./errors.js";
+import { CliError, NonInteractiveShellError } from "./errors.js";
 import { writeCommandOutput } from "./output.js";
 
 export interface PruneCommandOptions {
@@ -59,7 +59,11 @@ export async function runPruneCommand(
     }
 
     if (!runId) {
-      throw new Error("Expected --run <run-id> when --all is not set.");
+      throw new CliError(
+        "Missing prune target.",
+        [],
+        ["Provide `--run <run-id>` or use `--all`."],
+      );
     }
 
     const result = await executePruneCommand({

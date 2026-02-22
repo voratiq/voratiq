@@ -126,6 +126,45 @@ describe("review output contract validation", () => {
     ).toThrow(/Section order is invalid/u);
   });
 
+  it("allows non-required sections between ranking and recommendation", () => {
+    const markdown = [
+      "# Review",
+      "",
+      "## Specification",
+      "Summary",
+      "",
+      "## Key Requirements",
+      "- R1",
+      "",
+      "## Candidate Assessments",
+      "### r_aaaaaaaaaa",
+      "Assessment A.",
+      "",
+      "## Comparison",
+      "Comparison.",
+      "",
+      "## Ranking",
+      "1. r_aaaaaaaaaa",
+      "",
+      "## Notes",
+      "Additional optional notes.",
+      "",
+      "## Recommendation",
+      "**Preferred Candidate**: r_aaaaaaaaaa",
+      "**Rationale**: Reason",
+      "**Next Actions**:",
+      "none",
+      "",
+    ].join("\n");
+
+    expect(() =>
+      validateReviewOutputContract({
+        reviewMarkdown: markdown,
+        eligibleCandidateIds: ["r_aaaaaaaaaa"],
+      }),
+    ).not.toThrow();
+  });
+
   it("rejects candidate assessments that are not lexicographically ordered", () => {
     const markdown = buildReviewMarkdown({
       candidateAssessments: [
@@ -149,12 +188,12 @@ describe("review output contract validation", () => {
     ).toThrow(/ordered lexicographically/u);
   });
 
-  it("rejects cross-candidate references in candidate assessment blocks", () => {
+  it("allows cross-candidate references in candidate assessment blocks", () => {
     const markdown = buildReviewMarkdown({
       candidateAssessments: [
         {
           candidateId: "r_aaaaaaaaaa",
-          body: "This mentions r_bbbbbbbbbb and should fail.",
+          body: "Compared to r_bbbbbbbbbb, this is stronger on requirements coverage.",
         },
         {
           candidateId: "r_bbbbbbbbbb",
@@ -169,7 +208,7 @@ describe("review output contract validation", () => {
         reviewMarkdown: markdown,
         eligibleCandidateIds: ["r_aaaaaaaaaa", "r_bbbbbbbbbb"],
       }),
-    ).toThrow(/cross-candidate reasoning/u);
+    ).not.toThrow();
   });
 });
 

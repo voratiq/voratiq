@@ -31,7 +31,7 @@ async function handleFatalError(
   context: string,
   error: unknown,
 ): Promise<void> {
-  await terminateActiveRunSafe("failed", context);
+  await terminateActiveSessionsSafe("failed", context);
   await flushPendingHistory();
   console.error(error);
   process.exit(1);
@@ -39,7 +39,7 @@ async function handleFatalError(
 
 async function handleSignal(signal: NodeJS.Signals): Promise<void> {
   const exitCode = SIGNAL_EXIT_CODES[signal] ?? 1;
-  const teardownError = await terminateActiveRunSafe("aborted", signal);
+  const teardownError = await terminateActiveSessionsSafe("aborted", signal);
   if (teardownError) {
     await flushPendingHistory();
     process.exit(1);
@@ -100,6 +100,42 @@ async function terminateActiveRunSafe(
     );
     return normalizedError;
   }
+}
+
+async function terminateActiveReviewSafe(
+  status: "failed" | "aborted",
+  context: string,
+): Promise<Error | null> {
+  try {
+    const { terminateActiveReview } = await import(
+      "./commands/review/lifecycle.js"
+    );
+    await terminateActiveReview(status);
+    return null;
+  } catch (error) {
+    const { toErrorMessage } = await import("./utils/errors.js");
+    const normalizedError =
+      error instanceof Error ? error : new Error(toErrorMessage(error));
+    console.error(
+      `[voratiq] Failed to teardown review after ${context}: ${toErrorMessage(error)}`,
+    );
+    return normalizedError;
+  }
+}
+
+async function terminateActiveSessionsSafe(
+  status: "failed" | "aborted",
+  context: string,
+): Promise<Error | null> {
+  const runError = await terminateActiveRunSafe(status, context);
+  const reviewError = await terminateActiveReviewSafe(status, context);
+  if (runError && reviewError) {
+    return new AggregateError(
+      [runError, reviewError],
+      `Failed to teardown run and review after ${context}`,
+    );
+  }
+  return runError ?? reviewError ?? null;
 }
 
 export async function runCli(

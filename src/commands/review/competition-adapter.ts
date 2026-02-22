@@ -3,6 +3,8 @@ import {
   mkdir,
   readdir,
   readFile,
+  rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -18,8 +20,8 @@ import type { EnvironmentConfig } from "../../configs/environment/types.js";
 import { generateBlindedCandidateAlias } from "../../reviews/candidates.js";
 import {
   appendReviewRecord,
-  finalizeReviewRecord,
   flushReviewRecordBuffer,
+  readReviewRecords,
   rewriteReviewRecord,
 } from "../../reviews/records/persistence.js";
 import type { ReviewRecord } from "../../reviews/records/types.js";
@@ -68,8 +70,24 @@ import {
   assertRecommendationMatchesRanking,
   parseReviewRecommendation,
 } from "./recommendation.js";
+import { composeReviewSandboxPolicy } from "./sandbox-policy.js";
 
 export type ReviewCompetitionCandidate = AgentDefinition;
+
+interface BlindedReviewSessionInputs {
+  readonly aliasMap: Record<string, string>;
+  readonly sharedRootAbsolute: string;
+  readonly sharedInputsAbsolute: string;
+  readonly stagedSpecAbsolute: string;
+  readonly baseSnapshotAbsolute: string;
+  readonly stagedCandidates: ReadonlyArray<{
+    readonly candidateId: string;
+    readonly agentId: string;
+    readonly diffAbsolutePath: string;
+    readonly diffRecorded: boolean;
+  }>;
+  readonly worktreesToRemove: readonly string[];
+}
 
 export interface BlindedReviewPreparation {
   readonly enabled: true;
@@ -84,15 +102,15 @@ export interface BlindedReviewPreparation {
   }>;
   readonly extraWriteProtectedPaths: readonly string[];
   readonly extraReadProtectedPaths: readonly string[];
-  readonly worktreesToRemove: readonly string[];
 }
 
 export interface PreparedReviewCompetitionCandidate {
   readonly candidate: ReviewCompetitionCandidate;
   readonly workspacePaths: AgentWorkspacePaths;
+  readonly outputPath: string;
   readonly prompt: string;
   readonly missingArtifacts: readonly string[];
-  readonly blinded?: BlindedReviewPreparation;
+  readonly blinded: BlindedReviewPreparation;
 }
 
 export interface ReviewCompetitionExecution {
@@ -133,6 +151,7 @@ export function createReviewCompetitionAdapter(
   let failure: unknown;
   const workspacesToPrune = new Set<string>();
   const worktreesToRemove = new Set<string>();
+  let sharedInputs: BlindedReviewSessionInputs | undefined;
 
   return {
     prepareCandidates: async (
@@ -144,8 +163,41 @@ export function createReviewCompetitionAdapter(
       >
     > => {
       try {
-        const prepared: PreparedReviewCompetitionCandidate[] = [];
+        sharedInputs = await prepareSharedBlindedReviewInputs({
+          root,
+          reviewId,
+          run,
+        });
+        for (const worktreePath of sharedInputs.worktreesToRemove) {
+          worktreesToRemove.add(worktreePath);
+        }
 
+        const record: ReviewRecord = {
+          sessionId: reviewId,
+          runId: run.runId,
+          createdAt,
+          status: "running",
+          reviewers: candidates.map((candidate) => ({
+            agentId: candidate.id,
+            status: "running",
+            outputPath: buildReviewOutputPath({
+              root,
+              reviewId,
+              reviewerAgentId: candidate.id,
+            }),
+          })),
+          blinded: {
+            enabled: true,
+            aliasMap: sharedInputs.aliasMap,
+          },
+        };
+        await appendReviewRecord({
+          root,
+          reviewsFilePath,
+          record,
+        });
+
+        const prepared: PreparedReviewCompetitionCandidate[] = [];
         for (const candidate of candidates) {
           const workspacePaths = await scaffoldAgentSessionWorkspace({
             root,
@@ -159,33 +211,17 @@ export function createReviewCompetitionAdapter(
             relativeToRoot(root, workspacePaths.reviewPath),
           );
 
-          const blinded = await prepareBlindedReviewInputs({
+          await attachSharedInputsToReviewerWorkspace({
+            workspacePath: workspacePaths.workspacePath,
+            sharedInputsAbsolute: sharedInputs.sharedInputsAbsolute,
+          });
+
+          const blinded = await buildReviewerBlindedPreparation({
             root,
             reviewId,
             reviewerAgentId: candidate.id,
             workspacePaths,
-            run,
-          });
-          for (const path of blinded.worktreesToRemove) {
-            worktreesToRemove.add(path);
-          }
-
-          const record: ReviewRecord = {
-            sessionId: reviewId,
-            runId: run.runId,
-            createdAt,
-            status: "running",
-            agentId: candidate.id,
-            outputPath,
-            blinded: {
-              enabled: true,
-              aliasMap: blinded.aliasMap,
-            },
-          };
-          await appendReviewRecord({
-            root,
-            reviewsFilePath,
-            record,
+            sharedInputs,
           });
 
           const buildManifestResult = await buildBlindedReviewManifest({
@@ -245,6 +281,7 @@ export function createReviewCompetitionAdapter(
           prepared.push({
             candidate,
             workspacePaths,
+            outputPath,
             prompt: promptBuild.prompt,
             missingArtifacts: [...missingArtifacts],
             blinded,
@@ -261,14 +298,21 @@ export function createReviewCompetitionAdapter(
       }
     },
     executeCandidate: async (prepared): Promise<ReviewCompetitionExecution> => {
-      const { candidate, workspacePaths, prompt, blinded } = prepared;
+      const { candidate, workspacePaths, prompt, blinded, outputPath } =
+        prepared;
       const agent = candidate;
+      const sandboxPolicy = composeReviewSandboxPolicy({
+        runWorkspaceAbsolute,
+        stageWriteProtectedPaths: blinded.extraWriteProtectedPaths,
+        stageReadProtectedPaths: blinded.extraReadProtectedPaths,
+      });
       const result = await runSandboxedAgent({
         root,
         sessionId: reviewId,
         agent,
         prompt,
         environment,
+        teardownAuthOnExit: false,
         paths: {
           agentRoot: workspacePaths.agentRoot,
           workspacePath: workspacePaths.workspacePath,
@@ -281,11 +325,8 @@ export function createReviewCompetitionAdapter(
           stderrPath: workspacePaths.stderrPath,
         },
         captureChat: true,
-        extraWriteProtectedPaths: [
-          runWorkspaceAbsolute,
-          ...(blinded?.extraWriteProtectedPaths ?? []),
-        ],
-        extraReadProtectedPaths: blinded?.extraReadProtectedPaths ?? [],
+        extraWriteProtectedPaths: sandboxPolicy.extraWriteProtectedPaths,
+        extraReadProtectedPaths: sandboxPolicy.extraReadProtectedPaths,
       });
 
       if (result.exitCode !== 0 || result.errorMessage) {
@@ -312,19 +353,18 @@ export function createReviewCompetitionAdapter(
       }
 
       await assertReviewOutputExists(root, workspacePaths, reviewId, {
-        eligibleCandidateIds:
-          blinded?.stagedCandidates.map((entry) => entry.candidateId) ?? [],
+        eligibleCandidateIds: blinded.stagedCandidates.map(
+          (entry) => entry.candidateId,
+        ),
       });
 
-      if (blinded) {
-        await postProcessBlindedReviewOutputs({
-          root,
-          reviewsFilePath,
-          reviewId,
-          workspacePaths,
-          aliasMap: blinded.aliasMap,
-        });
-      }
+      await postProcessBlindedReviewOutputs({
+        root,
+        reviewsFilePath,
+        reviewId,
+        workspacePaths,
+        aliasMap: blinded.aliasMap,
+      });
 
       await promoteWorkspaceFile({
         workspacePath: workspacePaths.workspacePath,
@@ -343,44 +383,126 @@ export function createReviewCompetitionAdapter(
 
       return {
         agentId: agent.id,
-        outputPath: normalizePathForDisplay(
-          relativeToRoot(root, workspacePaths.reviewPath),
-        ),
+        outputPath,
         status: "succeeded",
         missingArtifacts: [...prepared.missingArtifacts],
       };
     },
-    captureExecutionFailure: ({ error }) => {
+    onCandidateCompleted: async (prepared) => {
+      await rewriteReviewRecordIfPresent({
+        root,
+        reviewsFilePath,
+        sessionId: reviewId,
+        mutate: (record) => {
+          assertReviewAliasMapConsistency({
+            record,
+            reviewId,
+            expectedAliasMap: prepared.blinded.aliasMap,
+          });
+          return mutateReviewerRecord(record, {
+            reviewerAgentId: prepared.candidate.id,
+            status: "succeeded",
+            completedAt: new Date().toISOString(),
+            error: null,
+          });
+        },
+      });
+    },
+    captureExecutionFailure: async ({ prepared, error }) => {
       failure = failure ?? error;
-      return undefined;
+      const detail = toReviewFailureDetail(error);
+      try {
+        await rewriteReviewRecordIfPresent({
+          root,
+          reviewsFilePath,
+          sessionId: reviewId,
+          mutate: (record) => {
+            assertReviewAliasMapConsistency({
+              record,
+              reviewId,
+              expectedAliasMap: prepared.blinded.aliasMap,
+            });
+            return mutateReviewerRecord(record, {
+              reviewerAgentId: prepared.candidate.id,
+              status: "failed",
+              completedAt: new Date().toISOString(),
+              error: detail,
+            });
+          },
+        });
+      } catch {
+        // Preserve the primary execution error.
+      }
+      return {
+        agentId: prepared.candidate.id,
+        outputPath: prepared.outputPath,
+        status: "failed",
+        missingArtifacts: [...prepared.missingArtifacts],
+        error: detail,
+      };
     },
     finalizeCompetition: async () => {
       const failed = failure !== undefined;
+      const failureDetail = toReviewFailureDetail(failure);
 
-      if (failed) {
-        await finalizeReviewRecord({
-          root,
-          reviewsFilePath,
-          sessionId: reviewId,
-          status: "failed",
-          error: toReviewFailureDetail(failure),
-        }).catch(() => {});
-        await flushReviewRecordBuffer({
-          reviewsFilePath,
-          sessionId: reviewId,
-        }).catch(() => {});
-      } else {
-        await finalizeReviewRecord({
-          root,
-          reviewsFilePath,
-          sessionId: reviewId,
-          status: "succeeded",
-        });
-        await flushReviewRecordBuffer({
-          reviewsFilePath,
-          sessionId: reviewId,
-        });
-      }
+      await rewriteReviewRecord({
+        root,
+        reviewsFilePath,
+        sessionId: reviewId,
+        mutate: (record) => {
+          const completedAt = record.completedAt ?? new Date().toISOString();
+          const runningReviewerStatus = resolveRunningReviewerStatus({
+            recordStatus: record.status,
+            failed,
+          });
+
+          const reviewers = record.reviewers.map(
+            (reviewer): ReviewRecord["reviewers"][number] => {
+              if (reviewer.status !== "running") {
+                return reviewer;
+              }
+              if (runningReviewerStatus === "succeeded") {
+                return {
+                  ...reviewer,
+                  status: runningReviewerStatus,
+                  completedAt,
+                  error: null,
+                };
+              }
+              return {
+                ...reviewer,
+                status: runningReviewerStatus,
+                completedAt,
+                error: reviewer.error ?? record.error ?? failureDetail,
+              };
+            },
+          );
+
+          const status =
+            record.status === "running"
+              ? failed
+                ? "failed"
+                : "succeeded"
+              : record.status;
+          const error =
+            status === "succeeded"
+              ? null
+              : (record.error ?? (failed ? failureDetail : null));
+
+          return {
+            ...record,
+            status,
+            completedAt,
+            error,
+            reviewers,
+          };
+        },
+      }).catch(() => {});
+
+      await flushReviewRecordBuffer({
+        reviewsFilePath,
+        sessionId: reviewId,
+      }).catch(() => {});
 
       for (const worktreePath of worktreesToRemove) {
         await removeWorktree({ root, worktreePath }).catch(() => {});
@@ -390,23 +512,86 @@ export function createReviewCompetitionAdapter(
         await pruneWorkspace(workspacePath);
       }
     },
-    sortResults: compareReviewExecutionsByAgentId,
   };
 }
 
-function compareReviewExecutionsByAgentId(
-  left: ReviewCompetitionExecution,
-  right: ReviewCompetitionExecution,
-): number {
-  return left.agentId.localeCompare(right.agentId);
+function mutateReviewerRecord(
+  record: ReviewRecord,
+  options: {
+    reviewerAgentId: string;
+    status: "succeeded" | "failed" | "aborted";
+    completedAt: string;
+    error: string | null;
+  },
+): ReviewRecord {
+  const { reviewerAgentId, status, completedAt, error } = options;
+  let found = false;
+  const reviewers = record.reviewers.map((reviewer) => {
+    if (reviewer.agentId !== reviewerAgentId) {
+      return reviewer;
+    }
+    found = true;
+    return {
+      ...reviewer,
+      status,
+      completedAt,
+      error,
+    };
+  });
+  if (!found) {
+    throw new Error(
+      `Review record ${record.sessionId} is missing reviewer ${reviewerAgentId}.`,
+    );
+  }
+  return {
+    ...record,
+    reviewers,
+  };
+}
+
+function resolveRunningReviewerStatus(options: {
+  recordStatus: ReviewRecord["status"];
+  failed: boolean;
+}): "succeeded" | "failed" | "aborted" {
+  const { recordStatus, failed } = options;
+  if (recordStatus === "aborted") {
+    return "aborted";
+  }
+  if (recordStatus === "failed") {
+    return "failed";
+  }
+  return failed ? "failed" : "succeeded";
+}
+
+async function rewriteReviewRecordIfPresent(
+  options: Parameters<typeof rewriteReviewRecord>[0],
+): Promise<void> {
+  try {
+    await rewriteReviewRecord(options);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      /Session\s+.+\s+not found\./u.test(error.message)
+    ) {
+      return;
+    }
+    throw error;
+  }
 }
 
 function toReviewFailureDetail(error: unknown): string {
-  if (
-    error instanceof ReviewGenerationFailedError &&
-    error.detailLines.length > 0
-  ) {
-    return error.detailLines.join("\n");
+  if (error instanceof ReviewGenerationFailedError) {
+    const detail = [...error.detailLines];
+    const informativeHints = error.hintLines.filter(
+      (line) =>
+        !line.startsWith("Review session:") && !line.startsWith("See stderr:"),
+    );
+    if (informativeHints.length > 0) {
+      detail.push(...informativeHints);
+    }
+    if (detail.length > 0) {
+      return detail.join("\n");
+    }
   }
 
   if (error === undefined) {
@@ -434,7 +619,7 @@ async function assertReviewOutputExists(
         relativeToRoot(root, workspacePaths.stderrPath),
       );
       throw new ReviewGenerationFailedError(
-        [`Missing output: ${REVIEW_FILENAME}`],
+        ["Reviewer process failed. No review output detected."],
         [`Review session: ${reviewId}`, `See stderr: ${stderrDisplay}`],
       );
     }
@@ -447,7 +632,7 @@ async function assertReviewOutputExists(
       relativeToRoot(root, workspacePaths.stderrPath),
     );
     throw new ReviewGenerationFailedError(
-      [`Missing output: ${REVIEW_FILENAME}`],
+      ["Reviewer process failed. No review output detected."],
       [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
     );
   }
@@ -466,7 +651,7 @@ async function assertReviewOutputExists(
       relativeToRoot(root, workspacePaths.stderrPath),
     );
     throw new ReviewGenerationFailedError(
-      [`Missing output: ${REVIEW_RECOMMENDATION_FILENAME}`],
+      ["Reviewer process failed. No recommendation output detected."],
       [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
     );
   }
@@ -530,14 +715,12 @@ async function assertReviewOutputExists(
   }
 }
 
-async function prepareBlindedReviewInputs(options: {
+async function prepareSharedBlindedReviewInputs(options: {
   root: string;
   reviewId: string;
-  reviewerAgentId: string;
-  workspacePaths: AgentWorkspacePaths;
   run: RunRecordEnhanced;
-}): Promise<BlindedReviewPreparation> {
-  const { root, reviewId, reviewerAgentId, workspacePaths, run } = options;
+}): Promise<BlindedReviewSessionInputs> {
+  const { root, reviewId, run } = options;
 
   const eligibleAgents = await resolveEligibleReviewCandidateAgents({
     root,
@@ -548,22 +731,28 @@ async function prepareBlindedReviewInputs(options: {
     throw new ReviewNoEligibleCandidatesError();
   }
 
-  const stagedInputsDir = join(workspacePaths.workspacePath, "inputs");
-  await mkdir(stagedInputsDir, { recursive: true });
+  const sharedRootAbsolute = resolveWorkspacePath(
+    root,
+    VORATIQ_REVIEWS_SESSIONS_DIR,
+    reviewId,
+    ".shared",
+  );
+  const sharedInputsAbsolute = join(sharedRootAbsolute, "inputs");
+  await mkdir(sharedInputsAbsolute, { recursive: true });
 
-  const stagedSpecAbsolute = join(stagedInputsDir, "spec.md");
+  const stagedSpecAbsolute = join(sharedInputsAbsolute, "spec.md");
   const specAbsolute = resolvePath(root, run.spec.path);
   await mkdir(dirname(stagedSpecAbsolute), { recursive: true });
   await copyFile(specAbsolute, stagedSpecAbsolute);
 
-  const baseSnapshotAbsolute = join(stagedInputsDir, "base");
+  const baseSnapshotAbsolute = join(sharedInputsAbsolute, "base");
   await createDetachedWorktree({
     root,
     worktreePath: baseSnapshotAbsolute,
     baseRevision: run.baseRevisionSha,
   });
 
-  const stagedCandidatesDir = join(stagedInputsDir, "candidates");
+  const stagedCandidatesDir = join(sharedInputsAbsolute, "candidates");
   await mkdir(stagedCandidatesDir, { recursive: true });
 
   const seenAliases = new Set<string>();
@@ -575,7 +764,7 @@ async function prepareBlindedReviewInputs(options: {
   const stagedCandidates: Array<{
     candidateId: string;
     agentId: string;
-    diffPath: string;
+    diffAbsolutePath: string;
     diffRecorded: boolean;
   }> = [];
 
@@ -587,39 +776,95 @@ async function prepareBlindedReviewInputs(options: {
 
     const stagedDiffAbsolute = join(stagedCandidatesDir, alias, "diff.patch");
     await mkdir(dirname(stagedDiffAbsolute), { recursive: true });
-
     await copyFile(eligible.diffSourceAbsolute, stagedDiffAbsolute);
 
     stagedCandidates.push({
       candidateId: alias,
       agentId: agent.agentId,
-      diffPath: toRepoRelativeOrThrow(root, stagedDiffAbsolute),
+      diffAbsolutePath: stagedDiffAbsolute,
       diffRecorded: true,
     });
   }
 
-  const denyRead: string[] = [];
-  const denyWrite: string[] = [];
+  return {
+    aliasMap,
+    sharedRootAbsolute,
+    sharedInputsAbsolute,
+    stagedSpecAbsolute,
+    baseSnapshotAbsolute,
+    stagedCandidates,
+    worktreesToRemove: [baseSnapshotAbsolute],
+  };
+}
+
+async function buildReviewerBlindedPreparation(options: {
+  root: string;
+  reviewId: string;
+  reviewerAgentId: string;
+  workspacePaths: AgentWorkspacePaths;
+  sharedInputs: BlindedReviewSessionInputs;
+}): Promise<BlindedReviewPreparation> {
+  const { root, reviewId, reviewerAgentId, workspacePaths, sharedInputs } =
+    options;
+
+  const stagedSpecPath = toRepoRelativeOrThrow(
+    root,
+    join(workspacePaths.workspacePath, "inputs", "spec.md"),
+  );
+  const baseSnapshotPath = toRepoRelativeOrThrow(
+    root,
+    join(workspacePaths.workspacePath, "inputs", "base"),
+  );
+  const stagedCandidates = sharedInputs.stagedCandidates.map((entry) => ({
+    candidateId: entry.candidateId,
+    agentId: entry.agentId,
+    diffPath: toRepoRelativeOrThrow(
+      root,
+      join(
+        workspacePaths.workspacePath,
+        "inputs",
+        "candidates",
+        entry.candidateId,
+        "diff.patch",
+      ),
+    ),
+    diffRecorded: entry.diffRecorded,
+  }));
+
   const protections = await buildReviewSandboxProtectedPaths({
     root,
     reviewId,
     reviewerAgentId,
+    sharedRootPath: sharedInputs.sharedRootAbsolute,
   });
-  denyRead.push(...protections.denyRead);
-  denyWrite.push(...protections.denyWrite);
-
-  denyWrite.push(baseSnapshotAbsolute);
+  const denyWrite = [
+    ...protections.denyWrite,
+    sharedInputs.sharedInputsAbsolute,
+    sharedInputs.baseSnapshotAbsolute,
+  ];
 
   return {
     enabled: true,
-    aliasMap,
-    stagedSpecPath: toRepoRelativeOrThrow(root, stagedSpecAbsolute),
-    baseSnapshotPath: toRepoRelativeOrThrow(root, baseSnapshotAbsolute),
+    aliasMap: sharedInputs.aliasMap,
+    stagedSpecPath,
+    baseSnapshotPath,
     stagedCandidates,
     extraWriteProtectedPaths: normalizeProtectedPaths(denyWrite),
-    extraReadProtectedPaths: normalizeProtectedPaths(denyRead),
-    worktreesToRemove: [baseSnapshotAbsolute],
+    extraReadProtectedPaths: protections.denyRead,
   };
+}
+
+async function attachSharedInputsToReviewerWorkspace(options: {
+  workspacePath: string;
+  sharedInputsAbsolute: string;
+}): Promise<void> {
+  const { workspacePath, sharedInputsAbsolute } = options;
+  const reviewerInputsPath = join(workspacePath, "inputs");
+  await rm(reviewerInputsPath, { recursive: true, force: true }).catch(
+    () => {},
+  );
+  const linkType = process.platform === "win32" ? "junction" : "dir";
+  await symlink(sharedInputsAbsolute, reviewerInputsPath, linkType);
 }
 
 function normalizeProtectedPaths(paths: readonly string[]): string[] {
@@ -632,11 +877,12 @@ async function buildReviewSandboxProtectedPaths(options: {
   root: string;
   reviewId: string;
   reviewerAgentId: string;
+  sharedRootPath: string;
 }): Promise<{
   denyRead: string[];
   denyWrite: string[];
 }> {
-  const { root, reviewId, reviewerAgentId } = options;
+  const { root, reviewId, reviewerAgentId, sharedRootPath } = options;
   const denyRead: string[] = [];
   const denyWrite: string[] = [];
 
@@ -688,7 +934,7 @@ async function buildReviewSandboxProtectedPaths(options: {
         continue;
       }
       const sibling = resolvePath(sessionDir, entry.name);
-      if (sibling === reviewerRoot) {
+      if (sibling === reviewerRoot || sibling === sharedRootPath) {
         continue;
       }
       denyRead.push(sibling);
@@ -803,17 +1049,98 @@ async function postProcessBlindedReviewOutputs(options: {
     "utf8",
   );
 
-  await rewriteReviewRecord({
+  await assertSessionAliasMapConsistency({
     root,
     reviewsFilePath,
-    sessionId: reviewId,
-    mutate: (record) => ({
-      ...record,
-      blinded: {
-        enabled: true,
-        aliasMap: record.blinded?.aliasMap ?? aliasMap,
-      },
-    }),
-    forceFlush: true,
+    reviewId,
+    expectedAliasMap: aliasMap,
   });
+}
+
+function buildReviewOutputPath(options: {
+  root: string;
+  reviewId: string;
+  reviewerAgentId: string;
+}): string {
+  const { root, reviewId, reviewerAgentId } = options;
+  const reviewAbsolutePath = resolveWorkspacePath(
+    root,
+    VORATIQ_REVIEWS_SESSIONS_DIR,
+    reviewId,
+    reviewerAgentId,
+    "artifacts",
+    REVIEW_FILENAME,
+  );
+  return toRepoRelativeOrThrow(root, reviewAbsolutePath);
+}
+
+function assertReviewAliasMapConsistency(options: {
+  record: ReviewRecord;
+  reviewId: string;
+  expectedAliasMap: Record<string, string>;
+}): void {
+  const { record, reviewId, expectedAliasMap } = options;
+  const recordAliasMap = record.blinded?.aliasMap;
+  if (!recordAliasMap) {
+    throw new ReviewGenerationFailedError([
+      `Review session ${reviewId} is missing a blinded alias map.`,
+    ]);
+  }
+  if (!areAliasMapsEqual(recordAliasMap, expectedAliasMap)) {
+    throw new ReviewGenerationFailedError([
+      "Blinded alias map divergence detected across reviewers in the same session.",
+    ]);
+  }
+}
+
+async function assertSessionAliasMapConsistency(options: {
+  root: string;
+  reviewsFilePath: string;
+  reviewId: string;
+  expectedAliasMap: Record<string, string>;
+}): Promise<void> {
+  const { root, reviewsFilePath, reviewId, expectedAliasMap } = options;
+  const records = await readReviewRecords({
+    root,
+    reviewsFilePath,
+    limit: 1,
+    predicate: (record) => record.sessionId === reviewId,
+  });
+  const record = records[0];
+  if (!record) {
+    throw new ReviewGenerationFailedError([
+      `Review session ${reviewId} record not found while validating alias map.`,
+    ]);
+  }
+  assertReviewAliasMapConsistency({
+    record,
+    reviewId,
+    expectedAliasMap,
+  });
+}
+
+function areAliasMapsEqual(
+  left: Record<string, string>,
+  right: Record<string, string>,
+): boolean {
+  const leftEntries = Object.entries(left).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  const rightEntries = Object.entries(right).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  if (leftEntries.length !== rightEntries.length) {
+    return false;
+  }
+  for (let index = 0; index < leftEntries.length; index += 1) {
+    const leftEntry = leftEntries[index];
+    const rightEntry = rightEntries[index];
+    if (!leftEntry || !rightEntry) {
+      return false;
+    }
+    if (leftEntry[0] !== rightEntry[0] || leftEntry[1] !== rightEntry[1]) {
+      return false;
+    }
+  }
+  return true;
 }

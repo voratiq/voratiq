@@ -22,6 +22,7 @@ import { RunOptionValidationError } from "../../runs/records/errors.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { WorkspaceMissingEntryError } from "../../workspace/errors.js";
+import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import {
   NoAgentsEnabledError,
   type PreflightIssue,
@@ -142,7 +143,10 @@ export async function validateAndPrepare(
   const evalConfig = loadEvalConfig({ root });
   const evalPlan = buildEvalDefinitions(evalConfig);
 
-  const effectiveMaxParallel = resolveMaxParallel(agents, requestedMaxParallel);
+  const effectiveMaxParallel = resolveEffectiveMaxParallel({
+    competitorCount: agents.length,
+    requestedMaxParallel,
+  });
 
   return {
     specContent,
@@ -152,17 +156,4 @@ export async function validateAndPrepare(
     effectiveMaxParallel,
     environment,
   };
-}
-
-function resolveMaxParallel(
-  agents: readonly AgentDefinition[],
-  requestedMaxParallel: number | undefined,
-): number {
-  const agentCount = agents.length;
-  if (agentCount === 0) {
-    return 0;
-  }
-  const resolvedInput =
-    requestedMaxParallel !== undefined ? requestedMaxParallel : agentCount;
-  return Math.min(agentCount, Math.max(1, resolvedInput));
 }

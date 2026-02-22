@@ -63,7 +63,7 @@ voratiq spec \
 Output:
 
 ```
-Generating specification...
+Generating specification…
 
 Spec saved: .voratiq/specs/add-run-branch.md
 
@@ -126,17 +126,38 @@ voratiq review --run 20260113-235501-hhkox --agent gpt-5-2-codex
 
 Output (truncated):
 
-```
-Generating review...
+````
+Generating review…
 
+20260221-233012-txwtd SUCCEEDED
+
+Elapsed    3m 13s
+Created    2026-02-21 15:30 PST
+Run        20260113-235501-hhkox
+Workspace  .voratiq/reviews/sessions/20260221-233012-txwtd
+
+AGENT            STATUS     DURATION
+gpt-5-2-codex    SUCCEEDED  3m 13s
+
+---
+
+Reviewer: gpt-5-2-codex
+
+```markdown
 ## Recommendation
-**Preferred Candidate(s)**: claude-opus-4-5-20251101
-**Rationale**: Best spec alignment with clean, centralized preflight logic, robust branch existence detection, clear error propagation, and all evals passing.
+**Preferred Candidate**: claude-opus-4-5-20251101
+**Rationale**: Best overall adherence with clean preflight module, explicit git error propagation, and all evals passing; only missing integration tests for dirty-worktree fast-fail/run-record avoidance are bounded follow-ups.
 **Next Actions**:
 voratiq apply --run 20260113-235501-hhkox --agent claude-opus-4-5-20251101
-
-Full review here: .voratiq/reviews/sessions/20260114-000812-rfvvu/gpt-5-2-codex/artifacts/review.md
 ```
+
+Review: .voratiq/reviews/sessions/20260221-233012-txwtd/gpt-5-2-codex/artifacts/review.md
+
+---
+
+To apply a solution:
+    voratiq apply --run 20260113-235501-hhkox --agent <agent-id>
+````
 
 The agent review is a starting point. We reviewed the top candidates ourselves, and Opus had the best implementation: a dedicated preflight module, proper edge case handling, and focused tests.
 
