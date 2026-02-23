@@ -210,13 +210,94 @@ describe("review output contract validation", () => {
       }),
     ).not.toThrow();
   });
+
+  it("accepts annotated ranking lines with bold/code-wrapped candidate selectors", () => {
+    const markdown = buildReviewMarkdown({
+      candidateAssessments: [
+        {
+          candidateId: "r_aaaaaaaaaa",
+          body: "Assessment A.",
+        },
+        {
+          candidateId: "r_bbbbbbbbbb",
+          body: "Assessment B.",
+        },
+        {
+          candidateId: "r_cccccccccc",
+          body: "Assessment C.",
+        },
+      ],
+      ranking: [],
+      rankingLines: [
+        "1. **r_aaaaaaaaaa** — strongest foundation",
+        "2. r_bbbbbbbbbb - cleaner apply path",
+        "3. `r_cccccccccc` (lowest risk)",
+      ],
+    });
+
+    const result = validateReviewOutputContract({
+      reviewMarkdown: markdown,
+      eligibleCandidateIds: ["r_aaaaaaaaaa", "r_bbbbbbbbbb", "r_cccccccccc"],
+    });
+
+    expect(result.ranking).toEqual([
+      "r_aaaaaaaaaa",
+      "r_bbbbbbbbbb",
+      "r_cccccccccc",
+    ]);
+  });
+
+  it("rejects ranking entries where the candidate selector is not first", () => {
+    const markdown = buildReviewMarkdown({
+      candidateAssessments: [
+        {
+          candidateId: "r_aaaaaaaaaa",
+          body: "Assessment A.",
+        },
+      ],
+      ranking: [],
+      rankingLines: ["1. strongest option: r_aaaaaaaaaa"],
+    });
+
+    expect(() =>
+      validateReviewOutputContract({
+        reviewMarkdown: markdown,
+        eligibleCandidateIds: ["r_aaaaaaaaaa"],
+      }),
+    ).toThrow(/must begin with a candidate id selector/u);
+  });
+
+  it("rejects annotated ranking lines that reference unknown candidate ids", () => {
+    const markdown = buildReviewMarkdown({
+      candidateAssessments: [
+        {
+          candidateId: "r_aaaaaaaaaa",
+          body: "Assessment A.",
+        },
+      ],
+      ranking: [],
+      rankingLines: ["1. **r_zzzzzzzzzz** - not in eligible set"],
+    });
+
+    expect(() =>
+      validateReviewOutputContract({
+        reviewMarkdown: markdown,
+        eligibleCandidateIds: ["r_aaaaaaaaaa"],
+      }),
+    ).toThrow(/Ranking contains unknown candidate id\(s\)/u);
+  });
 });
 
 function buildReviewMarkdown(options: {
   candidateAssessments: Array<{ candidateId: string; body: string }>;
   ranking: string[];
+  rankingLines?: string[];
 }): string {
-  const { candidateAssessments, ranking } = options;
+  const {
+    candidateAssessments,
+    ranking,
+    rankingLines: customRankingLines,
+  } = options;
 
   const assessmentLines = candidateAssessments.flatMap((assessment) => [
     `### ${assessment.candidateId}`,
@@ -224,9 +305,9 @@ function buildReviewMarkdown(options: {
     "",
   ]);
 
-  const rankingLines = ranking.map(
-    (candidateId, index) => `${index + 1}. ${candidateId}`,
-  );
+  const rankingLines =
+    customRankingLines ??
+    ranking.map((candidateId, index) => `${index + 1}. ${candidateId}`);
 
   return [
     "# Review",

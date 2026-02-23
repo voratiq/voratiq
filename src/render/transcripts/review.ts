@@ -77,13 +77,7 @@ export function renderReviewTranscript(options: {
   }
 
   reviewers.forEach((reviewer, index) => {
-    const failed =
-      reviewer.status === "failed" || reviewer.status === "aborted";
-    const block: string[] = [
-      failed
-        ? `Reviewer: ${reviewer.reviewerAgentId} ${reviewer.status.toUpperCase()}`
-        : `Reviewer: ${reviewer.reviewerAgentId}`,
-    ];
+    const block: string[] = [`Reviewer: ${reviewer.reviewerAgentId}`];
     if (reviewer.previewLines && reviewer.previewLines.length > 0) {
       block.push("", ...reviewer.previewLines);
     }

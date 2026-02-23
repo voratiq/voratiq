@@ -491,7 +491,7 @@ describe("voratiq auto", () => {
           "",
           "---",
           "",
-          "Reviewer: reviewer-b FAILED",
+          "Reviewer: reviewer-b",
           "",
           "Error: reviewer violated output contract",
         ].join("\n"),
@@ -523,7 +523,7 @@ describe("voratiq auto", () => {
 
     const output = stripAnsi(stdout.join(""));
     expect(output).toContain("review-789 FAILED");
-    expect(output).toContain("Reviewer: reviewer-b FAILED");
+    expect(output).toContain("Reviewer: reviewer-b");
     expect(output).toContain("Error: reviewer violated output contract");
     expect(output).toContain("Auto FAILED");
     expect(runApplyCommandMock).not.toHaveBeenCalled();

@@ -304,9 +304,16 @@ function parseRankingSection(options: {
       );
     }
 
+    const parsedCandidateId = parseLeadingRankingCandidateId(candidateToken);
+    if (!parsedCandidateId) {
+      throw new Error(
+        `Ranking entry ${numericIndex} must begin with a candidate id selector.`,
+      );
+    }
+
     rankingItems.push({
       index: numericIndex,
-      candidateId: unwrapMarkdownCodeSpan(candidateToken),
+      candidateId: parsedCandidateId,
     });
   }
 
@@ -403,14 +410,34 @@ function normalizeCandidateIds(candidateIds: readonly string[]): string[] {
   return nonEmpty;
 }
 
-function unwrapMarkdownCodeSpan(value: string): string {
+function parseLeadingRankingCandidateId(value: string): string | undefined {
   const trimmed = value.trim();
-  const codeSpan = trimmed.match(/^`([^`]+)`$/u);
-  if (codeSpan) {
-    const inner = codeSpan[1];
-    return inner ? inner.trim() : trimmed;
+  if (!trimmed) {
+    return undefined;
   }
-  return trimmed;
+
+  const wrappedCodeMatch = trimmed.match(
+    /^`(r_[a-z0-9_-]+)`(?:$|[\s)\],:;.!?]|[-\u2013\u2014])/u,
+  );
+  if (wrappedCodeMatch?.[1]) {
+    return wrappedCodeMatch[1];
+  }
+
+  const wrappedBoldMatch = trimmed.match(
+    /^\*\*(r_[a-z0-9_-]+)\*\*(?:$|[\s)\],:;.!?]|[-\u2013\u2014])/u,
+  );
+  if (wrappedBoldMatch?.[1]) {
+    return wrappedBoldMatch[1];
+  }
+
+  const rawMatch = trimmed.match(
+    /^(r_[a-z0-9_-]+)(?:$|[\s)\],:;.!?]|[-\u2013\u2014])/u,
+  );
+  if (rawMatch?.[1]) {
+    return rawMatch[1];
+  }
+
+  return undefined;
 }
 
 function assertUnique(values: readonly string[], message: string): void {
