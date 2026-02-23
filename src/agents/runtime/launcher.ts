@@ -12,7 +12,10 @@ import type { DenialBackoffConfig } from "../../configs/sandbox/types.js";
 import type { WatchdogMetadata } from "../../runs/records/types.js";
 import { getCliAssetPath, resolveCliAssetRoot } from "../../utils/cli-root.js";
 import { resolvePath } from "../../utils/path.js";
-import { spawnStreamingProcess } from "../../utils/process.js";
+import {
+  type ProcessOutputSource,
+  spawnStreamingProcess,
+} from "../../utils/process.js";
 import { AgentRuntimeProcessError } from "./errors.js";
 import {
   generateSandboxSettings,
@@ -217,8 +220,8 @@ export async function runAgentProcess(
           { once: true },
         );
       },
-      onData: (chunk: Buffer) => {
-        watchdogController?.handleOutput(chunk);
+      onData: (chunk: Buffer, source: ProcessOutputSource) => {
+        watchdogController?.handleOutput(chunk, source);
       },
       abortSignal: forceAbortController.signal,
     });

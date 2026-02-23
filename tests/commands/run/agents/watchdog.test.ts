@@ -114,7 +114,10 @@ describe("watchdog", () => {
       expect(patterns!.length).toBe(3);
       expect(patterns![0].test("invalid_request_error")).toBe(true);
       expect(patterns![1].test("unsupported_value")).toBe(true);
-      expect(patterns![2].test("thread 0 panicked")).toBe(true);
+      expect(patterns![2].test("thread 0 panicked at src/main.rs:99")).toBe(
+        true,
+      );
+      expect(patterns![2].test("thread 0 panicked")).toBe(false);
     });
 
     it("should have claude patterns for auth and quota errors", () => {
@@ -307,9 +310,9 @@ describe("watchdog", () => {
           },
         );
 
-        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED"));
+        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED\n"));
         jest.advanceTimersByTime(30000);
-        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED"));
+        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED\n"));
 
         const state = controller.getState();
         expect(state.triggered).toBe("fatal-pattern");
@@ -344,15 +347,15 @@ describe("watchdog", () => {
           },
         );
 
-        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED"));
+        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED\n"));
         jest.advanceTimersByTime(WATCHDOG_DEFAULTS.fatalRetryWindowMs + 1000);
-        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED"));
+        controller.handleOutput(Buffer.from("Error: PERMISSION_DENIED\n"));
 
         expect(controller.getState().triggered).toBeNull();
         expect(onTrigger).not.toHaveBeenCalled();
       });
 
-      it("should work for codex provider", () => {
+      it("should trigger for codex invalid_request_error in provider error context", () => {
         const onTrigger =
           jest.fn<
             (
@@ -370,10 +373,286 @@ describe("watchdog", () => {
           },
         );
 
-        controller.handleOutput(Buffer.from("Error: invalid_request_error"));
+        controller.handleOutput(
+          Buffer.from("OpenAI API error: invalid_request_error\n"),
+        );
         jest.advanceTimersByTime(10000);
-        controller.handleOutput(Buffer.from("Error: invalid_request_error"));
+        controller.handleOutput(
+          Buffer.from("OpenAI API error: invalid_request_error\n"),
+        );
 
+        expect(controller.getState().triggered).toBe("fatal-pattern");
+      });
+
+      it("should trigger for codex unsupported_value in provider error context", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "codex",
+          },
+        );
+
+        controller.handleOutput(
+          Buffer.from('{"error":{"code":"unsupported_value"}}\n'),
+        );
+        jest.advanceTimersByTime(10000);
+        controller.handleOutput(
+          Buffer.from('{"error":{"code":"unsupported_value"}}\n'),
+        );
+
+        expect(controller.getState().triggered).toBe("fatal-pattern");
+      });
+
+      it("should trigger for codex panic lines on stderr", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "codex",
+          },
+        );
+
+        controller.handleOutput(
+          Buffer.from("thread 0 panicked at src/main.rs:99\n"),
+          "stderr",
+        );
+        jest.advanceTimersByTime(10000);
+        controller.handleOutput(
+          Buffer.from("thread 0 panicked at src/main.rs:120\n"),
+          "stderr",
+        );
+
+        expect(controller.getState().triggered).toBe("fatal-pattern");
+      });
+
+      it("should ignore codex panic-like stdout output within retry window", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "codex",
+          },
+        );
+
+        controller.handleOutput(
+          Buffer.from("Fatal error pattern detected: thread .* panicked\n"),
+          "stdout",
+        );
+        jest.advanceTimersByTime(10000);
+        controller.handleOutput(
+          Buffer.from("thread 0 panicked at src/main.rs:99\n"),
+          "stdout",
+        );
+
+        expect(controller.getState().triggered).toBeNull();
+      });
+
+      it("should not stitch fatal panic lines across stdout and stderr streams", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "codex",
+          },
+        );
+
+        controller.handleOutput(
+          Buffer.from("thread 0 panicked at src/ma"),
+          "stdout",
+        );
+        controller.handleOutput(Buffer.from("in.rs:99\n"), "stderr");
+        jest.advanceTimersByTime(10000);
+        controller.handleOutput(
+          Buffer.from("thread 1 panicked at src/ma"),
+          "stdout",
+        );
+        controller.handleOutput(Buffer.from("in.rs:120\n"), "stderr");
+
+        expect(controller.getState().triggered).toBeNull();
+      });
+
+      it("should detect codex panic lines split across stderr chunks", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "codex",
+          },
+        );
+
+        controller.handleOutput(
+          Buffer.from("thread 0 panicked at src/ma"),
+          "stderr",
+        );
+        controller.handleOutput(Buffer.from("in.rs:99\n"), "stderr");
+        expect(controller.getState().triggered).toBeNull();
+
+        jest.advanceTimersByTime(5000);
+        controller.handleOutput(
+          Buffer.from("thread 0 panicked at src/ma"),
+          "stderr",
+        );
+        controller.handleOutput(Buffer.from("in.rs:120\n"), "stderr");
+        expect(controller.getState().triggered).toBe("fatal-pattern");
+      });
+
+      it("should evaluate completed lines after a matched trailing partial", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "codex",
+          },
+        );
+
+        controller.handleOutput(
+          Buffer.from("thread 0 panicked at src/main.rs:99"),
+          "stderr",
+        );
+        jest.advanceTimersByTime(5000);
+        controller.handleOutput(
+          Buffer.from("\nthread 1 panicked at src/main.rs:120\n"),
+          "stderr",
+        );
+
+        expect(controller.getState().triggered).toBe("fatal-pattern");
+      });
+
+      it("should trigger for claude provider fatal lines", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "claude",
+          },
+        );
+
+        controller.handleOutput(Buffer.from("OAuth token has expired\n"));
+        jest.advanceTimersByTime(10000);
+        controller.handleOutput(Buffer.from("OAuth token has expired\n"));
+
+        expect(controller.getState().triggered).toBe("fatal-pattern");
+      });
+
+      it("should ignore codex fatal tokens from grep/search output", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "codex",
+          },
+        );
+
+        controller.handleOutput(
+          Buffer.from(
+            "tests/fixtures/provider-errors.txt:12:Error: invalid_request_error\n",
+          ),
+        );
+        jest.advanceTimersByTime(1000);
+        controller.handleOutput(
+          Buffer.from(
+            "src/agents/runtime/failures.ts:68:/invalid_request_error/,\n",
+          ),
+        );
+        jest.advanceTimersByTime(1000);
+        controller.handleOutput(
+          Buffer.from("OpenAI API error: invalid_request_error\n"),
+        );
+
+        // Non-qualifying grep lines should not arm fatal retries.
+        expect(controller.getState().triggered).toBeNull();
+      });
+
+      it("should ignore repeated codex fixture text with invalid_request_error", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "codex",
+          },
+        );
+
+        controller.handleOutput(
+          Buffer.from('expect(stderr).toContain("invalid_request_error");'),
+        );
+        jest.advanceTimersByTime(1000);
+        controller.handleOutput(
+          Buffer.from('expect(stderr).toContain("invalid_request_error");'),
+        );
+
+        expect(controller.getState().triggered).toBeNull();
+      });
+
+      it("should ignore repeated generic Error: invalid_request_error lines", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "codex",
+          },
+        );
+
+        controller.handleOutput(Buffer.from("Error: invalid_request_error\n"));
+        jest.advanceTimersByTime(1000);
+        controller.handleOutput(Buffer.from("Error: invalid_request_error\n"));
+
+        expect(controller.getState().triggered).toBeNull();
+      });
+
+      it("should only count qualifying codex lines toward retry trigger", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "codex",
+          },
+        );
+
+        controller.handleOutput(
+          Buffer.from("OpenAI API error: invalid_request_error\n"),
+        );
+        jest.advanceTimersByTime(5000);
+        controller.handleOutput(
+          Buffer.from(
+            "tests/fixtures/provider-errors.txt:12:invalid_request_error\n",
+          ),
+        );
+        expect(controller.getState().triggered).toBeNull();
+
+        jest.advanceTimersByTime(5000);
+        controller.handleOutput(
+          Buffer.from(
+            '{"error":{"type":"invalid_request_error","message":"bad"}}\n',
+          ),
+        );
+        expect(controller.getState().triggered).toBe("fatal-pattern");
+      });
+
+      it("should detect codex fatal lines split across output chunks", () => {
+        const controller = createWatchdog(
+          mockChild as unknown as ChildProcess,
+          stderrStream,
+          {
+            providerId: "codex",
+          },
+        );
+
+        controller.handleOutput(
+          Buffer.from('{"error":{"type":"invalid_request_'),
+        );
+        controller.handleOutput(
+          Buffer.from('error","message":"unsupported model"}}\n'),
+        );
+        expect(controller.getState().triggered).toBeNull();
+
+        jest.advanceTimersByTime(5000);
+        controller.handleOutput(
+          Buffer.from('{"error":{"type":"invalid_request_'),
+        );
+        controller.handleOutput(
+          Buffer.from('error","message":"unsupported model"}}\n'),
+        );
         expect(controller.getState().triggered).toBe("fatal-pattern");
       });
 

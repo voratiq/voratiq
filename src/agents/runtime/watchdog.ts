@@ -21,6 +21,7 @@ export type WatchdogTrigger =
   | "wall-clock"
   | "fatal-pattern"
   | "sandbox-denial";
+export type WatchdogOutputSource = "stdout" | "stderr";
 
 export const WATCHDOG_DEFAULTS = {
   silenceTimeoutMs: 15 * 60 * 1000,
@@ -31,31 +32,51 @@ export const WATCHDOG_DEFAULTS = {
   hardAbortMs: 10 * 1000,
 } as const;
 
-export const FATAL_PATTERNS: ReadonlyMap<string, RegExp[]> = new Map([
+interface FatalPatternRule {
+  pattern: RegExp;
+  requiresProviderErrorContext?: boolean;
+  allowedSources?: readonly WatchdogOutputSource[];
+}
+
+const FATAL_PATTERN_RULES: ReadonlyMap<string, FatalPatternRule[]> = new Map([
   [
     "gemini",
     [
-      /PERMISSION_DENIED/i,
-      /RESOURCE_EXHAUSTED/i,
-      /MODEL_CAPACITY_EXHAUSTED/i,
-      /No capacity available for model/i,
+      { pattern: /PERMISSION_DENIED/i },
+      { pattern: /RESOURCE_EXHAUSTED/i },
+      { pattern: /MODEL_CAPACITY_EXHAUSTED/i },
+      { pattern: /No capacity available for model/i },
     ],
   ],
   [
     "codex",
-    [/invalid_request_error/i, /unsupported_value/i, /thread .* panicked/i],
+    [
+      { pattern: /invalid_request_error/i, requiresProviderErrorContext: true },
+      { pattern: /unsupported_value/i, requiresProviderErrorContext: true },
+      {
+        pattern: /^\s*thread\s+.+\s+panicked at\b/i,
+        allowedSources: ["stderr"],
+      },
+    ],
   ],
   [
     "claude",
     [
-      /OAuth token revoked/i,
-      /OAuth token has expired/i,
-      /Please run \/login/i,
-      /invalid.*api.*key/i,
-      /insufficient_quota/i,
+      { pattern: /OAuth token revoked/i },
+      { pattern: /OAuth token has expired/i },
+      { pattern: /Please run \/login/i },
+      { pattern: /invalid.*api.*key/i },
+      { pattern: /insufficient_quota/i },
     ],
   ],
 ]);
+
+export const FATAL_PATTERNS: ReadonlyMap<string, RegExp[]> = new Map(
+  Array.from(FATAL_PATTERN_RULES, ([providerId, rules]) => [
+    providerId,
+    rules.map((rule) => rule.pattern),
+  ]),
+);
 
 export interface WatchdogResult {
   exitCode: number;
@@ -80,13 +101,92 @@ interface WatchdogState {
   killGraceTimer: ReturnType<typeof setTimeout> | null;
   hardAbortTimer: ReturnType<typeof setTimeout> | null;
   fatalPatternFirstSeen: number | null;
+  fatalLineBufferBySource: Record<WatchdogOutputSource, string>;
+  fatalCurrentLineMatchedBySource: Record<WatchdogOutputSource, boolean>;
   triggered: WatchdogTrigger | null;
   triggeredReason: string | null;
   sandboxFailFast: SandboxFailFastInfo | null;
   denialBackoff: DenialBackoffTracker;
-  lineBuffer: string;
+  sandboxLineBufferBySource: Record<WatchdogOutputSource, string>;
   delayInProgress: boolean;
   abortController: AbortController;
+}
+
+function hasCodexErrorContext(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  if (
+    /^\s*(?:openai|codex)(?:\s+api)?\s+error\b/i.test(trimmed) ||
+    /^\s*api\s+error\b/i.test(trimmed)
+  ) {
+    return true;
+  }
+
+  if (
+    /^\s*\{.*"error"\s*:/i.test(trimmed) ||
+    /^\s*"error"\s*:/i.test(trimmed)
+  ) {
+    return true;
+  }
+
+  if (
+    /^\s*\{.*"type"\s*:\s*"invalid_request_error"/i.test(trimmed) ||
+    /^\s*"type"\s*:\s*"invalid_request_error"/i.test(trimmed)
+  ) {
+    return true;
+  }
+
+  if (
+    /^\s*\{.*"code"\s*:\s*"unsupported_value"/i.test(trimmed) ||
+    /^\s*"code"\s*:\s*"unsupported_value"/i.test(trimmed)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function hasProviderErrorContext(providerId: string, line: string): boolean {
+  if (providerId === "codex") {
+    return hasCodexErrorContext(line);
+  }
+  return true;
+}
+
+function findFatalPatternMatch(
+  providerId: string,
+  line: string,
+  source: WatchdogOutputSource,
+  rules: readonly FatalPatternRule[],
+): RegExp | undefined {
+  const trimmedLine = line.trim();
+  if (!trimmedLine) {
+    return undefined;
+  }
+
+  for (const rule of rules) {
+    if (
+      rule.allowedSources &&
+      !rule.allowedSources.some((allowedSource) => allowedSource === source)
+    ) {
+      continue;
+    }
+    if (!rule.pattern.test(trimmedLine)) {
+      continue;
+    }
+    if (
+      rule.requiresProviderErrorContext &&
+      !hasProviderErrorContext(providerId, trimmedLine)
+    ) {
+      continue;
+    }
+    return rule.pattern;
+  }
+
+  return undefined;
 }
 
 export function createWatchdog(
@@ -105,16 +205,27 @@ export function createWatchdog(
     killGraceTimer: null,
     hardAbortTimer: null,
     fatalPatternFirstSeen: null,
+    fatalLineBufferBySource: {
+      stdout: "",
+      stderr: "",
+    },
+    fatalCurrentLineMatchedBySource: {
+      stdout: false,
+      stderr: false,
+    },
     triggered: null,
     triggeredReason: null,
     sandboxFailFast: null,
     denialBackoff: new DenialBackoffTracker(denialBackoff),
-    lineBuffer: "",
+    sandboxLineBufferBySource: {
+      stdout: "",
+      stderr: "",
+    },
     delayInProgress: false,
     abortController: new AbortController(),
   };
 
-  const fatalPatterns = FATAL_PATTERNS.get(options.providerId) ?? [];
+  const fatalPatternRules = FATAL_PATTERN_RULES.get(options.providerId) ?? [];
 
   const resetSilenceTimer = (): void => {
     if (state.silenceTimer) {
@@ -177,45 +288,111 @@ export function createWatchdog(
     terminateProcess(child, state, { killGraceMs, hardAbortMs });
   };
 
-  const checkFatalPattern = (text: string): void => {
-    if (state.triggered || fatalPatterns.length === 0) {
+  const registerFatalPatternMatch = (pattern: RegExp): void => {
+    const now = Date.now();
+    if (state.fatalPatternFirstSeen === null) {
+      state.fatalPatternFirstSeen = now;
+      return;
+    }
+    const elapsed = now - state.fatalPatternFirstSeen;
+    if (elapsed <= WATCHDOG_DEFAULTS.fatalRetryWindowMs) {
+      triggerWatchdog(
+        "fatal-pattern",
+        `Fatal error pattern detected: ${pattern.source}`,
+      );
+    }
+  };
+
+  const checkFatalPatternLine = (
+    line: string,
+    source: WatchdogOutputSource,
+  ): boolean => {
+    if (state.triggered || fatalPatternRules.length === 0) {
+      return false;
+    }
+
+    const pattern = findFatalPatternMatch(
+      options.providerId,
+      line,
+      source,
+      fatalPatternRules,
+    );
+    if (!pattern) {
+      return false;
+    }
+
+    registerFatalPatternMatch(pattern);
+    return true;
+  };
+
+  const checkFatalPattern = (
+    text: string,
+    source: WatchdogOutputSource,
+  ): void => {
+    if (state.triggered || fatalPatternRules.length === 0) {
       return;
     }
 
-    for (const pattern of fatalPatterns) {
-      if (pattern.test(text)) {
-        const now = Date.now();
-        if (state.fatalPatternFirstSeen === null) {
-          state.fatalPatternFirstSeen = now;
-          return;
-        }
-        const elapsed = now - state.fatalPatternFirstSeen;
-        if (elapsed <= WATCHDOG_DEFAULTS.fatalRetryWindowMs) {
-          triggerWatchdog(
-            "fatal-pattern",
-            `Fatal error pattern detected: ${pattern.source}`,
-          );
-        }
+    state.fatalLineBufferBySource[source] += text;
+    const lines = state.fatalLineBufferBySource[source].split(/\r?\n/);
+    state.fatalLineBufferBySource[source] = lines.pop() ?? "";
+    const hadMatchedTrailingPartial =
+      state.fatalCurrentLineMatchedBySource[source];
+
+    for (const [index, line] of lines.entries()) {
+      if (state.triggered) {
         return;
       }
+
+      // If the trailing partial line was already matched in a prior chunk,
+      // skip exactly its completed replay on this chunk boundary.
+      if (hadMatchedTrailingPartial && index === 0) {
+        continue;
+      }
+
+      checkFatalPatternLine(line, source);
+    }
+
+    if (lines.length > 0) {
+      state.fatalCurrentLineMatchedBySource[source] = false;
+    }
+
+    if (state.triggered) {
+      return;
+    }
+    if (!state.fatalLineBufferBySource[source]) {
+      state.fatalCurrentLineMatchedBySource[source] = false;
+      return;
+    }
+    if (!state.fatalCurrentLineMatchedBySource[source]) {
+      state.fatalCurrentLineMatchedBySource[source] = checkFatalPatternLine(
+        state.fatalLineBufferBySource[source],
+        source,
+      );
     }
   };
 
-  const handleOutput = (chunk: Buffer | string): void => {
+  const handleOutput = (
+    chunk: Buffer | string,
+    source: WatchdogOutputSource = "stderr",
+  ): void => {
     resetSilenceTimer();
     const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
-    checkFatalPattern(text);
-    handleSandboxDenialText(text);
+    checkFatalPattern(text, source);
+    handleSandboxDenialText(text, source);
   };
 
-  const handleSandboxDenialText = (text: string): void => {
+  const handleSandboxDenialText = (
+    text: string,
+    source: WatchdogOutputSource,
+  ): void => {
     if (state.triggered) {
       return;
     }
 
-    state.lineBuffer += text;
-    const lines = state.lineBuffer.split("\n");
-    state.lineBuffer = lines.pop() ?? "";
+    state.sandboxLineBufferBySource[source] += text;
+    const lines = state.sandboxLineBufferBySource[source].split("\n");
+    state.sandboxLineBufferBySource[source] = lines.pop() ?? "";
 
     for (const line of lines) {
       if (state.triggered) {
@@ -315,7 +492,7 @@ export function createWatchdog(
 }
 
 export interface WatchdogController {
-  handleOutput: (chunk: Buffer | string) => void;
+  handleOutput: (chunk: Buffer | string, source?: WatchdogOutputSource) => void;
   cleanup: () => void;
   getState: () => {
     triggered: WatchdogTrigger | null;
