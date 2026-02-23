@@ -4,6 +4,7 @@ import {
 } from "../../commands/run/lifecycle.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import type { RunProgressRenderer } from "../../render/transcripts/run.js";
+import { emitStageProgressEvent } from "../../render/transcripts/stage-progress.js";
 import { normalizeDiffStatistics } from "../../utils/diff.js";
 import { rewriteRunRecord } from "./persistence.js";
 import type { AgentInvocationRecord } from "./types.js";
@@ -73,13 +74,15 @@ export function createAgentRecordMutators(
       return mergeAgentRecords(existing, queuedRecord);
     });
 
-    if (renderer) {
-      renderer.update({
+    emitStageProgressEvent(renderer, {
+      type: "stage.candidate",
+      stage: "run",
+      candidate: {
         agentId: agent.id,
         model: agent.model,
         status: "queued",
-      });
-    }
+      },
+    });
   };
 
   const recordAgentSnapshot = async (
@@ -90,9 +93,11 @@ export function createAgentRecordMutators(
       mergeAgentRecords(existing, snapshot),
     );
 
-    if (renderer) {
-      renderer.update(snapshot);
-    }
+    emitStageProgressEvent(renderer, {
+      type: "stage.candidate",
+      stage: "run",
+      candidate: snapshot,
+    });
   };
 
   return {

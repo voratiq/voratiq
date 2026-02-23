@@ -4,12 +4,18 @@ import { executeCompetitionWithAdapter } from "../../competition/command-adapter
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
+import type { ReviewProgressRenderer } from "../../render/transcripts/review.js";
 import type { RunRecordEnhanced } from "../../runs/records/enhanced.js";
 import { buildRunRecordView } from "../../runs/records/enhanced.js";
 import { RunRecordNotFoundError } from "../../runs/records/errors.js";
 import { fetchRunsSafely } from "../../runs/records/persistence.js";
 import { toErrorMessage } from "../../utils/errors.js";
+import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
 import { resolveRunWorkspacePaths } from "../../workspace/layout.js";
+import {
+  resolveWorkspacePath,
+  VORATIQ_REVIEWS_SESSIONS_DIR,
+} from "../../workspace/structure.js";
 import { RunNotFoundCliError } from "../errors.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
@@ -35,6 +41,7 @@ export interface ReviewCommandInput {
   agentOverrideFlag?: string;
   profileName?: string;
   maxParallel?: number;
+  renderer?: ReviewProgressRenderer;
 }
 
 export interface ReviewCommandResult {
@@ -58,6 +65,7 @@ export async function executeReviewCommand(
     agentOverrideFlag,
     profileName,
     maxParallel: requestedMaxParallel,
+    renderer,
   } = input;
 
   const { records } = await fetchRunsSafely({
@@ -99,6 +107,20 @@ export async function executeReviewCommand(
   });
 
   const runWorkspaceAbsolute = resolveRunWorkspacePaths(root, runId).absolute;
+
+  renderer?.begin({
+    runId: enhanced.runId,
+    reviewId,
+    createdAt,
+    workspacePath: normalizePathForDisplay(
+      relativeToRoot(
+        root,
+        resolveWorkspacePath(root, VORATIQ_REVIEWS_SESSIONS_DIR, reviewId),
+      ),
+    ),
+    status: "running",
+  });
+
   registerActiveReview({
     root,
     reviewsFilePath,
@@ -122,6 +144,7 @@ export async function executeReviewCommand(
         run: enhanced,
         environment,
         runWorkspaceAbsolute,
+        renderer,
       }),
     });
   } catch (error) {
@@ -137,6 +160,7 @@ export async function executeReviewCommand(
   }
 
   if (cleanupError) {
+    renderer?.complete("failed");
     if (executionError) {
       throw new ReviewGenerationFailedError([
         `Review session ${reviewId} failed and cleanup also failed.`,
@@ -151,6 +175,7 @@ export async function executeReviewCommand(
   }
 
   if (executionError) {
+    renderer?.complete("failed");
     if (executionError instanceof ReviewError) {
       throw executionError;
     }
@@ -159,6 +184,7 @@ export async function executeReviewCommand(
   }
 
   if (!reviewResults) {
+    renderer?.complete("failed");
     throw new ReviewGenerationFailedError([
       `Review session ${reviewId} did not produce any result.`,
     ]);
@@ -166,10 +192,16 @@ export async function executeReviewCommand(
 
   const selectedResult = reviewResults[0];
   if (!selectedResult) {
+    renderer?.complete("failed");
     throw new ReviewGenerationFailedError([
       `Review session ${reviewId} did not produce any result.`,
     ]);
   }
+
+  const finalStatus = reviewResults.some((result) => result.status === "failed")
+    ? "failed"
+    : "succeeded";
+  renderer?.complete(finalStatus);
 
   return {
     reviewId,

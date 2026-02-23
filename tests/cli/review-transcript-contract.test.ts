@@ -113,6 +113,7 @@ describe("review transcript contract", () => {
             status: "succeeded",
             outputPath:
               ".voratiq/reviews/sessions/review-123/reviewer-b/artifacts/review.md",
+            startedAt: "2026-01-01T00:00:03.000Z",
             completedAt: "2026-01-01T00:00:08.000Z",
             error: null,
           },
@@ -181,7 +182,268 @@ describe("review transcript contract", () => {
     expect(body).toContain("Error: failed reviewer");
     expect(body).toContain("FAILED");
     expect(body).toContain("SUCCEEDED");
+    expect(body).toMatch(/reviewer-a\s+FAILED\s+—/u);
+    expect(body).toMatch(/reviewer-b\s+SUCCEEDED\s+5s/u);
     expect(body.match(/\n---\n/gu)?.length ?? 0).toBe(3);
+  });
+
+  it("suppresses duplicate summary shell in final TTY output while preserving reviewer blocks", async () => {
+    const liveStdout: string[] = [];
+    const liveStderr: string[] = [];
+
+    executeReviewCommandMock.mockImplementation(
+      (input: Parameters<typeof executeReviewCommand>[0]) => {
+        input.renderer?.begin({
+          runId: "run-123",
+          reviewId: "review-tty-123",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          workspacePath: ".voratiq/reviews/sessions/review-tty-123",
+          status: "running",
+        });
+        input.renderer?.update({
+          reviewerAgentId: "reviewer-a",
+          status: "running",
+          startedAt: "2026-01-01T00:00:01.000Z",
+        });
+        input.renderer?.update({
+          reviewerAgentId: "reviewer-a",
+          status: "succeeded",
+          completedAt: "2026-01-01T00:00:04.000Z",
+        });
+        input.renderer?.complete("succeeded");
+
+        return Promise.resolve({
+          reviewId: "review-tty-123",
+          runRecord: { runId: "run-123" },
+          reviews: [
+            {
+              agentId: "reviewer-a",
+              outputPath:
+                ".voratiq/reviews/sessions/review-tty-123/reviewer-a/artifacts/review.md",
+              status: "succeeded",
+              missingArtifacts: [],
+            },
+          ],
+          agentId: "reviewer-a",
+          outputPath:
+            ".voratiq/reviews/sessions/review-tty-123/reviewer-a/artifacts/review.md",
+          missingArtifacts: [],
+        } as unknown as Awaited<ReturnType<typeof executeReviewCommand>>);
+      },
+    );
+
+    readReviewRecordsMock.mockResolvedValue([
+      {
+        sessionId: "review-tty-123",
+        runId: "run-123",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        completedAt: "2026-01-01T00:00:05.000Z",
+        status: "succeeded",
+        reviewers: [
+          {
+            agentId: "reviewer-a",
+            status: "succeeded",
+            outputPath:
+              ".voratiq/reviews/sessions/review-tty-123/reviewer-a/artifacts/review.md",
+            startedAt: "2026-01-01T00:00:01.000Z",
+            completedAt: "2026-01-01T00:00:04.000Z",
+            error: null,
+          },
+        ],
+      },
+    ]);
+
+    readReviewRecommendationMock.mockResolvedValue({
+      preferred_agent: "agent-a",
+      ranking: ["agent-a"],
+      rationale: "Reviewer A rationale.",
+      next_actions: ["voratiq apply --run run-123 --agent agent-a"],
+    });
+
+    const result = await runReviewCommand({
+      runId: "run-123",
+      agentIds: ["reviewer-a"],
+      writeOutput: () => undefined,
+      stdout: {
+        isTTY: true,
+        write: (chunk: string) => {
+          liveStdout.push(chunk);
+          return true;
+        },
+      },
+      stderr: {
+        isTTY: true,
+        write: (chunk: string) => {
+          liveStderr.push(chunk);
+          return true;
+        },
+      },
+    });
+
+    const streamed = liveStdout.join("");
+    expect(streamed).toContain("review-tty-123");
+    expect(streamed).toContain("DURATION");
+    expect(liveStderr).toEqual([]);
+
+    const body = stripAnsi(result.body);
+    expect(body).toContain("---\n\nReviewer: reviewer-a");
+    expect(body).toContain("Reviewer: reviewer-a");
+    expect(body).toContain(
+      "Review: .voratiq/reviews/sessions/review-tty-123/reviewer-a/artifacts/review.md",
+    );
+    expect(body).toContain("voratiq apply --run run-123 --agent <agent-id>");
+    expect(body).not.toContain("Elapsed");
+    expect(body).not.toContain("Workspace");
+    expect(body).not.toContain("DURATION");
+    expect(body).not.toContain("review-tty-123 SUCCEEDED");
+  });
+
+  it("streams live mixed reviewer transitions and still renders complete final transcript", async () => {
+    const liveStdout: string[] = [];
+    const liveStderr: string[] = [];
+
+    executeReviewCommandMock.mockImplementation(
+      (input: Parameters<typeof executeReviewCommand>[0]) => {
+        input.renderer?.begin({
+          runId: "run-123",
+          reviewId: "review-live-123",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          workspacePath: ".voratiq/reviews/sessions/review-live-123",
+          status: "running",
+        });
+        input.renderer?.update({
+          reviewerAgentId: "reviewer-a",
+          status: "queued",
+        });
+        input.renderer?.update({
+          reviewerAgentId: "reviewer-b",
+          status: "queued",
+        });
+        input.renderer?.update({
+          reviewerAgentId: "reviewer-a",
+          status: "running",
+          startedAt: "2026-01-01T00:00:01.000Z",
+        });
+        input.renderer?.update({
+          reviewerAgentId: "reviewer-b",
+          status: "running",
+          startedAt: "2026-01-01T00:00:02.000Z",
+        });
+        input.renderer?.update({
+          reviewerAgentId: "reviewer-b",
+          status: "failed",
+          startedAt: "2026-01-01T00:00:02.000Z",
+          completedAt: "2026-01-01T00:00:03.000Z",
+        });
+        input.renderer?.update({
+          reviewerAgentId: "reviewer-a",
+          status: "succeeded",
+          startedAt: "2026-01-01T00:00:01.000Z",
+          completedAt: "2026-01-01T00:00:04.000Z",
+        });
+        input.renderer?.complete("failed");
+
+        return Promise.resolve({
+          reviewId: "review-live-123",
+          runRecord: { runId: "run-123" },
+          reviews: [
+            {
+              agentId: "reviewer-a",
+              outputPath:
+                ".voratiq/reviews/sessions/review-live-123/reviewer-a/artifacts/review.md",
+              status: "succeeded",
+              missingArtifacts: [],
+            },
+            {
+              agentId: "reviewer-b",
+              outputPath:
+                ".voratiq/reviews/sessions/review-live-123/reviewer-b/artifacts/review.md",
+              status: "failed",
+              missingArtifacts: [],
+              error: "reviewer-b failed",
+            },
+          ],
+          agentId: "reviewer-a",
+          outputPath:
+            ".voratiq/reviews/sessions/review-live-123/reviewer-a/artifacts/review.md",
+          missingArtifacts: [],
+        } as unknown as Awaited<ReturnType<typeof executeReviewCommand>>);
+      },
+    );
+
+    readReviewRecordsMock.mockResolvedValue([
+      {
+        sessionId: "review-live-123",
+        runId: "run-123",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        completedAt: "2026-01-01T00:00:05.000Z",
+        status: "failed",
+        reviewers: [
+          {
+            agentId: "reviewer-a",
+            status: "succeeded",
+            outputPath:
+              ".voratiq/reviews/sessions/review-live-123/reviewer-a/artifacts/review.md",
+            completedAt: "2026-01-01T00:00:04.000Z",
+            error: null,
+          },
+          {
+            agentId: "reviewer-b",
+            status: "failed",
+            outputPath:
+              ".voratiq/reviews/sessions/review-live-123/reviewer-b/artifacts/review.md",
+            completedAt: "2026-01-01T00:00:03.000Z",
+            error: "reviewer-b failed",
+          },
+        ],
+      },
+    ]);
+
+    readReviewRecommendationMock.mockResolvedValue({
+      preferred_agent: "agent-a",
+      ranking: ["agent-a"],
+      rationale: "Reviewer A rationale.",
+      next_actions: ["voratiq apply --run run-123 --agent agent-a"],
+    });
+
+    const result = await runReviewCommand({
+      runId: "run-123",
+      agentIds: ["reviewer-a", "reviewer-b"],
+      writeOutput: () => undefined,
+      stdout: {
+        isTTY: false,
+        write: (chunk: string) => {
+          liveStdout.push(chunk);
+          return true;
+        },
+      },
+      stderr: {
+        isTTY: false,
+        write: (chunk: string) => {
+          liveStderr.push(chunk);
+          return true;
+        },
+      },
+    });
+
+    const streamed = stripAnsi(liveStdout.join(""));
+    expect(streamed).toContain("AGENT");
+    expect(streamed).toContain("STATUS");
+    expect(streamed).toContain("DURATION");
+    expect(streamed).toContain("reviewer-a");
+    expect(streamed).toContain("reviewer-b");
+    expect(streamed).toContain("FAILED");
+    expect(streamed).toContain("SUCCEEDED");
+    expect(liveStderr).toEqual([]);
+
+    const body = stripAnsi(result.body);
+    expect(body).toContain("Reviewer: reviewer-a");
+    expect(body).toContain("Reviewer: reviewer-b");
+    expect(body).toContain(
+      "Review: .voratiq/reviews/sessions/review-live-123/reviewer-a/artifacts/review.md",
+    );
+    expect(body).toContain("Error: reviewer-b failed");
+    expect(body).toContain("voratiq apply --run run-123 --agent <agent-id>");
   });
 
   it("fails hard when any reviewer recommendation artifact cannot be loaded", async () => {

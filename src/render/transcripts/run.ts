@@ -16,6 +16,7 @@ import { buildRunMetadataSectionWithStyle } from "../utils/runs.js";
 import { renderTranscript } from "../utils/transcript.js";
 import type { TranscriptShellStyleOptions } from "../utils/transcript-shell.js";
 import { renderTranscriptStatusTable } from "../utils/transcript-shell.js";
+import type { StageProgressEventConsumer } from "./stage-progress.js";
 
 const SUPPRESS_RUN_STATUS_TABLE_ENV = "VORATIQ_SUPPRESS_RUN_STATUS_TABLE";
 
@@ -43,7 +44,11 @@ interface RunRendererOptions {
   suppressTrailingBlankLine?: boolean;
 }
 
-interface RunProgressRenderer {
+interface RunProgressRenderer
+  extends StageProgressEventConsumer<
+    RunProgressContext,
+    AgentInvocationRecord
+  > {
   begin(context?: RunProgressContext): void;
   update(record: AgentInvocationRecord): void;
   complete(report: RunReport, options?: { suppressHint?: boolean }): string;
@@ -421,6 +426,38 @@ export function createRunRenderer(
   }
 
   return {
+    onProgressEvent(event): void {
+      guard(() => {
+        if (event.stage !== "run") {
+          return;
+        }
+
+        if (event.type === "stage.begin") {
+          context = { ...event.context };
+          render();
+          syncRefreshLoop();
+          return;
+        }
+
+        if (event.type === "stage.candidate") {
+          upsertRecord(event.candidate);
+          render();
+          syncRefreshLoop();
+          return;
+        }
+
+        if (!context) {
+          return;
+        }
+
+        context = {
+          ...context,
+          status: event.status as RunReport["status"],
+        };
+        render();
+        syncRefreshLoop();
+      });
+    },
     begin(beginContext?: RunProgressContext): void {
       guard(() => {
         if (!beginContext) {
@@ -428,22 +465,29 @@ export function createRunRenderer(
           syncRefreshLoop();
           return;
         }
-        context = { ...beginContext };
-        render();
-        syncRefreshLoop();
+        this.onProgressEvent({
+          type: "stage.begin",
+          stage: "run",
+          context: beginContext,
+        });
       });
     },
     update(record: AgentInvocationRecord): void {
-      guard(() => {
-        upsertRecord(record);
-        render();
-        syncRefreshLoop();
+      this.onProgressEvent({
+        type: "stage.candidate",
+        stage: "run",
+        candidate: record,
       });
     },
     complete(report: RunReport, options?: { suppressHint?: boolean }): string {
       let transcript = "";
       stopRefreshLoop();
       guard(() => {
+        this.onProgressEvent({
+          type: "stage.status",
+          stage: "run",
+          status: report.status,
+        });
         ensureFinalRender(report);
 
         disabled = true;

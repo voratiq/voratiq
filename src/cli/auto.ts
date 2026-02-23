@@ -258,6 +258,10 @@ export async function runAutoCommand(
             agentOverrideFlag: "--review-agent",
             profile: options.profile,
             maxParallel: options.maxParallel,
+            stdout: chainedOutput.stdout,
+            stderr: chainedOutput.stderr,
+            suppressLeadingBlankLine: !process.stdout.isTTY,
+            suppressTrailingBlankLine: !process.stdout.isTTY,
           });
 
           reviewStatus = "succeeded";

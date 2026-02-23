@@ -17,6 +17,8 @@ import type {
 } from "../../competition/command-adapter.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
+import type { ReviewProgressRenderer } from "../../render/transcripts/review.js";
+import { emitStageProgressEvent } from "../../render/transcripts/stage-progress.js";
 import { generateBlindedCandidateAlias } from "../../reviews/candidates.js";
 import {
   appendReviewRecord,
@@ -129,6 +131,7 @@ export interface CreateReviewCompetitionAdapterInput {
   readonly run: RunRecordEnhanced;
   readonly environment: EnvironmentConfig;
   readonly runWorkspaceAbsolute: string;
+  readonly renderer?: ReviewProgressRenderer;
 }
 
 export function createReviewCompetitionAdapter(
@@ -146,6 +149,7 @@ export function createReviewCompetitionAdapter(
     run,
     environment,
     runWorkspaceAbsolute,
+    renderer,
   } = input;
 
   let failure: unknown;
@@ -154,6 +158,16 @@ export function createReviewCompetitionAdapter(
   let sharedInputs: BlindedReviewSessionInputs | undefined;
 
   return {
+    queueCandidate: (candidate) => {
+      emitStageProgressEvent(renderer, {
+        type: "stage.candidate",
+        stage: "review",
+        candidate: {
+          reviewerAgentId: candidate.id,
+          status: "queued",
+        },
+      });
+    },
     prepareCandidates: async (
       candidates,
     ): Promise<
@@ -297,6 +311,45 @@ export function createReviewCompetitionAdapter(
         throw error;
       }
     },
+    onCandidateRunning: async (prepared) => {
+      const startedAt = new Date().toISOString();
+      await rewriteReviewRecordIfPresent({
+        root,
+        reviewsFilePath,
+        sessionId: reviewId,
+        mutate: (record) => {
+          assertReviewAliasMapConsistency({
+            record,
+            reviewId,
+            expectedAliasMap: prepared.blinded.aliasMap,
+          });
+
+          return {
+            ...record,
+            reviewers: record.reviewers.map((reviewer) => {
+              if (reviewer.agentId !== prepared.candidate.id) {
+                return reviewer;
+              }
+              return {
+                ...reviewer,
+                status: "running",
+                startedAt: reviewer.startedAt ?? startedAt,
+              };
+            }),
+          };
+        },
+      });
+
+      emitStageProgressEvent(renderer, {
+        type: "stage.candidate",
+        stage: "review",
+        candidate: {
+          reviewerAgentId: prepared.candidate.id,
+          status: "running",
+          startedAt,
+        },
+      });
+    },
     executeCandidate: async (prepared): Promise<ReviewCompetitionExecution> => {
       const { candidate, workspacePaths, prompt, blinded, outputPath } =
         prepared;
@@ -389,6 +442,7 @@ export function createReviewCompetitionAdapter(
       };
     },
     onCandidateCompleted: async (prepared) => {
+      const completedAt = new Date().toISOString();
       await rewriteReviewRecordIfPresent({
         root,
         reviewsFilePath,
@@ -402,15 +456,26 @@ export function createReviewCompetitionAdapter(
           return mutateReviewerRecord(record, {
             reviewerAgentId: prepared.candidate.id,
             status: "succeeded",
-            completedAt: new Date().toISOString(),
+            completedAt,
             error: null,
           });
+        },
+      });
+
+      emitStageProgressEvent(renderer, {
+        type: "stage.candidate",
+        stage: "review",
+        candidate: {
+          reviewerAgentId: prepared.candidate.id,
+          status: "succeeded",
+          completedAt,
         },
       });
     },
     captureExecutionFailure: async ({ prepared, error }) => {
       failure = failure ?? error;
       const detail = toReviewFailureDetail(error);
+      const completedAt = new Date().toISOString();
       try {
         await rewriteReviewRecordIfPresent({
           root,
@@ -425,7 +490,7 @@ export function createReviewCompetitionAdapter(
             return mutateReviewerRecord(record, {
               reviewerAgentId: prepared.candidate.id,
               status: "failed",
-              completedAt: new Date().toISOString(),
+              completedAt,
               error: detail,
             });
           },
@@ -433,6 +498,15 @@ export function createReviewCompetitionAdapter(
       } catch {
         // Preserve the primary execution error.
       }
+      emitStageProgressEvent(renderer, {
+        type: "stage.candidate",
+        stage: "review",
+        candidate: {
+          reviewerAgentId: prepared.candidate.id,
+          status: "failed",
+          completedAt,
+        },
+      });
       return {
         agentId: prepared.candidate.id,
         outputPath: prepared.outputPath,
@@ -444,60 +518,92 @@ export function createReviewCompetitionAdapter(
     finalizeCompetition: async () => {
       const failed = failure !== undefined;
       const failureDetail = toReviewFailureDetail(failure);
+      let finalizedRecord: ReviewRecord | undefined;
 
-      await rewriteReviewRecord({
-        root,
-        reviewsFilePath,
-        sessionId: reviewId,
-        mutate: (record) => {
-          const completedAt = record.completedAt ?? new Date().toISOString();
-          const runningReviewerStatus = resolveRunningReviewerStatus({
-            recordStatus: record.status,
-            failed,
-          });
+      try {
+        finalizedRecord = await rewriteReviewRecord({
+          root,
+          reviewsFilePath,
+          sessionId: reviewId,
+          mutate: (record) => {
+            const completedAt = record.completedAt ?? new Date().toISOString();
+            const runningReviewerStatus = resolveRunningReviewerStatus({
+              recordStatus: record.status,
+              failed,
+            });
 
-          const reviewers = record.reviewers.map(
-            (reviewer): ReviewRecord["reviewers"][number] => {
-              if (reviewer.status !== "running") {
-                return reviewer;
-              }
-              if (runningReviewerStatus === "succeeded") {
+            const reviewers = record.reviewers.map(
+              (reviewer): ReviewRecord["reviewers"][number] => {
+                if (reviewer.status !== "running") {
+                  return reviewer;
+                }
+                if (runningReviewerStatus === "succeeded") {
+                  return {
+                    ...reviewer,
+                    status: runningReviewerStatus,
+                    completedAt,
+                    error: null,
+                  };
+                }
                 return {
                   ...reviewer,
                   status: runningReviewerStatus,
                   completedAt,
-                  error: null,
+                  error: reviewer.error ?? record.error ?? failureDetail,
                 };
-              }
-              return {
-                ...reviewer,
-                status: runningReviewerStatus,
-                completedAt,
-                error: reviewer.error ?? record.error ?? failureDetail,
-              };
+              },
+            );
+
+            const status =
+              record.status === "running"
+                ? failed
+                  ? "failed"
+                  : "succeeded"
+                : record.status;
+            const error =
+              status === "succeeded"
+                ? null
+                : (record.error ?? (failed ? failureDetail : null));
+
+            return {
+              ...record,
+              status,
+              completedAt,
+              error,
+              reviewers,
+            };
+          },
+        });
+      } catch {
+        // Preserve cleanup behavior even when record rewrite fails.
+      }
+
+      if (finalizedRecord) {
+        for (const reviewer of finalizedRecord.reviewers) {
+          emitStageProgressEvent(renderer, {
+            type: "stage.candidate",
+            stage: "review",
+            candidate: {
+              reviewerAgentId: reviewer.agentId,
+              status: reviewer.status,
+              startedAt: reviewer.startedAt,
+              completedAt: reviewer.completedAt,
             },
-          );
+          });
+        }
 
-          const status =
-            record.status === "running"
-              ? failed
-                ? "failed"
-                : "succeeded"
-              : record.status;
-          const error =
-            status === "succeeded"
-              ? null
-              : (record.error ?? (failed ? failureDetail : null));
-
-          return {
-            ...record,
-            status,
-            completedAt,
-            error,
-            reviewers,
-          };
-        },
-      }).catch(() => {});
+        emitStageProgressEvent(renderer, {
+          type: "stage.status",
+          stage: "review",
+          status: finalizedRecord.status,
+        });
+      } else {
+        emitStageProgressEvent(renderer, {
+          type: "stage.status",
+          stage: "review",
+          status: failed ? "failed" : "succeeded",
+        });
+      }
 
       await flushReviewRecordBuffer({
         reviewsFilePath,
