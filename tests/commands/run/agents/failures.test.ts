@@ -67,6 +67,56 @@ describe("detectAgentProcessFailureDetail", () => {
     }
   });
 
+  it("extracts Claude message from structured result payloads", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "voratiq-detector-"));
+    const stdoutPath = join(scratch, "stdout.log");
+    const stderrPath = join(scratch, "stderr.log");
+    await writeFile(
+      stdoutPath,
+      `{"type":"result","is_error":true,"result":"You've hit your limit · resets 12pm (America/Los_Angeles)"}`,
+      "utf8",
+    );
+    await writeFile(stderrPath, "", "utf8");
+
+    try {
+      const detail = await detectAgentProcessFailureDetail({
+        provider: "claude",
+        stdoutPath,
+        stderrPath,
+      });
+      expect(detail).toBe(
+        "You've hit your limit · resets 12pm (America/Los_Angeles)",
+      );
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it("extracts Claude fallback line for quota/capacity failures", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "voratiq-detector-"));
+    const stdoutPath = join(scratch, "stdout.log");
+    const stderrPath = join(scratch, "stderr.log");
+    await writeFile(stdoutPath, "ok", "utf8");
+    await writeFile(
+      stderrPath,
+      "ERROR: rate limit reached for current account quota",
+      "utf8",
+    );
+
+    try {
+      const detail = await detectAgentProcessFailureDetail({
+        provider: "claude",
+        stdoutPath,
+        stderrPath,
+      });
+      expect(detail).toBe(
+        "ERROR: rate limit reached for current account quota",
+      );
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
   it("returns undefined for unsupported providers", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "voratiq-detector-"));
     const stdoutPath = join(scratch, "stdout.log");

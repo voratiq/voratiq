@@ -14,6 +14,7 @@ const CLAUDE_FAILURE_PATTERNS = [
 ];
 
 const JSON_MESSAGE_PATTERN = /"message"\s*:\s*"((?:\\.|[^"\\])*)"/;
+const JSON_RESULT_PATTERN = /"result"\s*:\s*"((?:\\.|[^"\\])*)"/;
 
 export interface AgentFailureDetectionInput {
   provider: string;
@@ -46,7 +47,11 @@ export async function detectAgentProcessFailureDetail(
       return CLAUDE_OAUTH_RELOGIN_HINT;
     }
 
-    return undefined;
+    return (
+      extractFirstJsonResult(combinedLogs) ??
+      extractFirstJsonMessage(combinedLogs) ??
+      extractClaudeFallbackLine(combinedLogs)
+    );
   }
 
   if (input.provider === GEMINI_PROVIDER_ID) {
@@ -71,7 +76,18 @@ export async function detectAgentProcessFailureDetail(
 }
 
 function extractFirstJsonMessage(text: string): string | undefined {
-  const match = JSON_MESSAGE_PATTERN.exec(text);
+  return extractFirstJsonStringField(text, JSON_MESSAGE_PATTERN);
+}
+
+function extractFirstJsonResult(text: string): string | undefined {
+  return extractFirstJsonStringField(text, JSON_RESULT_PATTERN);
+}
+
+function extractFirstJsonStringField(
+  text: string,
+  pattern: RegExp,
+): string | undefined {
+  const match = pattern.exec(text);
   if (!match) {
     return undefined;
   }
@@ -126,6 +142,28 @@ function extractGeminiFallbackLine(text: string): string | undefined {
     /No capacity available/i,
     /You have exhausted your capacity/i,
     /exhausted your capacity/i,
+  ]);
+}
+
+function extractClaudeFallbackLine(text: string): string | undefined {
+  const matched = findFirstMatchingLine(text, [
+    /.*hit your limit.*/i,
+    /.*usage limit.*/i,
+    /.*quota.*/i,
+    /.*capacity.*/i,
+    /.*rate limit.*/i,
+    /.*resource[_\s-]*exhausted.*/i,
+  ]);
+  if (matched) {
+    return matched;
+  }
+  return findFirstMatchingLine(text, [
+    /hit your limit/i,
+    /usage limit/i,
+    /quota/i,
+    /capacity/i,
+    /rate limit/i,
+    /resource[_\s-]*exhausted/i,
   ]);
 }
 
