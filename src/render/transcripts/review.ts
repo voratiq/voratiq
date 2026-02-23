@@ -1,10 +1,14 @@
 import { getAgentStatusStyle, getRunStatusStyle } from "../../status/colors.js";
-import { colorize } from "../../utils/colors.js";
 import { formatAgentErrorLine } from "../utils/agents.js";
-import { formatReviewBadge } from "../utils/badges.js";
 import { formatRunTimestamp } from "../utils/records.js";
-import { renderTable } from "../utils/table.js";
 import { renderTranscript } from "../utils/transcript.js";
+import type { TranscriptShellStyleOptions } from "../utils/transcript-shell.js";
+import {
+  buildTranscriptShellSection,
+  formatTranscriptStatusLabel,
+  renderTranscriptStatusTable,
+  resolveTranscriptShellStyle,
+} from "../utils/transcript-shell.js";
 
 interface ReviewTranscriptReviewerBlock {
   reviewerAgentId: string;
@@ -24,6 +28,7 @@ export function renderReviewTranscript(options: {
   status: "running" | "succeeded" | "failed" | "aborted";
   reviewers: readonly ReviewTranscriptReviewerBlock[];
   suppressHint?: boolean;
+  isTty?: boolean;
 }): string {
   const {
     runId,
@@ -34,40 +39,40 @@ export function renderReviewTranscript(options: {
     status,
     reviewers,
     suppressHint,
+    isTty,
   } = options;
 
+  const style: TranscriptShellStyleOptions = { isTty };
+  const resolvedStyle = resolveTranscriptShellStyle(style);
+
   const sections: string[][] = [];
-  sections.push([
-    `${formatReviewBadge(reviewId)} ${colorize(
-      status.toUpperCase(),
-      getRunStatusStyle(status).cli,
-    )}`,
-  ]);
-  sections.push([
-    ...buildDetailRows([
-      ["Elapsed", elapsed],
-      ["Created", formatRunTimestamp(createdAt)],
-      ["Run", runId],
-      ["Workspace", workspacePath],
-    ]),
-  ]);
+  sections.push(
+    buildTranscriptShellSection({
+      badgeText: reviewId,
+      badgeVariant: "review",
+      status: { value: status, color: getRunStatusStyle(status).cli },
+      detailRows: [
+        { label: "Elapsed", value: elapsed },
+        { label: "Created", value: formatRunTimestamp(createdAt) },
+        { label: "Run", value: runId },
+        { label: "Workspace", value: workspacePath },
+      ],
+      style,
+    }),
+  );
 
   if (reviewers.length > 0) {
     sections.push(
-      renderTable({
-        columns: [
-          { header: "AGENT", accessor: (row) => row.reviewerAgentId },
-          { header: "STATUS", accessor: (row) => row.statusLabel },
-          { header: "DURATION", accessor: (row) => row.duration },
-        ],
-        rows: reviewers.map((reviewer) => ({
-          reviewerAgentId: reviewer.reviewerAgentId,
-          statusLabel: colorize(
-            reviewer.status.toUpperCase(),
-            getAgentStatusStyle(reviewer.status).cli,
+      renderTranscriptStatusTable({
+        rows: reviewers,
+        agent: (row) => row.reviewerAgentId,
+        status: (row) =>
+          formatTranscriptStatusLabel(
+            row.status,
+            getAgentStatusStyle(row.status).cli,
+            resolvedStyle,
           ),
-          duration: reviewer.duration,
-        })),
+        duration: (row) => row.duration,
       }),
     );
   }
@@ -83,7 +88,7 @@ export function renderReviewTranscript(options: {
     }
     if (reviewer.errorLine) {
       const inlineError = reviewer.errorLine.replace(/\s+/g, " ").trim();
-      block.push("", formatAgentErrorLine(inlineError));
+      block.push("", formatAgentErrorLine(inlineError, style));
     }
     if (reviewer.outputPath && reviewer.status === "succeeded") {
       block.push("", `Review: ${reviewer.outputPath}`);
@@ -101,23 +106,4 @@ export function renderReviewTranscript(options: {
       };
 
   return renderTranscript({ sections, hint });
-}
-
-function buildDetailRows(rows: Array<[string, string]>): string[] {
-  const detailRows = rows.map(([label, value]) => ({ label, value }));
-  const tableLines = renderTable({
-    columns: [
-      {
-        header: "FIELD",
-        accessor: (row: (typeof detailRows)[number]) => row.label,
-      },
-      {
-        header: "VALUE",
-        accessor: (row: (typeof detailRows)[number]) => row.value,
-      },
-    ],
-    rows: detailRows,
-  });
-  const [, ...body] = tableLines;
-  return body;
 }

@@ -1,7 +1,7 @@
 import type { AgentSectionInput } from "../utils/agents.js";
-import { buildAgentSection } from "../utils/agents.js";
+import { buildAgentSectionWithStyle } from "../utils/agents.js";
 import type { RunDisplayInfo } from "../utils/runs.js";
-import { buildRunMetadataSection } from "../utils/runs.js";
+import { buildRunMetadataSectionWithStyle } from "../utils/runs.js";
 import type { TranscriptHintOptions } from "../utils/transcript.js";
 import { renderTranscript } from "../utils/transcript.js";
 
@@ -12,6 +12,7 @@ export interface TranscriptScaffoldOptions {
   afterAgents?: readonly string[][];
   warnings?: readonly string[];
   hint?: TranscriptHintOptions;
+  isTty?: boolean;
 }
 
 export function renderTranscriptWithMetadata(
@@ -26,7 +27,9 @@ function buildTranscriptSections(
 ): string[][] {
   const sections: string[][] = [];
 
-  const metadataSection = buildRunMetadataSection(options.metadata);
+  const metadataSection = buildRunMetadataSectionWithStyle(options.metadata, {
+    isTty: options.isTty,
+  });
   if (metadataSection.length > 0) {
     sections.push(metadataSection);
   }
@@ -34,7 +37,9 @@ function buildTranscriptSections(
   appendSections(sections, options.beforeAgents);
 
   options.agents.forEach((agent) => {
-    const agentSection = buildAgentSection(agent);
+    const agentSection = buildAgentSectionWithStyle(agent, {
+      isTty: options.isTty,
+    });
     if (agentSection.length > 0) {
       sections.push(agentSection);
     }

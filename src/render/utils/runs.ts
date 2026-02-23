@@ -1,8 +1,7 @@
 import { getRunStatusStyle } from "../../status/colors.js";
 import type { RunStatus } from "../../status/index.js";
-import { colorize } from "../../utils/colors.js";
-import { formatRunBadge } from "./badges.js";
-import { renderTable } from "./table.js";
+import type { TranscriptShellStyleOptions } from "./transcript-shell.js";
+import { buildTranscriptShellSection } from "./transcript-shell.js";
 
 export interface RunDisplayInfo {
   runId: string;
@@ -39,40 +38,22 @@ export function getRunMetadata(info: RunDisplayInfo): RunMetadataRow[] {
   );
 }
 
-export function buildRunMetadataSection(info: RunDisplayInfo): string[] {
-  const lines: string[] = [];
-  const badge = formatRunBadge(info.runId);
-  if (info.status) {
-    const statusStyle = getRunStatusStyle(info.status);
-    lines.push(
-      `${badge} ${colorize(info.status.toUpperCase(), statusStyle.cli)}`,
-    );
-  } else {
-    lines.push(badge);
-  }
-
+export function buildRunMetadataSectionWithStyle(
+  info: RunDisplayInfo,
+  style: TranscriptShellStyleOptions = {},
+): string[] {
   const detailRows = getRunMetadata(info);
 
-  if (detailRows.length > 0) {
-    const tableLines = renderTable({
-      columns: [
-        {
-          header: "FIELD",
-          accessor: (row: (typeof detailRows)[number]) => row.label,
-        },
-        {
-          header: "VALUE",
-          accessor: (row: (typeof detailRows)[number]) => row.value ?? "—",
-        },
-      ],
-      rows: detailRows,
-    });
-
-    const [, ...bodyLines] = tableLines;
-    if (bodyLines.length > 0) {
-      lines.push("", ...bodyLines);
-    }
-  }
-
-  return lines;
+  return buildTranscriptShellSection({
+    badgeText: info.runId,
+    badgeVariant: "run",
+    status: info.status
+      ? {
+          value: info.status,
+          color: getRunStatusStyle(info.status).cli,
+        }
+      : undefined,
+    detailRows,
+    style,
+  });
 }
