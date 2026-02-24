@@ -56,7 +56,7 @@ agents:
       });
 
     expect(load).toThrow(MissingOrchestrationConfigError);
-    expect(load).toThrow(/Missing orchestration configuration file/u);
+    expect(load).toThrow(/Missing `orchestration\.yaml`/u);
   });
 
   test("loads valid orchestration config", () => {
@@ -214,7 +214,7 @@ agents:
       });
 
     expect(load).toThrow(OrchestrationSchemaValidationError);
-    expect(load).toThrow(/unknown key "version"/u);
+    expect(load).toThrow(/unknown key `version`/u);
     const message = getThrownMessage(load);
     expect(message).not.toContain(".voratiq/orchestration.yaml");
   });
@@ -254,7 +254,7 @@ agents:
       });
 
     expect(load).toThrow(OrchestrationSchemaValidationError);
-    expect(load).toThrow(/unknown key "unexpected"/u);
+    expect(load).toThrow(/unknown key `unexpected`/u);
   });
 
   test("loads multiple profiles when each profile has valid stage config", () => {
@@ -489,7 +489,7 @@ agents:
         }),
       });
 
-    expect(load).toThrow(/profiles\.default: unknown key "deploy"/u);
+    expect(load).toThrow(/profiles\.default: unknown key `deploy`/u);
   });
 
   test("fails when profiles.default.spec is missing", () => {
@@ -668,9 +668,7 @@ agents:
       });
 
     expect(load).toThrow(OrchestrationSchemaValidationError);
-    expect(load).toThrow(
-      /agent `ghost` is not defined in \.voratiq\/agents\.yaml/u,
-    );
+    expect(load).toThrow(/Agent `ghost` is not defined in `agents\.yaml`/u);
     const message = getThrownMessage(load);
     expect(message).not.toContain("profiles.default.review.agents[0].id");
   });
@@ -709,9 +707,7 @@ agents:
       });
 
     expect(load).toThrow(OrchestrationSchemaValidationError);
-    expect(load).toThrow(
-      /agent `ghost` is not defined in \.voratiq\/agents\.yaml/u,
-    );
+    expect(load).toThrow(/Agent `ghost` is not defined in `agents\.yaml`/u);
     const message = getThrownMessage(load);
     expect(message).not.toContain("profiles.default.run.agents[0].id");
   });
@@ -750,9 +746,7 @@ agents:
       });
 
     expect(load).toThrow(OrchestrationSchemaValidationError);
-    expect(load).toThrow(
-      /agent `codex` is disabled in \.voratiq\/agents\.yaml/u,
-    );
+    expect(load).toThrow(/Agent `codex` is disabled in `agents\.yaml`/u);
     const message = getThrownMessage(load);
     expect(message).not.toContain("profiles.default.run.agents[0].id");
   });
@@ -782,7 +776,7 @@ profiles:
       });
 
     expect(load).toThrow(
-      /cannot validate stage agents because .*agents\.yaml is missing/u,
+      /Cannot validate stage agents because `agents\.yaml` is missing/u,
     );
   });
 

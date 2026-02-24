@@ -68,7 +68,7 @@ function formatEnvironmentPathRuntimeError(
   context: EnvironmentPathContext,
   detail: string,
 ): string {
-  return `Invalid ${context.key} "${context.value}": ${detail}.`;
+  return `Invalid \`${context.key}\` path \`${context.value}\`: ${detail}.`;
 }
 
 function assertRepoRelativeEnvironmentPath(
@@ -106,7 +106,7 @@ function guardResolvedPath(
     throw new WorkspaceSetupError(
       formatEnvironmentPathRuntimeError(
         context,
-        `resolved path "${resolvedPath}" escapes ${boundaryDescription} (${root}).`,
+        `resolved path \`${resolvedPath}\` escapes ${boundaryDescription} (\`${root}\`).`,
       ),
     );
   }
@@ -185,7 +185,7 @@ async function ensureNodeDependencies(
       throw new WorkspaceSetupError(
         formatEnvironmentPathRuntimeError(
           context,
-          `expected directory at "${repoDependencyPath}" but it does not exist.`,
+          `expected directory at \`${repoDependencyPath}\` but it does not exist.`,
         ),
       );
     }
@@ -228,7 +228,7 @@ async function ensurePythonEnvironment(
     throw new WorkspaceSetupError(
       formatEnvironmentPathRuntimeError(
         context,
-        `expected directory at "${repoPythonPath}" but it does not exist.`,
+        `expected directory at \`${repoPythonPath}\` but it does not exist.`,
       ),
     );
   }

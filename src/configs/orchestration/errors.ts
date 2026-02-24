@@ -12,7 +12,7 @@ export class OrchestrationConfigError extends WorkspaceSetupError {
 
 export class MissingOrchestrationConfigError extends OrchestrationConfigError {
   constructor(public readonly filePath: string) {
-    super(`Missing orchestration configuration file at ${filePath}.`);
+    super("Missing `orchestration.yaml`.");
     this.name = "MissingOrchestrationConfigError";
   }
 }

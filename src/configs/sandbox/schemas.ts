@@ -1,3 +1,5 @@
+import { basename } from "node:path";
+
 import { z } from "zod";
 
 import { relativeToRoot } from "../../utils/path.js";
@@ -95,10 +97,11 @@ export function validateSandboxOverrides(
       const issue = error.issues[0];
       const path = issue?.path?.join(".") ?? "";
       const detail = issue?.message ?? "Invalid configuration";
+      const displayPath = basename(relativeToRoot(root, filePath));
       const scopedDetail =
         path.length > 0
-          ? `${DEFAULT_SANDBOX_ERROR_CONTEXT}: ${relativeToRoot(root, filePath)} (${path}): ${detail}.`
-          : `${DEFAULT_SANDBOX_ERROR_CONTEXT}: ${relativeToRoot(root, filePath)}: ${detail}.`;
+          ? `${DEFAULT_SANDBOX_ERROR_CONTEXT}: \`${displayPath}\` (\`${path}\`): ${detail}.`
+          : `${DEFAULT_SANDBOX_ERROR_CONTEXT}: \`${displayPath}\`: ${detail}.`;
       throw new SandboxConfigurationError(scopedDetail);
     }
     throw error;

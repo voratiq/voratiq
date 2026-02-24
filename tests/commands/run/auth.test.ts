@@ -38,7 +38,7 @@ describe("auth provider verification", () => {
     } as AgentDefinition;
 
     await expect(verifyAgentProviders([agent])).resolves.toEqual([
-      { agentId: "test-agent", message: "missing provider" },
+      { agentId: "test-agent", message: "missing `provider`" },
     ]);
   });
 
@@ -51,7 +51,7 @@ describe("auth provider verification", () => {
     await expect(verifyAgentProviders([agent])).resolves.toEqual([
       {
         agentId: "test-agent",
-        message: 'unknown auth provider "unknown-provider"',
+        message: "unknown auth provider `unknown-provider`",
       },
     ]);
   });

@@ -374,7 +374,7 @@ describe("voratiq prune (integration)", () => {
         runId,
         confirm: () => Promise.resolve(true),
       }),
-    ).rejects.toThrow(`Run ${runId} has been deleted.`);
+    ).rejects.toThrow(`Run \`${runId}\` has been deleted.`);
   });
 
   it("allows two prune commands to mutate history concurrently", async () => {

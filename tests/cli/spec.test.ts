@@ -380,10 +380,13 @@ describe("voratiq spec (CLI)", () => {
       ANSI_PATTERN,
       "",
     );
-    expect(rendered).toContain('Error: No agent found for stage "spec".');
-    expect(rendered).toContain("Provide --agent <id>");
-    expect(rendered).toContain("profiles.default.spec.agents");
-    expect(rendered).toContain(".voratiq/orchestration.yaml");
+    expect(rendered).toContain("Error: No agents configured for stage `spec`.");
+    expect(rendered).toContain(
+      "Checked `profiles.default.spec.agents` in `orchestration.yaml`.",
+    );
+    expect(rendered).toContain(
+      "Configure exactly one agent under `profiles.default.spec.agents` in `orchestration.yaml`.",
+    );
     expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
   });
 
@@ -423,11 +426,13 @@ describe("voratiq spec (CLI)", () => {
       "",
     );
     expect(rendered).toContain(
-      'Error: Multiple agents found for stage "spec".',
+      "Error: Multiple agents configured for stage `spec`.",
     );
-    expect(rendered).toContain("Multi-agent spec is not supported.");
     expect(rendered).toContain(
-      "Configure exactly one agent under profiles.default.spec.agents in .voratiq/orchestration.yaml.",
+      "This command supports one agent for stage `spec`.",
+    );
+    expect(rendered).toContain(
+      "Configure exactly one agent under `profiles.default.spec.agents` in `orchestration.yaml`.",
     );
     expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
   });
@@ -555,9 +560,9 @@ describe("voratiq spec (CLI)", () => {
     );
     expect(rendered).toBe(
       [
-        'Error: Agent "missing" not found in agents.yaml.',
+        "Error: Agent `missing` not found in `agents.yaml`.",
         "",
-        "To add this agent, edit `.voratiq/agents.yaml`.",
+        "Update `agents.yaml` with this agent or choose a configured agent.",
       ].join("\n"),
     );
   });
@@ -584,7 +589,7 @@ describe("voratiq spec (CLI)", () => {
         title: "Payment Flow",
         output: ".voratiq/specs/custom.md",
       }),
-    ).rejects.toThrow("File already exists");
+    ).rejects.toThrow("Output file already exists:");
   });
 
   it("surfaces write failures when saving the final spec", async () => {

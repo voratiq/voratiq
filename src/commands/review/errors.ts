@@ -14,9 +14,9 @@ export class ReviewError extends CliError {
 export class ReviewAgentNotFoundError extends ReviewError {
   constructor(public readonly agentId: string) {
     super(
-      `Agent "${agentId}" not found in agents.yaml.`,
+      `Agent \`${agentId}\` not found in \`agents.yaml\`.`,
       [],
-      ["To add this agent, edit `.voratiq/agents.yaml`."],
+      ["Update `agents.yaml` with this agent or choose a configured agent."],
     );
     this.name = "ReviewAgentNotFoundError";
   }
@@ -27,14 +27,20 @@ export class ReviewGenerationFailedError extends ReviewError {
     detailLines: readonly string[] = [],
     hintLines: readonly string[] = [],
   ) {
-    super("Review generation failed.", detailLines, hintLines);
+    const normalizedHint =
+      hintLines[0] ?? "Inspect `stderr.log` to diagnose the failure.";
+    super("Review generation failed.", detailLines, [normalizedHint]);
     this.name = "ReviewGenerationFailedError";
   }
 }
 
 export class ReviewNoEligibleCandidatesError extends ReviewError {
   constructor() {
-    super("Review generation failed. No eligible candidates to review.");
+    super(
+      "No eligible candidates available for review.",
+      [],
+      ["Run `voratiq run` and ensure at least one agent produced a diff."],
+    );
     this.name = "ReviewNoEligibleCandidatesError";
   }
 }

@@ -17,7 +17,7 @@ export class WorkspaceError extends HintedError {
 
 export class WorkspaceMissingEntryError extends WorkspaceError {
   constructor(public readonly entryPath: string) {
-    super(`Missing workspace entry: ${entryPath}`);
+    super(`Missing workspace entry: \`${entryPath}\`.`);
     this.name = "WorkspaceMissingEntryError";
   }
 }
@@ -25,9 +25,9 @@ export class WorkspaceMissingEntryError extends WorkspaceError {
 export class WorkspaceNotInitializedError extends WorkspaceError {
   constructor(public readonly missingEntries: readonly string[]) {
     super(
-      "Voratiq workspace not found; aborting run.",
+      "Voratiq workspace is not initialized.",
       buildMissingEntryDetailLines(missingEntries),
-      ["Run `voratiq init` from the repository root and rerun."],
+      ["Run `voratiq init` from the repository root, then retry."],
     );
     this.name = "WorkspaceNotInitializedError";
   }
@@ -49,6 +49,6 @@ function buildMissingEntryDetailLines(
 
   return [
     "Missing workspace entries:",
-    ...entries.map((entry) => `  - ${entry}`),
+    ...entries.map((entry) => `  - \`${entry}\``),
   ];
 }

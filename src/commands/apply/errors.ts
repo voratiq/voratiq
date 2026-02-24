@@ -14,7 +14,7 @@ export class ApplyError extends CliError {
 export class ApplyRunDeletedError extends ApplyError {
   constructor(public readonly runId: string) {
     super(
-      `Run ${runId} has been deleted.`,
+      `Run \`${runId}\` has been deleted.`,
       [],
       ["Re-run the spec to generate fresh artifacts before applying."],
     );
@@ -25,10 +25,10 @@ export class ApplyRunDeletedError extends ApplyError {
 export class ApplyRunMetadataCorruptedError extends ApplyError {
   constructor(detail: string) {
     super(
-      "Run history is corrupted; cannot apply.",
+      "Run history is corrupted.",
       [detail],
       [
-        "Inspect `.voratiq/runs/index.json` and the affected run directory under `.voratiq/runs/sessions/<id>` or regenerate the run with `voratiq run`.",
+        "Inspect `runs/index.json` and the affected run directory under `runs/sessions/<id>`, then retry.",
       ],
     );
     this.name = "ApplyRunMetadataCorruptedError";
@@ -41,11 +41,9 @@ export class ApplyAgentNotFoundError extends ApplyError {
     public readonly agentId: string,
   ) {
     super(
-      `Agent ${agentId} not found in run ${runId}.`,
+      `Agent \`${agentId}\` not found in run \`${runId}\`.`,
       [],
-      [
-        `To review run information: voratiq review --run ${runId} --agent <agent-id>.`,
-      ],
+      ["Check available agents with `voratiq list`."],
     );
     this.name = "ApplyAgentNotFoundError";
   }
@@ -59,23 +57,34 @@ export class ApplyAgentSelectorUnresolvedError extends ApplyError {
     aliases: readonly string[];
   }) {
     const { runId, selector, canonicalAgentIds, aliases } = options;
-    const canonicalPreview = canonicalAgentIds.slice(0, 20).join(", ");
-    const aliasPreview = aliases.slice(0, 20).join(", ");
-    super(
-      `Agent selector "${selector}" did not resolve for run ${runId}.`,
-      [
-        canonicalAgentIds.length > 0
-          ? `Canonical agent ids: ${canonicalPreview}${
+    const canonicalPreview = canonicalAgentIds
+      .slice(0, 20)
+      .map((agentId) => `\`${agentId}\``)
+      .join(", ");
+    const aliasPreview = aliases
+      .slice(0, 20)
+      .map((alias) => `\`${alias}\``)
+      .join(", ");
+    const detailLines = [
+      ...(canonicalAgentIds.length > 0
+        ? [
+            `Available agent ids: ${canonicalPreview}${
               canonicalAgentIds.length > 20 ? ", ..." : ""
-            }`
-          : "Canonical agent ids: (none recorded)",
-        aliases.length > 0
-          ? `Blinded aliases: ${aliasPreview}${aliases.length > 20 ? ", ..." : ""}`
-          : "Blinded aliases: (none found)",
-      ],
-      [
-        "Pass a canonical agent id or a blinded alias from a review of this run.",
-      ],
+            }.`,
+          ]
+        : []),
+      ...(aliases.length > 0
+        ? [
+            `Available blinded aliases: ${aliasPreview}${
+              aliases.length > 20 ? ", ..." : ""
+            }.`,
+          ]
+        : []),
+    ];
+    super(
+      `Agent selector \`${selector}\` did not match run \`${runId}\`.`,
+      detailLines,
+      ["Use an agent id or blinded alias from this run's review output."],
     );
     this.name = "ApplyAgentSelectorUnresolvedError";
   }
@@ -90,17 +99,15 @@ export class ApplyAgentSelectorAmbiguousError extends ApplyError {
     const { runId, selector, matches } = options;
     const lines = matches
       .slice(0, 10)
-      .map((match) => `- ${match.reviewId}: ${match.agentId}`);
+      .map((match) => `- \`${match.reviewId}\`: \`${match.agentId}\``);
     super(
-      `Blinded alias "${selector}" is ambiguous for run ${runId}.`,
+      `Blinded alias \`${selector}\` is ambiguous for run \`${runId}\`.`,
       [
-        "This alias appears in multiple review sessions with different resolutions:",
+        "This alias resolves differently across review sessions:",
         ...lines,
         matches.length > 10 ? "- ..." : "",
       ].filter((line) => line.length > 0),
-      [
-        "Re-run with a canonical agent id, or consult the relevant review record to identify the intended candidate.",
-      ],
+      ["Use a canonical agent id for this run."],
     );
     this.name = "ApplyAgentSelectorAmbiguousError";
   }
@@ -111,9 +118,11 @@ export class ApplyAgentDiffNotRecordedError extends ApplyError {
     public readonly runId: string,
     public readonly agentId: string,
   ) {
-    super(`Agent ${agentId} did not record a diff for run ${runId}.`, [
-      `Select an agent that produced a diff via \`voratiq review --run ${runId} --agent <agent-id>\`.`,
-    ]);
+    super(
+      `Agent \`${agentId}\` did not record a diff for run \`${runId}\`.`,
+      [],
+      ["Select an agent that produced a diff in the run review output."],
+    );
     this.name = "ApplyAgentDiffNotRecordedError";
   }
 }
@@ -122,8 +131,8 @@ export class ApplyAgentDiffMissingOnDiskError extends ApplyError {
   constructor(public readonly diffPath: string) {
     super(
       "Recorded diff is missing from disk.",
-      [`Expected diff at ${diffPath} but it was not found.`],
-      ["Ensure the run directory still exists or re-run the agents."],
+      [`Expected diff: \`${diffPath}\`.`],
+      ["Re-run the run to regenerate artifacts."],
     );
     this.name = "ApplyAgentDiffMissingOnDiskError";
   }
@@ -135,11 +144,9 @@ export class ApplyAgentSummaryNotRecordedError extends ApplyError {
     public readonly agentId: string,
   ) {
     super(
-      `Agent ${agentId} did not record a summary for run ${runId}.`,
-      ["A summary artifact is required for `voratiq apply --commit`."],
-      [
-        "Re-run the spec to regenerate artifacts or apply without `--commit` and commit manually.",
-      ],
+      `Agent \`${agentId}\` did not record a summary for run \`${runId}\`.`,
+      ["A summary artifact is required when using `--commit`."],
+      ["Apply without `--commit` and write the commit message manually."],
     );
     this.name = "ApplyAgentSummaryNotRecordedError";
   }
@@ -149,8 +156,8 @@ export class ApplyAgentSummaryMissingOnDiskError extends ApplyError {
   constructor(public readonly summaryPath: string) {
     super(
       "Recorded summary is missing from disk.",
-      [`Expected summary at ${summaryPath} but it was not found.`],
-      ["Ensure the run directory still exists or re-run the agents."],
+      [`Expected summary: \`${summaryPath}\`.`],
+      ["Re-run the run to regenerate artifacts."],
     );
     this.name = "ApplyAgentSummaryMissingOnDiskError";
   }
@@ -160,10 +167,8 @@ export class ApplyAgentSummaryEmptyError extends ApplyError {
   constructor(public readonly summaryPath: string) {
     super(
       "Recorded summary is empty.",
-      [`Expected summary at ${summaryPath} to contain a commit subject.`],
-      [
-        "Re-run the spec to regenerate artifacts or apply without `--commit` and commit manually.",
-      ],
+      [`Expected summary with a commit subject: \`${summaryPath}\`.`],
+      ["Apply without `--commit` and write the commit message manually."],
     );
     this.name = "ApplyAgentSummaryEmptyError";
   }
@@ -189,10 +194,9 @@ export class ApplyBaseMismatchError extends ApplyError {
   constructor(options: ApplyBaseMismatchOptions) {
     const { baseRevisionSha, headRevision } = options;
     super(
-      `Repository HEAD (${shortSha(headRevision)}) no longer matches the run's base revision (${shortSha(baseRevisionSha)}).`,
-      [
-        "Reset to the recorded base or rerun the specification, or pass `--ignore-base-mismatch` to proceed at your own risk.",
-      ],
+      `Repository HEAD \`${shortSha(headRevision)}\` no longer matches run base \`${shortSha(baseRevisionSha)}\`.`,
+      [],
+      ["Re-run `voratiq run` to regenerate artifacts for the current HEAD."],
     );
     this.name = "ApplyBaseMismatchError";
   }
@@ -206,11 +210,13 @@ export class ApplyPatchApplicationError extends ApplyError {
     agentId: string,
   ) {
     super(
-      "Failed to apply the recorded diff.",
-      [detail, `Inspect the patch at ${diffPath} for additional context.`],
+      "Failed to apply recorded diff.",
       [
-        `Resolve the conflict and rerun \`voratiq apply --run ${runId} --agent ${agentId}\`.`,
+        detail,
+        `Run: \`${runId}\`, agent: \`${agentId}\`.`,
+        `Patch: \`${diffPath}\`.`,
       ],
+      ["Resolve the conflict, then re-run apply for the same run and agent."],
     );
     this.name = "ApplyPatchApplicationError";
   }

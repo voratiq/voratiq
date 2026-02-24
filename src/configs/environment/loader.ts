@@ -3,7 +3,6 @@ import {
   type YamlParseErrorDetail,
 } from "../../utils/yaml-reader.js";
 import {
-  formatWorkspacePath,
   resolveWorkspacePath,
   VORATIQ_ENVIRONMENT_FILE,
 } from "../../workspace/structure.js";
@@ -23,12 +22,9 @@ import {
   normalizeEnvironmentConfig,
 } from "./types.js";
 
-export const DEFAULT_ENVIRONMENT_FILE_DISPLAY = formatWorkspacePath(
-  VORATIQ_ENVIRONMENT_FILE,
-);
+export const DEFAULT_ENVIRONMENT_FILE_DISPLAY = VORATIQ_ENVIRONMENT_FILE;
 
-const DEFAULT_ENVIRONMENT_ERROR_CONTEXT =
-  "Failed to parse workspace environment configuration";
+const DEFAULT_ENVIRONMENT_ERROR_CONTEXT = "Invalid `environment.yaml`";
 
 export interface LoadEnvironmentConfigOptions {
   root?: string;

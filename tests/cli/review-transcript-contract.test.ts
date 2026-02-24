@@ -497,7 +497,7 @@ describe("review transcript contract", () => {
       }),
     ).rejects.toMatchObject({
       detailLines: [
-        "Failed to load recommendation artifact for reviewer reviewer-a.",
+        "Failed to load `recommendation.json` for reviewer `reviewer-a`.",
       ],
     });
   });

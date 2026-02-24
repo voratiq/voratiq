@@ -318,7 +318,7 @@ describe("watchdog", () => {
         expect(state.triggered).toBe("fatal-pattern");
         expect(onTrigger).toHaveBeenCalledWith(
           "fatal-pattern",
-          expect.stringContaining("Fatal error"),
+          expect.stringContaining("Fatal provider error"),
           undefined,
         );
         // Verify process group kill was attempted

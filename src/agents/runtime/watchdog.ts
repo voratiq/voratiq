@@ -288,7 +288,7 @@ export function createWatchdog(
     terminateProcess(child, state, { killGraceMs, hardAbortMs });
   };
 
-  const registerFatalPatternMatch = (pattern: RegExp): void => {
+  const registerFatalPatternMatch = (): void => {
     const now = Date.now();
     if (state.fatalPatternFirstSeen === null) {
       state.fatalPatternFirstSeen = now;
@@ -298,7 +298,7 @@ export function createWatchdog(
     if (elapsed <= WATCHDOG_DEFAULTS.fatalRetryWindowMs) {
       triggerWatchdog(
         "fatal-pattern",
-        `Fatal error pattern detected: ${pattern.source}`,
+        "Fatal provider error detected repeatedly. Inspect `stderr.log` for details.",
       );
     }
   };
@@ -321,7 +321,7 @@ export function createWatchdog(
       return false;
     }
 
-    registerFatalPatternMatch(pattern);
+    registerFatalPatternMatch();
     return true;
   };
 

@@ -47,7 +47,9 @@ export async function runSandboxedAgent(
 
   const providerId = sandboxProviderId ?? agent.provider ?? "";
   if (!providerId) {
-    throw new AgentRuntimeSandboxError(`Agent "${agent.id}" missing provider.`);
+    throw new AgentRuntimeSandboxError(
+      `Agent \`${agent.id}\` is missing a provider.`,
+    );
   }
 
   await mkdir(dirname(paths.runtimeManifestPath), { recursive: true });

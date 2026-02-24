@@ -8,7 +8,7 @@ export const reviewRecommendationSchema = z.object({
     .trim()
     .min(1)
     .refine((value) => value.toLowerCase() !== "none", {
-      message: "must not be 'none'",
+      message: "must not be `none`",
     }),
   ranking: z
     .array(z.string().trim().min(1))
@@ -56,23 +56,23 @@ export function assertRecommendationMatchesRanking(options: {
 }): void {
   const { recommendation, ranking } = options;
   if (ranking.length === 0) {
-    throw new Error("Ranking must include at least one candidate.");
+    throw new Error("`ranking` must include at least one candidate.");
   }
 
   const topRanked = ranking[0];
   if (!topRanked) {
-    throw new Error("Ranking is missing the #1 candidate.");
+    throw new Error("`ranking` is missing the top candidate.");
   }
 
   if (recommendation.preferred_agent !== topRanked) {
     throw new Error(
-      `Recommendation preferred_agent (${recommendation.preferred_agent}) must match ranking #1 (${topRanked}).`,
+      `\`preferred_agent\` (\`${recommendation.preferred_agent}\`) must match top-ranked candidate (\`${topRanked}\`).`,
     );
   }
 
   if (recommendation.ranking.length !== ranking.length) {
     throw new Error(
-      `Recommendation ranking must include exactly ${ranking.length} entries.`,
+      `\`ranking\` must include exactly ${ranking.length} entries.`,
     );
   }
 
@@ -81,7 +81,7 @@ export function assertRecommendationMatchesRanking(options: {
     const received = recommendation.ranking[index];
     if (expected !== received) {
       throw new Error(
-        `Recommendation ranking mismatch at position ${index + 1}: expected ${expected}, received ${received}.`,
+        `\`ranking\` mismatch at position ${index + 1}: expected \`${expected}\`, received \`${received}\`.`,
       );
     }
   }

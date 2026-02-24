@@ -163,13 +163,13 @@ export async function executeReviewCommand(
     renderer?.complete("failed");
     if (executionError) {
       throw new ReviewGenerationFailedError([
-        `Review session ${reviewId} failed and cleanup also failed.`,
+        `Review session \`${reviewId}\` failed and cleanup also failed.`,
         `Execution error: ${toErrorMessage(executionError)}`,
         `Cleanup error: ${toErrorMessage(cleanupError)}`,
       ]);
     }
     throw new ReviewGenerationFailedError([
-      `Review session ${reviewId} cleanup failed.`,
+      `Review session \`${reviewId}\` cleanup failed.`,
       `Cleanup error: ${toErrorMessage(cleanupError)}`,
     ]);
   }
@@ -186,7 +186,7 @@ export async function executeReviewCommand(
   if (!reviewResults) {
     renderer?.complete("failed");
     throw new ReviewGenerationFailedError([
-      `Review session ${reviewId} did not produce any result.`,
+      `Review session \`${reviewId}\` did not produce any result.`,
     ]);
   }
 
@@ -194,7 +194,7 @@ export async function executeReviewCommand(
   if (!selectedResult) {
     renderer?.complete("failed");
     throw new ReviewGenerationFailedError([
-      `Review session ${reviewId} did not produce any result.`,
+      `Review session \`${reviewId}\` did not produce any result.`,
     ]);
   }
 

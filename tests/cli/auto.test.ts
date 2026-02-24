@@ -718,7 +718,7 @@ describe("voratiq auto", () => {
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     expect(stripAnsi(stdout.join(""))).toContain(
-      "resolved_preferred_agent is missing or empty",
+      "Recommendation is missing `resolved_preferred_agent`.",
     );
     expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
   });
@@ -755,7 +755,7 @@ describe("voratiq auto", () => {
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     expect(stripAnsi(stdout.join(""))).toContain(
-      "resolved_preferred_agent is missing or empty",
+      "Recommendation is missing `resolved_preferred_agent`.",
     );
     expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
   });
@@ -817,7 +817,7 @@ describe("voratiq auto", () => {
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     expect(stripAnsi(stdout.join(""))).toContain(
-      "Failed to load structured review recommendation.",
+      "Failed to load `recommendation.json`.",
     );
     expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
     expect(process.exitCode).toBe(1);
@@ -855,7 +855,7 @@ describe("voratiq auto", () => {
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     expect(stripAnsi(stdout.join(""))).toContain(
-      "Failed to load structured review recommendation.",
+      "Failed to load `recommendation.json`.",
     );
     expect(stripAnsi(stdout.join(""))).toContain("preferred_agent");
     expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
@@ -894,7 +894,7 @@ describe("voratiq auto", () => {
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     expect(stripAnsi(stdout.join(""))).toContain(
-      "Failed to load structured review recommendation.",
+      "Failed to load `recommendation.json`.",
     );
     expect(stripAnsi(stdout.join(""))).toContain("preferred_agent");
     expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");

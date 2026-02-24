@@ -72,7 +72,12 @@ export class RunDirectoryExistsError extends RunCommandError {
   public readonly kind = "workspace-setup" as const;
 
   constructor(runId: string, displayPath: string) {
-    super(`Run directory already exists for id ${runId}: ${displayPath}`);
+    super(
+      `Run directory already exists for run \`${runId}\`: \`${displayPath}\`.`,
+      {
+        hintLines: ["Remove the existing run directory and retry."],
+      },
+    );
   }
 }
 
@@ -80,7 +85,9 @@ export class MissingAgentProviderError extends RunCommandError {
   public readonly kind = "workspace-setup" as const;
 
   constructor(agentId: string) {
-    super(`Agent "${agentId}" missing provider.`);
+    super(`Agent \`${agentId}\` is missing a provider.`, {
+      hintLines: ["Set `provider` for this agent in `agents.yaml`."],
+    });
   }
 }
 
@@ -88,7 +95,9 @@ export class UnknownAuthProviderError extends RunCommandError {
   public readonly kind = "workspace-setup" as const;
 
   constructor(providerId: string) {
-    super(`Unknown auth provider "${providerId}".`);
+    super(`Unknown auth provider \`${providerId}\`.`, {
+      hintLines: ["Use a provider configured by Voratiq."],
+    });
   }
 }
 
@@ -96,7 +105,9 @@ export class AuthProviderVerificationError extends RunCommandError {
   public readonly kind = "workspace-setup" as const;
 
   constructor(detail: string) {
-    super(detail);
+    super(detail, {
+      hintLines: ["Authenticate this provider, then retry."],
+    });
   }
 }
 
@@ -104,7 +115,9 @@ export class AuthProviderStageError extends RunCommandError {
   public readonly kind = "workspace-setup" as const;
 
   constructor(detail: string) {
-    super(detail);
+    super(detail, {
+      hintLines: ["Verify provider credentials, then retry."],
+    });
   }
 }
 
@@ -135,9 +148,9 @@ export class NoAgentsEnabledError extends RunCommandError {
   public readonly kind = "workspace-setup" as const;
 
   constructor() {
-    super(
-      "No agents enabled in `.voratiq/agents.yaml`. Set `enabled: true` on at least one agent.",
-    );
+    super("No agents are enabled in `agents.yaml`.", {
+      hintLines: ["Set `enabled: true` on at least one agent."],
+    });
   }
 }
 
@@ -145,7 +158,9 @@ export class RunProcessStreamError extends RunCommandError {
   public readonly kind = "process-spawn" as const;
 
   constructor(detail: string) {
-    super(detail);
+    super(detail, {
+      hintLines: ["Inspect `stderr.log` to diagnose the failure."],
+    });
     this.name = "RunProcessStreamError";
   }
 }

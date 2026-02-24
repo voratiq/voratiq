@@ -696,9 +696,11 @@ suite("voratiq run (integration)", () => {
 
     expect(capturedError).toBeInstanceOf(HintedError);
     const hinted = capturedError as HintedError;
-    expect(hinted.headline).toBe('No agent found for stage "run".');
+    expect(hinted.headline).toBe("No agents configured for stage `run`.");
     expect(
-      hinted.hintLines.some((line) => line.includes("Provide --agent <id>")),
+      hinted.hintLines.some((line) =>
+        line.includes("Configure at least one agent"),
+      ),
     ).toBe(true);
     expect(
       hinted.hintLines.some((line) =>
@@ -725,7 +727,7 @@ suite("voratiq run (integration)", () => {
           agentIds: ["missing-agent"],
         }),
       ).rejects.toThrow(
-        /Agent "missing-agent" is not defined in agents\.yaml/iu,
+        /Agent `missing-agent` is not defined in `agents\.yaml`/u,
       );
     } finally {
       process.chdir(originalCwd);
@@ -750,7 +752,7 @@ suite("voratiq run (integration)", () => {
           specPath: relative(repoRoot, specPath),
           agentIds: ["codex"],
         }),
-      ).rejects.toThrow(/Agent "codex" is disabled in agents\.yaml/iu);
+      ).rejects.toThrow(/Agent `codex` is disabled in `agents\.yaml`/u);
     } finally {
       process.chdir(originalCwd);
     }
@@ -774,7 +776,7 @@ suite("voratiq run (integration)", () => {
           agentIds: ["codex", "codex"],
         }),
       ).rejects.toMatchObject({
-        headline: 'Duplicate --agent values are not allowed for stage "run".',
+        headline: "Duplicate `--agent` values for stage `run`.",
       });
     } finally {
       process.chdir(originalCwd);

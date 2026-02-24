@@ -25,7 +25,6 @@ import {
 import { formatDurationLabel } from "../render/utils/agents.js";
 import { readReviewRecords } from "../reviews/records/persistence.js";
 import type { ReviewRecord } from "../reviews/records/types.js";
-import { toErrorMessage } from "../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import {
@@ -105,7 +104,7 @@ export async function runReviewCommand(
   });
   if (!record) {
     throw new ReviewGenerationFailedError([
-      `Review session ${execution.reviewId} record not found after execution.`,
+      `Review session \`${execution.reviewId}\` record not found after execution.`,
     ]);
   }
 
@@ -128,7 +127,7 @@ export async function runReviewCommand(
           previewLines: undefined,
           errorLine:
             reviewerRecord.error ??
-            "Reviewer process failed. No review output detected.",
+            "Reviewer process failed with no `review.md` output.",
         } as const;
       }
 
@@ -160,14 +159,13 @@ export async function runReviewCommand(
           previewLines,
           errorLine: undefined,
         } as const;
-      } catch (error) {
+      } catch {
         throw new ReviewGenerationFailedError(
           [
-            `Failed to load recommendation artifact for reviewer ${reviewerAgentId}.`,
+            `Failed to load \`${REVIEW_RECOMMENDATION_FILENAME}\` for reviewer \`${reviewerAgentId}\`.`,
           ],
           [
-            `Expected ${REVIEW_RECOMMENDATION_FILENAME} at ${recommendationPath}.`,
-            toErrorMessage(error),
+            `Re-run review to regenerate \`${REVIEW_RECOMMENDATION_FILENAME}\`.`,
           ],
         );
       }

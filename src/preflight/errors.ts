@@ -22,10 +22,8 @@ export class SandboxDependenciesError extends CliError {
   constructor(missing: string) {
     super(
       "Missing sandbox dependencies.",
-      [`Missing: ${missing}`],
-      [
-        "Install the missing dependencies and re-run the command. For more information, see: https://github.com/anthropic-experimental/sandbox-runtime/blob/1bafa66a2c3ebc52569fc0c1a868e85e778f66a0/README.md#platform-specific-dependencies",
-      ],
+      [`Missing dependencies: ${missing}.`],
+      ["Install the missing dependencies, then retry."],
     );
     this.name = "SandboxDependenciesError";
   }
@@ -34,7 +32,9 @@ export class SandboxDependenciesError extends CliError {
 export class BranchCheckoutError extends CliError {
   constructor(message: string, gitError?: string) {
     const detailLines = gitError ? [gitError] : [];
-    super(message, detailLines);
+    super(message, detailLines, [
+      "Resolve the branch checkout issue, then retry.",
+    ]);
     this.name = "BranchCheckoutError";
   }
 }

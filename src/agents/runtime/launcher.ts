@@ -111,7 +111,7 @@ export async function getRunCommand(): Promise<string> {
     await access(binaryPath, X_OK);
   } catch {
     throw new Error(
-      `Sandbox Runtime binary not found or not executable at ${binaryPath}. Please reinstall dependencies with 'npm install'.`,
+      `Sandbox runtime binary is missing or not executable at \`${binaryPath}\`. Run \`npm install\` to reinstall dependencies.`,
     );
   }
   return binaryPath;
@@ -167,7 +167,7 @@ export async function runAgentProcess(
   const shimEntryPath = resolveShimEntryPath();
   if (!existsSync(shimEntryPath)) {
     throw new AgentRuntimeProcessError(
-      `Shim entry point missing at ${shimEntryPath}`,
+      `Shim entry point is missing at \`${shimEntryPath}\`.`,
     );
   }
 
@@ -279,7 +279,7 @@ export async function stageManifestForSandbox(options: {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new AgentRuntimeProcessError(
-      `Failed to read manifest at "${runtimeManifestPath}": ${detail}`,
+      `Failed to read manifest at \`${runtimeManifestPath}\`: ${detail}`,
     );
   }
 
@@ -289,7 +289,7 @@ export async function stageManifestForSandbox(options: {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new AgentRuntimeProcessError(
-      `Manifest JSON at "${runtimeManifestPath}" is invalid: ${detail}`,
+      `Manifest JSON at \`${runtimeManifestPath}\` is invalid: ${detail}`,
     );
   }
 

@@ -14,14 +14,14 @@ export class AgentRuntimeError extends DisplayableError {
 
 export class MissingAgentProviderError extends AgentRuntimeError {
   constructor(agentId: string) {
-    super("auth", `Agent "${agentId}" missing provider.`);
+    super("auth", `Agent \`${agentId}\` is missing a provider.`);
     this.name = "MissingAgentProviderError";
   }
 }
 
 export class UnknownAuthProviderError extends AgentRuntimeError {
   constructor(providerId: string) {
-    super("auth", `Unknown auth provider "${providerId}".`);
+    super("auth", `Unknown auth provider \`${providerId}\`.`);
     this.name = "UnknownAuthProviderError";
   }
 }

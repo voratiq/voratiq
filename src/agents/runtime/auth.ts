@@ -60,7 +60,7 @@ export async function verifyAgentProviders(
   for (const agent of agents) {
     const providerId = agent.provider?.trim();
     if (!providerId) {
-      issues.push({ agentId: agent.id, message: "missing provider" });
+      issues.push({ agentId: agent.id, message: "missing `provider`" });
       continue;
     }
 
@@ -68,7 +68,7 @@ export async function verifyAgentProviders(
     if (!provider) {
       issues.push({
         agentId: agent.id,
-        message: `unknown auth provider "${providerId}"`,
+        message: `unknown auth provider \`${providerId}\``,
       });
       continue;
     }

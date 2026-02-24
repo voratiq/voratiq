@@ -2,7 +2,6 @@ import { type ZodIssue } from "zod";
 
 import { readAgentsConfig } from "../../configs/agents/loader.js";
 import { isMissing, readUtf8File } from "../../utils/fs.js";
-import { relativeToRoot } from "../../utils/path.js";
 import {
   parseYamlDocument,
   type YamlParseErrorDetail,
@@ -93,13 +92,13 @@ function validateStageAgentReferences(
 
         if (!matchingAgent) {
           throw new OrchestrationSchemaValidationError(
-            `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: agent ${formatAgentId(stageAgent.id)} is not defined in .voratiq/agents.yaml.`,
+            `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: Agent ${formatAgentId(stageAgent.id)} is not defined in \`agents.yaml\`.`,
           );
         }
 
         if (matchingAgent.enabled === false) {
           throw new OrchestrationSchemaValidationError(
-            `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: agent ${formatAgentId(stageAgent.id)} is disabled in .voratiq/agents.yaml.`,
+            `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: Agent ${formatAgentId(stageAgent.id)} is disabled in \`agents.yaml\`.`,
           );
         }
       }
@@ -114,7 +113,7 @@ function loadAgentsById(
   const agentsFilePath =
     context.agentsFilePath ?? resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const read = readFile ?? defaultReadFile;
-  const agentsDisplayPath = relativeToRoot(root, agentsFilePath);
+  const agentsDisplayPath = VORATIQ_AGENTS_FILE;
 
   let content: string;
   try {
@@ -122,7 +121,7 @@ function loadAgentsById(
   } catch (error) {
     if (isMissing(error)) {
       throw new OrchestrationSchemaValidationError(
-        `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: cannot validate stage agents because ${agentsDisplayPath} is missing.`,
+        `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: Cannot validate stage agents because \`${agentsDisplayPath}\` is missing.`,
       );
     }
     throw error;
@@ -137,7 +136,7 @@ function loadAgentsById(
         ? normalizeMessage(error.message)
         : "unknown error";
     throw new OrchestrationSchemaValidationError(
-      `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: cannot validate stage agents because ${agentsDisplayPath} is invalid (${message}).`,
+      `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: Cannot validate stage agents because \`${agentsDisplayPath}\` is invalid (${message}).`,
     );
   }
 
@@ -145,7 +144,7 @@ function loadAgentsById(
   for (const [index, agent] of agentsConfig.agents.entries()) {
     if (agentsById.has(agent.id)) {
       throw new OrchestrationSchemaValidationError(
-        `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: cannot validate stage agents because ${agentsDisplayPath} has duplicate id ${formatAgentId(agent.id)} at agents[${index}].`,
+        `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: Cannot validate stage agents because \`${agentsDisplayPath}\` has duplicate id ${formatAgentId(agent.id)} at \`agents[${index}]\`.`,
       );
     }
 
@@ -186,7 +185,7 @@ function formatSchemaValidationErrorMessage(
     const keys = issue.keys
       .slice()
       .sort()
-      .map((key) => `"${key}"`)
+      .map((key) => `\`${key}\``)
       .join(", ");
     const noun = issue.keys.length > 1 ? "keys" : "key";
     return `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: ${path}: unknown ${noun} ${keys}.`;
