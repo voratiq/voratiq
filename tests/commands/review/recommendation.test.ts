@@ -55,7 +55,7 @@ describe("review recommendation schema", () => {
           next_actions: [],
         }),
       ),
-    ).toThrow(/must not be 'none'/u);
+    ).toThrow(/must not be `none`/u);
   });
 
   it("accepts extra metadata keys", () => {
@@ -100,7 +100,7 @@ describe("recommendation ranking consistency", () => {
         },
         ranking: ["r_aaaaaaaaaa", "r_bbbbbbbbbb"],
       }),
-    ).toThrow(/ranking #1/u);
+    ).toThrow(/must match top-ranked candidate/u);
   });
 
   it("rejects empty ranking", () => {
@@ -114,6 +114,6 @@ describe("recommendation ranking consistency", () => {
         },
         ranking: [],
       }),
-    ).toThrow(/Ranking must include at least one candidate/u);
+    ).toThrow(/`ranking` must include at least one candidate/u);
   });
 });

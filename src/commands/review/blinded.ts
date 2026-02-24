@@ -43,10 +43,10 @@ function resolvePreferredAgent(options: {
   if (isBlindedCandidateAlias(preferredAgent)) {
     const canonical = aliasMap[preferredAgent];
     if (!canonical) {
-      throw new ReviewGenerationFailedError([
-        `Unknown blinded candidate id: ${preferredAgent}`,
-        "Ensure the recommendation uses the candidate ids listed in the prompt.",
-      ]);
+      throw new ReviewGenerationFailedError(
+        [`Unknown blinded candidate id: \`${preferredAgent}\`.`],
+        ["Use candidate ids listed in the review prompt."],
+      );
     }
     return {
       preferredAgent: canonical,
@@ -64,10 +64,10 @@ function resolvePreferredAgent(options: {
     };
   }
 
-  throw new ReviewGenerationFailedError([
-    `Unknown candidate selector: ${preferredAgent}`,
-    "Use a blinded candidate id (r_...) or a known canonical agent id.",
-  ]);
+  throw new ReviewGenerationFailedError(
+    [`Unknown candidate selector: \`${preferredAgent}\`.`],
+    ["Use a blinded candidate id or a known canonical agent id."],
+  );
 }
 
 function resolveCandidateId(options: {
@@ -78,10 +78,10 @@ function resolveCandidateId(options: {
   if (isBlindedCandidateAlias(candidateId)) {
     const canonical = aliasMap[candidateId];
     if (!canonical) {
-      throw new ReviewGenerationFailedError([
-        `Unknown blinded candidate id in ranking: ${candidateId}`,
-        "Ensure ranking only includes candidate ids listed in the prompt.",
-      ]);
+      throw new ReviewGenerationFailedError(
+        [`Unknown blinded candidate id in ranking: \`${candidateId}\`.`],
+        ["Ensure ranking includes only candidate ids listed in the prompt."],
+      );
     }
     return canonical;
   }

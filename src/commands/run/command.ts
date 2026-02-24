@@ -10,7 +10,7 @@ import type {
   RunRecord,
   RunReport,
 } from "../../runs/records/types.js";
-import { toError } from "../../utils/errors.js";
+import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
 import {
   buildAgentWorkspacePaths,
@@ -19,6 +19,7 @@ import {
 import { prepareRunWorkspace } from "../../workspace/run.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { executeAgents } from "./agent-execution.js";
+import { RunCommandError, RunProcessStreamError } from "./errors.js";
 import { generateRunId } from "./id.js";
 import { clearActiveRun, registerActiveRun } from "./lifecycle.js";
 import { initializeRunRecord } from "./record-init.js";
@@ -222,20 +223,26 @@ export async function executeRunCommand(
 
   if (cleanupError) {
     if (executionError) {
-      throw new AggregateError(
-        [executionError, cleanupError],
-        `Sandbox teardown failed after run ${runId} error`,
+      throw new RunProcessStreamError(
+        `Run \`${runId}\` failed and cleanup also failed: ${toErrorMessage(cleanupError)}`,
       );
     }
-    throw toError(cleanupError);
+    throw new RunProcessStreamError(
+      `Run \`${runId}\` cleanup failed: ${toErrorMessage(cleanupError)}`,
+    );
   }
 
   if (executionError) {
-    throw toError(executionError);
+    if (executionError instanceof RunCommandError) {
+      throw executionError;
+    }
+    throw new RunProcessStreamError(toErrorMessage(executionError));
   }
 
   if (!runReport) {
-    throw new Error(`Run ${runId} did not produce a report`);
+    throw new RunProcessStreamError(
+      `Run \`${runId}\` did not produce a report.`,
+    );
   }
 
   await flushRunRecordBuffer({

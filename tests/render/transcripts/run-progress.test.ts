@@ -159,6 +159,7 @@ describe("createRunRenderer", () => {
 
       expect(lines.length).toBeGreaterThan(0);
       const output = lines.join("");
+      expect(output).not.toMatch(ANSI_PATTERN);
       expect(output).toContain("20251105-test-12345");
       expect(output).toContain("RUNNING");
       expect(output).toContain("test-agent");
@@ -205,6 +206,7 @@ describe("createRunRenderer", () => {
 
       expect(transcript).toContain("20251105-test-12345");
       expect(transcript).toContain("SUCCEEDED");
+      expect(transcript).not.toMatch(ANSI_PATTERN);
       expect(lines[lines.length - 1].endsWith("\n")).toBe(true);
     });
 

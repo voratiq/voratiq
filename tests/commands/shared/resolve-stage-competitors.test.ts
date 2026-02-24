@@ -16,7 +16,7 @@ describe("resolveStageCompetitors", () => {
         cliAgentIds: ["alpha", "alpha"],
         cliOverrideFlag: "--run-agent",
       }),
-    ).toThrow('Duplicate --run-agent values are not allowed for stage "run".');
+    ).toThrow("Duplicate `--run-agent` values for stage `run`.");
   });
 
   it("reports single-agent guardrails using the provided override flag name", () => {
@@ -35,9 +35,11 @@ describe("resolveStageCompetitors", () => {
 
     expect(caught).toBeInstanceOf(HintedError);
     const hinted = caught as HintedError;
-    expect(hinted.headline).toBe('Multiple agents found for stage "review".');
+    expect(hinted.headline).toBe(
+      "Multiple agents configured for stage `review`.",
+    );
     expect(hinted.hintLines).toContain(
-      "Provide --review-agent <id> to run review with an explicit agent.",
+      "Configure exactly one agent under `profiles.default.review.agents` in `orchestration.yaml`.",
     );
   });
 
@@ -70,9 +72,9 @@ describe("resolveStageCompetitors", () => {
 
       expect(caught).toBeInstanceOf(HintedError);
       const hinted = caught as HintedError;
-      expect(hinted.headline).toBe('No agent found for stage "run".');
+      expect(hinted.headline).toBe("No agents configured for stage `run`.");
       expect(hinted.hintLines).toContain(
-        "Provide --run-agent <id> to run run with an explicit agent.",
+        "Configure at least one agent under `profiles.default.run.agents` in `orchestration.yaml`.",
       );
       expect(
         hinted.hintLines.some((line) =>
@@ -249,32 +251,14 @@ describe("resolveStageCompetitors", () => {
       expect(caught).toBeInstanceOf(HintedError);
       const hinted = caught as HintedError;
       expect(hinted.headline).toBe(
-        'Unknown orchestration profile "missing-profile".',
+        "Unknown orchestration profile `missing-profile`.",
       );
       expect(hinted.detailLines).toContain(
-        'Requested profile: "missing-profile".',
+        "Available profiles: `default`, `quality`.",
       );
-      expect(hinted.detailLines).toContain(
-        "Available profiles: default, quality.",
-      );
-      expect(hinted.detailLines).toContain(
-        "Config file: .voratiq/orchestration.yaml.",
-      );
-      expect(
-        hinted.hintLines.some((line) =>
-          line.includes("Use --profile <existing-profile>"),
-        ),
-      ).toBe(true);
-      expect(
-        hinted.hintLines.some((line) =>
-          line.includes("Update .voratiq/orchestration.yaml"),
-        ),
-      ).toBe(true);
-      expect(
-        hinted.hintLines.some((line) =>
-          line.includes('voratiq run --spec <path> --profile "default"'),
-        ),
-      ).toBe(true);
+      expect(hinted.hintLines).toEqual([
+        "Review `--profile` and update `orchestration.yaml` if needed.",
+      ]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

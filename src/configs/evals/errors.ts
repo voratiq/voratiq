@@ -1,6 +1,6 @@
 import { WorkspaceSetupError } from "../../workspace/errors.js";
 
-const DEFAULT_EVALS_ERROR_CONTEXT = "Invalid evals.yaml" as const;
+const DEFAULT_EVALS_ERROR_CONTEXT = "Invalid `evals.yaml`" as const;
 
 export { DEFAULT_EVALS_ERROR_CONTEXT };
 
@@ -20,7 +20,7 @@ export class EvalsConfigError extends EvalsError {
 
 export class MissingEvalsConfigError extends EvalsConfigError {
   constructor(public readonly filePath: string) {
-    super(`Missing eval configuration file at ${filePath}.`);
+    super("Missing `evals.yaml`.");
     this.name = "MissingEvalsConfigError";
   }
 }

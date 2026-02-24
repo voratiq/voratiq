@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import process from "node:process";
 
 import { assertTestHookRegistrationEnabled } from "../../testing/test-hooks.js";
@@ -73,14 +74,15 @@ const sandboxConfigLoader = createConfigLoader<
   selectReadFile: (options) => options.readFile,
   handleMissing: ({ root, filePath }) => {
     throw new SandboxConfigurationError(
-      `Missing sandbox configuration at ${relativeToRoot(root, filePath)}.`,
+      `Missing \`${basename(relativeToRoot(root, filePath))}\`.`,
     );
   },
   prepareContent: (content, { root, filePath }) => {
     const trimmed = content.trim();
     if (trimmed.length === 0) {
+      const displayPath = basename(relativeToRoot(root, filePath));
       throw new SandboxConfigurationError(
-        `${DEFAULT_SANDBOX_ERROR_CONTEXT}: ${relativeToRoot(root, filePath)} is empty.`,
+        `${DEFAULT_SANDBOX_ERROR_CONTEXT}: \`${displayPath}\` is empty.`,
       );
     }
     return trimmed;
@@ -231,7 +233,7 @@ export function loadSandboxProviderConfig(
 
   if (!providerConfig) {
     throw new SandboxConfigurationError(
-      `${DEFAULT_SANDBOX_ERROR_CONTEXT}: Unsupported sandbox provider "${resolvedProviderId}" in ${config.displayPath}.`,
+      `${DEFAULT_SANDBOX_ERROR_CONTEXT}: Unsupported sandbox provider \`${resolvedProviderId}\` in \`${basename(config.displayPath)}\`.`,
     );
   }
 
@@ -316,7 +318,7 @@ function validateProviderOverrides(
   for (const providerId of Object.keys(providerOverrides)) {
     if (!supportedProviders.has(providerId)) {
       throw new SandboxConfigurationError(
-        `${DEFAULT_SANDBOX_ERROR_CONTEXT}: Unknown provider "${providerId}" in ${displayPath}.`,
+        `${DEFAULT_SANDBOX_ERROR_CONTEXT}: Unknown provider \`${providerId}\` in \`${basename(displayPath)}\`.`,
       );
     }
   }

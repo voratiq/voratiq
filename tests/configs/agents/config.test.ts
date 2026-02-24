@@ -312,7 +312,7 @@ agents:
       (root) => {
         const load = () => loadAgentCatalog({ root });
         expect(load).toThrow(AgentBinaryAccessError);
-        expect(load).toThrow(/binary ".*" is not executable/iu);
+        expect(load).toThrow(/binary `.*` is not executable/iu);
       },
     );
   });
@@ -356,7 +356,7 @@ agents:
       },
       (root) => {
         expect(() => loadAgentCatalog({ root })).toThrow(
-          /Duplicate enabled agent id "codex"/u,
+          /Duplicate enabled agent id `codex`/u,
         );
       },
     );
@@ -433,7 +433,7 @@ agents:
       (root) => {
         const load = () => loadAgentById("missing", { root });
         expect(load).toThrow(AgentNotFoundError);
-        expect(load).toThrow(/Enabled agents: alpha, beta/u);
+        expect(load).toThrow(/Enabled agents: `alpha`, `beta`/u);
       },
     );
   });

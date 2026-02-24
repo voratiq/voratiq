@@ -37,7 +37,7 @@ export async function ensureWorkspaceShim(options: {
     }
     if (isFileSystemError(error) && error.code === "ENOENT") {
       throw new WorkspaceSetupError(
-        `Voratiq CLI shim missing at ${sourcePath}. Run "npm run build" in the Voratiq CLI checkout before invoking agents.`,
+        `Voratiq CLI shim is missing at \`${sourcePath}\`. Run \`npm run build\` in the Voratiq CLI checkout before invoking agents.`,
       );
     }
     throw error;

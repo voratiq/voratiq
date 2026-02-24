@@ -38,7 +38,9 @@ describe("CLI entrypoint error handling", () => {
     ]);
 
     const rendered = renderCliError(cliError);
-    expect(rendered).toContain("Missing workspace entry: .voratiq/agents.yaml");
+    expect(rendered).toContain(
+      "Missing workspace entry: `.voratiq/agents.yaml`.",
+    );
     expect(rendered).toContain(
       "Run `voratiq init` to configure the workspace.",
     );
@@ -52,7 +54,7 @@ describe("CLI entrypoint error handling", () => {
     const rendered = stripAnsi(renderCliError(cliError));
     expect(rendered).toBe(
       [
-        "Error: Missing workspace entry: .voratiq/orchestration.yaml",
+        "Error: Missing workspace entry: `.voratiq/orchestration.yaml`.",
         "",
         "Run `voratiq init` to configure the workspace.",
       ].join("\n"),
@@ -70,20 +72,20 @@ describe("CLI entrypoint error handling", () => {
 
     expect(cliError.detailLines).toEqual([
       "Missing workspace entries:",
-      "  - .voratiq/",
-      "  - .voratiq/runs/sessions/",
-      "  - .voratiq/runs/index.json",
+      "  - `.voratiq/`",
+      "  - `.voratiq/runs/sessions/`",
+      "  - `.voratiq/runs/index.json`",
     ]);
     expect(cliError.hintLines).toEqual([
-      "Run `voratiq init` from the repository root and rerun.",
+      "Run `voratiq init` from the repository root, then retry.",
     ]);
 
     const rendered = renderCliError(cliError);
-    expect(rendered).toContain("Voratiq workspace not found; aborting run.");
+    expect(rendered).toContain("Voratiq workspace is not initialized.");
     expect(rendered).toContain("Missing workspace entries:");
     expect(rendered).toContain(".voratiq/runs/index.json");
     expect(rendered).toContain(
-      "Run `voratiq init` from the repository root and rerun.",
+      "Run `voratiq init` from the repository root, then retry.",
     );
   });
 

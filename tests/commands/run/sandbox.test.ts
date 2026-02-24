@@ -95,7 +95,7 @@ describe("sandbox", () => {
             extraWriteProtectedPaths: [evalsPath],
             extraReadProtectedPaths: [evalsPath],
           }),
-        ).toThrow(/Invalid `\.voratiq\/sandbox\.yaml`/u);
+        ).toThrow(/Invalid `sandbox\.yaml`/u);
       } finally {
         await cleanup();
       }

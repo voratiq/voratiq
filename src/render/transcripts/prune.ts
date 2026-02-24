@@ -6,7 +6,7 @@ import type { RunRecord } from "../../runs/records/types.js";
 import type { RunStatus } from "../../status/index.js";
 import { colorize } from "../../utils/colors.js";
 import { formatRunTimestamp } from "../utils/records.js";
-import { buildRunMetadataSection } from "../utils/runs.js";
+import { buildRunMetadataSectionWithStyle } from "../utils/runs.js";
 import { renderBlocks, renderTranscript } from "../utils/transcript.js";
 import { renderRunList } from "./list.js";
 
@@ -39,7 +39,7 @@ export function buildPruneConfirmationPreface(
     previouslyDeletedAt,
   } = options;
 
-  const introLines = buildRunMetadataSection({
+  const introLines = buildRunMetadataSectionWithStyle({
     runId,
     specPath,
     status: runStatus,

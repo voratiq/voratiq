@@ -11,14 +11,14 @@ export class RunRecordParseError extends RunHistoryError {
     public readonly displayPath: string,
     public readonly details: string,
   ) {
-    super(`Failed to parse ${displayPath}: ${details}`);
+    super(`Failed to parse \`${displayPath}\`: ${details}`);
     this.name = "RunRecordParseError";
   }
 }
 
 export class RunRecordNotFoundError extends RunHistoryError {
   constructor(public readonly runId: string) {
-    super(`Run ${runId} not found.`);
+    super(`Run \`${runId}\` not found.`);
     this.name = "RunRecordNotFoundError";
   }
 }
@@ -32,13 +32,13 @@ export class RunRecordMutationError extends RunHistoryError {
 
 export class RunHistoryLockTimeoutError extends RunHistoryError {
   constructor(public readonly lockPath: string) {
-    super(`Timed out acquiring history lock at ${lockPath}.`);
+    super(`Timed out acquiring history lock at \`${lockPath}\`.`);
     this.name = "RunHistoryLockTimeoutError";
   }
 }
 
 export class RunOptionValidationError extends RunHistoryError {
   constructor(option: string, detail: string) {
-    super(`Invalid option "${option}": ${detail}`);
+    super(`Invalid option \`${option}\`: ${detail}`);
   }
 }

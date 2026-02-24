@@ -62,7 +62,7 @@ export async function runPruneCommand(
       throw new CliError(
         "Missing prune target.",
         [],
-        ["Provide `--run <run-id>` or use `--all`."],
+        ["Provide a run id with `--run <run-id>`."],
       );
     }
 

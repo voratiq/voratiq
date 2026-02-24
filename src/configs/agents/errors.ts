@@ -18,7 +18,7 @@ export class AgentsConfigError extends AgentsError {
 
 export class MissingAgentsConfigError extends AgentsConfigError {
   constructor(public readonly filePath: string) {
-    super(`Missing agent configuration file at ${filePath}.`);
+    super("Missing `agents.yaml`.");
     this.name = "MissingAgentsConfigError";
   }
 }
@@ -36,7 +36,7 @@ export class DuplicateAgentIdError extends AgentsConfigError {
     public readonly displayPath: string,
   ) {
     super(
-      `${DEFAULT_ERROR_CONTEXT}: Duplicate enabled agent id "${agentId}" in ${displayPath}. Agent ids must be unique.`,
+      `${DEFAULT_ERROR_CONTEXT}: Duplicate enabled agent id \`${agentId}\` in \`${displayPath}\`. Agent ids must be unique.`,
     );
     this.name = "DuplicateAgentIdError";
   }
@@ -47,12 +47,15 @@ export class AgentNotFoundError extends AgentsConfigError {
     public readonly agentId: string,
     public readonly enabledAgentIds: readonly string[],
   ) {
-    const enabledList =
-      enabledAgentIds.length > 0
-        ? enabledAgentIds.slice().sort().join(", ")
-        : "none";
+    const enabledList = enabledAgentIds
+      .slice()
+      .sort((left, right) => left.localeCompare(right))
+      .map((id) => `\`${id}\``)
+      .join(", ");
+    const enabledSuffix =
+      enabledList.length > 0 ? ` Enabled agents: ${enabledList}.` : "";
     super(
-      `${DEFAULT_ERROR_CONTEXT}: Agent "${agentId}" is not defined in agents.yaml. Enabled agents: ${enabledList}.`,
+      `${DEFAULT_ERROR_CONTEXT}: Agent \`${agentId}\` is not defined in \`agents.yaml\`.${enabledSuffix}`,
     );
     this.name = "AgentNotFoundError";
   }
@@ -61,7 +64,7 @@ export class AgentNotFoundError extends AgentsConfigError {
 export class AgentDisabledError extends AgentsConfigError {
   constructor(public readonly agentId: string) {
     super(
-      `${DEFAULT_ERROR_CONTEXT}: Agent "${agentId}" is disabled in agents.yaml.`,
+      `${DEFAULT_ERROR_CONTEXT}: Agent \`${agentId}\` is disabled in \`agents.yaml\`.`,
     );
     this.name = "AgentDisabledError";
   }
@@ -72,7 +75,9 @@ export class ModelPlaceholderMissingError extends AgentsError {
     public readonly agentId: string,
     public readonly placeholder: string,
   ) {
-    super(`Expected argv for agent ${agentId} to include ${placeholder}`);
+    super(
+      `Expected argv for agent \`${agentId}\` to include \`${placeholder}\`.`,
+    );
     this.name = "ModelPlaceholderMissingError";
   }
 }
@@ -83,7 +88,7 @@ export class UnknownAgentProviderTemplateError extends AgentsConfigError {
     public readonly provider: string,
   ) {
     super(
-      `${DEFAULT_ERROR_CONTEXT}: Unknown provider "${provider}" referenced by agent "${agentId}" in agents.yaml.`,
+      `${DEFAULT_ERROR_CONTEXT}: Unknown provider \`${provider}\` referenced by agent \`${agentId}\` in \`agents.yaml\`.`,
     );
     this.name = "UnknownAgentProviderTemplateError";
   }
@@ -92,7 +97,7 @@ export class UnknownAgentProviderTemplateError extends AgentsConfigError {
 export class AgentBinaryMissingError extends AgentsConfigError {
   constructor(public readonly agentId: string) {
     super(
-      `${DEFAULT_ERROR_CONTEXT}: Agent "${agentId}" must provide a binary path. Update agents.yaml with the CLI location for this agent.`,
+      `${DEFAULT_ERROR_CONTEXT}: Agent \`${agentId}\` must define a binary path in \`agents.yaml\`.`,
     );
     this.name = "AgentBinaryMissingError";
   }
@@ -105,7 +110,7 @@ export class AgentBinaryAccessError extends AgentsConfigError {
     public readonly detail: string,
   ) {
     super(
-      `${DEFAULT_ERROR_CONTEXT}: Agent "${agentId}" binary "${binaryPath}" is not executable (${detail}).`,
+      `${DEFAULT_ERROR_CONTEXT}: Agent \`${agentId}\` binary \`${binaryPath}\` is not executable (${detail}).`,
     );
     this.name = "AgentBinaryAccessError";
   }

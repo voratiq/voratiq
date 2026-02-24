@@ -1,8 +1,8 @@
 import { accessSync, constants as fsConstants } from "node:fs";
+import { basename } from "node:path";
 
 import { toErrorMessage } from "../../utils/errors.js";
 import { isFileSystemError } from "../../utils/fs.js";
-import { relativeToRoot } from "../../utils/path.js";
 import {
   parseYamlDocument,
   type YamlParseErrorDetail,
@@ -81,7 +81,7 @@ const loadAgentsConfigInternal = createConfigLoader<
       (entry) => entry.enabled !== false,
     );
 
-    const displayPath = relativeToRoot(context.root, context.filePath);
+    const displayPath = basename(context.filePath);
     const seenAgentIds = new Set<string>();
     for (const entry of enabledAgents) {
       if (seenAgentIds.has(entry.id)) {
@@ -216,7 +216,7 @@ function coerceAgentIssues(
     return [
       {
         agentId,
-        message: `binary "${error.binaryPath}" is not executable (${error.detail})`,
+        message: `binary \`${error.binaryPath}\` is not executable (${error.detail})`,
       },
     ];
   }
@@ -225,7 +225,7 @@ function coerceAgentIssues(
     return [
       {
         agentId,
-        message: `unknown provider "${error.provider}" referenced in agents.yaml`,
+        message: `unknown provider \`${error.provider}\` referenced in \`agents.yaml\``,
       },
     ];
   }
@@ -234,7 +234,7 @@ function coerceAgentIssues(
     return [
       {
         agentId,
-        message: `argv missing ${error.placeholder}`,
+        message: `argv missing \`${error.placeholder}\``,
       },
     ];
   }
@@ -284,13 +284,13 @@ function validateExtraArgs(
 
   if (extraArgs.includes(MODEL_PLACEHOLDER)) {
     throw new AgentsYamlParseError(
-      `${DEFAULT_ERROR_CONTEXT}: Agent "${agentId}" extraArgs cannot include bare ${MODEL_PLACEHOLDER}.`,
+      `${DEFAULT_ERROR_CONTEXT}: Agent \`${agentId}\` extraArgs cannot include bare \`${MODEL_PLACEHOLDER}\`.`,
     );
   }
 
   if (extraArgs.some((arg) => arg === "--model")) {
     throw new AgentsYamlParseError(
-      `${DEFAULT_ERROR_CONTEXT}: Agent "${agentId}" extraArgs cannot override --model. Remove "--model" from extraArgs.`,
+      `${DEFAULT_ERROR_CONTEXT}: Agent \`${agentId}\` extraArgs cannot override \`--model\`. Remove \`--model\` from extraArgs.`,
     );
   }
 }

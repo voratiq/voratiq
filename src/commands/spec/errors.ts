@@ -14,9 +14,9 @@ export class SpecError extends CliError {
 export class SpecAgentNotFoundError extends SpecError {
   constructor(public readonly agentId: string) {
     super(
-      `Agent "${agentId}" not found in agents.yaml.`,
+      `Agent \`${agentId}\` not found in \`agents.yaml\`.`,
       [],
-      ["To add this agent, edit `.voratiq/agents.yaml`."],
+      ["Update `agents.yaml` with this agent or choose a configured agent."],
     );
     this.name = "SpecAgentNotFoundError";
   }
@@ -25,9 +25,9 @@ export class SpecAgentNotFoundError extends SpecError {
 export class SpecOutputExistsError extends SpecError {
   constructor(outputPath: string) {
     super(
-      `File already exists: ${outputPath}`,
+      `Output file already exists: \`${outputPath}\`.`,
       [],
-      ["Use a different --output path or remove the existing file."],
+      ["Use a different `--output` path or remove the existing file."],
     );
     this.name = "SpecOutputExistsError";
   }
@@ -35,14 +35,16 @@ export class SpecOutputExistsError extends SpecError {
 
 export class SpecOutputPathError extends SpecError {
   constructor(message: string) {
-    super(message);
+    super(message, [], ["Use a path inside `specs/` or omit `--output`."]);
     this.name = "SpecOutputPathError";
   }
 }
 
 export class SpecGenerationFailedError extends SpecError {
   constructor(detailLines: readonly string[] = []) {
-    super("Specification generation failed.", detailLines);
+    super("Specification generation failed.", detailLines, [
+      "Inspect `stderr.log` to diagnose the failure.",
+    ]);
     this.name = "SpecGenerationFailedError";
   }
 }

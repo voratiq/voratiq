@@ -11,14 +11,14 @@ export class SessionRecordParseError extends SessionHistoryError {
     public readonly displayPath: string,
     public readonly details: string,
   ) {
-    super(`Failed to parse ${displayPath}: ${details}`);
+    super(`Failed to parse \`${displayPath}\`: ${details}`);
     this.name = "SessionRecordParseError";
   }
 }
 
 export class SessionRecordNotFoundError extends SessionHistoryError {
   constructor(public readonly sessionId: string) {
-    super(`Session ${sessionId} not found.`);
+    super(`Session \`${sessionId}\` not found.`);
     this.name = "SessionRecordNotFoundError";
   }
 }
@@ -32,7 +32,7 @@ export class SessionRecordMutationError extends SessionHistoryError {
 
 export class SessionHistoryLockTimeoutError extends SessionHistoryError {
   constructor(public readonly lockPath: string) {
-    super(`Timed out acquiring history lock at ${lockPath}.`);
+    super(`Timed out acquiring history lock at \`${lockPath}\`.`);
     this.name = "SessionHistoryLockTimeoutError";
   }
 }
@@ -42,6 +42,6 @@ export class SessionOptionValidationError extends SessionHistoryError {
     public readonly option: string,
     public readonly detail: string,
   ) {
-    super(`Invalid option "${option}": ${detail}`);
+    super(`Invalid option \`${option}\`: ${detail}`);
   }
 }

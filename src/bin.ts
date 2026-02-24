@@ -33,7 +33,17 @@ async function handleFatalError(
 ): Promise<void> {
   await terminateActiveSessionsSafe("failed", context);
   await flushPendingHistory();
-  console.error(error);
+  const { CliError, toCliError } = await import("./cli/errors.js");
+  const { renderCliError } = await import("./render/utils/errors.js");
+  const normalized = toCliError(error);
+  const rendered = renderCliError(
+    new CliError(
+      normalized.headline,
+      [`Context: ${context}.`, ...normalized.detailLines],
+      normalized.hintLines,
+    ),
+  );
+  console.error(rendered);
   process.exit(1);
 }
 

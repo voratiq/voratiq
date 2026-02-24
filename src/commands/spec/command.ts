@@ -82,7 +82,7 @@ export async function executeSpecCommand(
     });
     const resolvedAgent = resolution.competitors[0];
     if (!resolvedAgent) {
-      throw new Error("Expected a single resolved spec agent.");
+      throw new SpecGenerationFailedError(["Spec agent resolution failed."]);
     }
     agent = resolvedAgent;
   } catch (error) {

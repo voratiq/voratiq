@@ -110,6 +110,35 @@ describe("spawnStreamingProcess", () => {
     }
   });
 
+  it("passes stream source to onData for stdout and stderr chunks", async () => {
+    const child = createChildProcess();
+    spawnMock.mockReturnValue(child as unknown as ChildProcess);
+
+    const observed: Array<{ text: string; source: "stdout" | "stderr" }> = [];
+    const promise = spawnStreamingProcess({
+      command: "echo",
+      cwd: "/repo",
+      stdout: { writable: new PassThrough() },
+      stderr: { writable: new PassThrough() },
+      onData: (chunk, source) => {
+        observed.push({ text: chunk.toString("utf8"), source });
+      },
+    });
+
+    (child.stdout as PassThrough | null)?.write("alpha\n");
+    (child.stderr as PassThrough | null)?.write("beta\n");
+    (child.stdout as PassThrough | null)?.end();
+    (child.stderr as PassThrough | null)?.end();
+    child.emit("close", 0, null);
+
+    await promise;
+
+    expect(observed).toEqual([
+      { text: "alpha\n", source: "stdout" },
+      { text: "beta\n", source: "stderr" },
+    ]);
+  });
+
   it("forwards stdin when provided", async () => {
     const child = createChildProcess();
     const endSpy = jest.spyOn(child.stdin!, "end");

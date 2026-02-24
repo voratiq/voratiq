@@ -17,6 +17,8 @@ import type {
 } from "../../competition/command-adapter.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
+import type { ReviewProgressRenderer } from "../../render/transcripts/review.js";
+import { emitStageProgressEvent } from "../../render/transcripts/stage-progress.js";
 import { generateBlindedCandidateAlias } from "../../reviews/candidates.js";
 import {
   appendReviewRecord,
@@ -129,6 +131,7 @@ export interface CreateReviewCompetitionAdapterInput {
   readonly run: RunRecordEnhanced;
   readonly environment: EnvironmentConfig;
   readonly runWorkspaceAbsolute: string;
+  readonly renderer?: ReviewProgressRenderer;
 }
 
 export function createReviewCompetitionAdapter(
@@ -146,6 +149,7 @@ export function createReviewCompetitionAdapter(
     run,
     environment,
     runWorkspaceAbsolute,
+    renderer,
   } = input;
 
   let failure: unknown;
@@ -154,6 +158,16 @@ export function createReviewCompetitionAdapter(
   let sharedInputs: BlindedReviewSessionInputs | undefined;
 
   return {
+    queueCandidate: (candidate) => {
+      emitStageProgressEvent(renderer, {
+        type: "stage.candidate",
+        stage: "review",
+        candidate: {
+          reviewerAgentId: candidate.id,
+          status: "queued",
+        },
+      });
+    },
     prepareCandidates: async (
       candidates,
     ): Promise<
@@ -297,6 +311,45 @@ export function createReviewCompetitionAdapter(
         throw error;
       }
     },
+    onCandidateRunning: async (prepared) => {
+      const startedAt = new Date().toISOString();
+      await rewriteReviewRecordIfPresent({
+        root,
+        reviewsFilePath,
+        sessionId: reviewId,
+        mutate: (record) => {
+          assertReviewAliasMapConsistency({
+            record,
+            reviewId,
+            expectedAliasMap: prepared.blinded.aliasMap,
+          });
+
+          return {
+            ...record,
+            reviewers: record.reviewers.map((reviewer) => {
+              if (reviewer.agentId !== prepared.candidate.id) {
+                return reviewer;
+              }
+              return {
+                ...reviewer,
+                status: "running",
+                startedAt: reviewer.startedAt ?? startedAt,
+              };
+            }),
+          };
+        },
+      });
+
+      emitStageProgressEvent(renderer, {
+        type: "stage.candidate",
+        stage: "review",
+        candidate: {
+          reviewerAgentId: prepared.candidate.id,
+          status: "running",
+          startedAt,
+        },
+      });
+    },
     executeCandidate: async (prepared): Promise<ReviewCompetitionExecution> => {
       const { candidate, workspacePaths, prompt, blinded, outputPath } =
         prepared;
@@ -352,7 +405,7 @@ export function createReviewCompetitionAdapter(
         );
       }
 
-      await assertReviewOutputExists(root, workspacePaths, reviewId, {
+      await assertReviewOutputExists(root, workspacePaths, {
         eligibleCandidateIds: blinded.stagedCandidates.map(
           (entry) => entry.candidateId,
         ),
@@ -389,6 +442,7 @@ export function createReviewCompetitionAdapter(
       };
     },
     onCandidateCompleted: async (prepared) => {
+      const completedAt = new Date().toISOString();
       await rewriteReviewRecordIfPresent({
         root,
         reviewsFilePath,
@@ -402,15 +456,26 @@ export function createReviewCompetitionAdapter(
           return mutateReviewerRecord(record, {
             reviewerAgentId: prepared.candidate.id,
             status: "succeeded",
-            completedAt: new Date().toISOString(),
+            completedAt,
             error: null,
           });
+        },
+      });
+
+      emitStageProgressEvent(renderer, {
+        type: "stage.candidate",
+        stage: "review",
+        candidate: {
+          reviewerAgentId: prepared.candidate.id,
+          status: "succeeded",
+          completedAt,
         },
       });
     },
     captureExecutionFailure: async ({ prepared, error }) => {
       failure = failure ?? error;
       const detail = toReviewFailureDetail(error);
+      const completedAt = new Date().toISOString();
       try {
         await rewriteReviewRecordIfPresent({
           root,
@@ -425,7 +490,7 @@ export function createReviewCompetitionAdapter(
             return mutateReviewerRecord(record, {
               reviewerAgentId: prepared.candidate.id,
               status: "failed",
-              completedAt: new Date().toISOString(),
+              completedAt,
               error: detail,
             });
           },
@@ -433,6 +498,15 @@ export function createReviewCompetitionAdapter(
       } catch {
         // Preserve the primary execution error.
       }
+      emitStageProgressEvent(renderer, {
+        type: "stage.candidate",
+        stage: "review",
+        candidate: {
+          reviewerAgentId: prepared.candidate.id,
+          status: "failed",
+          completedAt,
+        },
+      });
       return {
         agentId: prepared.candidate.id,
         outputPath: prepared.outputPath,
@@ -444,60 +518,92 @@ export function createReviewCompetitionAdapter(
     finalizeCompetition: async () => {
       const failed = failure !== undefined;
       const failureDetail = toReviewFailureDetail(failure);
+      let finalizedRecord: ReviewRecord | undefined;
 
-      await rewriteReviewRecord({
-        root,
-        reviewsFilePath,
-        sessionId: reviewId,
-        mutate: (record) => {
-          const completedAt = record.completedAt ?? new Date().toISOString();
-          const runningReviewerStatus = resolveRunningReviewerStatus({
-            recordStatus: record.status,
-            failed,
-          });
+      try {
+        finalizedRecord = await rewriteReviewRecord({
+          root,
+          reviewsFilePath,
+          sessionId: reviewId,
+          mutate: (record) => {
+            const completedAt = record.completedAt ?? new Date().toISOString();
+            const runningReviewerStatus = resolveRunningReviewerStatus({
+              recordStatus: record.status,
+              failed,
+            });
 
-          const reviewers = record.reviewers.map(
-            (reviewer): ReviewRecord["reviewers"][number] => {
-              if (reviewer.status !== "running") {
-                return reviewer;
-              }
-              if (runningReviewerStatus === "succeeded") {
+            const reviewers = record.reviewers.map(
+              (reviewer): ReviewRecord["reviewers"][number] => {
+                if (reviewer.status !== "running") {
+                  return reviewer;
+                }
+                if (runningReviewerStatus === "succeeded") {
+                  return {
+                    ...reviewer,
+                    status: runningReviewerStatus,
+                    completedAt,
+                    error: null,
+                  };
+                }
                 return {
                   ...reviewer,
                   status: runningReviewerStatus,
                   completedAt,
-                  error: null,
+                  error: reviewer.error ?? record.error ?? failureDetail,
                 };
-              }
-              return {
-                ...reviewer,
-                status: runningReviewerStatus,
-                completedAt,
-                error: reviewer.error ?? record.error ?? failureDetail,
-              };
+              },
+            );
+
+            const status =
+              record.status === "running"
+                ? failed
+                  ? "failed"
+                  : "succeeded"
+                : record.status;
+            const error =
+              status === "succeeded"
+                ? null
+                : (record.error ?? (failed ? failureDetail : null));
+
+            return {
+              ...record,
+              status,
+              completedAt,
+              error,
+              reviewers,
+            };
+          },
+        });
+      } catch {
+        // Preserve cleanup behavior even when record rewrite fails.
+      }
+
+      if (finalizedRecord) {
+        for (const reviewer of finalizedRecord.reviewers) {
+          emitStageProgressEvent(renderer, {
+            type: "stage.candidate",
+            stage: "review",
+            candidate: {
+              reviewerAgentId: reviewer.agentId,
+              status: reviewer.status,
+              startedAt: reviewer.startedAt,
+              completedAt: reviewer.completedAt,
             },
-          );
+          });
+        }
 
-          const status =
-            record.status === "running"
-              ? failed
-                ? "failed"
-                : "succeeded"
-              : record.status;
-          const error =
-            status === "succeeded"
-              ? null
-              : (record.error ?? (failed ? failureDetail : null));
-
-          return {
-            ...record,
-            status,
-            completedAt,
-            error,
-            reviewers,
-          };
-        },
-      }).catch(() => {});
+        emitStageProgressEvent(renderer, {
+          type: "stage.status",
+          stage: "review",
+          status: finalizedRecord.status,
+        });
+      } else {
+        emitStageProgressEvent(renderer, {
+          type: "stage.status",
+          stage: "review",
+          status: failed ? "failed" : "succeeded",
+        });
+      }
 
       await flushReviewRecordBuffer({
         reviewsFilePath,
@@ -616,36 +722,40 @@ function formatReviewValidationFailure(reason: string): string {
 async function assertReviewOutputExists(
   root: string,
   workspacePaths: AgentWorkspacePaths,
-  reviewId: string,
   options: {
     eligibleCandidateIds: readonly string[];
   },
 ): Promise<void> {
   const { eligibleCandidateIds } = options;
+  const stderrDisplay = normalizePathForDisplay(
+    relativeToRoot(root, workspacePaths.stderrPath),
+  );
+  const reviewHint = `Inspect \`${stderrDisplay}\` to diagnose the reviewer failure.`;
   const reviewStagedPath = join(workspacePaths.workspacePath, REVIEW_FILENAME);
   let reviewContent: string;
   try {
     reviewContent = await readFile(reviewStagedPath, "utf8");
     if (reviewContent.trim().length === 0) {
-      const stderrDisplay = normalizePathForDisplay(
-        relativeToRoot(root, workspacePaths.stderrPath),
-      );
       throw new ReviewGenerationFailedError(
-        ["Reviewer process failed. No review output detected."],
-        [`Review session: ${reviewId}`, `See stderr: ${stderrDisplay}`],
+        [`Required reviewer artifact is empty: \`${REVIEW_FILENAME}\`.`],
+        [reviewHint],
       );
     }
   } catch (error) {
     if (error instanceof ReviewGenerationFailedError) {
       throw error;
     }
-    const detail = toErrorMessage(error);
-    const stderrDisplay = normalizePathForDisplay(
-      relativeToRoot(root, workspacePaths.stderrPath),
-    );
+    const detail = toErrorMessage(error).trim();
+    const detailLine =
+      detail.length > 0
+        ? `Read failure for \`${REVIEW_FILENAME}\`: ${detail}.`
+        : undefined;
     throw new ReviewGenerationFailedError(
-      ["Reviewer process failed. No review output detected."],
-      [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
+      [
+        `Required reviewer artifact is missing: \`${REVIEW_FILENAME}\`.`,
+        ...(detailLine ? [detailLine] : []),
+      ],
+      [reviewHint],
     );
   }
 
@@ -658,37 +768,33 @@ async function assertReviewOutputExists(
   try {
     recommendationContent = await readFile(recommendationStagedPath, "utf8");
   } catch (error) {
-    const detail = toErrorMessage(error);
-    const stderrDisplay = normalizePathForDisplay(
-      relativeToRoot(root, workspacePaths.stderrPath),
-    );
+    const detail = toErrorMessage(error).trim();
+    const detailLine =
+      detail.length > 0
+        ? `Read failure for \`${REVIEW_RECOMMENDATION_FILENAME}\`: ${detail}.`
+        : undefined;
     throw new ReviewGenerationFailedError(
-      ["Reviewer process failed. No recommendation output detected."],
-      [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
+      [
+        `Required reviewer artifact is missing: \`${REVIEW_RECOMMENDATION_FILENAME}\`.`,
+        ...(detailLine ? [detailLine] : []),
+      ],
+      [reviewHint],
     );
   }
 
   if (recommendationContent.trim().length === 0) {
-    const stderrDisplay = normalizePathForDisplay(
-      relativeToRoot(root, workspacePaths.stderrPath),
-    );
     throw new ReviewGenerationFailedError(
-      [`Invalid output: ${REVIEW_RECOMMENDATION_FILENAME}`],
       [
-        `Review session: ${reviewId}`,
-        "Recommendation artifact is empty.",
-        `See stderr: ${stderrDisplay}`,
+        `Required reviewer artifact is empty: \`${REVIEW_RECOMMENDATION_FILENAME}\`.`,
       ],
+      [reviewHint],
     );
   }
 
   if (eligibleCandidateIds.length === 0) {
     throw new ReviewGenerationFailedError(
-      [`Invalid output: ${REVIEW_FILENAME}`],
-      [
-        `Review session: ${reviewId}`,
-        "No eligible candidate ids were available for review validation.",
-      ],
+      [`Review output validation failed for \`${REVIEW_FILENAME}\`.`],
+      ["Re-run `voratiq review` after a successful run."],
     );
   }
 
@@ -697,12 +803,9 @@ async function assertReviewOutputExists(
     parsedRecommendation = parseReviewRecommendation(recommendationContent);
   } catch (error) {
     const detail = toErrorMessage(error);
-    const stderrDisplay = normalizePathForDisplay(
-      relativeToRoot(root, workspacePaths.stderrPath),
-    );
     throw new ReviewGenerationFailedError(
-      [`Invalid output: ${REVIEW_RECOMMENDATION_FILENAME}`],
-      [`Review session: ${reviewId}`, detail, `See stderr: ${stderrDisplay}`],
+      [`Invalid \`${REVIEW_RECOMMENDATION_FILENAME}\`.`, detail],
+      [reviewHint],
     );
   }
 
@@ -716,9 +819,10 @@ async function assertReviewOutputExists(
       ranking: validatedOutput.ranking,
     });
   } catch (error) {
-    throw new ReviewGenerationFailedError([
-      formatReviewValidationFailure(toErrorMessage(error)),
-    ]);
+    throw new ReviewGenerationFailedError(
+      [formatReviewValidationFailure(toErrorMessage(error))],
+      [reviewHint],
+    );
   }
 }
 
@@ -1004,11 +1108,15 @@ function assertNoCandidateIdentityLeak(options: {
   }
 
   if (leaks.length > 0) {
+    const leakPreview = leaks
+      .slice(0, 5)
+      .map((token) => `\`${token}\``)
+      .join(", ");
     throw new ReviewGenerationFailedError([
       "Blinded review leakage validation failed.",
-      `Forbidden candidate identity tokens detected: ${leaks
-        .slice(0, 5)
-        .join(", ")}${leaks.length > 5 ? ", ..." : ""}`,
+      `Forbidden candidate identity tokens detected: ${leakPreview}${
+        leaks.length > 5 ? ", ..." : ""
+      }.`,
     ]);
   }
 }
@@ -1025,7 +1133,7 @@ function containsBoundedToken(text: string, token: string): boolean {
 function toRepoRelativeOrThrow(root: string, absolutePath: string): string {
   const relative = normalizePathForDisplay(relativeToRoot(root, absolutePath));
   if (!isRepoRelativePath(relative)) {
-    throw new Error(`Expected repo-relative path, got "${relative}".`);
+    throw new Error(`Expected a repo-relative path, got \`${relative}\`.`);
   }
   return relative;
 }
@@ -1090,7 +1198,7 @@ function assertReviewAliasMapConsistency(options: {
   const recordAliasMap = record.blinded?.aliasMap;
   if (!recordAliasMap) {
     throw new ReviewGenerationFailedError([
-      `Review session ${reviewId} is missing a blinded alias map.`,
+      `Review session \`${reviewId}\` is missing a blinded alias map.`,
     ]);
   }
   if (!areAliasMapsEqual(recordAliasMap, expectedAliasMap)) {
@@ -1116,7 +1224,7 @@ async function assertSessionAliasMapConsistency(options: {
   const record = records[0];
   if (!record) {
     throw new ReviewGenerationFailedError([
-      `Review session ${reviewId} record not found while validating alias map.`,
+      `Review session \`${reviewId}\` record not found while validating alias map.`,
     ]);
   }
   assertReviewAliasMapConsistency({

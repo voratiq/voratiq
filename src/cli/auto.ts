@@ -62,9 +62,7 @@ function assertAutoOptionCompatibility(options: AutoCommandOptions): void {
     throw new CliError(
       "Option `--commit` requires `--apply`.",
       [],
-      [
-        "Re-run with `--apply --commit`, or omit `--commit` to keep apply disabled.",
-      ],
+      ["Add `--apply` when using `--commit`."],
     );
   }
 }
@@ -76,7 +74,6 @@ interface AutoRecommendationLoadResult {
 
 async function loadAutoRecommendation(options: {
   reviewOutputPath: string;
-  runId: string;
 }): Promise<AutoRecommendationLoadResult> {
   const recommendationPath = normalizePathForDisplay(
     join(dirname(options.reviewOutputPath), REVIEW_RECOMMENDATION_FILENAME),
@@ -104,14 +101,9 @@ async function loadAutoRecommendation(options: {
     };
   } catch (error) {
     throw new CliError(
-      "Failed to load structured review recommendation.",
-      [
-        `Expected ${REVIEW_RECOMMENDATION_FILENAME} at ${recommendationPath}.`,
-        toCliError(error).headline,
-      ],
-      [
-        `Re-run review to regenerate artifacts: voratiq review --run ${options.runId} --agent <agent-id>`,
-      ],
+      `Failed to load \`${REVIEW_RECOMMENDATION_FILENAME}\`.`,
+      [`Path: \`${recommendationPath}\`.`, toCliError(error).headline],
+      ["Re-run `voratiq review` to regenerate review artifacts."],
     );
   }
 }
@@ -123,44 +115,45 @@ function resolvePreferredAgentForAuto(options: {
   const resolvedPreferredAgent =
     recommendation.resolved_preferred_agent?.trim();
   if (!resolvedPreferredAgent) {
-    throw new Error(
-      "resolved_preferred_agent is missing or empty. Re-run review to regenerate recommendation.json.",
+    throw new CliError(
+      "Recommendation is missing `resolved_preferred_agent`.",
+      [],
+      ["Re-run `voratiq review` to regenerate `recommendation.json`."],
     );
   }
   return resolvedPreferredAgent;
 }
 
 function resolveRecommendedAgent(options: {
-  runId: string;
   recommendationPath: string;
   preferredAgent: string;
   availableAgents: readonly string[];
 }): string {
-  const { runId, recommendationPath, preferredAgent, availableAgents } =
-    options;
+  const { recommendationPath, preferredAgent, availableAgents } = options;
 
   const normalizedPreferredAgent = preferredAgent.trim();
   if (normalizedPreferredAgent.length === 0) {
     throw new CliError(
       "Recommendation is missing a preferred agent.",
-      [`No preferred agent is listed in ${recommendationPath}.`],
-      [
-        `Update ${recommendationPath} to include exactly one preferred agent or apply manually: voratiq apply --run ${runId} --agent <agent-id>`,
-      ],
+      [`No preferred agent is listed in \`${recommendationPath}\`.`],
+      ["Update the recommendation artifact and retry auto apply."],
     );
   }
 
   const availableSet = new Set(availableAgents);
   if (!availableSet.has(normalizedPreferredAgent)) {
+    const availableDisplay = availableAgents
+      .map((agentId) => `\`${agentId}\``)
+      .join(", ");
     throw new CliError(
       "Recommendation did not match any run agent.",
       [
-        `Preferred agent: ${normalizedPreferredAgent}`,
-        `Available agents: ${availableAgents.join(", ") || "(none recorded)"}`,
+        `Preferred agent: \`${normalizedPreferredAgent}\`.`,
+        ...(availableDisplay.length > 0
+          ? [`Available agents: ${availableDisplay}.`]
+          : []),
       ],
-      [
-        `Review ${recommendationPath} and rerun auto apply, or apply manually: voratiq apply --run ${runId} --agent <agent-id>`,
-      ],
+      ["Use an agent id present in the run report or review output."],
     );
   }
 
@@ -258,6 +251,10 @@ export async function runAutoCommand(
             agentOverrideFlag: "--review-agent",
             profile: options.profile,
             maxParallel: options.maxParallel,
+            stdout: chainedOutput.stdout,
+            stderr: chainedOutput.stderr,
+            suppressLeadingBlankLine: !process.stdout.isTTY,
+            suppressTrailingBlankLine: !process.stdout.isTTY,
           });
 
           reviewStatus = "succeeded";
@@ -294,18 +291,14 @@ export async function runAutoCommand(
           throw new CliError(
             "Auto apply requires exactly one reviewer.",
             [`Resolved reviewers: ${reviewResultCount}.`],
-            [
-              "Re-run with a single --review-agent <id>, or configure one agent under profiles.<name>.review.agents.",
-            ],
+            ["Run auto apply with exactly one reviewer."],
           );
         }
 
         const recommendationResult = await loadAutoRecommendation({
           reviewOutputPath,
-          runId,
         });
         const recommendedAgentId = resolveRecommendedAgent({
-          runId,
           recommendationPath: recommendationResult.recommendationPath,
           preferredAgent: recommendationResult.preferredAgent,
           availableAgents: runAgentIds,

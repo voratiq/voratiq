@@ -762,9 +762,7 @@ describe("voratiq review", () => {
 
       await expect(
         runReviewInRepo(repoRoot, { runId, agentIds: ["reviewer"] }),
-      ).rejects.toThrow(
-        "Review generation failed. No eligible candidates to review.",
-      );
+      ).rejects.toThrow("No eligible candidates available for review.");
       expect(runSandboxedAgentMock).not.toHaveBeenCalled();
     });
 
@@ -1006,9 +1004,11 @@ describe("voratiq review", () => {
 
       expect(caught).toBeInstanceOf(HintedError);
       const hinted = caught as HintedError;
-      expect(hinted.headline).toBe('No agent found for stage "review".');
+      expect(hinted.headline).toBe("No agents configured for stage `review`.");
       expect(
-        hinted.hintLines.some((line) => line.includes("Provide --agent <id>")),
+        hinted.hintLines.some((line) =>
+          line.includes("Configure at least one agent"),
+        ),
       ).toBe(true);
       expect(
         hinted.hintLines.some((line) =>
@@ -1339,8 +1339,8 @@ describe("voratiq review", () => {
           runReviewCommand({ runId: "missing-run", agentIds: ["reviewer"] }),
         ),
       ).rejects.toMatchObject({
-        headline: "Run missing-run not found.",
-        detailLines: ["To review past runs: voratiq list"],
+        headline: "Run `missing-run` not found.",
+        hintLines: ["Check available runs with `voratiq list`."],
       });
     });
 
@@ -1352,7 +1352,7 @@ describe("voratiq review", () => {
         withRepoCwd(repoRoot, () =>
           runReviewCommand({ runId: "any-run", agentIds: ["reviewer"] }),
         ),
-      ).rejects.toThrow("Failed to parse .voratiq/runs/index.json:");
+      ).rejects.toThrow("Failed to parse `.voratiq/runs/index.json`:");
     });
 
     it("preserves reviewer process-failure error shape", async () => {
@@ -1442,7 +1442,7 @@ describe("voratiq review", () => {
       });
       expect(missingOutputResult.exitCode).toBe(1);
       expect(stripAnsi(missingOutputResult.body)).toContain(
-        "Error: Reviewer process failed. No review output detected.",
+        "Error: Required reviewer artifact is missing: `review.md`.",
       );
     });
 
@@ -1479,7 +1479,7 @@ describe("voratiq review", () => {
       });
       expect(result.exitCode).toBe(1);
       expect(stripAnsi(result.body)).toContain(
-        "Error: Reviewer process failed. No recommendation output detected.",
+        "Error: Required reviewer artifact is missing: `recommendation.json`.",
       );
     });
 

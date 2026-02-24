@@ -9,6 +9,8 @@ export interface StreamTarget {
   endOnClose?: boolean;
 }
 
+export type ProcessOutputSource = "stdout" | "stderr";
+
 export interface SpawnStreamingProcessOptions {
   command: string;
   args?: string[];
@@ -19,7 +21,7 @@ export interface SpawnStreamingProcessOptions {
   stdout: StreamTarget;
   stderr: StreamTarget;
   /** Optional callback invoked for each chunk of stdout/stderr data. */
-  onData?: (chunk: Buffer) => void;
+  onData?: (chunk: Buffer, source: ProcessOutputSource) => void;
   /** Optional callback invoked when the process is spawned, providing the child process. */
   onSpawn?: (child: import("node:child_process").ChildProcess) => void;
   /**
@@ -88,8 +90,12 @@ export async function spawnStreamingProcess(
     }
 
     if (onData) {
-      childStdout.on("data", onData);
-      childStderr.on("data", onData);
+      childStdout.on("data", (chunk: Buffer) => {
+        onData(chunk, "stdout");
+      });
+      childStderr.on("data", (chunk: Buffer) => {
+        onData(chunk, "stderr");
+      });
     }
 
     childStdout.pipe(stdout.writable, { end: false });

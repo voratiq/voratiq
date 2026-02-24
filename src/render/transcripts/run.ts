@@ -7,14 +7,16 @@ import { colorize } from "../../utils/colors.js";
 import { formatCompactDiffStatistics } from "../../utils/diff.js";
 import {
   formatAgentDuration,
-  formatAgentStatusLabel,
+  formatAgentStatusLabelWithStyle,
   formatDurationLabel,
 } from "../utils/agents.js";
 import { formatAgentBadge } from "../utils/badges.js";
 import { formatRunTimestamp } from "../utils/records.js";
-import { buildRunMetadataSection } from "../utils/runs.js";
-import { renderTable } from "../utils/table.js";
+import { buildRunMetadataSectionWithStyle } from "../utils/runs.js";
 import { renderTranscript } from "../utils/transcript.js";
+import type { TranscriptShellStyleOptions } from "../utils/transcript-shell.js";
+import { renderTranscriptStatusTable } from "../utils/transcript-shell.js";
+import type { StageProgressEventConsumer } from "./stage-progress.js";
 
 const SUPPRESS_RUN_STATUS_TABLE_ENV = "VORATIQ_SUPPRESS_RUN_STATUS_TABLE";
 
@@ -42,7 +44,11 @@ interface RunRendererOptions {
   suppressTrailingBlankLine?: boolean;
 }
 
-interface RunProgressRenderer {
+interface RunProgressRenderer
+  extends StageProgressEventConsumer<
+    RunProgressContext,
+    AgentInvocationRecord
+  > {
   begin(context?: RunProgressContext): void;
   update(record: AgentInvocationRecord): void;
   complete(report: RunReport, options?: { suppressHint?: boolean }): string;
@@ -247,22 +253,26 @@ export function createRunRenderer(
       return;
     }
 
+    const style: TranscriptShellStyleOptions = { isTty: stdout.isTTY ?? false };
     const elapsedLabel = context.createdAt
       ? (formatRunElapsed(context.createdAt) ?? undefined)
       : undefined;
     lastElapsedLabel = elapsedLabel ?? null;
 
-    const metadataLines = buildRunMetadataSection({
-      runId: context.runId,
-      status: context.status,
-      specPath: context.specPath,
-      workspacePath: context.workspacePath,
-      elapsed: elapsedLabel,
-      createdAt: formatRunTimestamp(context.createdAt),
-      baseRevisionSha: context.baseRevisionSha,
-    });
+    const metadataLines = buildRunMetadataSectionWithStyle(
+      {
+        runId: context.runId,
+        status: context.status,
+        specPath: context.specPath,
+        workspacePath: context.workspacePath,
+        elapsed: elapsedLabel,
+        createdAt: formatRunTimestamp(context.createdAt),
+        baseRevisionSha: context.baseRevisionSha,
+      },
+      style,
+    );
 
-    const tableLines = buildAgentTable();
+    const tableLines = buildAgentTable(style);
     const shouldIncludeTable = tableLines.length > 0;
     const interactiveLines = buildInteractiveLines(metadataLines, tableLines);
 
@@ -318,7 +328,7 @@ export function createRunRenderer(
     }
   }
 
-  function buildAgentTable(): string[] {
+  function buildAgentTable(style: TranscriptShellStyleOptions): string[] {
     if (agentRecords.size === 0) {
       return [];
     }
@@ -328,23 +338,23 @@ export function createRunRenderer(
       .map((agentId) => {
         const record = agentRecords.get(agentId)!;
         return {
-          agentId: formatAgentBadge(agentId),
-          status: formatAgentStatusLabel(record.status),
+          agentId: formatAgentBadge(agentId, style),
+          status: formatAgentStatusLabelWithStyle(record.status, style),
           duration: formatDuration(record),
           diff: formatDiffCell(record.diffStatistics),
-          evals: formatEvals(record),
+          evals: formatEvals(record, style),
         };
       });
 
-    return renderTable({
-      columns: [
-        { header: "AGENT", accessor: (row) => row.agentId },
-        { header: "STATUS", accessor: (row) => row.status },
-        { header: "DURATION", accessor: (row) => row.duration },
+    return renderTranscriptStatusTable({
+      rows,
+      agent: (row) => row.agentId,
+      status: (row) => row.status,
+      duration: (row) => row.duration,
+      extras: [
         { header: "CHANGES", accessor: (row) => row.diff },
         { header: "EVALS", accessor: (row) => row.evals },
       ],
-      rows,
     });
   }
 
@@ -375,9 +385,16 @@ export function createRunRenderer(
     return formatDurationLabel(elapsedMs);
   }
 
-  function formatEvals(record: AgentInvocationRecord): string {
+  function formatEvals(
+    record: AgentInvocationRecord,
+    style: TranscriptShellStyleOptions,
+  ): string {
     if (!record.evals || record.evals.length === 0) {
       return DASH;
+    }
+
+    if (!style.isTty) {
+      return record.evals.map((evaluation) => evaluation.slug).join(" ");
     }
 
     return record.evals
@@ -409,6 +426,38 @@ export function createRunRenderer(
   }
 
   return {
+    onProgressEvent(event): void {
+      guard(() => {
+        if (event.stage !== "run") {
+          return;
+        }
+
+        if (event.type === "stage.begin") {
+          context = { ...event.context };
+          render();
+          syncRefreshLoop();
+          return;
+        }
+
+        if (event.type === "stage.candidate") {
+          upsertRecord(event.candidate);
+          render();
+          syncRefreshLoop();
+          return;
+        }
+
+        if (!context) {
+          return;
+        }
+
+        context = {
+          ...context,
+          status: event.status as RunReport["status"],
+        };
+        render();
+        syncRefreshLoop();
+      });
+    },
     begin(beginContext?: RunProgressContext): void {
       guard(() => {
         if (!beginContext) {
@@ -416,22 +465,29 @@ export function createRunRenderer(
           syncRefreshLoop();
           return;
         }
-        context = { ...beginContext };
-        render();
-        syncRefreshLoop();
+        this.onProgressEvent({
+          type: "stage.begin",
+          stage: "run",
+          context: beginContext,
+        });
       });
     },
     update(record: AgentInvocationRecord): void {
-      guard(() => {
-        upsertRecord(record);
-        render();
-        syncRefreshLoop();
+      this.onProgressEvent({
+        type: "stage.candidate",
+        stage: "run",
+        candidate: record,
       });
     },
     complete(report: RunReport, options?: { suppressHint?: boolean }): string {
       let transcript = "";
       stopRefreshLoop();
       guard(() => {
+        this.onProgressEvent({
+          type: "stage.status",
+          stage: "run",
+          status: report.status,
+        });
         ensureFinalRender(report);
 
         disabled = true;

@@ -18,11 +18,13 @@ import {
   ensureSandboxDependencies,
   resolveCliContext,
 } from "../preflight/index.js";
-import { renderReviewTranscript } from "../render/transcripts/review.js";
+import {
+  createReviewRenderer,
+  renderReviewTranscript,
+} from "../render/transcripts/review.js";
 import { formatDurationLabel } from "../render/utils/agents.js";
 import { readReviewRecords } from "../reviews/records/persistence.js";
 import type { ReviewRecord } from "../reviews/records/types.js";
-import { toErrorMessage } from "../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import {
@@ -39,6 +41,10 @@ export interface ReviewCommandOptions {
   profile?: string;
   maxParallel?: number;
   suppressHint?: boolean;
+  suppressLeadingBlankLine?: boolean;
+  suppressTrailingBlankLine?: boolean;
+  stdout?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
+  stderr?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
   writeOutput?: CommandOutputWriter;
 }
 
@@ -58,6 +64,10 @@ export async function runReviewCommand(
     profile,
     maxParallel,
     suppressHint,
+    suppressLeadingBlankLine,
+    suppressTrailingBlankLine,
+    stdout,
+    stderr,
     writeOutput = writeCommandOutput,
   } = options;
   const { root, workspacePaths } = await resolveCliContext();
@@ -66,6 +76,13 @@ export async function runReviewCommand(
 
   writeOutput({
     alerts: [{ severity: "info", message: "Generating review…" }],
+  });
+
+  const renderer = createReviewRenderer({
+    stdout,
+    stderr,
+    suppressLeadingBlankLine,
+    suppressTrailingBlankLine,
   });
 
   const execution = await executeReviewCommand({
@@ -77,6 +94,7 @@ export async function runReviewCommand(
     agentOverrideFlag,
     profileName: profile,
     maxParallel,
+    renderer,
   });
 
   const record = await readReviewSessionRecord({
@@ -86,18 +104,16 @@ export async function runReviewCommand(
   });
   if (!record) {
     throw new ReviewGenerationFailedError([
-      `Review session ${execution.reviewId} record not found after execution.`,
+      `Review session \`${execution.reviewId}\` record not found after execution.`,
     ]);
   }
 
   const aliasMap = record.blinded?.aliasMap;
-  const sessionStartMs = safeParseTimestamp(record.createdAt);
-
   const reviewerBlocks = await Promise.all(
     record.reviewers.map(async (reviewerRecord) => {
       const reviewerAgentId = reviewerRecord.agentId;
       const duration = formatReviewerDuration({
-        sessionStartMs,
+        startedAt: reviewerRecord.startedAt,
         completedAt: reviewerRecord.completedAt,
       });
 
@@ -111,7 +127,7 @@ export async function runReviewCommand(
           previewLines: undefined,
           errorLine:
             reviewerRecord.error ??
-            "Reviewer process failed. No review output detected.",
+            "Reviewer process failed with no `review.md` output.",
         } as const;
       }
 
@@ -143,14 +159,13 @@ export async function runReviewCommand(
           previewLines,
           errorLine: undefined,
         } as const;
-      } catch (error) {
+      } catch {
         throw new ReviewGenerationFailedError(
           [
-            `Failed to load recommendation artifact for reviewer ${reviewerAgentId}.`,
+            `Failed to load \`${REVIEW_RECOMMENDATION_FILENAME}\` for reviewer \`${reviewerAgentId}\`.`,
           ],
           [
-            `Expected ${REVIEW_RECOMMENDATION_FILENAME} at ${recommendationPath}.`,
-            toErrorMessage(error),
+            `Re-run review to regenerate \`${REVIEW_RECOMMENDATION_FILENAME}\`.`,
           ],
         );
       }
@@ -161,10 +176,7 @@ export async function runReviewCommand(
     runId: execution.runRecord.runId,
     reviewId: execution.reviewId,
     createdAt: record.createdAt,
-    elapsed:
-      formatReviewElapsed(record.createdAt, record.completedAt) ??
-      formatReviewElapsed(record.createdAt) ??
-      "—",
+    elapsed: formatReviewElapsed(record.createdAt, record.completedAt) ?? "—",
     workspacePath: normalizePathForDisplay(
       relativeToRoot(
         root,
@@ -178,6 +190,8 @@ export async function runReviewCommand(
     status: record.status,
     reviewers: reviewerBlocks,
     suppressHint,
+    isTty: stdout?.isTTY ?? process.stdout.isTTY,
+    includeSummarySection: !(stdout?.isTTY ?? process.stdout.isTTY),
   });
 
   return {
@@ -291,7 +305,7 @@ function formatReviewElapsed(
   if (start === undefined) {
     return undefined;
   }
-  const end = completedAt ? safeParseTimestamp(completedAt) : Date.now();
+  const end = safeParseTimestamp(completedAt);
   if (end === undefined || end < start) {
     return undefined;
   }
@@ -299,18 +313,18 @@ function formatReviewElapsed(
 }
 
 function formatReviewerDuration(options: {
-  sessionStartMs?: number;
+  startedAt?: string;
   completedAt?: string;
 }): string {
-  const { sessionStartMs, completedAt } = options;
-  if (sessionStartMs === undefined) {
+  const startedMs = safeParseTimestamp(options.startedAt);
+  if (startedMs === undefined) {
     return "—";
   }
-  const completedMs = safeParseTimestamp(completedAt);
-  if (completedMs === undefined || completedMs < sessionStartMs) {
+  const completedMs = safeParseTimestamp(options.completedAt);
+  if (completedMs === undefined || completedMs < startedMs) {
     return "—";
   }
-  return formatDurationLabel(completedMs - sessionStartMs) ?? "—";
+  return formatDurationLabel(completedMs - startedMs) ?? "—";
 }
 
 interface ReviewCommandActionOptions {

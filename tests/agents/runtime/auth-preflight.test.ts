@@ -83,8 +83,8 @@ describe("verifyAgentProviders (preflight aggregation)", () => {
     expect(issues).toEqual([
       { agentId: "alpha", message: "PERMISSION_DENIED" },
       { agentId: "alpha", message: "model requires Pro" },
-      { agentId: "beta", message: 'unknown auth provider "unknown"' },
-      { agentId: "gamma", message: "missing provider" },
+      { agentId: "beta", message: "unknown auth provider `unknown`" },
+      { agentId: "gamma", message: "missing `provider`" },
     ]);
 
     expect(failingVerify).toHaveBeenCalledTimes(1);

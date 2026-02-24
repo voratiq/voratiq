@@ -14,7 +14,6 @@ import type {
 import { HintedError } from "../../utils/errors.js";
 import { readUtf8File } from "../../utils/fs.js";
 import {
-  formatWorkspacePath,
   resolveWorkspacePath,
   VORATIQ_AGENTS_FILE,
   VORATIQ_ORCHESTRATION_FILE,
@@ -39,9 +38,7 @@ export interface CompetitionPlan {
 
 export type StageCompetitorResolution = CompetitionPlan;
 
-const ORCHESTRATION_CONFIG_DISPLAY_PATH = formatWorkspacePath(
-  VORATIQ_ORCHESTRATION_FILE,
-);
+const ORCHESTRATION_CONFIG_DISPLAY_PATH = VORATIQ_ORCHESTRATION_FILE;
 const DEFAULT_PROFILE_NAME = "default";
 
 export function resolveStageCompetitors(
@@ -69,7 +66,6 @@ export function resolveStageCompetitors(
     const orchestrationConfig = loadOrchestrationConfig({ root });
     selectedProfile = resolveOrchestrationProfile({
       config: orchestrationConfig,
-      stageId,
       profileName: selectedProfileName,
       profileFlag,
     });
@@ -83,7 +79,6 @@ export function resolveStageCompetitors(
   assertResolvedAgentCount({
     stageId,
     agentIds: resolvedAgentIds,
-    cliOverrideFlag,
     selectedProfileName,
     enforceSingleCompetitor,
   });
@@ -105,33 +100,25 @@ export function resolveStageCompetitors(
 
 function resolveOrchestrationProfile(options: {
   config: OrchestrationConfig;
-  stageId: OrchestrationStageId;
   profileName: string;
   profileFlag: string;
 }): OrchestrationProfile {
-  const { config, stageId, profileName, profileFlag } = options;
+  const { config, profileName, profileFlag } = options;
   const selectedProfile = config.profiles[profileName];
   if (selectedProfile) {
     return selectedProfile;
   }
 
   const availableProfileNames = Object.keys(config.profiles).sort();
-  const availableDisplay =
-    availableProfileNames.length > 0
-      ? availableProfileNames.join(", ")
-      : "(none configured)";
-  const fallbackProfile = availableProfileNames[0] ?? DEFAULT_PROFILE_NAME;
+  const availableDisplay = availableProfileNames.map((name) => `\`${name}\``);
 
-  throw new HintedError(`Unknown orchestration profile "${profileName}".`, {
-    detailLines: [
-      `Requested profile: "${profileName}".`,
-      `Available profiles: ${availableDisplay}.`,
-      `Config file: ${ORCHESTRATION_CONFIG_DISPLAY_PATH}.`,
-    ],
+  throw new HintedError(`Unknown orchestration profile \`${profileName}\`.`, {
+    detailLines:
+      availableDisplay.length > 0
+        ? [`Available profiles: ${availableDisplay.join(", ")}.`]
+        : [],
     hintLines: [
-      `Use ${profileFlag} <existing-profile> to select one of the configured profiles.`,
-      `Update ${ORCHESTRATION_CONFIG_DISPLAY_PATH} to add profile "${profileName}".`,
-      `Example: ${buildProfileSelectionExample(stageId, profileFlag, fallbackProfile)}`,
+      `Review \`${profileFlag}\` and update \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\` if needed.`,
     ],
   });
 }
@@ -169,14 +156,15 @@ function assertNoDuplicateCliAgentIds(
     return;
   }
 
-  const duplicateList = Array.from(duplicates).join(", ");
+  const duplicateList = Array.from(duplicates)
+    .sort((left, right) => left.localeCompare(right))
+    .map((agentId) => `\`${agentId}\``)
+    .join(", ");
   throw new HintedError(
-    `Duplicate ${cliOverrideFlag} values are not allowed for stage "${stageId}".`,
+    `Duplicate \`${cliOverrideFlag}\` values for stage \`${stageId}\`.`,
     {
       detailLines: [`Duplicate agent ids: ${duplicateList}.`],
-      hintLines: [
-        `Pass each ${cliOverrideFlag} id at most once, preserving your intended order.`,
-      ],
+      hintLines: [`Pass each \`${cliOverrideFlag}\` value once.`],
     },
   );
 }
@@ -207,32 +195,22 @@ function validateResolvedAgentIds(options: {
 function assertResolvedAgentCount(options: {
   stageId: OrchestrationStageId;
   agentIds: readonly string[];
-  cliOverrideFlag: string;
   selectedProfileName: string;
   enforceSingleCompetitor: boolean;
 }): void {
-  const {
-    stageId,
-    agentIds,
-    cliOverrideFlag,
-    selectedProfileName,
-    enforceSingleCompetitor,
-  } = options;
+  const { stageId, agentIds, selectedProfileName, enforceSingleCompetitor } =
+    options;
   const stageAgentsPath = `profiles.${selectedProfileName}.${stageId}.agents`;
 
   if (agentIds.length === 0) {
     const configInstruction = enforceSingleCompetitor
-      ? `Configure exactly one agent under ${stageAgentsPath} in ${ORCHESTRATION_CONFIG_DISPLAY_PATH}.`
-      : `Configure at least one agent under ${stageAgentsPath} in ${ORCHESTRATION_CONFIG_DISPLAY_PATH}.`;
-    throw new HintedError(`No agent found for stage "${stageId}".`, {
+      ? `Configure exactly one agent under \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`
+      : `Configure at least one agent under \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`;
+    throw new HintedError(`No agents configured for stage \`${stageId}\`.`, {
       detailLines: [
-        "Agents: (none).",
-        `Checked ${stageAgentsPath} in ${ORCHESTRATION_CONFIG_DISPLAY_PATH}.`,
+        `Checked \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`,
       ],
-      hintLines: [
-        `Provide ${cliOverrideFlag} <id> to run ${stageId} with an explicit agent.`,
-        configInstruction,
-      ],
+      hintLines: [configInstruction],
     });
   }
 
@@ -240,27 +218,15 @@ function assertResolvedAgentCount(options: {
     return;
   }
 
-  throw new HintedError(`Multiple agents found for stage "${stageId}".`, {
-    detailLines: [`Multi-agent ${stageId} is not supported.`],
-    hintLines: [
-      `Provide ${cliOverrideFlag} <id> to run ${stageId} with an explicit agent.`,
-      `Configure exactly one agent under ${stageAgentsPath} in ${ORCHESTRATION_CONFIG_DISPLAY_PATH}.`,
-    ],
-  });
-}
-
-function buildProfileSelectionExample(
-  stageId: OrchestrationStageId,
-  profileFlag: string,
-  profileName: string,
-): string {
-  const escapedProfile = JSON.stringify(profileName);
-  switch (stageId) {
-    case "run":
-      return `voratiq run --spec <path> ${profileFlag} ${escapedProfile}`;
-    case "review":
-      return `voratiq review --run <run-id> ${profileFlag} ${escapedProfile}`;
-    case "spec":
-      return `voratiq spec --description <text> ${profileFlag} ${escapedProfile}`;
-  }
+  throw new HintedError(
+    `Multiple agents configured for stage \`${stageId}\`.`,
+    {
+      detailLines: [
+        `This command supports one agent for stage \`${stageId}\`.`,
+      ],
+      hintLines: [
+        `Configure exactly one agent under \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`,
+      ],
+    },
+  );
 }

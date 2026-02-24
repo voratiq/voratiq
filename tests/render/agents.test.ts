@@ -7,28 +7,34 @@ import { colorize } from "../../src/utils/colors.js";
 
 describe("buildAgentSectionHeader", () => {
   it("renders status label with color", () => {
-    const header = buildAgentSectionHeader({
-      agentId: "codex",
-      status: "succeeded",
-      startedAt: "2025-10-13T00:00:00.000Z",
-      completedAt: "2025-10-13T01:02:05.000Z",
-    });
+    const header = buildAgentSectionHeader(
+      {
+        agentId: "codex",
+        status: "succeeded",
+        startedAt: "2025-10-13T00:00:00.000Z",
+        completedAt: "2025-10-13T01:02:05.000Z",
+      },
+      { isTty: true },
+    );
 
     expect(header).toBe(
-      `  ${formatAgentBadge("codex")} ${colorize("SUCCEEDED", "green")}`,
+      `  ${formatAgentBadge("codex", { isTty: true })} ${colorize("SUCCEEDED", "green")}`,
     );
   });
 
   it("falls back to status when timestamps are invalid", () => {
-    const header = buildAgentSectionHeader({
-      agentId: "claude",
-      status: "failed",
-      startedAt: "not-a-date",
-      completedAt: "2025-10-13T00:00:00.000Z",
-    });
+    const header = buildAgentSectionHeader(
+      {
+        agentId: "claude",
+        status: "failed",
+        startedAt: "not-a-date",
+        completedAt: "2025-10-13T00:00:00.000Z",
+      },
+      { isTty: true },
+    );
 
     expect(header).toBe(
-      `  ${formatAgentBadge("claude")} ${colorize("FAILED", "red")}`,
+      `  ${formatAgentBadge("claude", { isTty: true })} ${colorize("FAILED", "red")}`,
     );
   });
 });

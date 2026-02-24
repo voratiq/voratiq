@@ -38,6 +38,7 @@ export const reviewRecordReviewerSchema = z.object({
   agentId: agentIdSchema,
   status: reviewStatusSchema,
   outputPath: repoRelativePathSchema,
+  startedAt: z.string().optional(),
   completedAt: z.string().optional(),
   error: z.string().nullable().optional(),
 });

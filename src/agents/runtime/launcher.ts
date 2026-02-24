@@ -12,7 +12,10 @@ import type { DenialBackoffConfig } from "../../configs/sandbox/types.js";
 import type { WatchdogMetadata } from "../../runs/records/types.js";
 import { getCliAssetPath, resolveCliAssetRoot } from "../../utils/cli-root.js";
 import { resolvePath } from "../../utils/path.js";
-import { spawnStreamingProcess } from "../../utils/process.js";
+import {
+  type ProcessOutputSource,
+  spawnStreamingProcess,
+} from "../../utils/process.js";
 import { AgentRuntimeProcessError } from "./errors.js";
 import {
   generateSandboxSettings,
@@ -108,7 +111,7 @@ export async function getRunCommand(): Promise<string> {
     await access(binaryPath, X_OK);
   } catch {
     throw new Error(
-      `Sandbox Runtime binary not found or not executable at ${binaryPath}. Please reinstall dependencies with 'npm install'.`,
+      `Sandbox runtime binary is missing or not executable at \`${binaryPath}\`. Run \`npm install\` to reinstall dependencies.`,
     );
   }
   return binaryPath;
@@ -164,7 +167,7 @@ export async function runAgentProcess(
   const shimEntryPath = resolveShimEntryPath();
   if (!existsSync(shimEntryPath)) {
     throw new AgentRuntimeProcessError(
-      `Shim entry point missing at ${shimEntryPath}`,
+      `Shim entry point is missing at \`${shimEntryPath}\`.`,
     );
   }
 
@@ -217,8 +220,8 @@ export async function runAgentProcess(
           { once: true },
         );
       },
-      onData: (chunk: Buffer) => {
-        watchdogController?.handleOutput(chunk);
+      onData: (chunk: Buffer, source: ProcessOutputSource) => {
+        watchdogController?.handleOutput(chunk, source);
       },
       abortSignal: forceAbortController.signal,
     });
@@ -276,7 +279,7 @@ export async function stageManifestForSandbox(options: {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new AgentRuntimeProcessError(
-      `Failed to read manifest at "${runtimeManifestPath}": ${detail}`,
+      `Failed to read manifest at \`${runtimeManifestPath}\`: ${detail}`,
     );
   }
 
@@ -286,7 +289,7 @@ export async function stageManifestForSandbox(options: {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new AgentRuntimeProcessError(
-      `Manifest JSON at "${runtimeManifestPath}" is invalid: ${detail}`,
+      `Manifest JSON at \`${runtimeManifestPath}\` is invalid: ${detail}`,
     );
   }
 

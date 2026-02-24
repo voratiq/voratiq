@@ -1,12 +1,15 @@
 import { HintedError, toErrorMessage } from "../utils/errors.js";
 
+const DEFAULT_CLI_ERROR_HINT = "Inspect the error details and retry." as const;
+
 export class CliError extends HintedError {
   constructor(
     headline: string,
     detailLines: readonly string[] = [],
     hintLines: readonly string[] = [],
   ) {
-    super(headline, { detailLines, hintLines });
+    const normalizedHint = hintLines[0] ?? DEFAULT_CLI_ERROR_HINT;
+    super(headline, { detailLines, hintLines: [normalizedHint] });
     this.name = "CliError";
   }
 }
@@ -14,7 +17,9 @@ export class CliError extends HintedError {
 export class NonInteractiveShellError extends CliError {
   constructor() {
     super(
-      "Non-interactive shell detected; re-run with --yes to accept defaults.",
+      "Interactive confirmation is required.",
+      [],
+      ["Re-run with `--yes` to accept defaults."],
     );
     this.name = "NonInteractiveShellError";
   }
@@ -27,6 +32,13 @@ export function toCliError(error: unknown): CliError {
 
   if (error instanceof HintedError) {
     return new CliError(error.headline, error.detailLines, error.hintLines);
+  }
+
+  if (error instanceof AggregateError) {
+    const detailLines = error.errors
+      .slice(0, 3)
+      .map((entry) => toErrorMessage(entry));
+    return new CliError("Multiple errors occurred.", detailLines);
   }
 
   return new CliError(toErrorMessage(error));

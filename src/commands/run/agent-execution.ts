@@ -5,6 +5,7 @@ import type { EvalDefinition } from "../../configs/evals/types.js";
 import type { AgentRecordMutators } from "../../runs/records/mutators.js";
 import { toError } from "../../utils/errors.js";
 import { createRunCompetitionAdapter } from "./competition-adapter.js";
+import { RunProcessStreamError } from "./errors.js";
 import type { AgentExecutionPhaseResult } from "./phases.js";
 import { hasEvalFailures } from "./reports.js";
 
@@ -75,12 +76,12 @@ export async function executeAgents(
   }
 
   if (executionError) {
-    throw toError(executionError);
+    throw new RunProcessStreamError(toError(executionError).message);
   }
 
   if (!phaseResult) {
-    throw new Error(
-      `Agent execution did not produce a result for run ${runId}`,
+    throw new RunProcessStreamError(
+      `Agent execution did not produce a result for run \`${runId}\`.`,
     );
   }
 

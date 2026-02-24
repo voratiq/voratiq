@@ -42,7 +42,7 @@ async function checkoutBranch(root: string, branchName: string): Promise<void> {
   } catch (error) {
     const stderr = getGitStderr(error);
     throw new BranchCheckoutError(
-      `Failed to checkout branch '${branchName}'`,
+      `Failed to check out branch \`${branchName}\`.`,
       stderr,
     );
   }
@@ -57,7 +57,7 @@ async function createAndCheckoutBranch(
   } catch (error) {
     const stderr = getGitStderr(error);
     throw new BranchCheckoutError(
-      `Failed to create branch '${branchName}'`,
+      `Failed to create branch \`${branchName}\`.`,
       stderr,
     );
   }

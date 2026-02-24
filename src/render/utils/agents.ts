@@ -12,9 +12,14 @@ import {
   getEvalStatusStyle,
 } from "../../status/colors.js";
 import { colorize } from "../../utils/colors.js";
-import { formatErrorMessage } from "../../utils/output.js";
 import { formatAgentBadge } from "./badges.js";
 import { renderTable } from "./table.js";
+import type { TranscriptShellStyleOptions } from "./transcript-shell.js";
+import {
+  formatTranscriptErrorLine,
+  formatTranscriptStatusLabel,
+  resolveTranscriptShellStyle,
+} from "./transcript-shell.js";
 
 type AgentHeaderSource =
   | Pick<
@@ -40,19 +45,32 @@ type AgentMetadataRow = {
   value: string;
 };
 
-export function formatAgentStatusLabel(status: AgentStatus): string {
-  const statusColor = getAgentStatusStyle(status).cli;
-  return colorize(status.toUpperCase(), statusColor);
+export function formatAgentStatusLabelWithStyle(
+  status: AgentStatus,
+  style: TranscriptShellStyleOptions = {},
+): string {
+  const resolved = resolveTranscriptShellStyle(style);
+  return formatTranscriptStatusLabel(
+    status,
+    getAgentStatusStyle(status).cli,
+    resolved,
+  );
 }
 
-export function formatAgentErrorLine(error: string): string {
-  return formatErrorMessage(error);
+export function formatAgentErrorLine(
+  error: string,
+  style: TranscriptShellStyleOptions = {},
+): string {
+  return formatTranscriptErrorLine(error, resolveTranscriptShellStyle(style));
 }
 
-export function buildAgentSectionHeader(agent: AgentHeaderSource): string {
-  const agentLabel = formatAgentBadge(agent.agentId);
+export function buildAgentSectionHeader(
+  agent: AgentHeaderSource,
+  style: TranscriptShellStyleOptions = {},
+): string {
+  const agentLabel = formatAgentBadge(agent.agentId, style);
   const status = agent.status;
-  const statusLabel = formatAgentStatusLabel(status);
+  const statusLabel = formatAgentStatusLabelWithStyle(status, style);
   return `  ${agentLabel} ${statusLabel}`;
 }
 
@@ -97,9 +115,13 @@ export function buildAgentMetadataSection(agent: AgentSectionSource): string[] {
   return bodyLines;
 }
 
-export function buildAgentSection(agent: AgentSectionSource): string[] {
-  const lines: string[] = [buildAgentSectionHeader(agent)];
+export function buildAgentSectionWithStyle(
+  agent: AgentSectionSource,
+  style: TranscriptShellStyleOptions = {},
+): string[] {
+  const lines: string[] = [buildAgentSectionHeader(agent, style)];
   const agentRoot = getAgentRootPath(agent);
+  const resolvedStyle = resolveTranscriptShellStyle(style);
 
   const metadataLines = buildAgentMetadataSection(agent);
   if (metadataLines.length > 0) {
@@ -113,16 +135,18 @@ export function buildAgentSection(agent: AgentSectionSource): string[] {
 
   if (agent.warnings && agent.warnings.length > 0) {
     const warningLines = agent.warnings.map((warning) =>
-      colorize(`Warning: ${warning}`, "yellow"),
+      resolvedStyle.isTty
+        ? colorize(`Warning: ${warning}`, "yellow")
+        : `Warning: ${warning}`,
     );
     lines.push("", ...indentLines(warningLines));
   }
 
   if (agent.error) {
-    lines.push("", ...indentLines([formatAgentErrorLine(agent.error)]));
+    lines.push("", ...indentLines([formatAgentErrorLine(agent.error, style)]));
   }
 
-  const evalLines = buildAgentSectionEvals(agent, agentRoot);
+  const evalLines = buildAgentSectionEvals(agent, agentRoot, style);
   if (evalLines.length > 0) {
     lines.push("", ...indentLines(evalLines));
   }
@@ -180,18 +204,22 @@ export function buildAgentSectionArtifacts(
 export function buildAgentSectionEvals(
   agent: AgentSectionSource,
   agentRoot?: string,
+  style: TranscriptShellStyleOptions = {},
 ): string[] {
   const evalResults = agent.evals ?? [];
   if (evalResults.length === 0) {
     return [];
   }
 
+  const resolvedStyle = resolveTranscriptShellStyle(style);
   const rows = evalResults.map((evaluation) => ({
     slug: evaluation.slug,
-    status: colorize(
-      evaluation.status.toUpperCase(),
-      getEvalStatusStyle(evaluation.status).cli,
-    ),
+    status: resolvedStyle.isTty
+      ? colorize(
+          evaluation.status.toUpperCase(),
+          getEvalStatusStyle(evaluation.status).cli,
+        )
+      : evaluation.status.toUpperCase(),
     log:
       evaluation.logPath !== undefined
         ? relativizePath(evaluation.logPath, agentRoot)
