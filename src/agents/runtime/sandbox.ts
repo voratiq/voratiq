@@ -1,14 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute } from "node:path";
+import { dirname } from "node:path";
 
 import type { SandboxRuntimeConfig } from "@voratiq/sandbox-runtime";
 
 import { loadSandboxProviderConfig } from "../../configs/sandbox/loader.js";
-import type {
-  DenialBackoffConfig,
-  SandboxFilesystemConfig,
-} from "../../configs/sandbox/types.js";
+import type { DenialBackoffConfig } from "../../configs/sandbox/types.js";
 import { resolvePath } from "../../utils/path.js";
+import { buildSandboxPolicy, type SandboxStageId } from "./policy.js";
 import type { SandboxPolicyOverrides } from "./types.js";
 
 export type SandboxSettings = SandboxRuntimeConfig;
@@ -33,6 +31,7 @@ export const DEFAULT_DENIAL_BACKOFF: DenialBackoffConfig = {
 };
 
 export interface SandboxSettingsOptions {
+  stageId?: SandboxStageId;
   sandboxHomePath: string;
   workspacePath: string;
   providerId: string;
@@ -50,6 +49,7 @@ export function generateSandboxSettings(
   options: SandboxSettingsOptions,
 ): SandboxSettings {
   const {
+    stageId = "run",
     sandboxHomePath,
     workspacePath,
     providerId,
@@ -67,78 +67,37 @@ export function generateSandboxSettings(
     root,
     providerId,
   });
-  const { network: networkSettings, filesystem } = providerConfig;
-
-  const resolvedFilesystem = resolveFilesystemPaths(filesystem, workspacePath);
-  const overridesResolved = resolveFilesystemOverrides(
-    policyOverrides,
+  const { filesystem, network } = buildSandboxPolicy({
+    stageId,
+    root,
     workspacePath,
-  );
-
-  const runtimeWriteProtectedPaths = dedupePaths([
+    sandboxHomePath,
+    sandboxSettingsPath,
     runtimePath,
     artifactsPath,
-    ...extraWriteProtectedPaths,
-  ]);
-  const runtimeReadProtectedPaths = dedupePaths([
-    artifactsPath,
-    ...extraReadProtectedPaths,
-  ]);
-
-  const allowListBlockers = dedupePaths([
-    sandboxSettingsPath,
-    ...runtimeWriteProtectedPaths,
-    ...(repoRootPath ? [repoRootPath] : []),
-  ]);
-
-  const allowWrite = buildAllowWriteSet(
-    resolvedFilesystem,
-    sandboxHomePath,
-    workspacePath,
-    allowListBlockers,
-    overridesResolved.allowWrite,
-  );
-
-  const denyRead = dedupePaths([
-    ...resolvedFilesystem.denyRead,
-    ...runtimeReadProtectedPaths,
-    ...overridesResolved.denyRead,
-  ]);
-  const denyWrite = dedupePaths([
-    ...resolvedFilesystem.denyWrite,
-    ...runtimeWriteProtectedPaths,
-    ...overridesResolved.denyWrite,
-  ]);
+    repoRootPath,
+    providerFilesystem: providerConfig.filesystem,
+    providerNetwork: providerConfig.network,
+    policyOverrides,
+    stageDenyWritePaths: extraWriteProtectedPaths,
+    stageDenyReadPaths: extraReadProtectedPaths,
+  });
 
   return {
     network: {
-      allowedDomains: [...networkSettings.allowedDomains],
-      deniedDomains: [...networkSettings.deniedDomains],
-      ...(networkSettings.allowLocalBinding ? { allowLocalBinding: true } : {}),
-      ...(networkSettings.allowUnixSockets &&
-      networkSettings.allowUnixSockets.length > 0
-        ? { allowUnixSockets: [...networkSettings.allowUnixSockets] }
+      allowedDomains: [...network.allowedDomains],
+      deniedDomains: [...network.deniedDomains],
+      ...(network.allowLocalBinding ? { allowLocalBinding: true } : {}),
+      ...(network.allowUnixSockets && network.allowUnixSockets.length > 0
+        ? { allowUnixSockets: [...network.allowUnixSockets] }
         : {}),
-      ...(networkSettings.allowAllUnixSockets
-        ? { allowAllUnixSockets: true }
-        : {}),
+      ...(network.allowAllUnixSockets ? { allowAllUnixSockets: true } : {}),
     },
     filesystem: {
-      denyRead,
-      allowWrite: Array.from(allowWrite),
-      denyWrite,
+      denyRead: [...filesystem.denyRead],
+      allowWrite: [...filesystem.allowWrite],
+      denyWrite: [...filesystem.denyWrite],
     },
-  };
-}
-
-function resolveFilesystemOverrides(
-  overrides: SandboxPolicyOverrides | undefined,
-  workspacePath: string,
-): SandboxFilesystemConfig {
-  return {
-    allowWrite: resolvePaths(overrides?.allowWrite ?? [], workspacePath),
-    denyRead: resolvePaths(overrides?.denyRead ?? [], workspacePath),
-    denyWrite: resolvePaths(overrides?.denyWrite ?? [], workspacePath),
   };
 }
 
@@ -287,63 +246,6 @@ function countWithinMs(
     }
   }
   return count;
-}
-
-function getDefaultSandboxWritePaths(): string[] {
-  return [];
-}
-
-function buildAllowWriteSet(
-  filesystem: SandboxFilesystemConfig,
-  sandboxHomePath: string,
-  workspacePath: string,
-  blockedPaths: readonly string[],
-  overridesAllowWrite: readonly string[],
-): Set<string> {
-  const allowWrite = new Set<string>([
-    ...getDefaultSandboxWritePaths(),
-    ...filesystem.allowWrite,
-    ...overridesAllowWrite,
-  ]);
-  allowWrite.add(sandboxHomePath);
-  allowWrite.add(workspacePath);
-  for (const blockedPath of blockedPaths) {
-    allowWrite.delete(blockedPath);
-  }
-  return allowWrite;
-}
-
-function dedupePaths(paths: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const path of paths) {
-    if (seen.has(path)) {
-      continue;
-    }
-    seen.add(path);
-    result.push(path);
-  }
-  return result;
-}
-
-function resolveFilesystemPaths(
-  filesystem: SandboxFilesystemConfig,
-  workspacePath: string,
-): SandboxFilesystemConfig {
-  return {
-    allowWrite: resolvePaths(filesystem.allowWrite, workspacePath),
-    denyRead: resolvePaths(filesystem.denyRead, workspacePath),
-    denyWrite: resolvePaths(filesystem.denyWrite, workspacePath),
-  };
-}
-
-function resolvePaths(
-  entries: readonly string[],
-  workspacePath: string,
-): string[] {
-  return entries.map((entry) =>
-    isAbsolute(entry) ? entry : resolvePath(workspacePath, entry),
-  );
 }
 
 export async function writeSandboxSettings(

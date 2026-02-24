@@ -158,6 +158,7 @@ describe("executeAgentLifecycle integration", () => {
 
     const invocation = runSandboxedAgentMock.mock.calls.at(-1)?.[0];
     expect(invocation?.teardownAuthOnExit).toBe(false);
+    expect(invocation?.sandboxStageId).toBe("run");
   });
 
   it("propagates diff statistics from artifact collection into agent records", async () => {

@@ -4,6 +4,7 @@ import type { AgentDefinition } from "../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
 import type { DenialBackoffConfig } from "../../configs/sandbox/types.js";
 import type { WatchdogMetadata } from "../../runs/records/types.js";
+import type { SandboxStageId } from "./policy.js";
 import type { SandboxFailFastInfo } from "./sandbox.js";
 import type { WatchdogTrigger } from "./watchdog.js";
 
@@ -52,6 +53,8 @@ export interface AgentRuntimeHarnessInput {
   readonly prompt: string;
   readonly environment: EnvironmentConfig;
   readonly paths: AgentRuntimePaths;
+  /** Stage intent used to compose shared baseline sandbox policy rules. */
+  readonly sandboxStageId?: SandboxStageId;
 
   /**
    * Override for sandbox provider used to load sandbox configuration. Defaults to `agent.provider`.

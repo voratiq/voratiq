@@ -447,24 +447,31 @@ describe("voratiq review", () => {
 
       const sandboxInvocation = runSandboxedAgentMock.mock.calls.at(-1)?.[0];
       expect(sandboxInvocation).toBeDefined();
+      expect(sandboxInvocation?.sandboxStageId).toBe("review");
       const extraReadProtectedPaths =
         sandboxInvocation?.extraReadProtectedPaths ?? [];
       const extraWriteProtectedPaths =
         sandboxInvocation?.extraWriteProtectedPaths ?? [];
       expect(extraReadProtectedPaths).toEqual(
         expect.arrayContaining([
-          expect.stringMatching(/\/\.voratiq\/runs$/u),
-          expect.stringMatching(/\/\.voratiq\/specs$/u),
-          expect.stringMatching(/\/\.voratiq\/agents\.yaml$/u),
-          expect.stringMatching(/\/\.voratiq\/orchestration\.yaml$/u),
+          expect.stringMatching(/\/\.voratiq\/reviews\/index\.json$/u),
+          expect.stringMatching(/\/\.voratiq\/reviews\/history\.lock$/u),
+          expect.stringMatching(
+            new RegExp(
+              `/\\.voratiq/reviews/sessions/${result.reviewId}/record\\.json$`,
+              "u",
+            ),
+          ),
         ]),
       );
       expect(extraWriteProtectedPaths).toEqual(
         expect.arrayContaining([
-          expect.stringMatching(/\/\.voratiq\/runs$/u),
-          expect.stringMatching(/\/\.voratiq\/specs$/u),
-          expect.stringMatching(/\/\.voratiq\/agents\.yaml$/u),
-          expect.stringMatching(/\/\.voratiq\/orchestration\.yaml$/u),
+          expect.stringMatching(
+            new RegExp(
+              `/\\.voratiq/reviews/sessions/${result.reviewId}/\\.shared$`,
+              "u",
+            ),
+          ),
         ]),
       );
 
@@ -1157,6 +1164,35 @@ describe("voratiq review", () => {
       expect(result.body.match(/\n---\n/gu)?.length ?? 0).toBe(3);
       expect(result.body.indexOf(`Review: ${reviewerOnePath}`)).toBeLessThan(
         result.body.indexOf(`Review: ${reviewerTwoPath}`),
+      );
+
+      const reviewerCall = runSandboxedAgentMock.mock.calls.find(
+        ([input]) => input.agent.id === "reviewer",
+      )?.[0];
+      const secondReviewerCall = runSandboxedAgentMock.mock.calls.find(
+        ([input]) => input.agent.id === "second-reviewer",
+      )?.[0];
+      expect(reviewerCall).toBeDefined();
+      expect(secondReviewerCall).toBeDefined();
+      expect(reviewerCall?.extraReadProtectedPaths ?? []).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(
+            new RegExp(
+              `/\\.voratiq/reviews/sessions/${result.reviewId}/second-reviewer$`,
+              "u",
+            ),
+          ),
+        ]),
+      );
+      expect(secondReviewerCall?.extraReadProtectedPaths ?? []).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(
+            new RegExp(
+              `/\\.voratiq/reviews/sessions/${result.reviewId}/reviewer$`,
+              "u",
+            ),
+          ),
+        ]),
       );
     });
 

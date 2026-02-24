@@ -11,7 +11,6 @@ import { RunRecordNotFoundError } from "../../runs/records/errors.js";
 import { fetchRunsSafely } from "../../runs/records/persistence.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
-import { resolveRunWorkspacePaths } from "../../workspace/layout.js";
 import {
   resolveWorkspacePath,
   VORATIQ_REVIEWS_SESSIONS_DIR,
@@ -106,8 +105,6 @@ export async function executeReviewCommand(
     requestedMaxParallel,
   });
 
-  const runWorkspaceAbsolute = resolveRunWorkspacePaths(root, runId).absolute;
-
   renderer?.begin({
     runId: enhanced.runId,
     reviewId,
@@ -143,7 +140,6 @@ export async function executeReviewCommand(
         reviewsFilePath,
         run: enhanced,
         environment,
-        runWorkspaceAbsolute,
         renderer,
       }),
     });
