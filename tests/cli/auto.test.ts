@@ -638,7 +638,7 @@ describe("voratiq auto", () => {
     expect(output).toContain("Auto SUCCEEDED");
   });
 
-  it("fails auto --apply when review resolves multiple reviewers", async () => {
+  it("auto-applies when multiple reviewers unanimously select the same agent", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")
@@ -672,18 +672,138 @@ describe("voratiq auto", () => {
       ],
     });
 
-    await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
-      reviewerAgentIds: ["reviewer-a", "reviewer-b"],
-      apply: true,
+    runApplyCommandMock.mockResolvedValue({
+      result: {} as never,
+      body: "APPLY BODY",
+    });
+
+    await withTempRepo(async (repoRoot) => {
+      await writeRecommendationArtifact(
+        repoRoot,
+        ".voratiq/reviews/sessions/review-123/reviewer-a/artifacts/review.md",
+        {
+          preferred_agent: "agent-good",
+          resolved_preferred_agent: "agent-good",
+          rationale: "Best option",
+          next_actions: ["voratiq apply --run run-123 --agent agent-good"],
+        },
+      );
+      await writeRecommendationArtifact(
+        repoRoot,
+        ".voratiq/reviews/sessions/review-123/reviewer-b/artifacts/review.md",
+        {
+          preferred_agent: "agent-good",
+          resolved_preferred_agent: "agent-good",
+          rationale: "Best option",
+          next_actions: ["voratiq apply --run run-123 --agent agent-good"],
+        },
+      );
+
+      await runAutoCommand({
+        specPath: ".voratiq/specs/existing.md",
+        reviewerAgentIds: ["reviewer-a", "reviewer-b"],
+        apply: true,
+      });
+    });
+
+    expect(runApplyCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-123",
+        agentId: "agent-good",
+        commit: false,
+      }),
+    );
+    expect(stripAnsi(stdout.join(""))).toContain("APPLY BODY");
+    expect(stripAnsi(stdout.join(""))).toContain("Auto SUCCEEDED");
+  });
+
+  it("skips auto-apply and requests arbitration when reviewers disagree", async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+    stderrSpy = jest
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: unknown) => {
+        stderr.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockResolvedValue(buildRunResult(["agent-a", "agent-b"]));
+    runReviewCommandMock.mockResolvedValue({
+      ...buildReviewResult({
+        reviewId: "review-123",
+        outputPath:
+          ".voratiq/reviews/sessions/review-123/reviewer-a/artifacts/review.md",
+        body: [
+          "REVIEW BODY",
+          "",
+          "---",
+          "",
+          "To apply a solution:",
+          "    voratiq apply --run run-123 --agent <agent-id>",
+        ].join("\n"),
+      }),
+      reviews: [
+        {
+          agentId: "reviewer-a",
+          outputPath:
+            ".voratiq/reviews/sessions/review-123/reviewer-a/artifacts/review.md",
+          status: "succeeded",
+          missingArtifacts: [],
+        },
+        {
+          agentId: "reviewer-b",
+          outputPath:
+            ".voratiq/reviews/sessions/review-123/reviewer-b/artifacts/review.md",
+          status: "succeeded",
+          missingArtifacts: [],
+        },
+      ],
+    });
+
+    await withTempRepo(async (repoRoot) => {
+      await writeRecommendationArtifact(
+        repoRoot,
+        ".voratiq/reviews/sessions/review-123/reviewer-a/artifacts/review.md",
+        {
+          preferred_agent: "agent-a",
+          resolved_preferred_agent: "agent-a",
+          rationale: "Best option",
+          next_actions: ["voratiq apply --run run-123 --agent agent-a"],
+        },
+      );
+      await writeRecommendationArtifact(
+        repoRoot,
+        ".voratiq/reviews/sessions/review-123/reviewer-b/artifacts/review.md",
+        {
+          preferred_agent: "agent-b",
+          resolved_preferred_agent: "agent-b",
+          rationale: "Best option",
+          next_actions: ["voratiq apply --run run-123 --agent agent-b"],
+        },
+      );
+
+      await runAutoCommand({
+        specPath: ".voratiq/specs/existing.md",
+        reviewerAgentIds: ["reviewer-a", "reviewer-b"],
+        apply: true,
+      });
     });
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
-    expect(stripAnsi(stdout.join(""))).toContain(
-      "Auto apply requires exactly one reviewer.",
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain("To apply a solution:");
+    expect(output).toContain("voratiq apply --run run-123 --agent <agent-id>");
+    expect((output.match(/To apply a solution:/gu) ?? []).length).toBe(1);
+    expect(stripAnsi(stderr.join(""))).toContain(
+      "Warning: Reviewers disagreed. Review manually and apply the best solution.",
     );
-    expect(stripAnsi(stdout.join(""))).toContain("Resolved reviewers: 2.");
-    expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
+    expect(output).toContain("Auto SUCCEEDED");
   });
 
   it("fails when resolved_preferred_agent is missing", async () => {
