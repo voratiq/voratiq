@@ -1,7 +1,6 @@
 import {
   copyFile,
   mkdir,
-  readdir,
   readFile,
   rm,
   symlink,
@@ -46,17 +45,10 @@ import {
   REVIEW_ARTIFACT_INFO_FILENAME,
   REVIEW_FILENAME,
   REVIEW_RECOMMENDATION_FILENAME,
-  VORATIQ_AGENTS_FILE,
-  VORATIQ_ENVIRONMENT_FILE,
-  VORATIQ_EVALS_FILE,
   VORATIQ_HISTORY_LOCK_FILENAME,
-  VORATIQ_ORCHESTRATION_FILE,
   VORATIQ_REVIEWS_DIR,
   VORATIQ_REVIEWS_FILE,
   VORATIQ_REVIEWS_SESSIONS_DIR,
-  VORATIQ_RUNS_DIR,
-  VORATIQ_SANDBOX_FILE,
-  VORATIQ_SPECS_DIR,
 } from "../../workspace/structure.js";
 import { pruneWorkspace } from "../shared/prune.js";
 import { resolveBlindedRecommendation } from "./blinded.js";
@@ -130,7 +122,6 @@ export interface CreateReviewCompetitionAdapterInput {
   readonly reviewsFilePath: string;
   readonly run: RunRecordEnhanced;
   readonly environment: EnvironmentConfig;
-  readonly runWorkspaceAbsolute: string;
   readonly renderer?: ReviewProgressRenderer;
 }
 
@@ -148,7 +139,6 @@ export function createReviewCompetitionAdapter(
     reviewsFilePath,
     run,
     environment,
-    runWorkspaceAbsolute,
     renderer,
   } = input;
 
@@ -212,6 +202,7 @@ export function createReviewCompetitionAdapter(
         });
 
         const prepared: PreparedReviewCompetitionCandidate[] = [];
+        const reviewerAgentIds = candidates.map((candidate) => candidate.id);
         for (const candidate of candidates) {
           const workspacePaths = await scaffoldAgentSessionWorkspace({
             root,
@@ -230,10 +221,11 @@ export function createReviewCompetitionAdapter(
             sharedInputsAbsolute: sharedInputs.sharedInputsAbsolute,
           });
 
-          const blinded = await buildReviewerBlindedPreparation({
+          const blinded = buildReviewerBlindedPreparation({
             root,
             reviewId,
             reviewerAgentId: candidate.id,
+            reviewerAgentIds,
             workspacePaths,
             sharedInputs,
           });
@@ -355,13 +347,13 @@ export function createReviewCompetitionAdapter(
         prepared;
       const agent = candidate;
       const sandboxPolicy = composeReviewSandboxPolicy({
-        runWorkspaceAbsolute,
         stageWriteProtectedPaths: blinded.extraWriteProtectedPaths,
         stageReadProtectedPaths: blinded.extraReadProtectedPaths,
       });
       const result = await runSandboxedAgent({
         root,
         sessionId: reviewId,
+        sandboxStageId: "review",
         agent,
         prompt,
         environment,
@@ -908,15 +900,22 @@ async function prepareSharedBlindedReviewInputs(options: {
   };
 }
 
-async function buildReviewerBlindedPreparation(options: {
+function buildReviewerBlindedPreparation(options: {
   root: string;
   reviewId: string;
   reviewerAgentId: string;
+  reviewerAgentIds: readonly string[];
   workspacePaths: AgentWorkspacePaths;
   sharedInputs: BlindedReviewSessionInputs;
-}): Promise<BlindedReviewPreparation> {
-  const { root, reviewId, reviewerAgentId, workspacePaths, sharedInputs } =
-    options;
+}): BlindedReviewPreparation {
+  const {
+    root,
+    reviewId,
+    reviewerAgentId,
+    reviewerAgentIds,
+    workspacePaths,
+    sharedInputs,
+  } = options;
 
   const stagedSpecPath = toRepoRelativeOrThrow(
     root,
@@ -942,17 +941,14 @@ async function buildReviewerBlindedPreparation(options: {
     diffRecorded: entry.diffRecorded,
   }));
 
-  const protections = await buildReviewSandboxProtectedPaths({
+  const protections = buildReviewSandboxProtectedPaths({
     root,
     reviewId,
     reviewerAgentId,
+    reviewerAgentIds,
     sharedRootPath: sharedInputs.sharedRootAbsolute,
   });
-  const denyWrite = [
-    ...protections.denyWrite,
-    sharedInputs.sharedInputsAbsolute,
-    sharedInputs.baseSnapshotAbsolute,
-  ];
+  const denyWrite = [...protections.denyWrite, sharedInputs.sharedRootAbsolute];
 
   return {
     enabled: true,
@@ -960,7 +956,7 @@ async function buildReviewerBlindedPreparation(options: {
     stagedSpecPath,
     baseSnapshotPath,
     stagedCandidates,
-    extraWriteProtectedPaths: normalizeProtectedPaths(denyWrite),
+    extraWriteProtectedPaths: denyWrite,
     extraReadProtectedPaths: protections.denyRead,
   };
 }
@@ -978,38 +974,20 @@ async function attachSharedInputsToReviewerWorkspace(options: {
   await symlink(sharedInputsAbsolute, reviewerInputsPath, linkType);
 }
 
-function normalizeProtectedPaths(paths: readonly string[]): string[] {
-  return Array.from(new Set(paths)).sort((left, right) =>
-    left.localeCompare(right),
-  );
-}
-
-async function buildReviewSandboxProtectedPaths(options: {
+function buildReviewSandboxProtectedPaths(options: {
   root: string;
   reviewId: string;
   reviewerAgentId: string;
+  reviewerAgentIds: readonly string[];
   sharedRootPath: string;
-}): Promise<{
+}): {
   denyRead: string[];
   denyWrite: string[];
-}> {
-  const { root, reviewId, reviewerAgentId, sharedRootPath } = options;
+} {
+  const { root, reviewId, reviewerAgentId, reviewerAgentIds, sharedRootPath } =
+    options;
   const denyRead: string[] = [];
   const denyWrite: string[] = [];
-
-  const broadPaths = [
-    resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
-    resolveWorkspacePath(root, VORATIQ_SPECS_DIR),
-    resolveWorkspacePath(root, VORATIQ_AGENTS_FILE),
-    resolveWorkspacePath(root, VORATIQ_EVALS_FILE),
-    resolveWorkspacePath(root, VORATIQ_ENVIRONMENT_FILE),
-    resolveWorkspacePath(root, VORATIQ_ORCHESTRATION_FILE),
-    resolveWorkspacePath(root, VORATIQ_SANDBOX_FILE),
-  ];
-  denyRead.push(...broadPaths);
-  denyWrite.push(...broadPaths);
-
-  denyRead.push(resolvePath(root, ".git"));
   denyRead.push(resolveWorkspacePath(root, VORATIQ_REVIEWS_FILE));
   denyRead.push(
     resolveWorkspacePath(
@@ -1027,36 +1005,31 @@ async function buildReviewSandboxProtectedPaths(options: {
     ),
   );
 
-  const sessionDir = resolveWorkspacePath(
-    root,
-    VORATIQ_REVIEWS_SESSIONS_DIR,
-    reviewId,
-  );
   const reviewerRoot = resolveWorkspacePath(
     root,
     VORATIQ_REVIEWS_SESSIONS_DIR,
     reviewId,
     reviewerAgentId,
   );
-  try {
-    const entries = await readdir(sessionDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) {
-        continue;
-      }
-      const sibling = resolvePath(sessionDir, entry.name);
-      if (sibling === reviewerRoot || sibling === sharedRootPath) {
-        continue;
-      }
-      denyRead.push(sibling);
+  const sortedReviewerAgentIds = [...reviewerAgentIds].sort((left, right) =>
+    left.localeCompare(right),
+  );
+  for (const peerReviewerAgentId of sortedReviewerAgentIds) {
+    const sibling = resolveWorkspacePath(
+      root,
+      VORATIQ_REVIEWS_SESSIONS_DIR,
+      reviewId,
+      peerReviewerAgentId,
+    );
+    if (sibling === reviewerRoot || sibling === sharedRootPath) {
+      continue;
     }
-  } catch {
-    // Ignore; broad protections still block run/spec/config roots.
+    denyRead.push(sibling);
   }
 
   return {
-    denyRead: normalizeProtectedPaths(denyRead),
-    denyWrite: normalizeProtectedPaths(denyWrite),
+    denyRead,
+    denyWrite,
   };
 }
 

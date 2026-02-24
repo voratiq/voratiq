@@ -627,6 +627,9 @@ describe("voratiq spec (CLI)", () => {
       title,
     });
     expect(runSandboxedAgentMock).toHaveBeenCalledTimes(1);
+    expect(runSandboxedAgentMock.mock.calls[0]?.[0]?.sandboxStageId).toBe(
+      "spec",
+    );
     expect(result.body).toContain("Spec saved: .voratiq/specs/payment-flow.md");
     expect(result.body).toContain(
       "To begin a run:\n  voratiq run --spec .voratiq/specs/payment-flow.md",

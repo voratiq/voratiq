@@ -121,6 +121,11 @@ describe("runSandboxedAgent auth teardown", () => {
 
     await runSandboxedAgent(input);
 
+    expect(configureSandboxSettingsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stageId: "run",
+      }),
+    );
     expect(registerStagedAuthContextMock).toHaveBeenCalledTimes(1);
     expect(teardownRegisteredAuthContextMock).toHaveBeenCalledTimes(1);
     expect(teardownRegisteredAuthContextMock).toHaveBeenCalledWith(

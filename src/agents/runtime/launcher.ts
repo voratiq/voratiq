@@ -17,6 +17,7 @@ import {
   spawnStreamingProcess,
 } from "../../utils/process.js";
 import { AgentRuntimeProcessError } from "./errors.js";
+import type { SandboxStageId } from "./policy.js";
 import {
   generateSandboxSettings,
   resolveSrtBinary,
@@ -80,6 +81,7 @@ export type RunInvocationResolver = (
 ) => Promise<RunInvocation> | RunInvocation;
 
 export interface SandboxSettingsInput {
+  stageId?: SandboxStageId;
   sandboxHomePath: string;
   workspacePath: string;
   providerId: string;

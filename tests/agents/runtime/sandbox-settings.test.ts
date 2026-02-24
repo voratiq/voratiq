@@ -7,6 +7,10 @@ import { describe, expect, it } from "@jest/globals";
 import { generateSandboxSettings } from "../../../src/agents/runtime/sandbox.js";
 import type { AgentId } from "../../../src/configs/agents/types.js";
 import { buildAgentWorkspacePaths } from "../../../src/workspace/layout.js";
+import {
+  resolveWorkspacePath,
+  VORATIQ_REVIEWS_DIR,
+} from "../../../src/workspace/structure.js";
 
 describe("generateSandboxSettings", () => {
   it("keeps artifacts and the repo root write-protected while allowing workspace staging", async () => {
@@ -46,7 +50,7 @@ describe("generateSandboxSettings", () => {
     expect(settings.filesystem.denyWrite).toEqual(
       expect.arrayContaining([
         workspacePaths.artifactsPath,
-        workspacePaths.runtimePath,
+        resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR),
       ]),
     );
     await rm(root, { recursive: true, force: true });

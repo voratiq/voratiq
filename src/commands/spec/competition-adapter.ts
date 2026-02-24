@@ -117,6 +117,7 @@ export function createSpecCompetitionAdapter(
         const result = await runSandboxedAgent({
           root,
           sessionId,
+          sandboxStageId: "spec",
           agent: candidate,
           prompt,
           environment,
@@ -132,8 +133,6 @@ export function createSpecCompetitionAdapter(
             stderrPath: workspacePaths.stderrPath,
           },
           captureChat: true,
-          extraWriteProtectedPaths: [],
-          extraReadProtectedPaths: [],
         });
 
         if (result.exitCode !== 0 || result.errorMessage) {

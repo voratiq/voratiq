@@ -60,7 +60,6 @@ const subject: AdapterContractSubject<ReviewCompetitionExecution> = {
       reviewsFilePath: "/repo/.voratiq/reviews/index.json",
       run,
       environment,
-      runWorkspaceAbsolute: "/repo/.voratiq/runs/sessions/run-id",
     });
 
     return await executeCompetitionWithAdapter({

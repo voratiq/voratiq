@@ -11,6 +11,18 @@ import {
   type SandboxSettings,
   writeSandboxSettings,
 } from "../../../src/agents/runtime/sandbox.js";
+import {
+  resolveWorkspacePath,
+  VORATIQ_AGENTS_FILE,
+  VORATIQ_ENVIRONMENT_FILE,
+  VORATIQ_EVALS_FILE,
+  VORATIQ_HISTORY_LOCK_FILENAME,
+  VORATIQ_ORCHESTRATION_FILE,
+  VORATIQ_REVIEWS_DIR,
+  VORATIQ_RUNS_DIR,
+  VORATIQ_RUNS_FILE,
+  VORATIQ_SANDBOX_FILE,
+} from "../../../src/workspace/structure.js";
 import { clearSandboxConfigurationCache } from "../../support/hooks/sandbox-loader.js";
 
 const DEFAULT_ALLOWED_DOMAINS = ["*"];
@@ -41,6 +53,24 @@ describe("sandbox", () => {
       };
     }
 
+    function expectedRunBaselinePaths(root: string): string[] {
+      return [
+        join(root, ".git"),
+        resolveWorkspacePath(root, VORATIQ_AGENTS_FILE),
+        resolveWorkspacePath(root, VORATIQ_EVALS_FILE),
+        resolveWorkspacePath(root, VORATIQ_ENVIRONMENT_FILE),
+        resolveWorkspacePath(root, VORATIQ_ORCHESTRATION_FILE),
+        resolveWorkspacePath(root, VORATIQ_SANDBOX_FILE),
+        resolveWorkspacePath(root, VORATIQ_RUNS_FILE),
+        resolveWorkspacePath(
+          root,
+          VORATIQ_RUNS_DIR,
+          VORATIQ_HISTORY_LOCK_FILENAME,
+        ),
+        resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR),
+      ];
+    }
+
     test("injects runtime paths while using provider defaults", async () => {
       const { root, cleanup } = await setupSandboxConfig("providers: {}\n");
 
@@ -58,18 +88,20 @@ describe("sandbox", () => {
         });
 
         expect(settings.network).toEqual({
-          allowedDomains: ["api.openai.com", "chatgpt.com", "auth.openai.com"],
+          allowedDomains: ["api.openai.com", "auth.openai.com", "chatgpt.com"],
           deniedDomains: [],
         });
-        expect(settings.filesystem.denyRead).toEqual([
-          artifactsPath,
-          evalsPath,
-        ]);
-        expect(settings.filesystem.denyWrite).toEqual([
-          runtimePath,
-          artifactsPath,
-          evalsPath,
-        ]);
+        const baseline = expectedRunBaselinePaths(root);
+        expect(settings.filesystem.denyRead).toEqual(
+          expect.arrayContaining([...baseline, artifactsPath, evalsPath]),
+        );
+        expect(settings.filesystem.denyWrite).toEqual(
+          expect.arrayContaining([...baseline, artifactsPath, evalsPath]),
+        );
+        expect(settings.filesystem.denyRead).toEqual(
+          settings.filesystem.denyWrite,
+        );
+        expect(settings.filesystem.denyWrite).not.toContain(runtimePath);
         expect(new Set(settings.filesystem.allowWrite)).toEqual(
           new Set([sandboxHomePath, workspacePath]),
         );
@@ -119,10 +151,10 @@ describe("sandbox", () => {
         });
 
         expect(settings.network.allowedDomains).toEqual([
+          "allowed.example.com",
           "api.anthropic.com",
           "console.anthropic.com",
           "platform.claude.com",
-          "allowed.example.com",
         ]);
         expect(settings.network.deniedDomains).toEqual(["blocked.example.com"]);
       } finally {
@@ -177,26 +209,33 @@ describe("sandbox", () => {
         });
 
         expect(settings.network.allowedDomains).toEqual([
+          "allowed.example.com",
           "api.anthropic.com",
           "console.anthropic.com",
           "platform.claude.com",
-          "allowed.example.com",
         ]);
         expect(settings.network.allowAllUnixSockets).toBe(true);
         expect(new Set(settings.filesystem.allowWrite)).toEqual(
           new Set([sandboxHomePath, workspacePath, "/tmp/cache"]),
         );
-        expect(settings.filesystem.denyRead).toEqual([
-          join(workspacePath, "sandbox-secrets"),
-          artifactsPath,
-          evalsPath,
-        ]);
-        expect(settings.filesystem.denyWrite).toEqual([
-          "/tmp/cache/sensitive",
-          runtimePath,
-          artifactsPath,
-          evalsPath,
-        ]);
+        const baseline = expectedRunBaselinePaths(root);
+        expect(settings.filesystem.denyRead).toEqual(
+          expect.arrayContaining([
+            ...baseline,
+            join(workspacePath, "sandbox-secrets"),
+            artifactsPath,
+            evalsPath,
+          ]),
+        );
+        expect(settings.filesystem.denyWrite).toEqual(
+          expect.arrayContaining([
+            ...baseline,
+            "/tmp/cache/sensitive",
+            artifactsPath,
+            evalsPath,
+          ]),
+        );
+        expect(settings.filesystem.denyWrite).not.toContain(runtimePath);
         expect(emitWarning).toHaveBeenCalledWith(
           expect.stringContaining("allowAllUnixSockets"),
           expect.objectContaining({
@@ -225,11 +264,11 @@ describe("sandbox", () => {
           extraReadProtectedPaths: [evalsPath],
         });
 
-        expect(settings.filesystem.denyWrite).toEqual([
-          runtimePath,
-          artifactsPath,
-          evalsPath,
-        ]);
+        const baseline = expectedRunBaselinePaths(root);
+        expect(settings.filesystem.denyWrite).toEqual(
+          expect.arrayContaining([...baseline, artifactsPath, evalsPath]),
+        );
+        expect(settings.filesystem.denyWrite).not.toContain(runtimePath);
         expect(settings.filesystem.denyWrite).not.toContain(
           join(workspacePath, ".venv"),
         );

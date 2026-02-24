@@ -83,6 +83,7 @@ export async function executeAgentLifecycle(
     const processResult = await runSandboxedAgent({
       root,
       sessionId: execution.runId,
+      sandboxStageId: "run",
       agent,
       prompt,
       environment,
