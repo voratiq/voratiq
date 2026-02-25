@@ -16,7 +16,7 @@ import { REVIEW_RECOMMENDATION_FILENAME } from "../workspace/structure.js";
 import { runApplyCommand } from "./apply.js";
 import { CliError, toCliError } from "./errors.js";
 import { beginChainedCommandOutput, writeCommandOutput } from "./output.js";
-import { runReviewCommand } from "./review.js";
+import { type ReviewCommandResult, runReviewCommand } from "./review.js";
 import { runRunCommand } from "./run.js";
 
 export interface AutoCommandOptions {
@@ -72,6 +72,10 @@ interface AutoRecommendationLoadResult {
   preferredAgent: string;
 }
 
+interface ReviewerRecommendation extends AutoRecommendationLoadResult {
+  reviewerAgentId: string;
+}
+
 async function loadAutoRecommendation(options: {
   reviewOutputPath: string;
 }): Promise<AutoRecommendationLoadResult> {
@@ -106,6 +110,31 @@ async function loadAutoRecommendation(options: {
       ["Re-run `voratiq review` to regenerate review artifacts."],
     );
   }
+}
+
+async function loadReviewerRecommendationsForAuto(options: {
+  reviews: ReviewCommandResult["reviews"];
+}): Promise<ReviewerRecommendation[]> {
+  const successfulReviews = options.reviews.filter(
+    (
+      review,
+    ): review is (typeof options.reviews)[number] & {
+      status: "succeeded";
+    } => review.status === "succeeded",
+  );
+
+  return Promise.all(
+    successfulReviews.map(async (review) => {
+      const recommendation = await loadAutoRecommendation({
+        reviewOutputPath: review.outputPath,
+      });
+      return {
+        reviewerAgentId: review.agentId,
+        recommendationPath: recommendation.recommendationPath,
+        preferredAgent: recommendation.preferredAgent,
+      };
+    }),
+  );
 }
 
 function resolvePreferredAgentForAuto(options: {
@@ -189,6 +218,7 @@ export async function runAutoCommand(
     let reviewOutputPath: string | undefined;
     let reviewDetail: string | undefined;
     let reviewResultCount = 0;
+    let reviewResults: ReviewCommandResult["reviews"] | undefined;
 
     let applyStartedAt: number | undefined;
     let applyStatus: "succeeded" | "failed" | "skipped" = "skipped";
@@ -260,6 +290,7 @@ export async function runAutoCommand(
           reviewStatus = "succeeded";
           reviewOutputPath = reviewResult.outputPath;
           reviewResultCount = reviewResult.reviews?.length ?? 1;
+          reviewResults = reviewResult.reviews;
           if (reviewResult.exitCode === 1) {
             reviewStatus = "failed";
             reviewDetail = "One or more reviewers failed.";
@@ -287,38 +318,97 @@ export async function runAutoCommand(
     ) {
       applyStartedAt = now();
       try {
-        if (reviewResultCount > 1) {
+        let recommendationPath: string;
+        let preferredAgent: string;
+
+        if (reviewResultCount <= 1) {
+          const recommendationResult = await loadAutoRecommendation({
+            reviewOutputPath,
+          });
+          recommendationPath = recommendationResult.recommendationPath;
+          preferredAgent = recommendationResult.preferredAgent;
+        } else if (reviewResults && reviewResults.length > 0) {
+          const reviewerRecommendations =
+            await loadReviewerRecommendationsForAuto({
+              reviews: reviewResults,
+            });
+          if (reviewerRecommendations.length === 0) {
+            throw new CliError(
+              "Failed to resolve reviewer recommendation.",
+              [],
+              ["Re-run `voratiq review` to regenerate review artifacts."],
+            );
+          }
+          const preferredByReviewer = new Map(
+            reviewerRecommendations.map((recommendation) => [
+              recommendation.reviewerAgentId,
+              recommendation.preferredAgent,
+            ]),
+          );
+          const distinctPreferredAgents = new Set(preferredByReviewer.values());
+
+          if (distinctPreferredAgents.size === 1) {
+            const unanimousPreferredAgent =
+              [...distinctPreferredAgents][0] ?? "";
+            const firstRecommendation = reviewerRecommendations[0];
+            if (!firstRecommendation) {
+              throw new CliError(
+                "Failed to resolve reviewer recommendation.",
+                [],
+                ["Re-run `voratiq review` to regenerate review artifacts."],
+              );
+            }
+            recommendationPath = firstRecommendation.recommendationPath;
+            preferredAgent = unanimousPreferredAgent;
+          } else {
+            applyStatus = "skipped";
+            applyDetail =
+              "Reviewers disagreed on preferred candidate; manual arbitration required.";
+            writeCommandOutput({
+              alerts: [
+                {
+                  severity: "warn",
+                  message:
+                    "Reviewers disagreed. Review manually and apply the best solution.",
+                },
+              ],
+            });
+            recommendationPath = "";
+            preferredAgent = "";
+          }
+        } else {
           throw new CliError(
-            "Auto apply requires exactly one reviewer.",
-            [`Resolved reviewers: ${reviewResultCount}.`],
-            ["Run auto apply with exactly one reviewer."],
+            "Failed to resolve reviewer recommendations.",
+            [],
+            ["Re-run `voratiq review` to regenerate review artifacts."],
           );
         }
 
-        const recommendationResult = await loadAutoRecommendation({
-          reviewOutputPath,
-        });
-        const recommendedAgentId = resolveRecommendedAgent({
-          recommendationPath: recommendationResult.recommendationPath,
-          preferredAgent: recommendationResult.preferredAgent,
-          availableAgents: runAgentIds,
-        });
+        if (!preferredAgent) {
+          // Apply intentionally skipped because reviewers did not converge.
+        } else {
+          const recommendedAgentId = resolveRecommendedAgent({
+            recommendationPath,
+            preferredAgent,
+            availableAgents: runAgentIds,
+          });
 
-        const applyResult = await runApplyCommand({
-          runId,
-          agentId: recommendedAgentId,
-          commit: options.commit ?? false,
-        });
+          const applyResult = await runApplyCommand({
+            runId,
+            agentId: recommendedAgentId,
+            commit: options.commit ?? false,
+          });
 
-        applyStatus = "succeeded";
-        applyAgentId = recommendedAgentId;
+          applyStatus = "succeeded";
+          applyAgentId = recommendedAgentId;
 
-        writeCommandOutput({
-          body: applyResult.body,
-          exitCode: applyResult.exitCode,
-        });
-        if (applyResult.exitCode === 1) {
-          exitCode = 1;
+          writeCommandOutput({
+            body: applyResult.body,
+            exitCode: applyResult.exitCode,
+          });
+          if (applyResult.exitCode === 1) {
+            exitCode = 1;
+          }
         }
       } catch (error) {
         applyStatus = "failed";
