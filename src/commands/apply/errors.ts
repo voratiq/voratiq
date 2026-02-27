@@ -196,7 +196,7 @@ export class ApplyBaseMismatchError extends ApplyError {
     super(
       `Repository HEAD \`${shortSha(headRevision)}\` no longer matches run base \`${shortSha(baseRevisionSha)}\`.`,
       [],
-      ["Re-run `voratiq run` to regenerate artifacts for the current HEAD."],
+      ["Use `--ignore-base-mismatch` to apply anyway (conflicts may occur)."],
     );
     this.name = "ApplyBaseMismatchError";
   }
