@@ -35,7 +35,7 @@ interface BadgeStyle {
 export type TranscriptBadgeVariant = "run" | "review" | "agent";
 
 const BRAND_COLOR = "164;203;153";
-const REVIEW_COLOR = "226;159;115";
+const REVIEW_COLOR = "255;238;140";
 
 const BADGE_STYLES: Record<TranscriptBadgeVariant, BadgeStyle> = {
   run: {
