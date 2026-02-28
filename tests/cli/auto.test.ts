@@ -800,7 +800,7 @@ describe("voratiq auto", () => {
     expect(output).toContain("To apply a solution:");
     expect(output).toContain("voratiq apply --run run-123 --agent <agent-id>");
     expect((output.match(/To apply a solution:/gu) ?? []).length).toBe(1);
-    expect(stripAnsi(stderr.join(""))).toContain(
+    expect(output).toContain(
       "Warning: Reviewers disagreed. Review manually and apply the best solution.",
     );
     expect(output).toContain("Auto SUCCEEDED");

@@ -10,6 +10,7 @@ import { resolveCliContext } from "../preflight/index.js";
 import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
 import { renderCliError } from "../render/utils/errors.js";
 import type { RunStatus } from "../status/index.js";
+import { formatAlertMessage } from "../utils/output.js";
 import { normalizePathForDisplay, resolveDisplayPath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import { REVIEW_RECOMMENDATION_FILENAME } from "../workspace/structure.js";
@@ -365,13 +366,11 @@ export async function runAutoCommand(
             applyDetail =
               "Reviewers disagreed on preferred candidate; manual arbitration required.";
             writeCommandOutput({
-              alerts: [
-                {
-                  severity: "warn",
-                  message:
-                    "Reviewers disagreed. Review manually and apply the best solution.",
-                },
-              ],
+              body: formatAlertMessage(
+                "Warning",
+                "yellow",
+                "Reviewers disagreed. Review manually and apply the best solution.",
+              ),
             });
             recommendationPath = "";
             preferredAgent = "";
