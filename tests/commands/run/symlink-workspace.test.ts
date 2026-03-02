@@ -23,7 +23,10 @@ import {
   buildAgentWorkspacePaths,
   scaffoldAgentWorkspace,
 } from "../../../src/workspace/layout.js";
-import { sandboxTest } from "../../support/sandbox-requirements.js";
+import {
+  isSandboxLocalBindingPermissionError,
+  sandboxTest,
+} from "../../support/sandbox-requirements.js";
 
 const TEMP_PREFIX = "voratiq-symlink-workspace-";
 const TEST_AGENT_ID: AgentId = "codex";
@@ -147,6 +150,9 @@ sandboxTest(
       });
 
       const stderr = await readFile(workspacePaths.stderrPath, "utf8");
+      if (isSandboxLocalBindingPermissionError(stderr)) {
+        return;
+      }
       if (result.exitCode !== 0) {
         throw new Error(
           `Sandbox runtime exited with ${result.exitCode}. Stderr:\n${stderr}`,

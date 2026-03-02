@@ -3,6 +3,10 @@ import { formatAgentErrorLine } from "../utils/agents.js";
 import { formatDurationLabel } from "../utils/agents.js";
 import { formatAgentBadge } from "../utils/badges.js";
 import { formatRunTimestamp } from "../utils/records.js";
+import {
+  buildStageFrameLines,
+  buildStageFrameSections,
+} from "../utils/stage-output.js";
 import { renderTranscript } from "../utils/transcript.js";
 import type { TranscriptShellStyleOptions } from "../utils/transcript-shell.js";
 import {
@@ -95,6 +99,40 @@ function formatErrorDetail(error: unknown): string {
   return "unknown error";
 }
 
+function buildReviewStageShell(options: {
+  runId: string;
+  reviewId: string;
+  createdAt: string;
+  workspacePath: string;
+  status: "running" | "succeeded" | "failed" | "aborted";
+  elapsed: string;
+  tableLines?: string[];
+  style?: TranscriptShellStyleOptions;
+}): {
+  metadataLines: string[];
+  statusTableLines: string[];
+} {
+  const style = options.style ?? {};
+  return {
+    metadataLines: buildTranscriptShellSection({
+      badgeText: options.reviewId,
+      badgeVariant: "review",
+      status: {
+        value: options.status,
+        color: getRunStatusStyle(options.status).cli,
+      },
+      detailRows: [
+        { label: "Elapsed", value: options.elapsed },
+        { label: "Created", value: formatRunTimestamp(options.createdAt) },
+        { label: "Run", value: options.runId },
+        { label: "Workspace", value: options.workspacePath },
+      ],
+      style,
+    }),
+    statusTableLines: options.tableLines ?? [],
+  };
+}
+
 export function createReviewRenderer(
   options: ReviewRendererOptions = {},
 ): ReviewProgressRenderer {
@@ -108,7 +146,6 @@ export function createReviewRenderer(
   let disabled = false;
   let warningLogged = false;
   let blockInitialized = false;
-  let metadataPrinted = false;
   let lastRenderedLines = 0;
   let refreshInterval: ReturnType<typeof setInterval> | undefined;
   let lastElapsedLabel: string | null = null;
@@ -180,48 +217,6 @@ export function createReviewRenderer(
     }
   }
 
-  function buildInteractiveLines(
-    metadataLines: string[],
-    tableLines: string[],
-  ): string[] {
-    if (metadataLines.length === 0) {
-      return [];
-    }
-
-    const lines: string[] = [];
-    if (!suppressLeadingBlankLine) {
-      lines.push("");
-    }
-    lines.push(...metadataLines);
-
-    if (tableLines.length > 0) {
-      lines.push("");
-      lines.push(...tableLines);
-    }
-
-    if (!suppressTrailingBlankLine) {
-      lines.push("");
-    }
-
-    return lines;
-  }
-
-  function buildTableRefreshLines(tableLines: string[]): string[] {
-    if (tableLines.length === 0) {
-      return [];
-    }
-
-    const lines: string[] = [];
-    if (!suppressLeadingBlankLine) {
-      lines.push("");
-    }
-    lines.push(...tableLines);
-    if (!suppressTrailingBlankLine) {
-      lines.push("");
-    }
-    return lines;
-  }
-
   function formatReviewElapsed(createdAt: string): string | undefined {
     const startedAt = Date.parse(createdAt);
     if (Number.isNaN(startedAt)) {
@@ -286,82 +281,60 @@ export function createReviewRenderer(
   }
 
   function render(): void {
-    if (!context || disabled) {
+    if (!context || disabled || !stdout.isTTY) {
       return;
     }
 
-    const style: TranscriptShellStyleOptions = { isTty: stdout.isTTY ?? false };
+    const style: TranscriptShellStyleOptions = { isTty: true };
     const elapsed = formatReviewElapsed(context.createdAt);
     lastElapsedLabel = elapsed ?? null;
 
-    const metadataLines = buildTranscriptShellSection({
-      badgeText: context.reviewId,
-      badgeVariant: "review",
-      status: {
-        value: context.status,
-        color: getRunStatusStyle(context.status).cli,
-      },
-      detailRows: [
-        { label: "Elapsed", value: elapsed ?? DASH },
-        { label: "Created", value: formatRunTimestamp(context.createdAt) },
-        { label: "Run", value: context.runId },
-        { label: "Workspace", value: context.workspacePath },
-      ],
+    const shell = buildReviewStageShell({
+      runId: context.runId,
+      reviewId: context.reviewId,
+      createdAt: context.createdAt,
+      workspacePath: context.workspacePath,
+      status: context.status,
+      elapsed: elapsed ?? DASH,
+      tableLines: buildReviewerTable(style),
       style,
     });
-    const tableLines = buildReviewerTable(style);
-    const shouldIncludeTable = tableLines.length > 0;
-    const interactiveLines = buildInteractiveLines(metadataLines, tableLines);
+    const interactiveLines = buildStageFrameLines({
+      metadataLines: shell.metadataLines,
+      statusTableLines: shell.statusTableLines,
+      leadingBlankLine: !suppressLeadingBlankLine,
+      trailingBlankLine: !suppressTrailingBlankLine,
+    });
 
-    if (stdout.isTTY) {
-      if (interactiveLines.length === 0) {
-        return;
-      }
-
-      if (!blockInitialized) {
-        stdout.write(interactiveLines.join("\n"));
-        lastRenderedLines = interactiveLines.length;
-        blockInitialized = true;
-        return;
-      }
-
-      const linesToRewind = Math.max(0, lastRenderedLines - 1);
-      if (linesToRewind > 0) {
-        stdout.write(cursorUp(linesToRewind));
-      }
-      stdout.write(CURSOR_COLUMN_START);
-
-      const totalLines = Math.max(lastRenderedLines, interactiveLines.length);
-      const rewrittenLines: string[] = [];
-      for (let index = 0; index < totalLines; index += 1) {
-        const line = interactiveLines[index] ?? "";
-        rewrittenLines.push(CURSOR_COLUMN_START, ERASE_LINE, line);
-        if (index < totalLines - 1) {
-          rewrittenLines.push("\n");
-        }
-      }
-
-      stdout.write(rewrittenLines.join(""));
-      lastRenderedLines = totalLines;
+    if (interactiveLines.length === 0) {
       return;
     }
 
-    if (!metadataPrinted) {
-      if (interactiveLines.length > 0) {
-        stdout.write(interactiveLines.join("\n"));
+    if (!blockInitialized) {
+      stdout.write(interactiveLines.join("\n"));
+      lastRenderedLines = interactiveLines.length;
+      blockInitialized = true;
+      return;
+    }
+
+    const linesToRewind = Math.max(0, lastRenderedLines - 1);
+    if (linesToRewind > 0) {
+      stdout.write(cursorUp(linesToRewind));
+    }
+    stdout.write(CURSOR_COLUMN_START);
+
+    const totalLines = Math.max(lastRenderedLines, interactiveLines.length);
+    const rewrittenLines: string[] = [];
+    for (let index = 0; index < totalLines; index += 1) {
+      const line = interactiveLines[index] ?? "";
+      rewrittenLines.push(CURSOR_COLUMN_START, ERASE_LINE, line);
+      if (index < totalLines - 1) {
+        rewrittenLines.push("\n");
       }
-      metadataPrinted = true;
-      return;
     }
 
-    if (!shouldIncludeTable) {
-      return;
-    }
-
-    const refreshLines = buildTableRefreshLines(tableLines);
-    if (refreshLines.length > 0) {
-      stdout.write(refreshLines.join("\n"));
-    }
+    stdout.write(rewrittenLines.join(""));
+    lastRenderedLines = totalLines;
   }
 
   function upsertReviewer(record: ReviewProgressReviewerRecord): void {
@@ -489,36 +462,30 @@ export function renderReviewTranscript(options: {
 
   const sections: string[][] = [];
   if (includeSummarySection) {
-    sections.push(
-      buildTranscriptShellSection({
-        badgeText: reviewId,
-        badgeVariant: "review",
-        status: { value: status, color: getRunStatusStyle(status).cli },
-        detailRows: [
-          { label: "Elapsed", value: elapsed },
-          { label: "Created", value: formatRunTimestamp(createdAt) },
-          { label: "Run", value: runId },
-          { label: "Workspace", value: workspacePath },
-        ],
-        style,
-      }),
-    );
-
-    if (reviewers.length > 0) {
-      sections.push(
-        renderTranscriptStatusTable({
-          rows: reviewers,
-          agent: (row) => row.reviewerAgentId,
-          status: (row) =>
-            formatTranscriptStatusLabel(
-              row.status,
-              getAgentStatusStyle(row.status).cli,
-              resolvedStyle,
-            ),
-          duration: (row) => row.duration,
-        }),
-      );
-    }
+    const summaryShell = buildReviewStageShell({
+      runId,
+      reviewId,
+      createdAt,
+      workspacePath,
+      status,
+      elapsed,
+      tableLines:
+        reviewers.length > 0
+          ? renderTranscriptStatusTable({
+              rows: reviewers,
+              agent: (row) => row.reviewerAgentId,
+              status: (row) =>
+                formatTranscriptStatusLabel(
+                  row.status,
+                  getAgentStatusStyle(row.status).cli,
+                  resolvedStyle,
+                ),
+              duration: (row) => row.duration,
+            })
+          : [],
+      style,
+    });
+    sections.push(...buildStageFrameSections(summaryShell));
   }
 
   if (reviewers.length > 0) {

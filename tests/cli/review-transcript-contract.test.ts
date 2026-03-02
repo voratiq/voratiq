@@ -427,13 +427,7 @@ describe("review transcript contract", () => {
     });
 
     const streamed = stripAnsi(liveStdout.join(""));
-    expect(streamed).toContain("AGENT");
-    expect(streamed).toContain("STATUS");
-    expect(streamed).toContain("DURATION");
-    expect(streamed).toContain("reviewer-a");
-    expect(streamed).toContain("reviewer-b");
-    expect(streamed).toContain("FAILED");
-    expect(streamed).toContain("SUCCEEDED");
+    expect(streamed).toBe("");
     expect(liveStderr).toEqual([]);
 
     const body = stripAnsi(result.body);

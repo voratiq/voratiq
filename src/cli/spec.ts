@@ -7,6 +7,7 @@ import {
   resolveCliContext,
 } from "../preflight/index.js";
 import { renderSpecTranscript } from "../render/transcripts/spec.js";
+import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
@@ -44,6 +45,12 @@ export async function runSpecCommand(
   checkPlatformSupport();
   ensureSandboxDependencies();
 
+  const startLine = createStageStartLineEmitter((message) => {
+    writeOutput({
+      alerts: [{ severity: "info", message }],
+    });
+  });
+
   const result = await executeSpecCommand({
     root,
     specsFilePath: workspacePaths.specsFile,
@@ -54,7 +61,7 @@ export async function runSpecCommand(
     title,
     outputPath: output,
     onStatus: (message) => {
-      writeOutput({ alerts: [{ severity: "info", message }] });
+      startLine.emit(message);
     },
   });
 

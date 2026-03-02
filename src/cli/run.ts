@@ -12,8 +12,10 @@ import {
   resolveCliContext,
 } from "../preflight/index.js";
 import { createRunRenderer } from "../render/transcripts/run.js";
+import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import type { RunReport } from "../runs/records/types.js";
 import { parsePositiveInteger } from "../utils/validators.js";
+import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
 
 export interface RunCommandOptions {
@@ -28,6 +30,7 @@ export interface RunCommandOptions {
   suppressTrailingBlankLine?: boolean;
   stdout?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
   stderr?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
+  writeOutput?: CommandOutputWriter;
 }
 
 export interface RunCommandResult {
@@ -51,6 +54,7 @@ export async function runRunCommand(
     suppressTrailingBlankLine,
     stdout,
     stderr,
+    writeOutput,
   } = options;
 
   const { root, workspacePaths } = await resolveCliContext();
@@ -62,6 +66,15 @@ export async function runRunCommand(
   if (branch) {
     const branchName = deriveBranchNameFromSpecPath(displayPath);
     await checkoutOrCreateBranch(root, branchName);
+  }
+
+  if (writeOutput) {
+    const startLine = createStageStartLineEmitter((message) => {
+      writeOutput({
+        alerts: [{ severity: "info", message }],
+      });
+    });
+    startLine.emit("Executing run…");
   }
 
   const renderer = createRunRenderer({
@@ -155,6 +168,7 @@ export function createRunCommand(): Command {
         profile: options.profile,
         maxParallel: options.maxParallel,
         branch: options.branch,
+        writeOutput: writeCommandOutput,
       };
 
       const result = await runRunCommand(runOptions);

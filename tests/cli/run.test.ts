@@ -811,13 +811,16 @@ suite("voratiq run (integration)", () => {
         process.chdir(originalCwd);
       }
       const normalizedBody = body.replace(ANSI_PATTERN, "");
-      const claudeIndex = normalizedBody.indexOf("  claude SUCCEEDED");
-      const codexIndex = normalizedBody.indexOf("  codex SUCCEEDED");
-      const geminiIndex = normalizedBody.indexOf("  gemini SUCCEEDED");
+      const claudeIndex = normalizedBody.indexOf("claude");
+      const codexIndex = normalizedBody.indexOf("codex");
+      const geminiIndex = normalizedBody.indexOf("gemini");
 
       expect(claudeIndex).toBeGreaterThanOrEqual(0);
       expect(codexIndex).toBeGreaterThanOrEqual(0);
       expect(geminiIndex).toBeGreaterThanOrEqual(0);
+      expect(normalizedBody).toMatch(/claude\s+SUCCEEDED/u);
+      expect(normalizedBody).toMatch(/codex\s+SUCCEEDED/u);
+      expect(normalizedBody).toMatch(/gemini\s+SUCCEEDED/u);
       expect(codexIndex).toBeGreaterThan(claudeIndex);
       expect(geminiIndex).toBeGreaterThan(codexIndex);
 

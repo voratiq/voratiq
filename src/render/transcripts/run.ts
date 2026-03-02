@@ -13,17 +13,13 @@ import {
 import { formatAgentBadge } from "../utils/badges.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import { buildRunMetadataSectionWithStyle } from "../utils/runs.js";
-import { renderTranscript } from "../utils/transcript.js";
+import {
+  buildStageFrameLines,
+  renderStageFinalFrame,
+} from "../utils/stage-output.js";
 import type { TranscriptShellStyleOptions } from "../utils/transcript-shell.js";
 import { renderTranscriptStatusTable } from "../utils/transcript-shell.js";
 import type { StageProgressEventConsumer } from "./stage-progress.js";
-
-const SUPPRESS_RUN_STATUS_TABLE_ENV = "VORATIQ_SUPPRESS_RUN_STATUS_TABLE";
-
-function shouldSuppressRunStatusTable(): boolean {
-  const flag = process.env[SUPPRESS_RUN_STATUS_TABLE_ENV];
-  return flag === "1" || flag?.toLowerCase() === "true";
-}
 
 type CliWriter = Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
 
@@ -120,11 +116,10 @@ export function createRunRenderer(
   const suppressTrailingBlankLine = options.suppressTrailingBlankLine === true;
 
   let context: RunProgressContext | undefined;
-  let disabled = shouldSuppressRunStatusTable();
+  let disabled = false;
   let warningLogged = false;
   let lastRenderedLines = 0;
   let blockInitialized = false;
-  let metadataPrinted = false;
   let refreshInterval: ReturnType<typeof setInterval> | undefined;
   let lastElapsedLabel: string | null = null;
 
@@ -207,125 +202,90 @@ export function createRunRenderer(
     }
   }
 
-  function buildInteractiveLines(
-    metadataLines: string[],
-    tableLines: string[],
-  ): string[] {
-    if (metadataLines.length === 0) {
-      return [];
-    }
-
-    const lines: string[] = [];
-    if (!suppressLeadingBlankLine) {
-      lines.push("");
-    }
-    lines.push(...metadataLines);
-
-    if (tableLines.length > 0) {
-      lines.push("");
-      lines.push(...tableLines);
-    }
-
-    if (!suppressTrailingBlankLine) {
-      lines.push("");
-    }
-    return lines;
+  function resolveFinalContext(report: RunReport): RunProgressContext {
+    return {
+      runId: context?.runId ?? report.runId,
+      status: report.status,
+      specPath: context?.specPath ?? report.spec.path,
+      workspacePath: context?.workspacePath ?? "",
+      createdAt: context?.createdAt ?? report.createdAt,
+      baseRevisionSha: context?.baseRevisionSha ?? report.baseRevisionSha,
+    };
   }
 
-  function buildTableRefreshLines(tableLines: string[]): string[] {
-    if (tableLines.length === 0) {
-      return [];
-    }
-
-    const lines: string[] = [];
-    if (!suppressLeadingBlankLine) {
-      lines.push("");
-    }
-    lines.push(...tableLines);
-    if (!suppressTrailingBlankLine) {
-      lines.push("");
-    }
-    return lines;
-  }
-
-  function render(): void {
-    if (!context || disabled) {
-      return;
-    }
-
-    const style: TranscriptShellStyleOptions = { isTty: stdout.isTTY ?? false };
-    const elapsedLabel = context.createdAt
-      ? (formatRunElapsed(context.createdAt) ?? undefined)
+  function buildRunStageShell(
+    source: RunProgressContext,
+    style: TranscriptShellStyleOptions,
+  ): {
+    metadataLines: string[];
+    statusTableLines: string[];
+  } {
+    const elapsedLabel = source.createdAt
+      ? (formatRunElapsed(source.createdAt) ?? undefined)
       : undefined;
     lastElapsedLabel = elapsedLabel ?? null;
 
-    const metadataLines = buildRunMetadataSectionWithStyle(
-      {
-        runId: context.runId,
-        status: context.status,
-        specPath: context.specPath,
-        workspacePath: context.workspacePath,
-        elapsed: elapsedLabel,
-        createdAt: formatRunTimestamp(context.createdAt),
-        baseRevisionSha: context.baseRevisionSha,
-      },
-      style,
-    );
+    return {
+      metadataLines: buildRunMetadataSectionWithStyle(
+        {
+          runId: source.runId,
+          status: source.status,
+          specPath: source.specPath,
+          workspacePath: source.workspacePath,
+          elapsed: elapsedLabel,
+          createdAt: formatRunTimestamp(source.createdAt),
+          baseRevisionSha: source.baseRevisionSha,
+        },
+        style,
+      ),
+      statusTableLines: buildAgentTable(style),
+    };
+  }
 
-    const tableLines = buildAgentTable(style);
-    const shouldIncludeTable = tableLines.length > 0;
-    const interactiveLines = buildInteractiveLines(metadataLines, tableLines);
-
-    if (stdout.isTTY) {
-      if (interactiveLines.length === 0) {
-        return;
-      }
-
-      if (!blockInitialized) {
-        stdout.write(interactiveLines.join("\n"));
-        lastRenderedLines = interactiveLines.length;
-        blockInitialized = true;
-        return;
-      }
-
-      const linesToRewind = Math.max(0, lastRenderedLines - 1);
-      if (linesToRewind > 0) {
-        stdout.write(cursorUp(linesToRewind));
-      }
-      stdout.write(CURSOR_COLUMN_START);
-
-      const totalLines = Math.max(lastRenderedLines, interactiveLines.length);
-      const rewrittenLines: string[] = [];
-
-      for (let index = 0; index < totalLines; index += 1) {
-        const line = interactiveLines[index] ?? "";
-        rewrittenLines.push(CURSOR_COLUMN_START, ERASE_LINE, line);
-        if (index < totalLines - 1) {
-          rewrittenLines.push("\n");
-        }
-      }
-
-      stdout.write(rewrittenLines.join(""));
-      lastRenderedLines = totalLines;
+  function render(): void {
+    if (!context || disabled || !stdout.isTTY) {
       return;
     }
 
-    if (!metadataPrinted) {
-      if (interactiveLines.length > 0) {
-        stdout.write(interactiveLines.join("\n"));
+    const style: TranscriptShellStyleOptions = { isTty: true };
+    const shell = buildRunStageShell(context, style);
+    const interactiveLines = buildStageFrameLines({
+      metadataLines: shell.metadataLines,
+      statusTableLines: shell.statusTableLines,
+      leadingBlankLine: !suppressLeadingBlankLine,
+      trailingBlankLine: !suppressTrailingBlankLine,
+    });
+
+    if (interactiveLines.length === 0) {
+      return;
+    }
+
+    if (!blockInitialized) {
+      stdout.write(interactiveLines.join("\n"));
+      lastRenderedLines = interactiveLines.length;
+      blockInitialized = true;
+      return;
+    }
+
+    const linesToRewind = Math.max(0, lastRenderedLines - 1);
+    if (linesToRewind > 0) {
+      stdout.write(cursorUp(linesToRewind));
+    }
+    stdout.write(CURSOR_COLUMN_START);
+
+    const totalLines = Math.max(lastRenderedLines, interactiveLines.length);
+    const rewrittenLines: string[] = [];
+
+    for (let index = 0; index < totalLines; index += 1) {
+      const line = interactiveLines[index] ?? "";
+      rewrittenLines.push(CURSOR_COLUMN_START, ERASE_LINE, line);
+      if (index < totalLines - 1) {
+        rewrittenLines.push("\n");
       }
-      metadataPrinted = true;
-      return;
     }
 
-    if (!shouldIncludeTable) {
-      return;
-    }
-
-    const refreshLines = buildTableRefreshLines(tableLines);
-    if (refreshLines.length > 0) {
-      stdout.write(refreshLines.join("\n"));
-    }
+    stdout.write(rewrittenLines.join(""));
+    lastRenderedLines = totalLines;
   }
 
   function buildAgentTable(style: TranscriptShellStyleOptions): string[] {
@@ -412,6 +372,27 @@ export function createRunRenderer(
     agentRecords.set(record.agentId, record);
   }
 
+  function syncRecordsFromReport(report: RunReport): void {
+    const sortedAgents = [...report.agents].sort((a, b) =>
+      a.agentId.localeCompare(b.agentId),
+    );
+
+    for (const agent of sortedAgents) {
+      const existing = agentRecords.get(agent.agentId);
+      upsertRecord({
+        agentId: agent.agentId,
+        model: existing?.model ?? "unknown",
+        status: agent.status,
+        startedAt: agent.startedAt,
+        completedAt: agent.completedAt,
+        diffStatistics: agent.diffStatistics,
+        evals: agent.evals,
+        error: agent.error,
+        warnings: agent.warnings,
+      });
+    }
+  }
+
   function ensureFinalRender(report: RunReport): void {
     if (!context) {
       return;
@@ -480,8 +461,8 @@ export function createRunRenderer(
       });
     },
     complete(report: RunReport, options?: { suppressHint?: boolean }): string {
-      let transcript = "";
       stopRefreshLoop();
+      syncRecordsFromReport(report);
       guard(() => {
         this.onProgressEvent({
           type: "stage.status",
@@ -499,37 +480,19 @@ export function createRunRenderer(
             message: `To review results:\n  voratiq review --run ${report.runId}`,
           };
 
-      const sections = stdout.isTTY
-        ? undefined
-        : buildRunTranscriptSections(report);
+      if (stdout.isTTY) {
+        return hint?.message ?? "";
+      }
 
-      transcript = renderTranscript({ sections, hint });
-      return transcript;
+      const finalContext = resolveFinalContext(report);
+      const finalShell = buildRunStageShell(finalContext, { isTty: false });
+      return renderStageFinalFrame({
+        metadataLines: finalShell.metadataLines,
+        statusTableLines: finalShell.statusTableLines,
+        hint,
+      });
     },
   };
-}
-
-export function buildRunTranscriptSections(report: RunReport): string[][] {
-  const sections: string[][] = [];
-
-  const headerLines: string[] = [];
-  headerLines.push(`${report.runId} ${report.status.toUpperCase()}`);
-  sections.push(headerLines);
-
-  const agentLines: string[] = [];
-  const sortedAgents = [...report.agents].sort((a, b) =>
-    a.agentId.localeCompare(b.agentId),
-  );
-
-  for (const agent of sortedAgents) {
-    agentLines.push(`  ${agent.agentId} ${agent.status.toUpperCase()}`);
-  }
-
-  if (agentLines.length > 0) {
-    sections.push(agentLines);
-  }
-
-  return sections;
 }
 
 export type { RunProgressContext, RunProgressRenderer };

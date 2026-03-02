@@ -240,6 +240,7 @@ export async function runAutoCommand(
         profile: options.profile,
         maxParallel: options.maxParallel,
         branch: options.branch,
+        writeOutput: writeCommandOutput,
         suppressHint: true,
         suppressLeadingBlankLine: suppressBlankLines,
         suppressTrailingBlankLine: suppressBlankLines,
