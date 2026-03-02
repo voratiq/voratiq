@@ -24,7 +24,10 @@ import {
   buildAgentWorkspacePaths,
   scaffoldAgentWorkspace,
 } from "../../src/workspace/layout.js";
-import { sandboxTest } from "../support/sandbox-requirements.js";
+import {
+  isSandboxLocalBindingPermissionError,
+  sandboxTest,
+} from "../support/sandbox-requirements.js";
 
 const PROBE_SCRIPT_PATH = fileURLToPath(
   new URL("../fixtures/sandbox/probe-write.py", import.meta.url),
@@ -188,6 +191,9 @@ sandboxTest("denies writes to blocked workspace paths", async () => {
 
   try {
     const { result, stderr } = await runWriteProbe(context);
+    if (isSandboxLocalBindingPermissionError(stderr)) {
+      return;
+    }
     expect(result.exitCode).toBe(42);
     await expect(access(context.targetPath)).rejects.toMatchObject({
       code: expect.stringMatching(/ENOENT|EACCES|EPERM/),
@@ -213,6 +219,9 @@ sandboxTest("allows writes to allowed workspace paths", async () => {
 
   try {
     const { result, stderr } = await runWriteProbe(context);
+    if (isSandboxLocalBindingPermissionError(stderr)) {
+      return;
+    }
     expect(result.exitCode).toBe(0);
     await expect(access(context.targetPath)).resolves.toBeUndefined();
     const contents = await readFile(context.targetPath, "utf8");

@@ -1,4 +1,4 @@
-import { renderTranscript } from "../utils/transcript.js";
+import { renderStageFinalFrame } from "../utils/stage-output.js";
 
 export function renderSpecTranscript(
   outputPath: string,
@@ -10,8 +10,8 @@ export function renderSpecTranscript(
         message: `To begin a run:\n  voratiq run --spec ${outputPath}`,
       };
 
-  return renderTranscript({
-    sections: [[`Spec saved: ${outputPath}`]],
+  return renderStageFinalFrame({
+    metadataLines: [`Spec saved: ${outputPath}`],
     hint,
   });
 }

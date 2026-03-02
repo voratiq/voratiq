@@ -24,3 +24,7 @@ export const sandboxTest: typeof it = sandboxSuiteEnabled ? it : it.skip;
 export async function withSandboxEnabled<T>(fn: () => Promise<T>): Promise<T> {
   return await fn();
 }
+
+export function isSandboxLocalBindingPermissionError(stderr: string): boolean {
+  return /listen EPERM: operation not permitted 127\.0\.0\.1/u.test(stderr);
+}

@@ -6,6 +6,35 @@ const ESC = String.fromCharCode(0x1b);
 const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
 
 describe("renderReviewTranscript", () => {
+  it.each(["succeeded", "failed", "aborted"] as const)(
+    "renders one non-TTY summary frame for %s",
+    (status) => {
+      const output = renderReviewTranscript({
+        runId: "run-123",
+        reviewId: "review-123",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        elapsed: "10s",
+        workspacePath: ".voratiq/reviews/sessions/review-123",
+        status,
+        reviewers: [
+          {
+            reviewerAgentId: "reviewer-a",
+            outputPath: "review.md",
+            duration: "5s",
+            status,
+          },
+        ],
+        suppressHint: true,
+        isTty: false,
+      });
+
+      expect(output).toContain(`review-123 ${status.toUpperCase()}`);
+      expect((output.match(/\bAGENT\b/gu) ?? []).length).toBe(1);
+      expect(output).toContain("reviewer-a");
+      expect(output).not.toMatch(ANSI_PATTERN);
+    },
+  );
+
   it("renders plain transcript shell output when non-TTY", () => {
     const output = renderReviewTranscript({
       runId: "run-123",

@@ -23,6 +23,7 @@ import {
   renderReviewTranscript,
 } from "../render/transcripts/review.js";
 import { formatDurationLabel } from "../render/utils/agents.js";
+import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { readReviewRecords } from "../reviews/records/persistence.js";
 import type { ReviewRecord } from "../reviews/records/types.js";
 import { normalizePathForDisplay, relativeToRoot } from "../utils/path.js";
@@ -74,9 +75,12 @@ export async function runReviewCommand(
   checkPlatformSupport();
   ensureSandboxDependencies();
 
-  writeOutput({
-    alerts: [{ severity: "info", message: "Generating review…" }],
+  const startLine = createStageStartLineEmitter((message) => {
+    writeOutput({
+      alerts: [{ severity: "info", message }],
+    });
   });
+  startLine.emit("Generating review…");
 
   const renderer = createReviewRenderer({
     stdout,
