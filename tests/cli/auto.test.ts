@@ -3,12 +3,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { jest } from "@jest/globals";
-import { CommanderError } from "commander";
 
 import * as applyCli from "../../src/cli/apply.js";
 import { createAutoCommand, runAutoCommand } from "../../src/cli/auto.js";
+import { writeCommandOutput } from "../../src/cli/output.js";
 import * as reviewCli from "../../src/cli/review.js";
 import * as runCli from "../../src/cli/run.js";
+import * as specCli from "../../src/cli/spec.js";
 import { HintedError } from "../../src/utils/errors.js";
 import { REVIEW_RECOMMENDATION_FILENAME } from "../../src/workspace/structure.js";
 
@@ -23,6 +24,10 @@ jest.mock("../../src/cli/run.js", () => ({
   runRunCommand: jest.fn(),
 }));
 
+jest.mock("../../src/cli/spec.js", () => ({
+  runSpecCommand: jest.fn(),
+}));
+
 jest.mock("../../src/cli/review.js", () => ({
   runReviewCommand: jest.fn(),
 }));
@@ -33,6 +38,7 @@ jest.mock("../../src/cli/apply.js", () => ({
 
 describe("voratiq auto", () => {
   const runRunCommandMock = jest.mocked(runCli.runRunCommand);
+  const runSpecCommandMock = jest.mocked(specCli.runSpecCommand);
   const runReviewCommandMock = jest.mocked(reviewCli.runReviewCommand);
   const runApplyCommandMock = jest.mocked(applyCli.runApplyCommand);
 
@@ -44,6 +50,7 @@ describe("voratiq auto", () => {
     originalExitCode = process.exitCode;
     process.exitCode = undefined;
     runRunCommandMock.mockReset();
+    runSpecCommandMock.mockReset();
     runReviewCommandMock.mockReset();
     runApplyCommandMock.mockReset();
   });
@@ -54,17 +61,19 @@ describe("voratiq auto", () => {
     stderrSpy?.mockRestore();
   });
 
-  it("requires --spec", async () => {
+  it("requires exactly one of --spec or --description", async () => {
     stderrSpy = jest
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
     const command = createAutoCommand().exitOverride();
     await expect(
       command.parseAsync(["node", "voratiq", "--review-agent", "reviewer"]),
-    ).rejects.toBeInstanceOf(CommanderError);
+    ).rejects.toThrow(
+      "Exactly one of `--spec` or `--description` is required.",
+    );
   });
 
-  it("does not accept legacy spec-generation flags", async () => {
+  it("rejects using --spec and --description together", async () => {
     stderrSpy = jest
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
@@ -80,20 +89,44 @@ describe("voratiq auto", () => {
         "--review-agent",
         "reviewer",
       ]),
-    ).rejects.toBeInstanceOf(CommanderError);
+    ).rejects.toThrow(
+      "Exactly one of `--spec` or `--description` is required.",
+    );
   });
 
-  it("help reflects existing-spec contract and apply flags", () => {
+  it("help reflects spec-or-description contract and apply flags", () => {
     const help = createAutoCommand().helpInformation();
     expect(help).toContain("--spec <path>");
-    expect(help).toContain("Path to the spec file");
+    expect(help).toContain("Path to an existing spec file");
+    expect(help).toContain("--description <text>");
     expect(help).toContain("--run-agent <agent-id>");
     expect(help).toContain("--review-agent <agent-id>");
     expect(help).toContain("--profile <name>");
     expect(help).toContain("--apply");
     expect(help).toContain("--commit");
-    expect(help).not.toContain("--description");
     expect(help).not.toContain("--spec-agent");
+  });
+
+  it("parses --description", async () => {
+    let received: unknown;
+    const command = createAutoCommand();
+    command.exitOverride().action((options) => {
+      received = options;
+    });
+
+    await command.parseAsync([
+      "node",
+      "voratiq",
+      "--description",
+      "Draft a migration spec",
+      "--profile",
+      "quality",
+    ]);
+
+    expect((received as { description?: string }).description).toBe(
+      "Draft a migration spec",
+    );
+    expect((received as { profile?: string }).profile).toBe("quality");
   });
 
   it("parses --profile", async () => {
@@ -171,6 +204,245 @@ describe("voratiq auto", () => {
     ).rejects.toThrow("Option `--commit` requires `--apply`.");
     expect(runRunCommandMock).not.toHaveBeenCalled();
     expect(runApplyCommandMock).not.toHaveBeenCalled();
+  });
+
+  it("chains --description through spec -> run -> review in order without duplicate stage starts", async () => {
+    const stdout: string[] = [];
+
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runSpecCommandMock.mockImplementation((options) => {
+      options.writeOutput?.({
+        alerts: [{ severity: "info", message: "Generating specification…" }],
+      });
+      return Promise.resolve({
+        outputPath: ".voratiq/specs/generated.md",
+        body: [
+          "Spec saved: .voratiq/specs/generated.md",
+          "",
+          "---",
+          "",
+          "To begin a run:",
+          "  voratiq run --spec .voratiq/specs/generated.md",
+        ].join("\n"),
+      });
+    });
+    runRunCommandMock.mockImplementation((options) => {
+      options.writeOutput?.({
+        alerts: [{ severity: "info", message: "Executing run…" }],
+      });
+      return Promise.resolve({
+        report: {
+          runId: "run-123",
+          spec: { path: ".voratiq/specs/generated.md" },
+          status: "succeeded",
+          createdAt: new Date().toISOString(),
+          baseRevisionSha: "deadbeef",
+          agents: [{ agentId: "codex" } as never],
+          hadAgentFailure: false,
+          hadEvalFailure: false,
+        },
+        body: ["run-123 SUCCEEDED", "", "AGENT", "codex"].join("\n"),
+      });
+    });
+    runReviewCommandMock.mockImplementation(() => {
+      writeCommandOutput({
+        alerts: [{ severity: "info", message: "Generating review…" }],
+      });
+      return Promise.resolve({
+        ...buildReviewResult({
+          reviewId: "review-123",
+          outputPath:
+            ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
+          body: [
+            "review-123 SUCCEEDED",
+            "",
+            "AGENT",
+            "reviewer",
+            "",
+            "---",
+            "",
+            "Reviewer: reviewer",
+          ].join("\n"),
+        }),
+        exitCode: 0,
+      });
+    });
+
+    await runAutoCommand({
+      description: "Generate a run spec",
+      reviewerAgentIds: ["reviewer"],
+    });
+
+    const output = stripAnsi(stdout.join(""));
+    expect(runSpecCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: "Generate a run spec",
+        suppressHint: true,
+      }),
+    );
+    expect(runRunCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specPath: ".voratiq/specs/generated.md",
+      }),
+    );
+    expect((output.match(/Generating specification…/gu) ?? []).length).toBe(1);
+    expect((output.match(/Executing run…/gu) ?? []).length).toBe(1);
+    expect((output.match(/Generating review…/gu) ?? []).length).toBe(1);
+    expect(
+      (output.match(/Spec saved: \.voratiq\/specs\/generated\.md/gu) ?? [])
+        .length,
+    ).toBe(1);
+    expect((output.match(/run-123 SUCCEEDED/gu) ?? []).length).toBe(1);
+    expect((output.match(/review-123 SUCCEEDED/gu) ?? []).length).toBe(1);
+
+    expect(output.indexOf("Generating specification…")).toBeLessThan(
+      output.indexOf("Spec saved: .voratiq/specs/generated.md"),
+    );
+    expect(
+      output.indexOf("Spec saved: .voratiq/specs/generated.md"),
+    ).toBeLessThan(output.indexOf("Executing run…"));
+    expect(output.indexOf("Executing run…")).toBeLessThan(
+      output.indexOf("run-123 SUCCEEDED"),
+    );
+    expect(output.indexOf("run-123 SUCCEEDED")).toBeLessThan(
+      output.indexOf("Generating review…"),
+    );
+    expect(output.indexOf("Generating review…")).toBeLessThan(
+      output.indexOf("review-123 SUCCEEDED"),
+    );
+  });
+
+  it("keeps per-phase final frames stable for auto --spec and non-success review output", async () => {
+    const stdout: string[] = [];
+
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockImplementation((options) => {
+      options.writeOutput?.({
+        alerts: [{ severity: "info", message: "Executing run…" }],
+      });
+      return Promise.resolve({
+        report: {
+          runId: "run-456",
+          spec: { path: ".voratiq/specs/existing.md" },
+          status: "succeeded",
+          createdAt: new Date().toISOString(),
+          baseRevisionSha: "cafebabe",
+          agents: [{ agentId: "runner" } as never],
+          hadAgentFailure: false,
+          hadEvalFailure: false,
+        },
+        body: ["run-456 SUCCEEDED", "", "AGENT", "runner"].join("\n"),
+      });
+    });
+    runReviewCommandMock.mockImplementation(() => {
+      writeCommandOutput({
+        alerts: [{ severity: "info", message: "Generating review…" }],
+      });
+      return Promise.resolve({
+        ...buildReviewResult({
+          reviewId: "review-456",
+          body: ["review-456 ABORTED", "", "AGENT", "reviewer"].join("\n"),
+        }),
+        exitCode: 1,
+      });
+    });
+
+    await runAutoCommand({
+      specPath: ".voratiq/specs/existing.md",
+      reviewerAgentIds: ["reviewer"],
+    });
+
+    const output = stripAnsi(stdout.join(""));
+    expect((output.match(/run-456 SUCCEEDED/gu) ?? []).length).toBe(1);
+    expect((output.match(/review-456 ABORTED/gu) ?? []).length).toBe(1);
+    expect(output).toContain("Auto FAILED");
+    expect(output.indexOf("run-456 SUCCEEDED")).toBeLessThan(
+      output.indexOf("review-456 ABORTED"),
+    );
+    expect(output.indexOf("review-456 ABORTED")).toBeLessThan(
+      output.indexOf("Auto FAILED"),
+    );
+  });
+
+  it("does not emit redraw artifacts in chained non-TTY output", async () => {
+    const stdout: string[] = [];
+    const originalStdoutIsTty = Object.getOwnPropertyDescriptor(
+      process.stdout,
+      "isTTY",
+    );
+
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    Object.defineProperty(process.stdout, "isTTY", {
+      value: false,
+      configurable: true,
+    });
+
+    runRunCommandMock.mockImplementation((options) => {
+      expect(options.stdout?.isTTY).toBe(false);
+      options.writeOutput?.({
+        alerts: [{ severity: "info", message: "Executing run…" }],
+      });
+      return Promise.resolve({
+        report: {
+          runId: "run-789",
+          spec: { path: ".voratiq/specs/existing.md" },
+          status: "succeeded",
+          createdAt: new Date().toISOString(),
+          baseRevisionSha: "deadbeef",
+          agents: [{ agentId: "runner" } as never],
+          hadAgentFailure: false,
+          hadEvalFailure: false,
+        },
+        body: ["run-789 SUCCEEDED", "", "AGENT", "runner"].join("\n"),
+      });
+    });
+    runReviewCommandMock.mockImplementation(() => {
+      writeCommandOutput({
+        alerts: [{ severity: "info", message: "Generating review…" }],
+      });
+      return Promise.resolve({
+        ...buildReviewResult({
+          reviewId: "review-789",
+          body: ["review-789 SUCCEEDED", "", "AGENT", "reviewer"].join("\n"),
+        }),
+        exitCode: 0,
+      });
+    });
+
+    try {
+      await runAutoCommand({
+        specPath: ".voratiq/specs/existing.md",
+        reviewerAgentIds: ["reviewer"],
+      });
+    } finally {
+      if (originalStdoutIsTty) {
+        Object.defineProperty(process.stdout, "isTTY", originalStdoutIsTty);
+      }
+    }
+
+    const output = stdout.join("");
+    expect(output).not.toContain("\u001b[2K");
+    expect(output).not.toContain("\u001b[0G");
+    const cursorUpPattern = new RegExp(`${ESC}\\[\\d+F`, "u");
+    expect(output).not.toMatch(cursorUpPattern);
   });
 
   it("runs review even when run reports agent failure", async () => {

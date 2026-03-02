@@ -19,9 +19,11 @@ import { CliError, toCliError } from "./errors.js";
 import { beginChainedCommandOutput, writeCommandOutput } from "./output.js";
 import { type ReviewCommandResult, runReviewCommand } from "./review.js";
 import { runRunCommand } from "./run.js";
+import { runSpecCommand } from "./spec.js";
 
 export interface AutoCommandOptions {
-  specPath: string;
+  specPath?: string;
+  description?: string;
   runAgentIds?: readonly string[];
   reviewerAgentIds?: readonly string[];
   profile?: string;
@@ -59,6 +61,20 @@ function collectReviewAgentOption(value: string, previous: string[]): string[] {
 }
 
 function assertAutoOptionCompatibility(options: AutoCommandOptions): void {
+  const hasSpecPath =
+    typeof options.specPath === "string" && options.specPath.trim().length > 0;
+  const hasDescription =
+    typeof options.description === "string" &&
+    options.description.trim().length > 0;
+
+  if (hasSpecPath === hasDescription) {
+    throw new CliError(
+      "Exactly one of `--spec` or `--description` is required.",
+      [],
+      ["Pass one flag, not both (or neither)."],
+    );
+  }
+
   if (options.commit && !options.apply) {
     throw new CliError(
       "Option `--commit` requires `--apply`.",
@@ -107,7 +123,7 @@ async function loadAutoRecommendation(options: {
   } catch (error) {
     throw new CliError(
       `Failed to load \`${REVIEW_RECOMMENDATION_FILENAME}\`.`,
-      [`Path: \`${recommendationPath}\`.`, toCliError(error).headline],
+      [toCliError(error).headline],
       ["Re-run `voratiq review` to regenerate review artifacts."],
     );
   }
@@ -164,9 +180,9 @@ function resolveRecommendedAgent(options: {
   const normalizedPreferredAgent = preferredAgent.trim();
   if (normalizedPreferredAgent.length === 0) {
     throw new CliError(
-      "Recommendation is missing a preferred agent.",
-      [`No preferred agent is listed in \`${recommendationPath}\`.`],
-      ["Update the recommendation artifact and retry auto apply."],
+      `No preferred agent in \`${recommendationPath}\`.`,
+      [],
+      ["Re-run `voratiq review` to regenerate the recommendation."],
     );
   }
 
@@ -226,46 +242,67 @@ export async function runAutoCommand(
     let applyAgentId: string | undefined;
     let applyDetail: string | undefined;
 
-    runStartedAt = now();
+    let resolvedSpecPath = options.specPath;
 
-    try {
-      // For non-TTY, suppress run renderer blank lines and let the chained
-      // output system handle spacing. For TTY, let the run renderer handle
-      // its own spacing since cursor control requires precise line counts.
-      const suppressBlankLines = !process.stdout.isTTY;
-      const runResult = await runRunCommand({
-        specPath: options.specPath,
-        agentIds: options.runAgentIds ? [...options.runAgentIds] : undefined,
-        agentOverrideFlag: "--run-agent",
-        profile: options.profile,
-        maxParallel: options.maxParallel,
-        branch: options.branch,
-        writeOutput: writeCommandOutput,
-        suppressHint: true,
-        suppressLeadingBlankLine: suppressBlankLines,
-        suppressTrailingBlankLine: suppressBlankLines,
-        stdout: chainedOutput.stdout,
-        stderr: chainedOutput.stderr,
-      });
-
-      runStatus = "succeeded";
-      runId = runResult.report.runId;
-      runRecordStatus = runResult.report.status;
-      runCreatedAt = runResult.report.createdAt;
-      runSpecPath = runResult.report.spec?.path;
-      runBaseRevisionSha = runResult.report.baseRevisionSha;
-      runAgentIds = runResult.report.agents.map((agent) => agent.agentId);
-
-      if (runResult.exitCode === 1) {
+    if (options.description) {
+      try {
+        const specResult = await runSpecCommand({
+          description: options.description,
+          profile: options.profile,
+          maxParallel: options.maxParallel,
+          suppressHint: true,
+          writeOutput: writeCommandOutput,
+        });
+        resolvedSpecPath = specResult.outputPath;
+        writeCommandOutput({ body: specResult.body });
+      } catch (error) {
         exitCode = 1;
+        writeCommandOutput({ body: renderCliError(toCliError(error)) });
       }
+    }
 
-      writeCommandOutput({ body: runResult.body });
-    } catch (error) {
-      runStatus = "failed";
-      runDetail = toCliError(error).headline;
-      exitCode = 1;
-      writeCommandOutput({ body: renderCliError(toCliError(error)) });
+    if (exitCode === 0 && resolvedSpecPath) {
+      runStartedAt = now();
+
+      try {
+        // For non-TTY, suppress run renderer blank lines and let the chained
+        // output system handle spacing. For TTY, let the run renderer handle
+        // its own spacing since cursor control requires precise line counts.
+        const suppressBlankLines = !process.stdout.isTTY;
+        const runResult = await runRunCommand({
+          specPath: resolvedSpecPath,
+          agentIds: options.runAgentIds ? [...options.runAgentIds] : undefined,
+          agentOverrideFlag: "--run-agent",
+          profile: options.profile,
+          maxParallel: options.maxParallel,
+          branch: options.branch,
+          writeOutput: writeCommandOutput,
+          suppressHint: true,
+          suppressLeadingBlankLine: suppressBlankLines,
+          suppressTrailingBlankLine: suppressBlankLines,
+          stdout: chainedOutput.stdout,
+          stderr: chainedOutput.stderr,
+        });
+
+        runStatus = "succeeded";
+        runId = runResult.report.runId;
+        runRecordStatus = runResult.report.status;
+        runCreatedAt = runResult.report.createdAt;
+        runSpecPath = runResult.report.spec?.path;
+        runBaseRevisionSha = runResult.report.baseRevisionSha;
+        runAgentIds = runResult.report.agents.map((agent) => agent.agentId);
+
+        if (runResult.exitCode === 1) {
+          exitCode = 1;
+        }
+
+        writeCommandOutput({ body: runResult.body });
+      } catch (error) {
+        runStatus = "failed";
+        runDetail = toCliError(error).headline;
+        exitCode = 1;
+        writeCommandOutput({ body: renderCliError(toCliError(error)) });
+      }
     }
 
     if (exitCode === 0 || runId) {
@@ -480,6 +517,7 @@ export async function runAutoCommand(
 
 interface AutoCommandActionOptions {
   spec?: string;
+  description?: string;
   runAgent?: string[];
   reviewAgent?: string[];
   profile?: string;
@@ -494,7 +532,11 @@ export function createAutoCommand(): Command {
     .description(
       "End-to-end pipeline to run agents, review results, and optionally apply",
     )
-    .requiredOption("--spec <path>", "Path to the spec file")
+    .option("--spec <path>", "Path to an existing spec file")
+    .option(
+      "--description <text>",
+      "Generate a spec from a plain-language description",
+    )
     .addOption(
       new Option(
         "--run-agent <agent-id>",
@@ -527,7 +569,8 @@ export function createAutoCommand(): Command {
     .allowExcessArguments(false)
     .action(async (options: AutoCommandActionOptions) => {
       await runAutoCommand({
-        specPath: options.spec!,
+        specPath: options.spec,
+        description: options.description,
         runAgentIds: options.runAgent,
         reviewerAgentIds: options.reviewAgent,
         profile: options.profile,
