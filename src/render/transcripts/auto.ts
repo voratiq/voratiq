@@ -1,5 +1,5 @@
-import { getRunStatusStyle } from "../../status/colors.js";
 import type { AutoTerminalStatus } from "../../runs/records/types.js";
+import { getRunStatusStyle } from "../../status/colors.js";
 import type { RunStatus } from "../../status/index.js";
 import { colorize } from "../../utils/colors.js";
 import { formatDurationLabel } from "../utils/agents.js";

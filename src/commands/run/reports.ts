@@ -93,7 +93,9 @@ export function toRunReport(
   hadAgentFailure: boolean,
   hadEvalFailure: boolean,
 ): RunReport {
-  const derivedAgentFailure = agents.some((agent) => agent.status === "failed");
+  const derivedAgentFailure = agents.some(
+    (agent) => agent.status === "failed" || agent.status === "errored",
+  );
   const derivedEvalFailure = hasEvalFailures(agents);
 
   if (hadAgentFailure !== derivedAgentFailure) {

@@ -510,6 +510,43 @@ describe("voratiq auto", () => {
     expect(stderr.join("")).toHaveLength(0);
   });
 
+  it("fails the auto pipeline when run status and exit code contradict", async () => {
+    const stdout: string[] = [];
+
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockResolvedValue({
+      report: {
+        runId: "run-contradiction",
+        spec: { path: ".voratiq/specs/existing.md" },
+        status: "succeeded",
+        createdAt: new Date().toISOString(),
+        baseRevisionSha: "deadbeef",
+        agents: [],
+        hadAgentFailure: false,
+        hadEvalFailure: false,
+      },
+      body: "run body",
+      exitCode: 2,
+    });
+
+    await runAutoCommand({
+      specPath: ".voratiq/specs/existing.md",
+      reviewerAgentIds: ["reviewer"],
+    });
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain("Run status/exit code mismatch.");
+    expect(runReviewCommandMock).not.toHaveBeenCalled();
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+  });
+
   it("prints summary even if review fails", async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];

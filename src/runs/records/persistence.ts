@@ -22,8 +22,8 @@ import {
 } from "./errors.js";
 import { acquireHistoryLock } from "./history-lock.js";
 import {
-  type RunAutoOutcome,
   type RunApplyStatus,
+  type RunAutoOutcome,
   type RunRecord,
   runRecordSchema,
 } from "./types.js";

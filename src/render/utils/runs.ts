@@ -11,6 +11,7 @@ export interface RunDisplayInfo {
   elapsed?: string;
   createdAt?: string;
   baseRevisionSha?: string;
+  outcome?: string;
 }
 
 type RunMetadataRow = {
@@ -20,6 +21,7 @@ type RunMetadataRow = {
 
 export function getRunMetadata(info: RunDisplayInfo): RunMetadataRow[] {
   const detailRows = [
+    { label: "Outcome", value: info.outcome },
     { label: "Elapsed", value: info.elapsed },
     { label: "Created", value: info.createdAt },
     { label: "Spec", value: info.specPath },

@@ -15,7 +15,7 @@ import type {
   AutoTerminalStatus,
   RunAutoOutcome,
 } from "../runs/records/types.js";
-import type { RunStatus } from "../status/index.js";
+import { mapRunStatusToExitCode, type RunStatus } from "../status/index.js";
 import { formatAlertMessage } from "../utils/output.js";
 import { normalizePathForDisplay, resolveDisplayPath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
@@ -385,10 +385,29 @@ export async function runAutoCommand(
           stderr: chainedOutput.stderr,
         });
 
-        runStatus =
-          runResult.report.status === "succeeded" && runResult.exitCode !== 1
-            ? "succeeded"
-            : "failed";
+        const expectedRunExitCode = mapRunStatusToExitCode(
+          runResult.report.status,
+        );
+        const resolvedRunExitCode =
+          typeof runResult.exitCode === "number"
+            ? runResult.exitCode
+            : expectedRunExitCode;
+
+        if (
+          typeof runResult.exitCode === "number" &&
+          runResult.exitCode !== expectedRunExitCode
+        ) {
+          throw new CliError(
+            "Run status/exit code mismatch.",
+            [
+              `Status: \`${runResult.report.status}\`.`,
+              `Exit code: ${runResult.exitCode}.`,
+            ],
+            ["Re-run the command; run outcome signaling was inconsistent."],
+          );
+        }
+
+        runStatus = resolvedRunExitCode === 0 ? "succeeded" : "failed";
         runId = runResult.report.runId;
         runRecordStatus = runResult.report.status;
         runCreatedAt = runResult.report.createdAt;
@@ -397,6 +416,12 @@ export async function runAutoCommand(
         runAgentIds = runResult.report.agents.map((agent) => agent.agentId);
 
         if (runStatus === "failed") {
+          const statusDetail = runRecordStatus
+            ? `status \`${runRecordStatus}\``
+            : "a non-success status";
+          runDetail =
+            runDetail ??
+            `Run completed with ${statusDetail} (exit code ${resolvedRunExitCode}).`;
           hardFailure = true;
         }
 

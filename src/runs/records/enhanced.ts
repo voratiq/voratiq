@@ -13,8 +13,8 @@ import {
 import type {
   AgentEvalSnapshot,
   AgentStatus,
-  RunAutoOutcome,
   RunApplyStatus,
+  RunAutoOutcome,
   RunRecord,
   RunSpecDescriptor,
 } from "./types.js";

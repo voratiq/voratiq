@@ -14,6 +14,7 @@ import {
 import { createRunRenderer } from "../render/transcripts/run.js";
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import type { RunReport } from "../runs/records/types.js";
+import { mapRunStatusToExitCode } from "../status/index.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
@@ -98,11 +99,7 @@ export async function runRunCommand(
 
   const body = renderer.complete(report, { suppressHint });
 
-  // Unlike other commands, `run` signals a degraded outcome via exit code 1
-  // when any agent fails. Eval failures are quality signals displayed in the output
-  // but do not affect exit code. All other CLI commands either throw on error
-  // or return a clean success with exit code 0, so keep this deviation explicit.
-  const exitCode = report.hadAgentFailure ? 1 : undefined;
+  const exitCode = mapRunStatusToExitCode(report.status);
 
   return { report, body, exitCode };
 }
