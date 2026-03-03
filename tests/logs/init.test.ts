@@ -55,7 +55,7 @@ describe("renderInitTranscript", () => {
     },
   };
 
-  it("renders the workspace configuration summary with learn-more and spec hint", () => {
+  it("renders the workspace configuration summary with learn-more and auto hint", () => {
     const output = renderInitTranscript(baseResult);
     const lines = output.split("\n");
 
@@ -89,10 +89,12 @@ describe("renderInitTranscript", () => {
       "https://github.com/voratiq/voratiq/tree/main/docs/configs",
     );
     expect(output).toContain(colorize("Voratiq initialized.", "green"));
-    expect(output).toContain("To generate a spec:");
+    expect(output).toContain("To run end-to-end:");
     expect(output).toContain(
-      'voratiq spec --description "<what you want to build>" --agent <agent-id>',
+      'voratiq auto --description "<what you want to build>" --apply --commit',
     );
+    expect(output).not.toContain("To generate a spec:");
+    expect(output).not.toContain("voratiq spec --description");
     expect(output).not.toContain("Detecting agent CLIs…");
     expect(output).not.toContain("PROVIDER  BINARY");
     expect(output).not.toContain("Enable detected providers? [Y/n]:");

@@ -291,7 +291,7 @@ describe("review transcript contract", () => {
     expect(body).toContain(
       "Review: .voratiq/reviews/sessions/review-tty-123/reviewer-a/artifacts/review.md",
     );
-    expect(body).toContain("voratiq apply --run run-123 --agent <agent-id>");
+    expect(body).toContain("voratiq apply --run run-123 --agent agent-a");
     expect(body).not.toContain("Elapsed");
     expect(body).not.toContain("Workspace");
     expect(body).not.toContain("DURATION");
@@ -437,7 +437,7 @@ describe("review transcript contract", () => {
       "Review: .voratiq/reviews/sessions/review-live-123/reviewer-a/artifacts/review.md",
     );
     expect(body).toContain("Error: reviewer-b failed");
-    expect(body).toContain("voratiq apply --run run-123 --agent <agent-id>");
+    expect(body).toContain("voratiq apply --run run-123 --agent agent-a");
   });
 
   it("fails hard when any reviewer recommendation artifact cannot be loaded", async () => {

@@ -87,7 +87,7 @@ describe("init transcript ordering", () => {
       findIndex(captured, "To learn more about configuration:"),
     ).toBeLessThan(findIndex(captured, "Voratiq initialized."));
     expect(findIndex(captured, "Voratiq initialized.")).toBeLessThan(
-      findIndex(captured, "To generate a spec:"),
+      findIndex(captured, "To run end-to-end:"),
     );
     expect(captured.join("\n")).not.toContain("Detecting agent CLIs…");
     expect(captured.join("\n")).not.toContain("PROVIDER  BINARY");
@@ -128,7 +128,7 @@ describe("init transcript ordering", () => {
       findIndex(lines, "Voratiq initialized."),
     );
     expect(findIndex(lines, "Voratiq initialized.")).toBeLessThan(
-      findIndex(lines, "To generate a spec:"),
+      findIndex(lines, "To run end-to-end:"),
     );
     expect(lines.join("\n")).not.toContain("Detecting agent CLIs…");
     expect(lines.join("\n")).not.toContain("PROVIDER  BINARY");

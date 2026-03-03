@@ -113,6 +113,7 @@ export async function runReviewCommand(
   }
 
   const aliasMap = record.blinded?.aliasMap;
+  const recommendedApplyAgents = new Set<string>();
   const reviewerBlocks = await Promise.all(
     record.reviewers.map(async (reviewerRecord) => {
       const reviewerAgentId = reviewerRecord.agentId;
@@ -154,6 +155,13 @@ export async function runReviewCommand(
         const previewLines = buildMarkdownPreviewLines(
           formatResolvedRecommendationSnippet(previewRecommendation, aliasMap),
         );
+        const resolvedPreferredAgent =
+          previewRecommendation.resolved_preferred_agent ??
+          previewRecommendation.preferred_agent;
+        const normalizedPreferredAgent = resolvedPreferredAgent.trim();
+        if (normalizedPreferredAgent.length > 0) {
+          recommendedApplyAgents.add(normalizedPreferredAgent);
+        }
 
         return {
           reviewerAgentId,
@@ -175,6 +183,10 @@ export async function runReviewCommand(
       }
     }),
   );
+  const recommendedAgentId =
+    recommendedApplyAgents.size === 1
+      ? [...recommendedApplyAgents][0]
+      : undefined;
 
   const body = renderReviewTranscript({
     runId: execution.runRecord.runId,
@@ -193,6 +205,7 @@ export async function runReviewCommand(
     ),
     status: record.status,
     reviewers: reviewerBlocks,
+    recommendedAgentId,
     suppressHint,
     isTty: stdout?.isTTY ?? process.stdout.isTTY,
     includeSummarySection: !(stdout?.isTTY ?? process.stdout.isTTY),

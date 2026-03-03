@@ -99,8 +99,8 @@ export function renderInitTranscript(
   ]);
   sections.push([buildWorkspaceInitializedSection()]);
   sections.push([
-    "To generate a spec:",
-    '  voratiq spec --description "<what you want to build>" --agent <agent-id>',
+    "To run end-to-end:",
+    '  voratiq auto --description "<what you want to build>" --apply --commit',
   ]);
 
   return renderTranscript({ sections });

@@ -85,4 +85,40 @@ describe("renderReviewTranscript", () => {
 
     expect(output).toMatch(ANSI_PATTERN);
   });
+
+  it("renders concrete apply hint agent when recommendation is resolved", () => {
+    const output = renderReviewTranscript({
+      runId: "run-123",
+      reviewId: "review-123",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      elapsed: "10s",
+      workspacePath: ".voratiq/reviews/sessions/review-123",
+      status: "succeeded",
+      reviewers: [],
+      recommendedAgentId: "agent-a",
+      isTty: false,
+    });
+
+    expect(output).toContain("To apply a solution:");
+    expect(output).toContain("voratiq apply --run run-123 --agent agent-a");
+    expect(output).not.toContain(
+      "voratiq apply --run run-123 --agent <agent-id>",
+    );
+  });
+
+  it("falls back to placeholder apply hint agent when recommendation is unavailable", () => {
+    const output = renderReviewTranscript({
+      runId: "run-123",
+      reviewId: "review-123",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      elapsed: "10s",
+      workspacePath: ".voratiq/reviews/sessions/review-123",
+      status: "succeeded",
+      reviewers: [],
+      isTty: false,
+    });
+
+    expect(output).toContain("To apply a solution:");
+    expect(output).toContain("voratiq apply --run run-123 --agent <agent-id>");
+  });
 });
