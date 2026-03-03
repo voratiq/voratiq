@@ -1,6 +1,7 @@
 import { isAbsolute, resolve } from "node:path";
 
-import { ensureFileExists } from "../utils/fs.js";
+import { executeInitCommand } from "../commands/init/command.js";
+import { ensureFileExists, pathExists } from "../utils/fs.js";
 import {
   assertGitRepository,
   type DirtyPathSummary,
@@ -45,25 +46,43 @@ export interface WorkspacePaths {
 export interface CliContext {
   root: string;
   workspacePaths: WorkspacePaths;
+  workspaceAutoInitialized?: boolean;
 }
+
+export type WorkspaceAutoInitMode = "never" | "when-missing";
 
 export interface ResolveCliContextOptions {
   requireWorkspace?: boolean;
+  workspaceAutoInitMode?: WorkspaceAutoInitMode;
 }
 
 export async function resolveCliContext(
   options: ResolveCliContextOptions = {},
 ): Promise<CliContext> {
-  const { requireWorkspace = true } = options;
+  const { requireWorkspace = true, workspaceAutoInitMode = "never" } = options;
   const root = process.cwd();
 
   await assertGitRepository(root);
 
+  const workspaceDir = resolveWorkspacePath(root);
+  let workspaceAutoInitialized = false;
+
   if (requireWorkspace) {
+    const workspaceMissing = !(await pathExists(workspaceDir));
+    if (workspaceAutoInitMode === "when-missing" && workspaceMissing) {
+      await executeInitCommand({
+        root,
+        preset: "pro",
+        presetProvided: false,
+        assumeYes: true,
+        interactive: false,
+      });
+      workspaceAutoInitialized = true;
+    }
+
     await validateWorkspace(root);
   }
 
-  const workspaceDir = resolveWorkspacePath(root);
   const workspacePaths: WorkspacePaths = {
     root,
     workspaceDir,
@@ -75,7 +94,7 @@ export async function resolveCliContext(
     specsFile: resolveWorkspacePath(root, VORATIQ_SPECS_FILE),
   };
 
-  return { root, workspacePaths };
+  return { root, workspacePaths, workspaceAutoInitialized };
 }
 
 export interface ResolvedSpecPath {

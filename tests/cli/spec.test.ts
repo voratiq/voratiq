@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Command } from "commander";
@@ -146,6 +146,12 @@ describe("voratiq spec command options", () => {
 
     expect((received as { maxParallel?: number }).maxParallel).toBe(2);
   });
+
+  it("does not expose auto-init toggles in help output", () => {
+    const help = createSpecCommand().helpInformation();
+    expect(help).not.toContain("--auto-init");
+    expect(help).not.toContain("--no-auto-init");
+  });
 });
 
 describe("voratiq spec (CLI)", () => {
@@ -207,6 +213,43 @@ describe("voratiq spec (CLI)", () => {
     restorePlatformSpy?.mockRestore();
     restoreDependenciesSpy?.mockRestore();
     await workspace?.cleanup();
+  });
+
+  it("auto-initializes a missing workspace and emits a single notice", async () => {
+    await rm(join(repoRoot, ".voratiq"), { recursive: true, force: true });
+
+    const providerBinDir = join(repoRoot, "provider-bin");
+    await mkdir(providerBinDir, { recursive: true });
+    const codexPath = join(providerBinDir, "codex");
+    await writeFile(codexPath, "#!/usr/bin/env bash\nexit 0\n", "utf8");
+    await chmod(codexPath, 0o755);
+
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${providerBinDir}:${originalPath ?? ""}`;
+    const infoMessages: string[] = [];
+
+    try {
+      const result = await runSpecCommand({
+        description: "Write a spec",
+        agent: "gpt-5-3-codex",
+        writeOutput: (payload) => {
+          for (const alert of payload.alerts ?? []) {
+            if (alert.severity === "info") {
+              infoMessages.push(alert.message);
+            }
+          }
+        },
+      });
+
+      expect(result.outputPath).toBe(".voratiq/specs/payment-flow.md");
+      expect(
+        infoMessages.filter(
+          (message) => message === "Voratiq initialized (.voratiq/).",
+        ),
+      ).toHaveLength(1);
+    } finally {
+      process.env.PATH = originalPath;
+    }
   });
 
   it("runs in non-interactive shells without --yes", async () => {

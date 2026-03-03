@@ -6,6 +6,7 @@ import {
   ensureSandboxDependencies,
   resolveCliContext,
 } from "../preflight/index.js";
+import { renderWorkspaceAutoInitializedNotice } from "../render/transcripts/shared.js";
 import { renderSpecTranscript } from "../render/transcripts/spec.js";
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { parsePositiveInteger } from "../utils/validators.js";
@@ -41,7 +42,20 @@ export async function runSpecCommand(
     writeOutput = writeCommandOutput,
   } = options;
 
-  const { root, workspacePaths } = await resolveCliContext();
+  const { root, workspacePaths, workspaceAutoInitialized } =
+    await resolveCliContext({
+      workspaceAutoInitMode: "when-missing",
+    });
+
+  if (workspaceAutoInitialized) {
+    writeOutput({
+      alerts: [
+        { severity: "info", message: renderWorkspaceAutoInitializedNotice() },
+      ],
+      leadingNewline: false,
+    });
+  }
+
   checkPlatformSupport();
   ensureSandboxDependencies();
 

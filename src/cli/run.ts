@@ -12,6 +12,7 @@ import {
   resolveCliContext,
 } from "../preflight/index.js";
 import { createRunRenderer } from "../render/transcripts/run.js";
+import { renderWorkspaceAutoInitializedNotice } from "../render/transcripts/shared.js";
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import type { RunReport } from "../runs/records/types.js";
 import { mapRunStatusToExitCode } from "../status/index.js";
@@ -58,7 +59,20 @@ export async function runRunCommand(
     writeOutput,
   } = options;
 
-  const { root, workspacePaths } = await resolveCliContext();
+  const { root, workspacePaths, workspaceAutoInitialized } =
+    await resolveCliContext({
+      workspaceAutoInitMode: "when-missing",
+    });
+
+  if (workspaceAutoInitialized && writeOutput) {
+    writeOutput({
+      alerts: [
+        { severity: "info", message: renderWorkspaceAutoInitializedNotice() },
+      ],
+      leadingNewline: false,
+    });
+  }
+
   checkPlatformSupport();
   ensureSandboxDependencies();
   await ensureCleanWorkingTree(root);
