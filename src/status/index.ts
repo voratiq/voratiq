@@ -15,6 +15,40 @@ export type RunStatus = (typeof RUN_STATUS_VALUES)[number];
 export const runStatusSchema = z.enum(RUN_STATUS_VALUES);
 
 /**
+ * Derive the terminal run status from agent outcomes.
+ * Returns "succeeded" when at least one agent succeeds; otherwise "failed".
+ */
+export function deriveRunStatusFromAgents(
+  agentStatuses: readonly AgentStatus[],
+): RunStatus {
+  const hasAgentSuccess = agentStatuses.some(
+    (status) => status === "succeeded",
+  );
+  return hasAgentSuccess ? "succeeded" : "failed";
+}
+
+/**
+ * Map a terminal run status to a deterministic process exit code.
+ * Throws when invoked with a non-terminal status to avoid contradictory pairs.
+ */
+export function mapRunStatusToExitCode(status: RunStatus): number {
+  switch (status) {
+    case "succeeded":
+      return 0;
+    case "failed":
+      return 1;
+    case "errored":
+      return 2;
+    case "aborted":
+      return 3;
+    default:
+      throw new Error(
+        `Cannot map non-terminal run status "${status}" to an exit code.`,
+      );
+  }
+}
+
+/**
  * Run statuses that indicate the run has finished execution.
  */
 export const TERMINAL_RUN_STATUSES: readonly RunStatus[] = [

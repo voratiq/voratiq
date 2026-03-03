@@ -10,6 +10,7 @@ import type {
   RunRecord,
   RunReport,
 } from "../../runs/records/types.js";
+import { deriveRunStatusFromAgents } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
 import {
@@ -153,14 +154,9 @@ export async function executeRunCommand(
 
     agentRecords = executionResult.agentRecords;
 
-    const derivedRunStatus: RunRecord["status"] =
-      executionResult.hadAgentFailure
-        ? "failed"
-        : executionResult.agentReports.some(
-              (report) => report.status === "errored",
-            )
-          ? "errored"
-          : "succeeded";
+    const derivedRunStatus: RunRecord["status"] = deriveRunStatusFromAgents(
+      executionResult.agentReports.map((report) => report.status),
+    );
 
     const updatedRunRecord = await rewriteRunRecord({
       root,

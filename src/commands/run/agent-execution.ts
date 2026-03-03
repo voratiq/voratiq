@@ -61,7 +61,7 @@ export async function executeAgents(
     const agentReports = sortedExecutions.map((execution) => execution.report);
 
     const hadAgentFailure = agentReports.some(
-      (report) => report.status === "failed",
+      (report) => report.status === "failed" || report.status === "errored",
     );
     const hadEvalFailure = hasEvalFailures(agentReports);
 

@@ -505,9 +505,46 @@ describe("voratiq auto", () => {
     );
     expect(runApplyCommandMock).not.toHaveBeenCalled();
 
-    expect(stripAnsi(stdout.join(""))).toContain("Auto SUCCEEDED");
+    expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
     expect(process.exitCode).toBe(1);
     expect(stderr.join("")).toHaveLength(0);
+  });
+
+  it("fails the auto pipeline when run status and exit code contradict", async () => {
+    const stdout: string[] = [];
+
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockResolvedValue({
+      report: {
+        runId: "run-contradiction",
+        spec: { path: ".voratiq/specs/existing.md" },
+        status: "succeeded",
+        createdAt: new Date().toISOString(),
+        baseRevisionSha: "deadbeef",
+        agents: [],
+        hadAgentFailure: false,
+        hadEvalFailure: false,
+      },
+      body: "run body",
+      exitCode: 2,
+    });
+
+    await runAutoCommand({
+      specPath: ".voratiq/specs/existing.md",
+      reviewerAgentIds: ["reviewer"],
+    });
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain("Run status/exit code mismatch.");
+    expect(runReviewCommandMock).not.toHaveBeenCalled();
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
   });
 
   it("prints summary even if review fails", async () => {
@@ -890,11 +927,15 @@ describe("voratiq auto", () => {
         },
       );
 
-      await runAutoCommand({
+      const result = await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
         reviewerAgentIds: ["reviewer"],
         apply: true,
       });
+
+      expect(result.auto.status).toBe("succeeded");
+      expect(result.apply.status).toBe("succeeded");
+      expect(result.exitCode).toBe(0);
     });
 
     expect(runApplyCommandMock).toHaveBeenCalledWith(
@@ -971,11 +1012,15 @@ describe("voratiq auto", () => {
         },
       );
 
-      await runAutoCommand({
+      const result = await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
         reviewerAgentIds: ["reviewer-a", "reviewer-b"],
         apply: true,
       });
+
+      expect(result.auto.status).toBe("succeeded");
+      expect(result.apply.status).toBe("succeeded");
+      expect(result.exitCode).toBe(0);
     });
 
     expect(runApplyCommandMock).toHaveBeenCalledWith(
@@ -987,6 +1032,7 @@ describe("voratiq auto", () => {
     );
     expect(stripAnsi(stdout.join(""))).toContain("APPLY BODY");
     expect(stripAnsi(stdout.join(""))).toContain("Auto SUCCEEDED");
+    expect(process.exitCode).toBe(0);
   });
 
   it("skips auto-apply and requests arbitration when reviewers disagree", async () => {
@@ -1060,11 +1106,15 @@ describe("voratiq auto", () => {
         },
       );
 
-      await runAutoCommand({
+      const result = await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
         reviewerAgentIds: ["reviewer-a", "reviewer-b"],
         apply: true,
       });
+
+      expect(result.auto.status).toBe("action_required");
+      expect(result.apply.status).toBe("skipped");
+      expect(result.exitCode).toBe(1);
     });
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
@@ -1075,10 +1125,86 @@ describe("voratiq auto", () => {
     expect(output).toContain(
       "Warning: Reviewers disagreed. Review manually and apply the best solution.",
     );
-    expect(output).toContain("Auto SUCCEEDED");
+    expect(output).toContain("Auto ACTION REQUIRED");
+    expect(process.exitCode).toBe(1);
   });
 
-  it("fails when resolved_preferred_agent is missing", async () => {
+  it("marks no-shared multi-reviewer recommendation as action required", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockResolvedValue(buildRunResult(["agent-a", "agent-b"]));
+    runReviewCommandMock.mockResolvedValue({
+      ...buildReviewResult({
+        reviewId: "review-999",
+        outputPath:
+          ".voratiq/reviews/sessions/review-999/reviewer-a/artifacts/review.md",
+      }),
+      reviews: [
+        {
+          agentId: "reviewer-a",
+          outputPath:
+            ".voratiq/reviews/sessions/review-999/reviewer-a/artifacts/review.md",
+          status: "succeeded",
+          missingArtifacts: [],
+        },
+        {
+          agentId: "reviewer-b",
+          outputPath:
+            ".voratiq/reviews/sessions/review-999/reviewer-b/artifacts/review.md",
+          status: "succeeded",
+          missingArtifacts: [],
+        },
+      ],
+    });
+
+    await withTempRepo(async (repoRoot) => {
+      await writeRecommendationArtifact(
+        repoRoot,
+        ".voratiq/reviews/sessions/review-999/reviewer-a/artifacts/review.md",
+        {
+          preferred_agent: "agent-a",
+          rationale: "No resolved winner",
+          next_actions: ["voratiq apply --run run-123 --agent agent-a"],
+        },
+      );
+      await writeRecommendationArtifact(
+        repoRoot,
+        ".voratiq/reviews/sessions/review-999/reviewer-b/artifacts/review.md",
+        {
+          preferred_agent: "agent-b",
+          resolved_preferred_agent: "agent-b",
+          rationale: "Resolved winner",
+          next_actions: ["voratiq apply --run run-123 --agent agent-b"],
+        },
+      );
+
+      const result = await runAutoCommand({
+        specPath: ".voratiq/specs/existing.md",
+        reviewerAgentIds: ["reviewer-a", "reviewer-b"],
+        apply: true,
+      });
+
+      expect(result.auto.status).toBe("action_required");
+      expect(result.apply.status).toBe("skipped");
+      expect(result.exitCode).toBe(1);
+    });
+
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain(
+      "Warning: No shared recommendation was resolved. Review manually and apply the best solution.",
+    );
+    expect(output).toContain("Auto ACTION REQUIRED");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("marks no-shared recommendation as action required when resolved_preferred_agent is missing", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")
@@ -1101,21 +1227,26 @@ describe("voratiq auto", () => {
         },
       );
 
-      await runAutoCommand({
+      const result = await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
         reviewerAgentIds: ["reviewer"],
         apply: true,
       });
+
+      expect(result.auto.status).toBe("action_required");
+      expect(result.apply.status).toBe("skipped");
+      expect(result.exitCode).toBe(1);
     });
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     expect(stripAnsi(stdout.join(""))).toContain(
-      "Recommendation is missing `resolved_preferred_agent`.",
+      "Warning: No resolvable recommendation was produced. Review manually and apply the best solution.",
     );
-    expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
+    expect(stripAnsi(stdout.join(""))).toContain("Auto ACTION REQUIRED");
+    expect(process.exitCode).toBe(1);
   });
 
-  it("fails when only aliased preferred_agent is present", async () => {
+  it("marks aliased-only recommendation as action required when no resolved candidate is available", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")
@@ -1138,18 +1269,23 @@ describe("voratiq auto", () => {
         },
       );
 
-      await runAutoCommand({
+      const result = await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
         reviewerAgentIds: ["reviewer"],
         apply: true,
       });
+
+      expect(result.auto.status).toBe("action_required");
+      expect(result.apply.status).toBe("skipped");
+      expect(result.exitCode).toBe(1);
     });
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     expect(stripAnsi(stdout.join(""))).toContain(
-      "Recommendation is missing `resolved_preferred_agent`.",
+      "Warning: No resolvable recommendation was produced. Review manually and apply the best solution.",
     );
-    expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
+    expect(stripAnsi(stdout.join(""))).toContain("Auto ACTION REQUIRED");
+    expect(process.exitCode).toBe(1);
   });
 
   it("passes --commit through to apply when --apply is enabled", async () => {
@@ -1200,11 +1336,15 @@ describe("voratiq auto", () => {
     runReviewCommandMock.mockResolvedValue(buildReviewResult());
 
     await withTempRepo(async () => {
-      await runAutoCommand({
+      const result = await runAutoCommand({
         specPath: ".voratiq/specs/existing.md",
         reviewerAgentIds: ["reviewer"],
         apply: true,
       });
+
+      expect(result.auto.status).toBe("failed");
+      expect(result.apply.status).toBe("failed");
+      expect(result.exitCode).toBe(1);
     });
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();

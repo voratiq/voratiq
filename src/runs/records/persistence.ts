@@ -23,6 +23,7 @@ import {
 import { acquireHistoryLock } from "./history-lock.js";
 import {
   type RunApplyStatus,
+  type RunAutoOutcome,
   type RunRecord,
   runRecordSchema,
 } from "./types.js";
@@ -135,7 +136,7 @@ const runPersistence = createSessionPersistence<
     }
     return result.data;
   },
-  mergeRecordOnFlush: (buffered, disk) => mergeApplyStatus(buffered, disk),
+  mergeRecordOnFlush: (buffered, disk) => mergeRunMetaStatus(buffered, disk),
   buildIndexEntry: (record) => ({
     runId: record.runId,
     createdAt: record.createdAt,
@@ -343,21 +344,37 @@ function shouldForceFlush(status: RunRecord["status"]): boolean {
   return status !== "running" && status !== "queued";
 }
 
-function mergeApplyStatus(buffered: RunRecord, disk?: RunRecord): RunRecord {
+function mergeRunMetaStatus(buffered: RunRecord, disk?: RunRecord): RunRecord {
   const latest = pickLatestApplyStatus(buffered.applyStatus, disk?.applyStatus);
-  if (!latest) {
-    return buffered;
+  const latestAuto = pickLatestAutoOutcome(buffered.auto, disk?.auto);
+
+  let merged = buffered;
+  if (latest) {
+    const bufferedStatus = buffered.applyStatus;
+    if (!bufferedStatus || !areSameApplyStatus(bufferedStatus, latest)) {
+      merged = {
+        ...merged,
+        applyStatus: { ...latest },
+      };
+    }
   }
 
-  const bufferedStatus = buffered.applyStatus;
-  if (bufferedStatus && areSameApplyStatus(bufferedStatus, latest)) {
-    return buffered;
+  if (latestAuto) {
+    const bufferedAuto = merged.auto;
+    if (!bufferedAuto || !areSameAutoOutcome(bufferedAuto, latestAuto)) {
+      merged = {
+        ...merged,
+        auto: {
+          ...latestAuto,
+          apply: {
+            ...latestAuto.apply,
+          },
+        },
+      };
+    }
   }
 
-  return {
-    ...buffered,
-    applyStatus: { ...latest },
-  };
+  return merged;
 }
 
 function pickLatestApplyStatus(
@@ -402,6 +419,51 @@ function areSameApplyStatus(a: RunApplyStatus, b: RunApplyStatus): boolean {
     a.ignoredBaseMismatch === b.ignoredBaseMismatch &&
     a.appliedCommitSha === b.appliedCommitSha &&
     (a.detail ?? undefined) === (b.detail ?? undefined)
+  );
+}
+
+function pickLatestAutoOutcome(
+  buffered?: RunAutoOutcome,
+  disk?: RunAutoOutcome,
+): RunAutoOutcome | undefined {
+  if (!buffered) {
+    return disk;
+  }
+  if (!disk) {
+    return buffered;
+  }
+
+  return compareAutoOutcome(buffered, disk) >= 0 ? buffered : disk;
+}
+
+function compareAutoOutcome(a: RunAutoOutcome, b: RunAutoOutcome): number {
+  const aTime = Date.parse(a.completedAt);
+  const bTime = Date.parse(b.completedAt);
+
+  const aValid = Number.isFinite(aTime);
+  const bValid = Number.isFinite(bTime);
+
+  if (aValid && bValid) {
+    return aTime - bTime;
+  }
+  if (aValid) {
+    return 1;
+  }
+  if (bValid) {
+    return -1;
+  }
+
+  return a.completedAt.localeCompare(b.completedAt);
+}
+
+function areSameAutoOutcome(a: RunAutoOutcome, b: RunAutoOutcome): boolean {
+  return (
+    a.status === b.status &&
+    a.completedAt === b.completedAt &&
+    (a.detail ?? undefined) === (b.detail ?? undefined) &&
+    a.apply.status === b.apply.status &&
+    (a.apply.agentId ?? undefined) === (b.apply.agentId ?? undefined) &&
+    (a.apply.detail ?? undefined) === (b.apply.detail ?? undefined)
   );
 }
 

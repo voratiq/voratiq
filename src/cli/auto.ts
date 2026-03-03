@@ -9,7 +9,13 @@ import {
 import { resolveCliContext } from "../preflight/index.js";
 import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
 import { renderCliError } from "../render/utils/errors.js";
-import type { RunStatus } from "../status/index.js";
+import { rewriteRunRecord } from "../runs/records/persistence.js";
+import type {
+  AutoApplyStatus,
+  AutoTerminalStatus,
+  RunAutoOutcome,
+} from "../runs/records/types.js";
+import { mapRunStatusToExitCode, type RunStatus } from "../status/index.js";
 import { formatAlertMessage } from "../utils/output.js";
 import { normalizePathForDisplay, resolveDisplayPath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
@@ -38,6 +44,14 @@ export interface AutoCommandResult {
   runId?: string;
   reviewOutputPath?: string;
   appliedAgentId?: string;
+  auto: {
+    status: AutoTerminalStatus;
+    detail?: string;
+  };
+  apply: {
+    status: AutoApplyStatus;
+    detail?: string;
+  };
 }
 
 interface AutoRuntimeOptions {
@@ -86,7 +100,7 @@ function assertAutoOptionCompatibility(options: AutoCommandOptions): void {
 
 interface AutoRecommendationLoadResult {
   recommendationPath: string;
-  preferredAgent: string;
+  preferredAgent?: string;
 }
 
 interface ReviewerRecommendation extends AutoRecommendationLoadResult {
@@ -156,18 +170,13 @@ async function loadReviewerRecommendationsForAuto(options: {
 
 function resolvePreferredAgentForAuto(options: {
   recommendation: ReviewRecommendation;
-}): string {
+}): string | undefined {
   const { recommendation } = options;
   const resolvedPreferredAgent =
     recommendation.resolved_preferred_agent?.trim();
-  if (!resolvedPreferredAgent) {
-    throw new CliError(
-      "Recommendation is missing `resolved_preferred_agent`.",
-      [],
-      ["Re-run `voratiq review` to regenerate `recommendation.json`."],
-    );
-  }
-  return resolvedPreferredAgent;
+  return resolvedPreferredAgent && resolvedPreferredAgent.length > 0
+    ? resolvedPreferredAgent
+    : undefined;
 }
 
 function resolveRecommendedAgent(options: {
@@ -206,6 +215,83 @@ function resolveRecommendedAgent(options: {
   return normalizedPreferredAgent;
 }
 
+function resolveAutoTerminalStatus(options: {
+  hardFailure: boolean;
+  actionRequired: boolean;
+}): AutoTerminalStatus {
+  if (options.hardFailure) {
+    return "failed";
+  }
+  if (options.actionRequired) {
+    return "action_required";
+  }
+  return "succeeded";
+}
+
+function mapAutoTerminalStatusToExitCode(status: AutoTerminalStatus): number {
+  return status === "succeeded" ? 0 : 1;
+}
+
+function truncateOutcomeDetail(detail?: string): string | undefined {
+  if (!detail) {
+    return undefined;
+  }
+  const trimmed = detail.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+  return trimmed.length > 256 ? trimmed.slice(0, 256) : trimmed;
+}
+
+function resolveAutoTerminalDetail(options: {
+  status: AutoTerminalStatus;
+  actionRequiredDetail?: string;
+  applyDetail?: string;
+  reviewDetail?: string;
+  runDetail?: string;
+}): string | undefined {
+  if (options.status === "action_required") {
+    return truncateOutcomeDetail(
+      options.actionRequiredDetail ?? options.applyDetail,
+    );
+  }
+
+  if (options.status === "failed") {
+    return truncateOutcomeDetail(
+      options.applyDetail ?? options.reviewDetail ?? options.runDetail,
+    );
+  }
+
+  return undefined;
+}
+
+async function persistAutoOutcome(options: {
+  runId?: string;
+  outcome: RunAutoOutcome;
+}): Promise<void> {
+  const { runId, outcome } = options;
+  if (!runId) {
+    return;
+  }
+
+  try {
+    const { root, workspacePaths } = await resolveCliContext();
+    await rewriteRunRecord({
+      root,
+      runsFilePath: workspacePaths.runsFile,
+      runId,
+      mutate: (record) => ({
+        ...record,
+        auto: outcome,
+      }),
+      forceFlush: true,
+    });
+  } catch {
+    // Keep auto command behavior resilient in unit tests and non-standard
+    // harnesses where run records may be mocked or unavailable.
+  }
+}
+
 export async function runAutoCommand(
   options: AutoCommandOptions,
   runtime: AutoRuntimeOptions = {},
@@ -218,7 +304,9 @@ export async function runAutoCommand(
   const chainedOutput = beginChainedCommandOutput();
 
   try {
-    let exitCode = 0;
+    let hardFailure = false;
+    let actionRequired = false;
+    let actionRequiredDetail: string | undefined;
 
     let runStartedAt: number | undefined;
     let runStatus: "succeeded" | "failed" | "skipped" = "skipped";
@@ -238,9 +326,22 @@ export async function runAutoCommand(
     let reviewResults: ReviewCommandResult["reviews"] | undefined;
 
     let applyStartedAt: number | undefined;
-    let applyStatus: "succeeded" | "failed" | "skipped" = "skipped";
+    let applyStatus: AutoApplyStatus = "skipped";
     let applyAgentId: string | undefined;
     let applyDetail: string | undefined;
+
+    const markActionRequired = (
+      detail: string,
+      warningMessage: string,
+    ): void => {
+      actionRequired = true;
+      actionRequiredDetail = detail;
+      applyStatus = "skipped";
+      applyDetail = detail;
+      writeCommandOutput({
+        body: formatAlertMessage("Warning", "yellow", warningMessage),
+      });
+    };
 
     let resolvedSpecPath = options.specPath;
 
@@ -256,12 +357,12 @@ export async function runAutoCommand(
         resolvedSpecPath = specResult.outputPath;
         writeCommandOutput({ body: specResult.body });
       } catch (error) {
-        exitCode = 1;
+        hardFailure = true;
         writeCommandOutput({ body: renderCliError(toCliError(error)) });
       }
     }
 
-    if (exitCode === 0 && resolvedSpecPath) {
+    if (!hardFailure && resolvedSpecPath) {
       runStartedAt = now();
 
       try {
@@ -284,7 +385,29 @@ export async function runAutoCommand(
           stderr: chainedOutput.stderr,
         });
 
-        runStatus = "succeeded";
+        const expectedRunExitCode = mapRunStatusToExitCode(
+          runResult.report.status,
+        );
+        const resolvedRunExitCode =
+          typeof runResult.exitCode === "number"
+            ? runResult.exitCode
+            : expectedRunExitCode;
+
+        if (
+          typeof runResult.exitCode === "number" &&
+          runResult.exitCode !== expectedRunExitCode
+        ) {
+          throw new CliError(
+            "Run status/exit code mismatch.",
+            [
+              `Status: \`${runResult.report.status}\`.`,
+              `Exit code: ${runResult.exitCode}.`,
+            ],
+            ["Re-run the command; run outcome signaling was inconsistent."],
+          );
+        }
+
+        runStatus = resolvedRunExitCode === 0 ? "succeeded" : "failed";
         runId = runResult.report.runId;
         runRecordStatus = runResult.report.status;
         runCreatedAt = runResult.report.createdAt;
@@ -292,20 +415,26 @@ export async function runAutoCommand(
         runBaseRevisionSha = runResult.report.baseRevisionSha;
         runAgentIds = runResult.report.agents.map((agent) => agent.agentId);
 
-        if (runResult.exitCode === 1) {
-          exitCode = 1;
+        if (runStatus === "failed") {
+          const statusDetail = runRecordStatus
+            ? `status \`${runRecordStatus}\``
+            : "a non-success status";
+          runDetail =
+            runDetail ??
+            `Run completed with ${statusDetail} (exit code ${resolvedRunExitCode}).`;
+          hardFailure = true;
         }
 
         writeCommandOutput({ body: runResult.body });
       } catch (error) {
         runStatus = "failed";
         runDetail = toCliError(error).headline;
-        exitCode = 1;
+        hardFailure = true;
         writeCommandOutput({ body: renderCliError(toCliError(error)) });
       }
     }
 
-    if (exitCode === 0 || runId) {
+    if (!hardFailure || runId) {
       if (!runId) {
         reviewStatus = "skipped";
       } else {
@@ -333,7 +462,7 @@ export async function runAutoCommand(
           if (reviewResult.exitCode === 1) {
             reviewStatus = "failed";
             reviewDetail = "One or more reviewers failed.";
-            exitCode = 1;
+            hardFailure = true;
           }
 
           writeCommandOutput({
@@ -343,7 +472,7 @@ export async function runAutoCommand(
         } catch (error) {
           reviewStatus = "failed";
           reviewDetail = toCliError(error).headline;
-          exitCode = 1;
+          hardFailure = true;
           writeCommandOutput({ body: renderCliError(toCliError(error)) });
         }
       }
@@ -357,8 +486,8 @@ export async function runAutoCommand(
     ) {
       applyStartedAt = now();
       try {
-        let recommendationPath: string;
-        let preferredAgent: string;
+        let recommendationPath: string | undefined;
+        let preferredAgent: string | undefined;
 
         if (reviewResultCount <= 1) {
           const recommendationResult = await loadAutoRecommendation({
@@ -366,52 +495,59 @@ export async function runAutoCommand(
           });
           recommendationPath = recommendationResult.recommendationPath;
           preferredAgent = recommendationResult.preferredAgent;
+          if (!preferredAgent) {
+            markActionRequired(
+              "No resolvable recommendation was produced; manual arbitration required.",
+              "No resolvable recommendation was produced. Review manually and apply the best solution.",
+            );
+          }
         } else if (reviewResults && reviewResults.length > 0) {
           const reviewerRecommendations =
             await loadReviewerRecommendationsForAuto({
               reviews: reviewResults,
             });
           if (reviewerRecommendations.length === 0) {
-            throw new CliError(
-              "Failed to resolve reviewer recommendation.",
-              [],
-              ["Re-run `voratiq review` to regenerate review artifacts."],
+            markActionRequired(
+              "No shared reviewer recommendation could be resolved; manual arbitration required.",
+              "No shared recommendation was resolved. Review manually and apply the best solution.",
             );
-          }
-          const preferredByReviewer = new Map(
-            reviewerRecommendations.map((recommendation) => [
-              recommendation.reviewerAgentId,
-              recommendation.preferredAgent,
-            ]),
-          );
-          const distinctPreferredAgents = new Set(preferredByReviewer.values());
-
-          if (distinctPreferredAgents.size === 1) {
-            const unanimousPreferredAgent =
-              [...distinctPreferredAgents][0] ?? "";
-            const firstRecommendation = reviewerRecommendations[0];
-            if (!firstRecommendation) {
-              throw new CliError(
-                "Failed to resolve reviewer recommendation.",
-                [],
-                ["Re-run `voratiq review` to regenerate review artifacts."],
-              );
-            }
-            recommendationPath = firstRecommendation.recommendationPath;
-            preferredAgent = unanimousPreferredAgent;
           } else {
-            applyStatus = "skipped";
-            applyDetail =
-              "Reviewers disagreed on preferred candidate; manual arbitration required.";
-            writeCommandOutput({
-              body: formatAlertMessage(
-                "Warning",
-                "yellow",
-                "Reviewers disagreed. Review manually and apply the best solution.",
-              ),
-            });
-            recommendationPath = "";
-            preferredAgent = "";
+            const resolvedPreferredAgents = reviewerRecommendations
+              .map(
+                (recommendation) => recommendation.preferredAgent?.trim() ?? "",
+              )
+              .filter((agent): agent is string => agent.length > 0);
+
+            if (
+              resolvedPreferredAgents.length !== reviewerRecommendations.length
+            ) {
+              markActionRequired(
+                "No shared reviewer recommendation could be resolved; manual arbitration required.",
+                "No shared recommendation was resolved. Review manually and apply the best solution.",
+              );
+            } else {
+              const distinctPreferredAgents = new Set(resolvedPreferredAgents);
+
+              if (distinctPreferredAgents.size === 1) {
+                const unanimousPreferredAgent =
+                  [...distinctPreferredAgents][0] ?? "";
+                const firstRecommendation = reviewerRecommendations[0];
+                if (!firstRecommendation) {
+                  throw new CliError(
+                    "Failed to resolve reviewer recommendation.",
+                    [],
+                    ["Re-run `voratiq review` to regenerate review artifacts."],
+                  );
+                }
+                recommendationPath = firstRecommendation.recommendationPath;
+                preferredAgent = unanimousPreferredAgent;
+              } else {
+                markActionRequired(
+                  "Reviewers disagreed on preferred candidate; manual arbitration required.",
+                  "Reviewers disagreed. Review manually and apply the best solution.",
+                );
+              }
+            }
           }
         } else {
           throw new CliError(
@@ -421,7 +557,7 @@ export async function runAutoCommand(
           );
         }
 
-        if (!preferredAgent) {
+        if (!preferredAgent || !recommendationPath) {
           // Apply intentionally skipped because reviewers did not converge.
         } else {
           const recommendedAgentId = resolveRecommendedAgent({
@@ -444,13 +580,15 @@ export async function runAutoCommand(
             exitCode: applyResult.exitCode,
           });
           if (applyResult.exitCode === 1) {
-            exitCode = 1;
+            applyStatus = "failed";
+            applyDetail = "Apply stage reported a non-zero exit code.";
+            hardFailure = true;
           }
         }
       } catch (error) {
         applyStatus = "failed";
         applyDetail = toCliError(error).headline;
-        exitCode = 1;
+        hardFailure = true;
         writeCommandOutput({ body: renderCliError(toCliError(error)) });
       }
     }
@@ -463,7 +601,39 @@ export async function runAutoCommand(
     const applyDurationMs =
       applyStartedAt !== undefined ? now() - applyStartedAt : undefined;
 
+    const autoStatus = resolveAutoTerminalStatus({
+      hardFailure,
+      actionRequired,
+    });
+    const autoDetail = resolveAutoTerminalDetail({
+      status: autoStatus,
+      actionRequiredDetail,
+      applyDetail,
+      reviewDetail,
+      runDetail,
+    });
+    const normalizedApplyDetail = truncateOutcomeDetail(applyDetail);
+
+    const autoOutcome: RunAutoOutcome = {
+      status: autoStatus,
+      completedAt: new Date(now()).toISOString(),
+      ...(autoDetail ? { detail: autoDetail } : {}),
+      apply: {
+        status: applyStatus,
+        ...(applyAgentId ? { agentId: applyAgentId } : {}),
+        ...(normalizedApplyDetail ? { detail: normalizedApplyDetail } : {}),
+      },
+    };
+
+    await persistAutoOutcome({
+      runId,
+      outcome: autoOutcome,
+    });
+
+    const exitCode = mapAutoTerminalStatusToExitCode(autoStatus);
+
     const summaryBody = renderAutoSummaryTranscript({
+      status: autoStatus,
       totalDurationMs: overallDurationMs,
       run: {
         status: runStatus,
@@ -485,18 +655,14 @@ export async function runAutoCommand(
         ...(reviewOutputPath ? { outputPath: reviewOutputPath } : {}),
         ...(reviewDetail ? { detail: reviewDetail } : {}),
       },
-      ...(options.apply
-        ? {
-            apply: {
-              status: applyStatus,
-              ...(typeof applyDurationMs === "number"
-                ? { durationMs: applyDurationMs }
-                : {}),
-              ...(applyAgentId ? { agentId: applyAgentId } : {}),
-              ...(applyDetail ? { detail: applyDetail } : {}),
-            },
-          }
-        : {}),
+      apply: {
+        status: applyStatus,
+        ...(typeof applyDurationMs === "number"
+          ? { durationMs: applyDurationMs }
+          : {}),
+        ...(applyAgentId ? { agentId: applyAgentId } : {}),
+        ...(normalizedApplyDetail ? { detail: normalizedApplyDetail } : {}),
+      },
     });
 
     writeCommandOutput({
@@ -509,6 +675,14 @@ export async function runAutoCommand(
       runId,
       reviewOutputPath,
       ...(applyAgentId ? { appliedAgentId: applyAgentId } : {}),
+      auto: {
+        status: autoStatus,
+        ...(autoDetail ? { detail: autoDetail } : {}),
+      },
+      apply: {
+        status: applyStatus,
+        ...(normalizedApplyDetail ? { detail: normalizedApplyDetail } : {}),
+      },
     };
   } finally {
     chainedOutput.end();

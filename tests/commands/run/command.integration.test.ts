@@ -267,6 +267,332 @@ describe("executeRunCommand integration", () => {
     expect(report).toEqual(runReport);
   });
 
+  it("marks the run succeeded when at least one agent succeeds in a mixed outcome", async () => {
+    generateRunIdMock.mockReturnValue("run-mixed");
+    resolveStageCompetitorsMock.mockReturnValue({
+      source: "orchestration",
+      agentIds: ["alpha", "beta"],
+      competitors: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+        {
+          id: "beta",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+    });
+
+    const createdAt = "2025-11-10T01:00:00.000Z";
+    const validationResult: ValidationResult = {
+      specContent: "Implement feature",
+      baseRevisionSha: "abc123",
+      agents: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+        {
+          id: "beta",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+      evalPlan: [],
+      effectiveMaxParallel: 2,
+      environment: {},
+    };
+    validateAndPrepareMock.mockResolvedValue(validationResult);
+
+    prepareRunWorkspaceMock.mockResolvedValue({
+      runWorkspace: {
+        absolute: "/tmp/run-workspace",
+        relative: ".voratiq/runs/sessions/run-mixed",
+      },
+    });
+
+    const initialRecord: RunRecord = {
+      runId: "run-mixed",
+      baseRevisionSha: validationResult.baseRevisionSha,
+      rootPath: ".",
+      spec: { path: "spec.md" },
+      status: "running",
+      createdAt,
+      agents: [],
+      deletedAt: null,
+    };
+    initializeRunRecordMock.mockResolvedValue({
+      initialRecord,
+      recordPersisted: true,
+    });
+
+    createAgentRecordMutatorsMock.mockReturnValue({
+      recordAgentQueued: jest.fn(() => Promise.resolve()),
+      recordAgentSnapshot: jest.fn(() => Promise.resolve()),
+    });
+
+    const agentRecords: AgentInvocationRecord[] = [
+      {
+        agentId: "alpha",
+        model: "claude-3",
+        status: "succeeded",
+        startedAt: "2025-11-10T01:00:00.000Z",
+        completedAt: "2025-11-10T01:10:00.000Z",
+        evals: [],
+      },
+      {
+        agentId: "beta",
+        model: "claude-3",
+        status: "failed",
+        startedAt: "2025-11-10T01:00:00.000Z",
+        completedAt: "2025-11-10T01:05:00.000Z",
+        evals: [],
+        error: "agent failed",
+      },
+    ];
+
+    const agentReports: AgentReport[] = [
+      {
+        agentId: "alpha",
+        status: "succeeded",
+        runtimeManifestPath: "/repo/alpha.json",
+        baseDirectory: "/repo/alpha",
+        assets: {},
+        evals: [],
+        startedAt: "2025-11-10T01:00:00.000Z",
+        completedAt: "2025-11-10T01:10:00.000Z",
+        diffAttempted: false,
+        diffCaptured: false,
+      },
+      {
+        agentId: "beta",
+        status: "failed",
+        runtimeManifestPath: "/repo/beta.json",
+        baseDirectory: "/repo/beta",
+        assets: {},
+        evals: [],
+        error: "agent failed",
+        startedAt: "2025-11-10T01:00:00.000Z",
+        completedAt: "2025-11-10T01:05:00.000Z",
+        diffAttempted: false,
+        diffCaptured: false,
+      },
+    ];
+
+    const executionResult: AgentExecutionPhaseResult = {
+      agentRecords,
+      agentReports,
+      hadAgentFailure: true,
+      hadEvalFailure: false,
+    };
+    executeAgentsMock.mockResolvedValue(executionResult);
+
+    let mutatedRecord: RunRecord | undefined;
+    rewriteRunRecordMock.mockImplementation(({ mutate }) => {
+      mutatedRecord = mutate(initialRecord);
+      return Promise.resolve(mutatedRecord);
+    });
+
+    const runReport: RunReport = {
+      runId: "run-mixed",
+      spec: initialRecord.spec,
+      status: "succeeded",
+      createdAt,
+      baseRevisionSha: initialRecord.baseRevisionSha,
+      agents: agentReports,
+      hadAgentFailure: true,
+      hadEvalFailure: false,
+    };
+    toRunReportMock.mockReturnValue(runReport);
+
+    const report = await executeRunCommand({
+      root: "/repo",
+      runsFilePath: "/repo/runs.json",
+      specAbsolutePath: "/repo/spec.md",
+      specDisplayPath: "spec.md",
+    });
+
+    expect(mutatedRecord?.status).toBe("succeeded");
+    expect(report.status).toBe("succeeded");
+    expect(report.hadAgentFailure).toBe(true);
+  });
+
+  it("marks the run failed when no agents succeed", async () => {
+    generateRunIdMock.mockReturnValue("run-no-success");
+    resolveStageCompetitorsMock.mockReturnValue({
+      source: "orchestration",
+      agentIds: ["alpha", "beta"],
+      competitors: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+        {
+          id: "beta",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+    });
+
+    const createdAt = "2025-11-10T02:00:00.000Z";
+    const validationResult: ValidationResult = {
+      specContent: "Implement feature",
+      baseRevisionSha: "abc123",
+      agents: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+        {
+          id: "beta",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+      evalPlan: [],
+      effectiveMaxParallel: 2,
+      environment: {},
+    };
+    validateAndPrepareMock.mockResolvedValue(validationResult);
+
+    prepareRunWorkspaceMock.mockResolvedValue({
+      runWorkspace: {
+        absolute: "/tmp/run-workspace",
+        relative: ".voratiq/runs/sessions/run-no-success",
+      },
+    });
+
+    const initialRecord: RunRecord = {
+      runId: "run-no-success",
+      baseRevisionSha: validationResult.baseRevisionSha,
+      rootPath: ".",
+      spec: { path: "spec.md" },
+      status: "running",
+      createdAt,
+      agents: [],
+      deletedAt: null,
+    };
+    initializeRunRecordMock.mockResolvedValue({
+      initialRecord,
+      recordPersisted: true,
+    });
+
+    createAgentRecordMutatorsMock.mockReturnValue({
+      recordAgentQueued: jest.fn(() => Promise.resolve()),
+      recordAgentSnapshot: jest.fn(() => Promise.resolve()),
+    });
+
+    const agentRecords: AgentInvocationRecord[] = [
+      {
+        agentId: "alpha",
+        model: "claude-3",
+        status: "errored",
+        startedAt: "2025-11-10T02:00:00.000Z",
+        completedAt: "2025-11-10T02:01:00.000Z",
+        evals: [],
+        error: "runtime error",
+      },
+      {
+        agentId: "beta",
+        model: "claude-3",
+        status: "errored",
+        startedAt: "2025-11-10T02:00:00.000Z",
+        completedAt: "2025-11-10T02:01:00.000Z",
+        evals: [],
+        error: "runtime error",
+      },
+    ];
+
+    const agentReports: AgentReport[] = [
+      {
+        agentId: "alpha",
+        status: "errored",
+        runtimeManifestPath: "/repo/alpha.json",
+        baseDirectory: "/repo/alpha",
+        assets: {},
+        evals: [],
+        error: "runtime error",
+        startedAt: "2025-11-10T02:00:00.000Z",
+        completedAt: "2025-11-10T02:01:00.000Z",
+        diffAttempted: false,
+        diffCaptured: false,
+      },
+      {
+        agentId: "beta",
+        status: "errored",
+        runtimeManifestPath: "/repo/beta.json",
+        baseDirectory: "/repo/beta",
+        assets: {},
+        evals: [],
+        error: "runtime error",
+        startedAt: "2025-11-10T02:00:00.000Z",
+        completedAt: "2025-11-10T02:01:00.000Z",
+        diffAttempted: false,
+        diffCaptured: false,
+      },
+    ];
+
+    const executionResult: AgentExecutionPhaseResult = {
+      agentRecords,
+      agentReports,
+      hadAgentFailure: true,
+      hadEvalFailure: false,
+    };
+    executeAgentsMock.mockResolvedValue(executionResult);
+
+    let mutatedRecord: RunRecord | undefined;
+    rewriteRunRecordMock.mockImplementation(({ mutate }) => {
+      mutatedRecord = mutate(initialRecord);
+      return Promise.resolve(mutatedRecord);
+    });
+
+    const runReport: RunReport = {
+      runId: "run-no-success",
+      spec: initialRecord.spec,
+      status: "failed",
+      createdAt,
+      baseRevisionSha: initialRecord.baseRevisionSha,
+      agents: agentReports,
+      hadAgentFailure: true,
+      hadEvalFailure: false,
+    };
+    toRunReportMock.mockReturnValue(runReport);
+
+    const report = await executeRunCommand({
+      root: "/repo",
+      runsFilePath: "/repo/runs.json",
+      specAbsolutePath: "/repo/spec.md",
+      specDisplayPath: "spec.md",
+    });
+
+    expect(mutatedRecord?.status).toBe("failed");
+    expect(report.status).toBe("failed");
+    expect(report.hadAgentFailure).toBe(true);
+  });
+
   it("preserves aborted run status if finalization races with an abort", async () => {
     generateRunIdMock.mockReturnValue("run-aborted");
     const createdAt = "2025-11-10T00:00:00.000Z";
@@ -420,6 +746,69 @@ describe("executeRunCommand integration", () => {
       executionResult.hadEvalFailure,
     );
     expect(report).toEqual(runReport);
+  });
+
+  it("persists an errored run status when orchestration fails", async () => {
+    generateRunIdMock.mockReturnValue("run-orchestration-error");
+    validateAndPrepareMock.mockResolvedValue({
+      specContent: "Implement feature",
+      baseRevisionSha: "abc123",
+      agents: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+      evalPlan: [],
+      effectiveMaxParallel: 1,
+      environment: {},
+    });
+    prepareRunWorkspaceMock.mockResolvedValue({
+      runWorkspace: {
+        absolute: "/tmp/run-workspace",
+        relative: ".voratiq/runs/sessions/run-orchestration-error",
+      },
+    });
+    const initialRecord: RunRecord = {
+      runId: "run-orchestration-error",
+      baseRevisionSha: "abc123",
+      rootPath: ".",
+      spec: { path: "spec.md" },
+      status: "running",
+      createdAt: "2025-11-10T00:00:00.000Z",
+      agents: [],
+      deletedAt: null,
+    };
+    initializeRunRecordMock.mockResolvedValue({
+      initialRecord,
+      recordPersisted: true,
+    });
+    createAgentRecordMutatorsMock.mockReturnValue({
+      recordAgentQueued: jest.fn(() => Promise.resolve()),
+      recordAgentSnapshot: jest.fn(() => Promise.resolve()),
+    });
+    executeAgentsMock.mockRejectedValue(new Error("orchestration exploded"));
+
+    let mutatedRecord: RunRecord | undefined;
+    rewriteRunRecordMock.mockImplementation(({ mutate }) => {
+      mutatedRecord = mutate(initialRecord);
+      return Promise.resolve(mutatedRecord);
+    });
+
+    await expect(
+      executeRunCommand({
+        root: "/repo",
+        runsFilePath: "/repo/runs.json",
+        specAbsolutePath: "/repo/spec.md",
+        specDisplayPath: "spec.md",
+      }),
+    ).rejects.toThrow("orchestration exploded");
+
+    expect(mutatedRecord?.status).toBe("errored");
+    expect(toRunReportMock).not.toHaveBeenCalled();
   });
 
   it("tears down run auth exactly once when execution throws", async () => {
