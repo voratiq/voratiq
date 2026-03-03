@@ -64,4 +64,23 @@ describe("runRecordSchema", () => {
     const parsed = runRecordSchema.parse(withDetail);
     expect(parsed.applyStatus?.detail).toBe("detail");
   });
+
+  it("parses persisted auto outcome with action_required and skipped apply", () => {
+    const withAutoOutcome = {
+      ...baseRunRecord,
+      auto: {
+        status: "action_required" as const,
+        completedAt: "2025-01-01T03:00:00.000Z",
+        detail: "manual arbitration required",
+        apply: {
+          status: "skipped" as const,
+          detail: "no shared recommendation",
+        },
+      },
+    };
+
+    const parsed = runRecordSchema.parse(withAutoOutcome);
+    expect(parsed.auto?.status).toBe("action_required");
+    expect(parsed.auto?.apply.status).toBe("skipped");
+  });
 });

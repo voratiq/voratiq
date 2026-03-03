@@ -1,4 +1,5 @@
 import { getRunStatusStyle } from "../../status/colors.js";
+import type { AutoTerminalStatus } from "../../runs/records/types.js";
 import type { RunStatus } from "../../status/index.js";
 import { colorize } from "../../utils/colors.js";
 import { formatDurationLabel } from "../utils/agents.js";
@@ -13,6 +14,7 @@ export interface AutoPhaseSummary {
 }
 
 export interface AutoSummaryInput {
+  status: AutoTerminalStatus;
   totalDurationMs: number;
   run: AutoPhaseSummary & {
     runId?: string;
@@ -27,13 +29,20 @@ export interface AutoSummaryInput {
 
 export function renderAutoSummaryTranscript(input: AutoSummaryInput): string {
   const totalDuration = formatDurationLabel(input.totalDurationMs) ?? "—";
-  const autoSucceeded =
-    input.run.status !== "failed" &&
-    input.review.status !== "failed" &&
-    input.apply?.status !== "failed";
-  const runStatus: RunStatus = autoSucceeded ? "succeeded" : "failed";
-  const statusLabel = autoSucceeded ? "SUCCEEDED" : "FAILED";
-  const statusStyle = getRunStatusStyle(runStatus);
+  const statusLabel =
+    input.status === "action_required"
+      ? "ACTION REQUIRED"
+      : input.status === "succeeded"
+        ? "SUCCEEDED"
+        : "FAILED";
+  const statusStyle =
+    input.status === "action_required"
+      ? { cli: "yellow" as const }
+      : getRunStatusStyle(
+          (input.status === "succeeded"
+            ? "succeeded"
+            : "failed") satisfies RunStatus,
+        );
   const lines: string[] = [
     `Auto ${colorize(statusLabel, statusStyle.cli)} (${totalDuration})`,
   ];

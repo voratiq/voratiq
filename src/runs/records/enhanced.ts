@@ -13,6 +13,7 @@ import {
 import type {
   AgentEvalSnapshot,
   AgentStatus,
+  RunAutoOutcome,
   RunApplyStatus,
   RunRecord,
   RunSpecDescriptor,
@@ -48,6 +49,7 @@ export interface RunRecordEnhanced {
   agents: AgentInvocationEnhanced[];
   deletedAt?: string | null;
   applyStatus?: RunApplyStatus;
+  auto?: RunAutoOutcome;
 }
 
 export interface BuildRunRecordViewOptions {
@@ -125,6 +127,9 @@ export function buildRunRecordEnhanced(record: RunRecord): RunRecordEnhanced {
   }
   if (record.applyStatus) {
     enhanced.applyStatus = record.applyStatus;
+  }
+  if (record.auto) {
+    enhanced.auto = record.auto;
   }
 
   return enhanced;

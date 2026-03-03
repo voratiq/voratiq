@@ -178,6 +178,39 @@ export const applyStatusSchema = z.object({
 
 export type RunApplyStatus = z.infer<typeof applyStatusSchema>;
 
+export const AUTO_TERMINAL_STATUS_VALUES = [
+  "succeeded",
+  "failed",
+  "action_required",
+] as const;
+
+export type AutoTerminalStatus = (typeof AUTO_TERMINAL_STATUS_VALUES)[number];
+
+export const autoTerminalStatusSchema = z.enum(AUTO_TERMINAL_STATUS_VALUES);
+
+export const AUTO_APPLY_STATUS_VALUES = [
+  "succeeded",
+  "failed",
+  "skipped",
+] as const;
+
+export type AutoApplyStatus = (typeof AUTO_APPLY_STATUS_VALUES)[number];
+
+export const autoApplyStatusSchema = z.enum(AUTO_APPLY_STATUS_VALUES);
+
+export const autoOutcomeSchema = z.object({
+  status: autoTerminalStatusSchema,
+  completedAt: z.string(),
+  detail: z.string().max(256).nullable().optional(),
+  apply: z.object({
+    status: autoApplyStatusSchema,
+    agentId: agentIdSchema.optional(),
+    detail: z.string().max(256).nullable().optional(),
+  }),
+});
+
+export type RunAutoOutcome = z.infer<typeof autoOutcomeSchema>;
+
 export const runRecordSchema = z.object({
   runId: z.string(),
   baseRevisionSha: z.string(),
@@ -187,6 +220,7 @@ export const runRecordSchema = z.object({
   createdAt: z.string(),
   agents: z.array(agentInvocationRecordSchema),
   applyStatus: applyStatusSchema.optional(),
+  auto: autoOutcomeSchema.optional(),
   deletedAt: z.string().nullable().optional(),
 });
 
