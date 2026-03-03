@@ -206,6 +206,11 @@ const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     extraArgs: ["--config", "model_reasoning_effort=xhigh"],
   },
   {
+    id: "gemini-2-5-flash-lite",
+    provider: "gemini",
+    model: "gemini-2.5-flash-lite",
+  },
+  {
     id: "gemini-2-5-flash",
     provider: "gemini",
     model: "gemini-2.5-flash",
@@ -221,9 +226,9 @@ const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     model: "gemini-2.5-pro",
   },
   {
-    id: "gemini-3-pro-preview",
+    id: "gemini-3-1-pro-preview",
     provider: "gemini",
-    model: "gemini-3-pro-preview",
+    model: "gemini-3.1-pro-preview",
   },
 ] as const;
 
