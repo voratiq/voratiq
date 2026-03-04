@@ -4,11 +4,12 @@ import { dirname, join } from "node:path";
 
 import { jest } from "@jest/globals";
 
+import { runCli } from "../../src/bin.js";
 import * as applyCli from "../../src/cli/apply.js";
 import { createAutoCommand, runAutoCommand } from "../../src/cli/auto.js";
 import { writeCommandOutput } from "../../src/cli/output.js";
 import * as reviewCli from "../../src/cli/review.js";
-import * as runCli from "../../src/cli/run.js";
+import * as runCliModule from "../../src/cli/run.js";
 import * as specCli from "../../src/cli/spec.js";
 import { HintedError } from "../../src/utils/errors.js";
 import { REVIEW_RECOMMENDATION_FILENAME } from "../../src/workspace/structure.js";
@@ -37,7 +38,7 @@ jest.mock("../../src/cli/apply.js", () => ({
 }));
 
 describe("voratiq auto", () => {
-  const runRunCommandMock = jest.mocked(runCli.runRunCommand);
+  const runRunCommandMock = jest.mocked(runCliModule.runRunCommand);
   const runSpecCommandMock = jest.mocked(specCli.runSpecCommand);
   const runReviewCommandMock = jest.mocked(reviewCli.runReviewCommand);
   const runApplyCommandMock = jest.mocked(applyCli.runApplyCommand);
@@ -104,9 +105,213 @@ describe("voratiq auto", () => {
     expect(help).toContain("--profile <name>");
     expect(help).toContain("--apply");
     expect(help).toContain("--commit");
+    expect(help).toContain("Equivalent entry styles:");
+    expect(help).toContain("voratiq auto --description <text> [options]");
+    expect(help).toContain("voratiq --description <text> [options]");
     expect(help).not.toContain("--spec-agent");
     expect(help).not.toContain("--auto-init");
     expect(help).not.toContain("--no-auto-init");
+  });
+
+  it("routes root --description through auto with equivalent outcomes", async () => {
+    const fixedTimestamp = "2026-01-01T00:00:00.000Z";
+    const nowSpy = jest
+      .spyOn(Date, "now")
+      .mockReturnValue(new Date(fixedTimestamp).getTime());
+
+    runSpecCommandMock.mockResolvedValue({
+      outputPath: ".voratiq/specs/generated.md",
+      body: "Spec saved: .voratiq/specs/generated.md",
+    });
+    runRunCommandMock.mockResolvedValue({
+      report: {
+        runId: "run-flat-parity",
+        spec: { path: ".voratiq/specs/generated.md" },
+        status: "succeeded",
+        createdAt: fixedTimestamp,
+        baseRevisionSha: "deadbeef",
+        agents: [{ agentId: "runner" } as never],
+        hadAgentFailure: false,
+        hadEvalFailure: false,
+      },
+      body: "run-flat-parity SUCCEEDED",
+    });
+    runReviewCommandMock.mockResolvedValue(
+      buildReviewResult({
+        reviewId: "review-flat-parity",
+        outputPath:
+          ".voratiq/reviews/sessions/review-flat-parity/reviewer/artifacts/review.md",
+        body: "review-flat-parity SUCCEEDED",
+      }),
+    );
+
+    try {
+      const flatResult = await invokeCli([
+        "--description",
+        "Draft a migration plan",
+        "--review-agent",
+        "reviewer",
+      ]);
+      const autoResult = await invokeCli([
+        "auto",
+        "--description",
+        "Draft a migration plan",
+        "--review-agent",
+        "reviewer",
+      ]);
+
+      expect(flatResult.exitCode).toBe(0);
+      expect(flatResult.exitCode).toBe(autoResult.exitCode);
+      expect(flatResult.stderr).toBe(autoResult.stderr);
+      expect(stripAnsi(flatResult.stdout)).toBe(stripAnsi(autoResult.stdout));
+
+      expect(runSpecCommandMock).toHaveBeenCalledTimes(2);
+      expect(runRunCommandMock).toHaveBeenCalledTimes(2);
+      expect(runReviewCommandMock).toHaveBeenCalledTimes(2);
+      expect(runApplyCommandMock).not.toHaveBeenCalled();
+      expect(runSpecCommandMock).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          description: "Draft a migration plan",
+          suppressHint: true,
+        }),
+      );
+      expect(runSpecCommandMock).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          description: "Draft a migration plan",
+          suppressHint: true,
+        }),
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it("keeps root --description --apply behavior equivalent to auto --description --apply", async () => {
+    const fixedTimestamp = "2026-01-01T00:00:00.000Z";
+    const nowSpy = jest
+      .spyOn(Date, "now")
+      .mockReturnValue(new Date(fixedTimestamp).getTime());
+
+    runSpecCommandMock.mockResolvedValue({
+      outputPath: ".voratiq/specs/generated.md",
+      body: "Spec saved: .voratiq/specs/generated.md",
+    });
+    runRunCommandMock.mockResolvedValue({
+      report: {
+        runId: "run-flat-apply-parity",
+        spec: { path: ".voratiq/specs/generated.md" },
+        status: "succeeded",
+        createdAt: fixedTimestamp,
+        baseRevisionSha: "deadbeef",
+        agents: [{ agentId: "agent-good" } as never],
+        hadAgentFailure: false,
+        hadEvalFailure: false,
+      },
+      body: "run-flat-apply-parity SUCCEEDED",
+    });
+    runReviewCommandMock.mockResolvedValue(
+      buildReviewResult({
+        reviewId: "review-flat-apply-parity",
+        outputPath:
+          ".voratiq/reviews/sessions/review-flat-apply-parity/reviewer/artifacts/review.md",
+        body: "review-flat-apply-parity SUCCEEDED",
+      }),
+    );
+    runApplyCommandMock.mockResolvedValue({
+      result: {} as never,
+      body: "APPLY BODY",
+    });
+
+    try {
+      await withTempRepo(async (repoRoot) => {
+        await writeRecommendationArtifact(
+          repoRoot,
+          ".voratiq/reviews/sessions/review-flat-apply-parity/reviewer/artifacts/review.md",
+          {
+            preferred_agent: "agent-good",
+            resolved_preferred_agent: "agent-good",
+            rationale: "Best option",
+            next_actions: [
+              "voratiq apply --run run-flat-apply-parity --agent agent-good",
+            ],
+          },
+        );
+
+        const flatResult = await invokeCli([
+          "--description",
+          "Draft a migration plan",
+          "--review-agent",
+          "reviewer",
+          "--apply",
+        ]);
+        const autoResult = await invokeCli([
+          "auto",
+          "--description",
+          "Draft a migration plan",
+          "--review-agent",
+          "reviewer",
+          "--apply",
+        ]);
+
+        expect(flatResult.exitCode).toBe(0);
+        expect(flatResult.exitCode).toBe(autoResult.exitCode);
+        expect(flatResult.stderr).toBe(autoResult.stderr);
+        expect(stripAnsi(flatResult.stdout)).toBe(stripAnsi(autoResult.stdout));
+      });
+
+      expect(runSpecCommandMock).toHaveBeenCalledTimes(2);
+      expect(runRunCommandMock).toHaveBeenCalledTimes(2);
+      expect(runReviewCommandMock).toHaveBeenCalledTimes(2);
+      expect(runApplyCommandMock).toHaveBeenCalledTimes(2);
+      expect(runApplyCommandMock).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          runId: "run-flat-apply-parity",
+          agentId: "agent-good",
+          commit: false,
+        }),
+      );
+      expect(runApplyCommandMock).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          runId: "run-flat-apply-parity",
+          agentId: "agent-good",
+          commit: false,
+        }),
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it("keeps root --description failure semantics equivalent to auto --description", async () => {
+    runSpecCommandMock.mockRejectedValue(new Error("spec exploded"));
+
+    const flatResult = await invokeCli([
+      "--description",
+      "Draft a migration plan",
+      "--review-agent",
+      "reviewer",
+    ]);
+    const autoResult = await invokeCli([
+      "auto",
+      "--description",
+      "Draft a migration plan",
+      "--review-agent",
+      "reviewer",
+    ]);
+
+    expect(flatResult.exitCode).toBe(1);
+    expect(flatResult.exitCode).toBe(autoResult.exitCode);
+    expect(flatResult.stderr).toBe(autoResult.stderr);
+    expect(stripAnsi(flatResult.stdout)).toBe(stripAnsi(autoResult.stdout));
+    expect(stripAnsi(flatResult.stdout)).toContain("spec exploded");
+    expect(stripAnsi(flatResult.stdout)).toContain("Auto FAILED");
+    expect(runRunCommandMock).not.toHaveBeenCalled();
+    expect(runReviewCommandMock).not.toHaveBeenCalled();
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
   });
 
   it("parses --description", async () => {
@@ -1762,6 +1967,42 @@ function buildRunResult(agentIds: readonly string[]) {
     },
     body: "RUN BODY",
   };
+}
+
+async function invokeCli(args: readonly string[]): Promise<{
+  stdout: string;
+  stderr: string;
+  exitCode: number | string | undefined;
+}> {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const stdoutSpy = jest
+    .spyOn(process.stdout, "write")
+    .mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
+  const stderrSpy = jest
+    .spyOn(process.stderr, "write")
+    .mockImplementation((chunk: unknown) => {
+      stderr.push(String(chunk));
+      return true;
+    });
+  const originalExitCode = process.exitCode;
+  process.exitCode = undefined;
+
+  try {
+    await runCli(["node", "voratiq", ...args]);
+    return {
+      stdout: stdout.join(""),
+      stderr: stderr.join(""),
+      exitCode: process.exitCode,
+    };
+  } finally {
+    process.exitCode = originalExitCode ?? undefined;
+    stdoutSpy.mockRestore();
+    stderrSpy.mockRestore();
+  }
 }
 
 function buildReviewResult(

@@ -12,6 +12,7 @@ Complete reference for all Voratiq commands.
 - Commands exit with code 1 on operational errors
 - Most commands expect `.voratiq/` to exist (created via `voratiq init`)
 - Transcripts stream to stdout; stderr is reserved for warnings and errors
+- Flat intent style is supported: `voratiq --description <text> ...` is equivalent to `voratiq auto --description <text> ...`
 
 ## `voratiq init`
 
@@ -200,6 +201,60 @@ voratiq review --run 20251031-232802-abc123 --agent gpt-5-2-codex --agent claude
 - Reviewer authentication fails (aborts before any reviewer starts)
 - Any reviewer output contract violation (fails the overall review command)
 - Run artifacts are missing (warns but continues)
+
+## `voratiq auto`
+
+Run the full spec->run->review flow (and optionally apply) as one command.
+
+### Usage
+
+```bash
+voratiq auto (--spec <path> | --description <text>) [--run-agent <agent-id>]... [--review-agent <agent-id>]... [--profile <name>] [--max-parallel <count>] [--branch] [--apply] [--commit]
+
+# Flat entrypoint (description flow only): equivalent to the command above
+voratiq --description <text> [--run-agent <agent-id>]... [--review-agent <agent-id>]... [--profile <name>] [--max-parallel <count>] [--branch] [--apply] [--commit]
+```
+
+### Options
+
+- `--spec <path>`: Existing spec to run (mutually exclusive with `--description`)
+- `--description <text>`: Generate a spec first, then run/review it (mutually exclusive with `--spec`)
+- `--run-agent <agent-id>`: Override run-stage agents (repeatable; preserves CLI order)
+- `--review-agent <agent-id>`: Override review-stage agents (repeatable; preserves CLI order)
+- `--profile <name>`: Orchestration profile used for stage resolution (default: `default`)
+- `--max-parallel <count>`: Maximum number of agents/reviewers to run concurrently
+- `--branch`: Checkout or create a branch named after the spec
+- `--apply`: Apply the recommended candidate after review
+- `--commit`: Commit after apply (requires `--apply`)
+
+### Behavior
+
+`auto` orchestrates:
+
+1. `spec` (only when `--description` is provided)
+2. `run`
+3. `review`
+4. `apply` (only when `--apply` is set and recommendations resolve cleanly)
+
+The flat form (`voratiq --description ...`) routes to this exact `auto --description` implementation and preserves the same output and exit semantics.
+
+### Examples
+
+```bash
+# Flat and subcommand forms are equivalent
+voratiq --description "add retries to billing webhook delivery" --apply
+voratiq auto --description "add retries to billing webhook delivery" --apply
+
+# Existing spec path uses subcommand form
+voratiq auto --spec .voratiq/specs/retry-webhooks.md --review-agent gpt-5-2-codex
+```
+
+### Errors
+
+- Neither or both of `--spec` / `--description` are provided
+- `--commit` is provided without `--apply`
+- Downstream `spec`, `run`, `review`, or `apply` stage failures
+- Reviewer recommendations require manual arbitration
 
 ## `voratiq apply`
 

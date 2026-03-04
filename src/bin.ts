@@ -10,6 +10,15 @@ const SIGNAL_EXIT_CODES: Partial<Record<NodeJS.Signals, number>> = {
   SIGTERM: 143,
 };
 
+const ROOT_AUTO_DESCRIPTION_HELP_TEXT = [
+  "",
+  "Flat intent entrypoint (equivalent to `voratiq auto --description <text>`):",
+  "  voratiq --description <text> [--run-agent <agent-id>] [--review-agent <agent-id>] [--profile <name>] [--max-parallel <count>] [--branch] [--apply] [--commit]",
+  "",
+  "For an existing spec path, use:",
+  "  voratiq auto --spec <path> [options]",
+].join("\n");
+
 function installProcessGuards(): void {
   process.once("SIGINT", () => {
     void handleSignal("SIGINT");
@@ -153,12 +162,14 @@ export async function runCli(
 ): Promise<void> {
   const { Command, CommanderError } = await import("commander");
   const program = new Command();
+  const effectiveArgv = normalizeRootIntentArgv(argv);
 
   const localVersion = (await import("./utils/version.js")).getVoratiqVersion();
 
   program
     .name("voratiq")
     .description("Voratiq CLI")
+    .addHelpText("after", ROOT_AUTO_DESCRIPTION_HELP_TEXT)
     .version(localVersion, "-v, --version", "print the Voratiq version")
     .exitOverride()
     .showHelpAfterError()
@@ -203,16 +214,16 @@ export async function runCli(
       }
     }
 
-    await registerCommands(program, argv);
+    await registerCommands(program, effectiveArgv);
 
-    if (argv.length <= 2) {
+    if (effectiveArgv.length <= 2) {
       const { writeCommandOutput } = await import("./cli/output.js");
       writeCommandOutput({ body: program.helpInformation() });
       return;
     }
 
     try {
-      await program.parseAsync(argv);
+      await program.parseAsync(effectiveArgv);
     } catch (error) {
       if (error instanceof CommanderError) {
         const { commanderAlreadyRendered } = await import(
@@ -247,6 +258,43 @@ export async function runCli(
   } finally {
     updateHandle?.finish();
   }
+}
+
+function normalizeRootIntentArgv(argv: readonly string[]): readonly string[] {
+  if (!shouldRouteRootDescriptionToAuto(argv)) {
+    return argv;
+  }
+
+  const [nodePath = "node", cliPath = "voratiq"] = argv;
+  return [nodePath, cliPath, "auto", ...argv.slice(2)];
+}
+
+function shouldRouteRootDescriptionToAuto(argv: readonly string[]): boolean {
+  const firstUserArgument = argv[2];
+  if (!firstUserArgument || firstUserArgument === "--") {
+    return false;
+  }
+
+  if (!firstUserArgument.startsWith("-")) {
+    return false;
+  }
+
+  return hasRootDescriptionFlag(argv);
+}
+
+function hasRootDescriptionFlag(argv: readonly string[]): boolean {
+  for (let index = 2; index < argv.length; index += 1) {
+    const entry = argv[index];
+    if (!entry || entry === "--") {
+      return false;
+    }
+
+    if (entry === "--description" || entry.startsWith("--description=")) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function registerCommands(

@@ -58,6 +58,9 @@ interface AutoRuntimeOptions {
   now?: () => number;
 }
 
+const AUTO_ENTRYPOINT_EQUIVALENCE_TEXT =
+  "Equivalent entry styles: `voratiq auto --description <text> [options]` or `voratiq --description <text> [options]`.";
+
 function parseMaxParallelOption(value: string): number {
   return parsePositiveInteger(
     value,
@@ -758,7 +761,10 @@ interface AutoCommandActionOptions {
 export function createAutoCommand(): Command {
   return new Command("auto")
     .description(
-      "End-to-end pipeline to run agents, review results, and optionally apply",
+      [
+        "End-to-end pipeline to run agents, review results, and optionally apply",
+        AUTO_ENTRYPOINT_EQUIVALENCE_TEXT,
+      ].join("\n"),
     )
     .option("--spec <path>", "Path to an existing spec file")
     .option(
