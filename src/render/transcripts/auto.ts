@@ -16,6 +16,7 @@ export interface AutoPhaseSummary {
 export interface AutoSummaryInput {
   status: AutoTerminalStatus;
   totalDurationMs: number;
+  spec: AutoPhaseSummary & { specPath?: string };
   run: AutoPhaseSummary & {
     runId?: string;
     runStatus?: RunStatus;

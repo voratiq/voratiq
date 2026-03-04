@@ -4,11 +4,11 @@ import { colorize } from "../../src/utils/colors.js";
 
 describe("renderInitTranscript", () => {
   const noSupportedCliNote =
-    "No supported agent CLIs were detected, so no agents were added to the run stage. Verify provider CLI installs/PATH. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
+    "No agent CLIs detected on PATH. Install providers, then update `agents.yaml`.";
   const manualPresetNote =
-    "Manual preset creates empty orchestration stages. Decide what should run, then update .voratiq/orchestration.yaml.";
+    "Manual preset leaves stages empty. Add agents to `orchestration.yaml`.";
   const partialPresetNote =
-    "Some preset providers were not detected, so only detected providers were added to the run stage. Verify installs/PATH for missing providers. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
+    "Some providers not found on PATH. Only detected providers were configured. Install missing ones, then update `agents.yaml`.";
 
   const baseResult: InitCommandResult = {
     preset: "pro",
@@ -55,7 +55,7 @@ describe("renderInitTranscript", () => {
     },
   };
 
-  it("renders the workspace configuration summary with learn-more and spec hint", () => {
+  it("renders the workspace configuration summary with learn-more and auto hint", () => {
     const output = renderInitTranscript(baseResult);
     const lines = output.split("\n");
 
@@ -84,15 +84,15 @@ describe("renderInitTranscript", () => {
     ).toBeLessThan(
       findLineIndex(lines, "sandbox        .voratiq/sandbox.yaml"),
     );
-    expect(output).toContain("To learn more about configuration:");
+    expect(output).toContain("Configuration docs:");
     expect(output).toContain(
       "https://github.com/voratiq/voratiq/tree/main/docs/configs",
     );
     expect(output).toContain(colorize("Voratiq initialized.", "green"));
-    expect(output).toContain("To generate a spec:");
-    expect(output).toContain(
-      'voratiq spec --description "<what you want to build>" --agent <agent-id>',
-    );
+    expect(output).toContain("Run end-to-end:");
+    expect(output).toContain('voratiq auto --description "<task>"');
+    expect(output).not.toContain("To generate a spec:");
+    expect(output).not.toContain("voratiq spec --description");
     expect(output).not.toContain("Detecting agent CLIs…");
     expect(output).not.toContain("PROVIDER  BINARY");
     expect(output).not.toContain("Enable detected providers? [Y/n]:");

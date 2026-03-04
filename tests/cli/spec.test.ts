@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Command } from "commander";
@@ -8,6 +8,7 @@ import * as sandboxRuntime from "../../src/agents/runtime/sandbox.js";
 import { CliError } from "../../src/cli/errors.js";
 import { createSpecCommand, runSpecCommand } from "../../src/cli/spec.js";
 import { executeCompetitionWithAdapter } from "../../src/competition/command-adapter.js";
+import { readAgentsConfig } from "../../src/configs/agents/loader.js";
 import * as preflight from "../../src/preflight/index.js";
 import { renderCliError } from "../../src/render/utils/errors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
@@ -146,6 +147,12 @@ describe("voratiq spec command options", () => {
 
     expect((received as { maxParallel?: number }).maxParallel).toBe(2);
   });
+
+  it("does not expose auto-init toggles in help output", () => {
+    const help = createSpecCommand().helpInformation();
+    expect(help).not.toContain("--auto-init");
+    expect(help).not.toContain("--no-auto-init");
+  });
 });
 
 describe("voratiq spec (CLI)", () => {
@@ -209,6 +216,54 @@ describe("voratiq spec (CLI)", () => {
     await workspace?.cleanup();
   });
 
+  it("auto-initializes a missing workspace and emits a single notice", async () => {
+    await rm(join(repoRoot, ".voratiq"), { recursive: true, force: true });
+
+    const providerBinDir = join(repoRoot, "provider-bin");
+    await mkdir(providerBinDir, { recursive: true });
+    const codexPath = join(providerBinDir, "codex");
+    await writeFile(codexPath, "#!/usr/bin/env bash\nexit 0\n", "utf8");
+    await chmod(codexPath, 0o755);
+
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${providerBinDir}:${originalPath ?? ""}`;
+    const infoMessages: string[] = [];
+
+    try {
+      const result = await runSpecCommand({
+        description: "Write a spec",
+        agent: "gpt-5-3-codex",
+        writeOutput: (payload) => {
+          for (const alert of payload.alerts ?? []) {
+            if (alert.severity === "info") {
+              infoMessages.push(alert.message);
+            }
+          }
+        },
+      });
+
+      expect(result.outputPath).toBe(".voratiq/specs/payment-flow.md");
+      expect(
+        infoMessages.filter(
+          (message) => message === "Voratiq initialized (.voratiq/).",
+        ),
+      ).toHaveLength(1);
+
+      const agents = readAgentsConfig(
+        await readFile(join(repoRoot, ".voratiq", "agents.yaml"), "utf8"),
+      );
+      const codexEntries = agents.agents.filter(
+        (entry) => entry.provider === "codex",
+      );
+      expect(codexEntries.length).toBeGreaterThan(0);
+      for (const entry of codexEntries) {
+        expect(entry.binary).toBe(codexPath);
+      }
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
   it("runs in non-interactive shells without --yes", async () => {
     const originalDescriptor = Object.getOwnPropertyDescriptor(
       process.stdin,
@@ -231,7 +286,7 @@ describe("voratiq spec (CLI)", () => {
         "Spec saved: .voratiq/specs/payment-flow.md",
       );
       expect(result.body).toContain(
-        "To begin a run:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
+        "Next:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
       );
     } finally {
       if (originalDescriptor) {
@@ -562,7 +617,7 @@ describe("voratiq spec (CLI)", () => {
       [
         "Error: Agent `missing` not found in `agents.yaml`.",
         "",
-        "Update `agents.yaml` with this agent or choose a configured agent.",
+        "Add this agent to `agents.yaml`.",
       ].join("\n"),
     );
   });
@@ -632,7 +687,7 @@ describe("voratiq spec (CLI)", () => {
     );
     expect(result.body).toContain("Spec saved: .voratiq/specs/payment-flow.md");
     expect(result.body).toContain(
-      "To begin a run:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
+      "Next:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
     );
 
     expect(executeCompetitionWithAdapterMock).toHaveBeenCalledTimes(1);

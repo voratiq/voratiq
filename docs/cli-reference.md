@@ -8,25 +8,73 @@ Complete reference for all Voratiq commands.
 
 ## Global Behavior
 
-- Running `voratiq` without arguments prints help
-- Commands exit with code 1 on operational errors
-- Most commands expect `.voratiq/` to exist (created via `voratiq init`)
+- Must be run inside a git repository
+- `.voratiq/` is created automatically on first use
 - Transcripts stream to stdout; stderr is reserved for warnings and errors
+- Commands exit with code 1 on operational errors
 
-## `voratiq init`
+## `voratiq auto`
 
-Bootstrap workspace scaffolding in the current repository.
+Run `spec`, `run`, `review`, and `apply` as one command.
 
 ### Usage
 
 ```bash
-voratiq init [--preset pro|lite|manual] [-y, --yes]
+voratiq auto (--spec <path> | --description <text>) [options]
 ```
 
 ### Options
 
-- `-y, --yes`: Assume yes and accept defaults (suppresses prompts; useful for CI/scripts)
+Provide exactly one of `--spec` or `--description`.
+
+- `--spec <path>`: Existing spec to run
+- `--description <text>`: Generate a spec, then run and review it
+- `--run-agent <agent-id>`: Set run-stage agents directly (repeatable; order preserved)
+- `--review-agent <agent-id>`: Set review-stage agents directly (repeatable)
+- `--profile <name>`: Orchestration profile (default: `default`)
+- `--max-parallel <count>`: Max concurrent agents/reviewers
+- `--branch`: Create or checkout a branch named after the spec
+- `--apply`: Apply the recommended candidate after review
+- `--commit`: Commit after apply (requires `--apply`)
+
+### Behavior
+
+Stages run in order: `spec` (if `--description`), `run`, `review`, `apply` (if `--apply`).
+
+As a convenience, `voratiq --description <text> ...` is shorthand for `voratiq auto --description <text> ...`.
+
+### Examples
+
+```bash
+voratiq --description "add retries to billing webhook delivery"
+```
+
+```bash
+# Apply and commit the winner
+voratiq auto --description "add retries to billing webhook delivery" --apply --commit
+```
+
+### Errors
+
+- Exactly one of `--spec` or `--description` is required
+- `--commit` requires `--apply`
+- Stage failure in `spec`, `run`, `review`, or `apply`
+- Reviewers disagree and no single candidate resolves
+
+## `voratiq init`
+
+Initialize the Voratiq workspace.
+
+### Usage
+
+```bash
+voratiq init [options]
+```
+
+### Options
+
 - `--preset <preset>`: Select a preset (`pro|lite|manual`, default: `pro`)
+- `-y, --yes`: Assume yes and accept defaults (suppresses prompts; useful for CI/scripts)
 
 ### Behavior
 
@@ -48,17 +96,12 @@ Interactive mode (TTY) prompts for confirmation. Non-TTY environments require th
 ### Examples
 
 ```bash
-# Interactive mode (prompts for confirmation)
 voratiq init
+```
 
-# Non-interactive mode (skip prompts)
-voratiq init -y
-
-# Use faster default models
+```bash
+# Smaller, faster agent set
 voratiq init --preset lite
-
-# Start with an empty agents.yaml (configure agents yourself)
-voratiq init --preset manual --yes
 ```
 
 ### Errors
@@ -68,29 +111,35 @@ voratiq init --preset manual --yes
 
 ## `voratiq spec`
 
-Generate a structured spec from a task description via a sandboxed agent.
+Generate a spec from a task description.
 
 ### Usage
 
 ```bash
-voratiq spec --description <text> [--agent <agent-id>] [--profile <name>] [--title <text>] [--output <path>]
+voratiq spec --description <text> [options]
 ```
 
 ### Options
 
-- `--description <text>`: Task description for the spec (required)
+- `--description <text>`: Task description (required)
 - `--agent <agent-id>`: Agent to draft the spec (uses orchestration config if omitted)
-- `--profile <name>`: Orchestration profile used for `spec` stage resolution (default: `default`)
+- `--profile <name>`: Orchestration profile (default: `default`)
 - `--title <text>`: Spec title; agent infers if omitted
-- `--output <path>`: Output path; agent infers if omitted (default: `.voratiq/specs/<slug>.md`)
+- `--output <path>`: Output path (default: `.voratiq/specs/<slug>.md`)
 
 ### Behavior
 
-Invokes the specified agent in a sandbox to draft a structured Markdown spec from the provided description.
+The spec agent runs in a sandbox.
 
 ### Examples
 
 ```bash
+# Spec agent comes from orchestration.yaml
+voratiq spec --description "add dark mode toggle with localStorage persistence"
+```
+
+```bash
+# Set the spec agent directly
 voratiq spec --description "add dark mode toggle with localStorage persistence" --agent claude-opus-4-5-20251101
 ```
 
@@ -101,7 +150,7 @@ voratiq spec --description "add dark mode toggle with localStorage persistence" 
 - No agent found for spec stage (stage config empty and no `--agent`)
 - Multiple agents found for spec stage (multi-agent spec is not supported)
 - Output path already exists
-- Specification generation failed
+- Spec generation failed
 
 ## `voratiq run`
 
@@ -110,16 +159,16 @@ Execute agents against a spec.
 ### Usage
 
 ```bash
-voratiq run --spec <path> [--agent <agent-id>]... [--profile <name>] [--max-parallel <count>] [--branch]
+voratiq run --spec <path> [options]
 ```
 
 ### Options
 
-- `--spec <path>`: Path to the Markdown spec file (required)
-- `--agent <agent-id>`: Agent identifier override (repeatable; preserves CLI order). Uses orchestration config if omitted.
-- `--profile <name>`: Orchestration profile used for `run` stage resolution (default: `default`)
-- `--max-parallel <count>`: Maximum number of agents to run concurrently (default: all agents)
-- `--branch`: Checkout or create a branch named after the spec file
+- `--spec <path>`: Path to the spec file (required)
+- `--agent <agent-id>`: Set agents directly (repeatable; order preserved)
+- `--profile <name>`: Orchestration profile (default: `default`)
+- `--max-parallel <count>`: Max concurrent agents (default: all)
+- `--branch`: Create or checkout a branch named after the spec
 
 ### Behavior
 
@@ -129,22 +178,17 @@ voratiq run --spec <path> [--agent <agent-id>]... [--profile <name>] [--max-para
 4. Runs evals in each agent's workspace after the agent completes
 5. Captures diffs, persists records, generates report
 
-Exits with code 1 if:
-
-- Preflight checks fail
-- No agents found for the stage
-- Any agent fails or errors
-
-Eval failures are quality signals displayed in the output but do not affect exit code.
+Eval failures are quality signals and do not affect exit code.
 
 ### Examples
 
 ```bash
-# Run agents against a spec
 voratiq run --spec .voratiq/specs/fix-auth-bug.md
+```
 
-# Limit concurrency to 2 agents at a time
-voratiq run --spec .voratiq/specs/refactor.md --max-parallel 2
+```bash
+# Isolate changes on a branch
+voratiq run --spec .voratiq/specs/refactor.md --branch
 ```
 
 ### Errors
@@ -158,37 +202,35 @@ voratiq run --spec .voratiq/specs/refactor.md --max-parallel 2
 
 ## `voratiq review`
 
-Run one or more reviewer agents against a recorded run.
+Review a recorded run.
 
 ### Usage
 
 ```bash
-voratiq review --run <run-id> [--agent <agent-id>]... [--profile <name>] [--max-parallel <count>]
+voratiq review --run <run-id> [options]
 ```
 
 ### Options
 
 - `--run <run-id>`: Run ID to review (required)
-- `--agent <agent-id>`: Reviewer agent identifier override (repeatable; preserves CLI order). Uses orchestration config if omitted.
-- `--profile <name>`: Orchestration profile used for `review` stage resolution (default: `default`)
-- `--max-parallel <count>`: Maximum number of reviewers to run concurrently (default: all reviewers)
+- `--agent <agent-id>`: Set reviewers directly (repeatable; order preserved)
+- `--profile <name>`: Orchestration profile (default: `default`)
+- `--max-parallel <count>`: Max concurrent reviewers (default: all)
 
 ### Behavior
 
-Invokes one or more reviewer agents in sandboxes to analyze artifacts from a completed run and write independent recommendations.
+Each reviewer runs in a sandbox and writes an independent recommendation. Reviews are blinded — reviewers see randomized candidate ids, not agent names.
 
-Review artifacts are written under:
-`.voratiq/reviews/sessions/<review-id>/<reviewer-agent-id>/artifacts/`
-
-- `review.md`: blinded narrative review content
-- `recommendation.json`: machine-readable recommendation containing:
-  - `preferred_agent`: blinded candidate id (for example, `r_...`) from the reviewer
-  - `resolved_preferred_agent`: original agent id resolved by Voratiq
-  - `rationale`, `next_actions`
+Each reviewer produces a `review.md` (narrative) and `recommendation.json` (preferred candidate, rationale, next actions). Artifacts are saved under `.voratiq/reviews/`.
 
 ### Examples
 
 ```bash
+voratiq review --run 20251031-232802-abc123
+```
+
+```bash
+# Set reviewers directly
 voratiq review --run 20251031-232802-abc123 --agent gpt-5-2-codex --agent claude-opus-4-5-20251101
 ```
 
@@ -198,47 +240,42 @@ voratiq review --run 20251031-232802-abc123 --agent gpt-5-2-codex --agent claude
 - Run record is malformed
 - No agent found for review stage (stage config empty and no `--agent`)
 - Reviewer authentication fails (aborts before any reviewer starts)
-- Any reviewer output contract violation (fails the overall review command)
+- Reviewer output contract violation
 - Run artifacts are missing (warns but continues)
 
 ## `voratiq apply`
 
-Apply a specific agent's diff to the repository using `git apply`.
+Apply an agent's diff from a run.
 
 ### Usage
 
 ```bash
-voratiq apply --run <run-id> --agent <agent-id> [--ignore-base-mismatch] [--commit]
+voratiq apply --run <run-id> --agent <agent-id> [options]
 ```
 
 ### Options
 
 - `--run <run-id>`: Run ID containing the agent (required)
 - `--agent <agent-id>`: Agent ID whose diff to apply (required)
-- `--ignore-base-mismatch`: Skip base revision check (apply even if current HEAD differs from run's base)
-- `--commit`: Create a git commit after a successful apply, using the agent's summary as the commit message
+- `--ignore-base-mismatch`: Skip base revision check
+- `--commit`: Commit after apply, using the agent's summary as the message
 
 ### Behavior
 
 1. Validates git working tree is clean
-2. Loads the agent's diff from `.voratiq/runs/sessions/<run-id>/<agent-id>/artifacts/diff.patch`
-3. Compares current `HEAD` to the run's base revision; exits with a base mismatch error unless `--ignore-base-mismatch` is provided
+2. Loads the agent's diff from `.voratiq/runs/`
+3. Verifies `HEAD` matches the run's base revision
 4. Executes `git apply <diff.patch>`
-
-Common `git apply` failures:
-
-- Base mismatch: Current HEAD differs from the run's base (resolve conflicts manually or use `--ignore-base-mismatch`)
-- Conflicts: Diff doesn't apply cleanly (resolve manually)
-- Generic error: Something else went wrong (check git status)
 
 ### Examples
 
 ```bash
-# Apply agent's diff (with base check)
 voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh
+```
 
-# Apply diff, ignoring base mismatch
-voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh --ignore-base-mismatch
+```bash
+# Apply and commit
+voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh --commit
 ```
 
 ### Errors
@@ -250,39 +287,34 @@ voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh --ignore-base-m
 
 ## `voratiq list`
 
-Display recorded runs with optional filtering.
+List recorded runs.
 
 ### Usage
 
 ```bash
-voratiq list [--limit <n>] [--spec <path>] [--run <run-id>] [--include-pruned]
+voratiq list [options]
 ```
 
 ### Options
 
-- `--limit <n>`: Show only the N most recent runs (default: 10)
+- `--limit <count>`: Show only the N most recent runs (default: 10)
 - `--spec <path>`: Filter by spec path
 - `--run <run-id>`: Show only the specified run ID
 - `--include-pruned`: Include runs marked as pruned
 
 ### Behavior
 
-Renders a table of recorded runs with run ID, status, spec path, and creation timestamp.
+Shows run ID, status, spec path, and creation timestamp.
 
 ### Examples
 
 ```bash
-# List recent runs (default: last 10, excludes pruned)
 voratiq list
+```
 
-# List runs for a specific spec
+```bash
+# Filter by spec
 voratiq list --spec .voratiq/specs/fix-auth-bug.md
-
-# Show a specific run
-voratiq list --run 20251031-232802-abc123
-
-# Include pruned runs
-voratiq list --include-pruned
 ```
 
 ### Errors
@@ -291,12 +323,12 @@ voratiq list --include-pruned
 
 ## `voratiq prune`
 
-Remove run workspaces and mark the run as pruned in records (use `--purge` to delete artifacts).
+Remove run workspaces and mark runs as pruned.
 
 ### Usage
 
 ```bash
-voratiq prune (--run <run-id> | --all) [--purge] [-y, --yes]
+voratiq prune (--run <run-id> | --all) [options]
 ```
 
 ### Options
@@ -309,22 +341,20 @@ voratiq prune (--run <run-id> | --all) [--purge] [-y, --yes]
 ### Behavior
 
 1. Loads the run record
-2. Displays a summary of workspaces, artifacts, and branches slated for deletion and requests confirmation (unless `-y/--yes`)
+2. Shows what will be deleted, then confirms (unless `-y`)
 3. Deletes run worktrees and, when `--purge` is set, all associated configs and artifacts
 4. Updates run record, marking it as pruned
 
-`--purge` broadens what is removed but still prompts for confirmation; combine with `-y` for non-interactive execution.
+`--purge` still prompts for confirmation; combine with `-y` to skip.
 
 ### Examples
 
 ```bash
-# Interactive pruning
 voratiq prune --run 20251031-232802-abc123
+```
 
-# Non-interactive (skip prompts)
-voratiq prune --run 20251031-232802-abc123 -y
-
-# Fully purge the run directory (non-interactively)
+```bash
+# Full cleanup, no prompts
 voratiq prune --run 20251031-232802-abc123 --purge -y
 ```
 

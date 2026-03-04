@@ -43,7 +43,7 @@ export function mapRunStatusToExitCode(status: RunStatus): number {
       return 3;
     default:
       throw new Error(
-        `Cannot map non-terminal run status "${status}" to an exit code.`,
+        `Cannot map non-terminal run status \`${status}\` to an exit code.`,
       );
   }
 }

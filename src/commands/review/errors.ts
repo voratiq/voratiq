@@ -16,7 +16,7 @@ export class ReviewAgentNotFoundError extends ReviewError {
     super(
       `Agent \`${agentId}\` not found in \`agents.yaml\`.`,
       [],
-      ["Update `agents.yaml` with this agent or choose a configured agent."],
+      ["Add this agent to `agents.yaml`."],
     );
     this.name = "ReviewAgentNotFoundError";
   }
@@ -39,7 +39,7 @@ export class ReviewNoEligibleCandidatesError extends ReviewError {
     super(
       "No eligible candidates available for review.",
       [],
-      ["Run `voratiq run` and ensure at least one agent produced a diff."],
+      ["At least one agent must produce a diff."],
     );
     this.name = "ReviewNoEligibleCandidatesError";
   }

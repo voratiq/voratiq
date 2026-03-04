@@ -59,17 +59,13 @@ interface ApplyCommandActionOptions {
 
 export function createApplyCommand(): Command {
   return new Command("apply")
-    .description("Apply the winning agent implementation from a run")
-    .requiredOption("--run <run-id>", "Identifier of the recorded run")
-    .requiredOption("--agent <agent-id>", "Agent id to apply from the run")
-    .option(
-      "--ignore-base-mismatch",
-      "Apply even if the current HEAD differs from the recorded base",
-      () => true,
-    )
+    .description("Apply an agent's diff from a run")
+    .requiredOption("--run <run-id>", "Run ID containing the agent")
+    .requiredOption("--agent <agent-id>", "Agent ID whose diff to apply")
+    .option("--ignore-base-mismatch", "Skip base revision check", () => true)
     .option(
       "--commit",
-      "Commit the applied diff immediately using the agent summary",
+      "Commit after apply, using the agent's summary as the message",
       () => true,
     )
     .allowExcessArguments(false)

@@ -36,8 +36,7 @@ export class AgentProcessError extends RunCommandError {
 
   constructor(options: AgentProcessErrorOptions = {}) {
     const { detail, exitCode } = options;
-    const baseMessage =
-      detail ?? "Agent process failed. Please review the logs.";
+    const baseMessage = detail ?? "Agent process failed.";
     const formattedMessage =
       typeof exitCode === "number"
         ? `${baseMessage} (exit code ${exitCode})`

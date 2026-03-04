@@ -8,10 +8,6 @@ import { wrapWords } from "../utils/wrap.js";
 
 const INIT_NOTE_MAX_WIDTH = 79;
 
-export function buildInitializationPrompt(): string {
-  return "Initializing Voratiq…";
-}
-
 export function renderPresetPromptPreface(firstPrompt: boolean): string[] {
   const sections: string[][] = [
     [
@@ -94,14 +90,11 @@ export function renderInitTranscript(
     );
   }
   sections.push([
-    "To learn more about configuration:",
+    "Configuration docs:",
     "  https://github.com/voratiq/voratiq/tree/main/docs/configs",
   ]);
   sections.push([buildWorkspaceInitializedSection()]);
-  sections.push([
-    "To generate a spec:",
-    '  voratiq spec --description "<what you want to build>" --agent <agent-id>',
-  ]);
+  sections.push(["Run end-to-end:", '  voratiq auto --description "<task>"']);
 
   return renderTranscript({ sections });
 }
@@ -142,11 +135,11 @@ function resolveConditionalInitNote({
   agentSummary,
 }: ConditionalInitNoteOptions): string | undefined {
   if (agentSummary.zeroDetections) {
-    return "No supported agent CLIs were detected, so no agents were added to the run stage. Verify provider CLI installs/PATH. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
+    return "No agent CLIs detected on PATH. Install providers, then update `agents.yaml`.";
   }
 
   if (preset === "manual") {
-    return "Manual preset creates empty orchestration stages. Decide what should run, then update .voratiq/orchestration.yaml.";
+    return "Manual preset leaves stages empty. Add agents to `orchestration.yaml`.";
   }
 
   const presetProviders = new Set(
@@ -159,7 +152,7 @@ function resolveConditionalInitNote({
   );
   for (const presetProvider of presetProviders) {
     if (!detectedProviders.has(presetProvider)) {
-      return "Some preset providers were not detected, so only detected providers were added to the run stage. Verify installs/PATH for missing providers. Then update .voratiq/agents.yaml and .voratiq/orchestration.yaml.";
+      return "Some providers not found on PATH. Only detected providers were configured. Install missing ones, then update `agents.yaml`.";
     }
   }
 

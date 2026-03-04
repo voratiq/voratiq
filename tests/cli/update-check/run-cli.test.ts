@@ -163,7 +163,7 @@ describe("runCli update-check prompt flow", () => {
       { stdio: "inherit" },
     );
     expect(stripAnsi(stdout.join(""))).toContain(
-      "Update completed. Please rerun your command.",
+      "Updated. Rerun your command.",
     );
     expect(stripAnsi(stdout.join(""))).not.toContain("0.4.2");
     expect(close).toHaveBeenCalledTimes(1);
@@ -187,9 +187,7 @@ describe("runCli update-check prompt flow", () => {
 
     await runCli(["node", "voratiq", "--version"]);
 
-    expect(stripAnsi(stdout.join(""))).toContain(
-      "Update failed. Please try again manually.",
-    );
+    expect(stripAnsi(stdout.join(""))).toContain("Update failed.");
     expect(stripAnsi(stdout.join(""))).not.toContain("0.4.2");
     expect(handle.finishSpy).toHaveBeenCalledTimes(1);
     expect(close).toHaveBeenCalledTimes(1);

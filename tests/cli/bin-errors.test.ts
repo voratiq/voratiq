@@ -147,6 +147,35 @@ describe("CLI entrypoint error handling", () => {
     expect(stderr.join("")).toHaveLength(0);
     expect(process.exitCode).toBe(0);
   });
+
+  it("documents root description intent option in help", async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    stderrSpy = jest
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: unknown) => {
+        stderr.push(String(chunk));
+        return true;
+      });
+
+    await runCli(["node", "voratiq", "--help"]);
+
+    const help = stripAnsi(stdout.join(""));
+    expect(help).toContain("--description <text>");
+    expect(help).toContain(
+      "Describe what to build, then run the full pipeline",
+    );
+    expect(stderr.join("")).toHaveLength(0);
+    expect(process.exitCode).toBe(0);
+  });
 });
 
 function stripAnsi(value: string): string {

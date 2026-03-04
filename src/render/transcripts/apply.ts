@@ -65,8 +65,8 @@ export function renderApplyTranscript(result: ApplyResult): string {
     afterAgents: [afterAgentsLines],
     hint: {
       message: result.appliedCommitSha
-        ? "Review the commit (e.g., `git show --stat`) and run tests."
-        : "Review changes (e.g., `git status`) and run tests before committing.",
+        ? "Review the commit and run tests."
+        : "Review changes and run tests.",
     },
   });
 }

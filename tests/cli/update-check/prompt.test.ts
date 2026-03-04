@@ -69,9 +69,7 @@ describe("showUpdatePrompt", () => {
 
     // Check output
     expect(write.getOutput()).toContain("Updating Voratiq via");
-    expect(write.getOutput()).toContain(
-      "Update completed. Please rerun your command.",
-    );
+    expect(write.getOutput()).toContain("Updated. Rerun your command.");
   });
 
   it("input '1' runs update", async () => {
@@ -122,7 +120,7 @@ describe("showUpdatePrompt", () => {
     });
 
     expect(result.shouldExit).toBe(false);
-    expect(write.getOutput()).toContain("Please choose 1 or 2.");
+    expect(write.getOutput()).toContain("Choose 1 or 2.");
     // Preface lines should only be present on first prompt
     expect(prompt.calls[0]?.prefaceLines).toBeDefined();
     expect(prompt.calls[1]?.prefaceLines).toBeUndefined();

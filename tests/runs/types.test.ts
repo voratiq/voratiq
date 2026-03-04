@@ -71,7 +71,7 @@ describe("runRecordSchema", () => {
       auto: {
         status: "action_required" as const,
         completedAt: "2025-01-01T03:00:00.000Z",
-        detail: "manual arbitration required",
+        detail: "manual review required",
         apply: {
           status: "skipped" as const,
           detail: "no shared recommendation",

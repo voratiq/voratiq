@@ -92,21 +92,13 @@ interface PruneCommandActionOptions {
 
 export function createPruneCommand(): Command {
   return new Command("prune")
-    .description("Remove artifacts for a recorded run")
-    .addOption(
-      new Option("--run <run-id>", "Identifier of the run to prune").conflicts(
-        "all",
-      ),
-    )
+    .description("Remove run workspaces and mark runs as pruned")
+    .addOption(new Option("--run <run-id>", "Run ID to prune").conflicts("all"))
     .addOption(
       new Option("--all", "Prune all non-pruned runs").conflicts("run"),
     )
-    .option("--purge", "Also delete associated configs and artifacts")
-    .option("-y, --yes", "Assume yes for all prompts")
-    .addHelpText(
-      "after",
-      "\nRemoves agent workspaces, deletes agent branches, and marks runs as pruned.",
-    )
+    .option("--purge", "Delete all associated configs and artifacts")
+    .option("-y, --yes", "Skip interactive confirmations")
     .allowExcessArguments(false)
     .action(async (options: PruneCommandActionOptions, command: Command) => {
       const hasRun = typeof options.run === "string" && options.run.length > 0;

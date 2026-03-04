@@ -5,10 +5,6 @@ import {
   formatErrorMessage,
 } from "../utils/output.js";
 
-export function writeCommandPreface(preface: string): void {
-  process.stdout.write(`\n${preface}\n`);
-}
-
 type CliWriter = Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
 
 export type AlertSeverity = "info" | "warn" | "error";

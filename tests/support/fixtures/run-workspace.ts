@@ -171,9 +171,18 @@ export async function createRunTestWorkspace(
 }
 
 async function initGitRepository(root: string): Promise<void> {
-  await execFileAsync("git", ["init", "--initial-branch=main"], {
-    cwd: root,
-  });
+  const templateDir = await mkdtemp(join(tmpdir(), "voratiq-git-template-"));
+  try {
+    await execFileAsync(
+      "git",
+      ["init", "--initial-branch=main", "--template", templateDir],
+      {
+        cwd: root,
+      },
+    );
+  } finally {
+    await rm(templateDir, { recursive: true, force: true });
+  }
   await execFileAsync("git", ["config", "user.email", "tests@voratiq.dev"], {
     cwd: root,
   });

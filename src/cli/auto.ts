@@ -25,7 +25,7 @@ import { CliError, toCliError } from "./errors.js";
 import { beginChainedCommandOutput, writeCommandOutput } from "./output.js";
 import { type ReviewCommandResult, runReviewCommand } from "./review.js";
 import { runRunCommand } from "./run.js";
-import { runSpecCommand } from "./spec.js";
+import { runSpecCommand, type SpecCommandResult } from "./spec.js";
 
 export interface AutoCommandOptions {
   specPath?: string;
@@ -85,7 +85,7 @@ function assertAutoOptionCompatibility(options: AutoCommandOptions): void {
     throw new CliError(
       "Exactly one of `--spec` or `--description` is required.",
       [],
-      ["Pass one flag, not both (or neither)."],
+      ["Pass exactly one."],
     );
   }
 
@@ -96,6 +96,30 @@ function assertAutoOptionCompatibility(options: AutoCommandOptions): void {
       ["Add `--apply` when using `--commit`."],
     );
   }
+}
+
+function resolveSpecPathForAuto(result: SpecCommandResult): string {
+  const specPathCandidate =
+    typeof result.specPath === "string" && result.specPath.trim().length > 0
+      ? result.specPath.trim()
+      : undefined;
+  if (specPathCandidate) {
+    return specPathCandidate;
+  }
+
+  const outputPathCandidate =
+    typeof result.outputPath === "string" && result.outputPath.trim().length > 0
+      ? result.outputPath.trim()
+      : undefined;
+  if (outputPathCandidate) {
+    return outputPathCandidate;
+  }
+
+  throw new CliError(
+    "Spec stage did not return a spec path.",
+    [],
+    ["Re-run the spec stage and check for `Spec saved:` in the output."],
+  );
 }
 
 interface AutoRecommendationLoadResult {
@@ -297,6 +321,11 @@ export async function runAutoCommand(
   runtime: AutoRuntimeOptions = {},
 ): Promise<AutoCommandResult> {
   assertAutoOptionCompatibility(options);
+  const hasDescription =
+    typeof options.description === "string" &&
+    options.description.trim().length > 0;
+  const description =
+    typeof options.description === "string" ? options.description : undefined;
 
   const now = runtime.now ?? Date.now.bind(Date);
 
@@ -307,6 +336,11 @@ export async function runAutoCommand(
     let hardFailure = false;
     let actionRequired = false;
     let actionRequiredDetail: string | undefined;
+
+    let specStartedAt: number | undefined;
+    let specStatus: "succeeded" | "failed" | "skipped" = "skipped";
+    let specPath: string | undefined;
+    let specDetail: string | undefined;
 
     let runStartedAt: number | undefined;
     let runStatus: "succeeded" | "failed" | "skipped" = "skipped";
@@ -345,18 +379,23 @@ export async function runAutoCommand(
 
     let resolvedSpecPath = options.specPath;
 
-    if (options.description) {
+    if (hasDescription && description) {
+      specStartedAt = now();
       try {
         const specResult = await runSpecCommand({
-          description: options.description,
+          description,
           profile: options.profile,
           maxParallel: options.maxParallel,
           suppressHint: true,
           writeOutput: writeCommandOutput,
         });
-        resolvedSpecPath = specResult.outputPath;
+        specStatus = "succeeded";
+        specPath = resolveSpecPathForAuto(specResult);
+        resolvedSpecPath = specPath;
         writeCommandOutput({ body: specResult.body });
       } catch (error) {
+        specStatus = "failed";
+        specDetail = toCliError(error).headline;
         hardFailure = true;
         writeCommandOutput({ body: renderCliError(toCliError(error)) });
       }
@@ -403,7 +442,7 @@ export async function runAutoCommand(
               `Status: \`${runResult.report.status}\`.`,
               `Exit code: ${runResult.exitCode}.`,
             ],
-            ["Re-run the command; run outcome signaling was inconsistent."],
+            ["Re-run the command."],
           );
         }
 
@@ -434,7 +473,11 @@ export async function runAutoCommand(
       }
     }
 
-    if (!hardFailure || runId) {
+    const shouldAttemptReview = hasDescription
+      ? runStatus === "succeeded" && typeof runId === "string"
+      : !hardFailure || runId;
+
+    if (shouldAttemptReview) {
       if (!runId) {
         reviewStatus = "skipped";
       } else {
@@ -449,6 +492,7 @@ export async function runAutoCommand(
             agentOverrideFlag: "--review-agent",
             profile: options.profile,
             maxParallel: options.maxParallel,
+            suppressHint: options.apply === true,
             stdout: chainedOutput.stdout,
             stderr: chainedOutput.stderr,
             suppressLeadingBlankLine: !process.stdout.isTTY,
@@ -482,7 +526,8 @@ export async function runAutoCommand(
       options.apply &&
       runId &&
       reviewStatus === "succeeded" &&
-      reviewOutputPath
+      reviewOutputPath &&
+      (!hasDescription || runStatus === "succeeded")
     ) {
       applyStartedAt = now();
       try {
@@ -497,8 +542,8 @@ export async function runAutoCommand(
           preferredAgent = recommendationResult.preferredAgent;
           if (!preferredAgent) {
             markActionRequired(
-              "No resolvable recommendation was produced; manual arbitration required.",
-              "No resolvable recommendation was produced. Review manually and apply the best solution.",
+              "No resolvable recommendation was produced; manual review required.",
+              "No resolvable recommendation was produced. Review results and apply manually.",
             );
           }
         } else if (reviewResults && reviewResults.length > 0) {
@@ -508,8 +553,8 @@ export async function runAutoCommand(
             });
           if (reviewerRecommendations.length === 0) {
             markActionRequired(
-              "No shared reviewer recommendation could be resolved; manual arbitration required.",
-              "No shared recommendation was resolved. Review manually and apply the best solution.",
+              "No shared reviewer recommendation could be resolved; manual review required.",
+              "No shared recommendation was resolved. Review results and apply manually.",
             );
           } else {
             const resolvedPreferredAgents = reviewerRecommendations
@@ -522,8 +567,8 @@ export async function runAutoCommand(
               resolvedPreferredAgents.length !== reviewerRecommendations.length
             ) {
               markActionRequired(
-                "No shared reviewer recommendation could be resolved; manual arbitration required.",
-                "No shared recommendation was resolved. Review manually and apply the best solution.",
+                "No shared reviewer recommendation could be resolved; manual review required.",
+                "No shared recommendation was resolved. Review results and apply manually.",
               );
             } else {
               const distinctPreferredAgents = new Set(resolvedPreferredAgents);
@@ -543,8 +588,8 @@ export async function runAutoCommand(
                 preferredAgent = unanimousPreferredAgent;
               } else {
                 markActionRequired(
-                  "Reviewers disagreed on preferred candidate; manual arbitration required.",
-                  "Reviewers disagreed. Review manually and apply the best solution.",
+                  "Reviewers disagreed on preferred candidate; manual review required.",
+                  "Reviewers disagreed. Review results and apply manually.",
                 );
               }
             }
@@ -594,6 +639,8 @@ export async function runAutoCommand(
     }
 
     const overallDurationMs = now() - overallStart;
+    const specDurationMs =
+      specStartedAt !== undefined ? now() - specStartedAt : undefined;
     const runDurationMs =
       runStartedAt !== undefined ? now() - runStartedAt : undefined;
     const reviewDurationMs =
@@ -635,6 +682,14 @@ export async function runAutoCommand(
     const summaryBody = renderAutoSummaryTranscript({
       status: autoStatus,
       totalDurationMs: overallDurationMs,
+      spec: {
+        status: specStatus,
+        ...(typeof specDurationMs === "number"
+          ? { durationMs: specDurationMs }
+          : {}),
+        ...(specPath ? { specPath } : {}),
+        ...(specDetail ? { detail: specDetail } : {}),
+      },
       run: {
         status: runStatus,
         ...(typeof runDurationMs === "number"
@@ -703,18 +758,13 @@ interface AutoCommandActionOptions {
 
 export function createAutoCommand(): Command {
   return new Command("auto")
-    .description(
-      "End-to-end pipeline to run agents, review results, and optionally apply",
-    )
-    .option("--spec <path>", "Path to an existing spec file")
-    .option(
-      "--description <text>",
-      "Generate a spec from a plain-language description",
-    )
+    .description("Run spec, run, review, and apply as one command")
+    .option("--spec <path>", "Existing spec to run")
+    .option("--description <text>", "Generate a spec, then run and review it")
     .addOption(
       new Option(
         "--run-agent <agent-id>",
-        "Override run-stage agents (repeatable)",
+        "Set run-stage agents directly (repeatable; order preserved)",
       )
         .default([], "")
         .argParser(collectRunAgentOption),
@@ -722,7 +772,7 @@ export function createAutoCommand(): Command {
     .addOption(
       new Option(
         "--review-agent <agent-id>",
-        "Override review-stage agents (repeatable)",
+        "Set review-stage agents directly (repeatable)",
       )
         .default([], "")
         .argParser(collectReviewAgentOption),
@@ -730,16 +780,16 @@ export function createAutoCommand(): Command {
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
       "--max-parallel <count>",
-      "Maximum number of agents to run concurrently",
+      "Max concurrent agents/reviewers",
       parseMaxParallelOption,
     )
-    .option("--branch", "Checkout or create a branch named after the spec")
+    .option("--branch", "Create or checkout a branch named after the spec")
     .option(
       "--apply",
-      "Apply the recommended agent's output after review",
+      "Apply the recommended candidate after review",
       () => true,
     )
-    .option("--commit", "Commit after applying (requires --apply)", () => true)
+    .option("--commit", "Commit after apply (requires --apply)", () => true)
     .allowExcessArguments(false)
     .action(async (options: AutoCommandActionOptions) => {
       await runAutoCommand({

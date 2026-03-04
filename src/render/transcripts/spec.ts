@@ -7,7 +7,7 @@ export function renderSpecTranscript(
   const hint = options.suppressHint
     ? undefined
     : {
-        message: `To begin a run:\n  voratiq run --spec ${outputPath}`,
+        message: `Next:\n  voratiq run --spec ${outputPath}`,
       };
 
   return renderStageFinalFrame({

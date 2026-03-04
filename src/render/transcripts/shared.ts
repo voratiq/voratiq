@@ -15,6 +15,10 @@ export interface TranscriptScaffoldOptions {
   isTty?: boolean;
 }
 
+export function renderWorkspaceAutoInitializedNotice(): string {
+  return "Voratiq initialized (.voratiq/).";
+}
+
 export function renderTranscriptWithMetadata(
   options: TranscriptScaffoldOptions,
 ): string {

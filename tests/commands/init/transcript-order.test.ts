@@ -65,7 +65,7 @@ describe("init transcript ordering", () => {
       findIndex(captured, "CONFIGURATION  FILE"),
     );
     expect(findIndex(captured, "CONFIGURATION  FILE")).toBeLessThan(
-      findIndex(captured, "To learn more about configuration:"),
+      findIndex(captured, "Configuration docs:"),
     );
     expect(
       findIndex(captured, "agents         .voratiq/agents.yaml"),
@@ -83,11 +83,11 @@ describe("init transcript ordering", () => {
     expect(
       findIndex(captured, "evals          .voratiq/evals.yaml"),
     ).toBeLessThan(findIndex(captured, "sandbox        .voratiq/sandbox.yaml"));
-    expect(
-      findIndex(captured, "To learn more about configuration:"),
-    ).toBeLessThan(findIndex(captured, "Voratiq initialized."));
+    expect(findIndex(captured, "Configuration docs:")).toBeLessThan(
+      findIndex(captured, "Voratiq initialized."),
+    );
     expect(findIndex(captured, "Voratiq initialized.")).toBeLessThan(
-      findIndex(captured, "To generate a spec:"),
+      findIndex(captured, "Run end-to-end:"),
     );
     expect(captured.join("\n")).not.toContain("Detecting agent CLIs…");
     expect(captured.join("\n")).not.toContain("PROVIDER  BINARY");
@@ -106,7 +106,7 @@ describe("init transcript ordering", () => {
       findIndex(lines, "CONFIGURATION  FILE"),
     );
     expect(findIndex(lines, "CONFIGURATION  FILE")).toBeLessThan(
-      findIndex(lines, "To learn more about configuration:"),
+      findIndex(lines, "Configuration docs:"),
     );
     expect(
       findIndex(lines, "agents         .voratiq/agents.yaml"),
@@ -124,11 +124,11 @@ describe("init transcript ordering", () => {
     expect(findIndex(lines, "evals          .voratiq/evals.yaml")).toBeLessThan(
       findIndex(lines, "sandbox        .voratiq/sandbox.yaml"),
     );
-    expect(findIndex(lines, "To learn more about configuration:")).toBeLessThan(
+    expect(findIndex(lines, "Configuration docs:")).toBeLessThan(
       findIndex(lines, "Voratiq initialized."),
     );
     expect(findIndex(lines, "Voratiq initialized.")).toBeLessThan(
-      findIndex(lines, "To generate a spec:"),
+      findIndex(lines, "Run end-to-end:"),
     );
     expect(lines.join("\n")).not.toContain("Detecting agent CLIs…");
     expect(lines.join("\n")).not.toContain("PROVIDER  BINARY");

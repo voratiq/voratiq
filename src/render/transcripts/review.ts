@@ -440,6 +440,7 @@ export function renderReviewTranscript(options: {
   workspacePath: string;
   status: "running" | "succeeded" | "failed" | "aborted";
   reviewers: readonly ReviewTranscriptReviewerBlock[];
+  recommendedAgentId?: string;
   suppressHint?: boolean;
   isTty?: boolean;
   includeSummarySection?: boolean;
@@ -452,6 +453,7 @@ export function renderReviewTranscript(options: {
     workspacePath,
     status,
     reviewers,
+    recommendedAgentId,
     suppressHint,
     isTty,
     includeSummarySection = true,
@@ -513,7 +515,7 @@ export function renderReviewTranscript(options: {
   const hint = suppressHint
     ? undefined
     : {
-        message: `---\n\nTo apply a solution:\n    voratiq apply --run ${runId} --agent <agent-id>`,
+        message: `---\n\nTo apply a solution:\n  voratiq apply --run ${runId} --agent ${recommendedAgentId ?? "<agent-id>"}`,
       };
 
   return renderTranscript({ sections, hint });

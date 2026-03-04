@@ -12,15 +12,13 @@ describe("run errors", () => {
 
   it("formats agent process errors without exit code", () => {
     const error = new AgentProcessError({});
-    expect(error.messageForDisplay()).toBe(
-      "Agent process failed. Please review the logs.",
-    );
+    expect(error.messageForDisplay()).toBe("Agent process failed.");
   });
 
   it("formats agent process errors with exit code", () => {
     const error = new AgentProcessError({ exitCode: 9 });
     expect(error.messageForDisplay()).toBe(
-      "Agent process failed. Please review the logs. (exit code 9)",
+      "Agent process failed. (exit code 9)",
     );
   });
 

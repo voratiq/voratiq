@@ -153,12 +153,20 @@ export async function runCli(
 ): Promise<void> {
   const { Command, CommanderError } = await import("commander");
   const program = new Command();
+  const effectiveArgv = normalizeRootIntentArgv(argv);
 
   const localVersion = (await import("./utils/version.js")).getVoratiqVersion();
 
   program
     .name("voratiq")
-    .description("Voratiq CLI")
+    .description(
+      "Voratiq CLI \u2013 run coding agents against each other, merge the winner.",
+    )
+    .enablePositionalOptions()
+    .option(
+      "--description <text>",
+      "Describe what to build, then run the full pipeline",
+    )
     .version(localVersion, "-v, --version", "print the Voratiq version")
     .exitOverride()
     .showHelpAfterError()
@@ -203,16 +211,16 @@ export async function runCli(
       }
     }
 
-    await registerCommands(program, argv);
+    await registerCommands(program, effectiveArgv);
 
-    if (argv.length <= 2) {
+    if (effectiveArgv.length <= 2) {
       const { writeCommandOutput } = await import("./cli/output.js");
       writeCommandOutput({ body: program.helpInformation() });
       return;
     }
 
     try {
-      await program.parseAsync(argv);
+      await program.parseAsync(effectiveArgv);
     } catch (error) {
       if (error instanceof CommanderError) {
         const { commanderAlreadyRendered } = await import(
@@ -249,6 +257,43 @@ export async function runCli(
   }
 }
 
+function normalizeRootIntentArgv(argv: readonly string[]): readonly string[] {
+  if (!shouldRouteRootDescriptionToAuto(argv)) {
+    return argv;
+  }
+
+  const [nodePath = "node", cliPath = "voratiq"] = argv;
+  return [nodePath, cliPath, "auto", ...argv.slice(2)];
+}
+
+function shouldRouteRootDescriptionToAuto(argv: readonly string[]): boolean {
+  const firstUserArgument = argv[2];
+  if (!firstUserArgument || firstUserArgument === "--") {
+    return false;
+  }
+
+  if (!firstUserArgument.startsWith("-")) {
+    return false;
+  }
+
+  return hasRootDescriptionFlag(argv);
+}
+
+function hasRootDescriptionFlag(argv: readonly string[]): boolean {
+  for (let index = 2; index < argv.length; index += 1) {
+    const entry = argv[index];
+    if (!entry || entry === "--") {
+      return false;
+    }
+
+    if (entry === "--description" || entry.startsWith("--description=")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 async function registerCommands(
   program: InstanceType<(typeof import("commander"))["Command"]>,
   argv: readonly string[],
@@ -262,13 +307,13 @@ async function registerCommands(
     wantsHelp ||
     (commandName !== undefined &&
       ![
+        "auto",
         "init",
-        "list",
         "spec",
         "run",
         "review",
-        "auto",
         "apply",
+        "list",
         "prune",
       ].includes(commandName));
 
@@ -277,13 +322,13 @@ async function registerCommands(
   }
 
   if (loadAll) {
+    program.addCommand((await import("./cli/auto.js")).createAutoCommand());
     program.addCommand((await import("./cli/init.js")).createInitCommand());
-    program.addCommand((await import("./cli/list.js")).createListCommand());
     program.addCommand((await import("./cli/spec.js")).createSpecCommand());
     program.addCommand((await import("./cli/run.js")).createRunCommand());
     program.addCommand((await import("./cli/review.js")).createReviewCommand());
-    program.addCommand((await import("./cli/auto.js")).createAutoCommand());
     program.addCommand((await import("./cli/apply.js")).createApplyCommand());
+    program.addCommand((await import("./cli/list.js")).createListCommand());
     program.addCommand((await import("./cli/prune.js")).createPruneCommand());
     return;
   }
@@ -365,31 +410,7 @@ function safeRealpath(path: string): string {
   }
 }
 
-function shouldWriteInitPreface(argv: readonly string[]): boolean {
-  const commandName = findCommandName(argv);
-  if (commandName !== "init") {
-    return false;
-  }
-
-  if (argv.includes("--help") || argv.includes("-h")) {
-    return false;
-  }
-
-  if (argv.includes("--version") || argv.includes("-v")) {
-    return false;
-  }
-
-  return true;
-}
-
-function writeInitPreface(): void {
-  process.stdout.write("\nInitializing Voratiq…\n");
-}
-
 if (shouldAutorun()) {
-  if (shouldWriteInitPreface(process.argv)) {
-    writeInitPreface();
-  }
   installProcessGuards();
   void runCli();
 }

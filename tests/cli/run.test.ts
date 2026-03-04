@@ -128,6 +128,12 @@ describe("voratiq run command options", () => {
 
     expect((received as { profile?: string }).profile).toBe("quality");
   });
+
+  it("does not expose auto-init toggles in help output", () => {
+    const help = createRunCommand().helpInformation();
+    expect(help).not.toContain("--auto-init");
+    expect(help).not.toContain("--no-auto-init");
+  });
 });
 
 suite("voratiq run (integration)", () => {
@@ -156,6 +162,61 @@ suite("voratiq run (integration)", () => {
     }
     await workspace?.cleanup();
   });
+
+  it(
+    "auto-initializes a missing workspace and emits a single notice",
+    async () => {
+      const providerBinDir = join(repoRoot, "provider-bin");
+      await mkdir(providerBinDir, { recursive: true });
+      for (const provider of AGENT_IDS) {
+        const providerPath = join(providerBinDir, provider);
+        await writeFile(
+          providerPath,
+          `#!/usr/bin/env bash\n"${agentScriptPath}" "$@"\n`,
+          "utf8",
+        );
+        await chmod(providerPath, 0o755);
+      }
+
+      const specRelativePath = "specs/auto-init.md";
+      const specPath = join(repoRoot, specRelativePath);
+      await mkdir(join(repoRoot, "specs"), { recursive: true });
+      await writeFile(specPath, "# Auto init run spec\n", "utf8");
+
+      const originalPath = process.env.PATH;
+      process.env.PATH = `${providerBinDir}:${originalPath ?? ""}`;
+      const originalCwd = process.cwd();
+      process.chdir(repoRoot);
+
+      const infoMessages: string[] = [];
+
+      try {
+        const result = await runRunCommand({
+          specPath: specRelativePath,
+          writeOutput: (payload) => {
+            for (const alert of payload.alerts ?? []) {
+              if (alert.severity === "info") {
+                infoMessages.push(alert.message);
+              }
+            }
+          },
+        });
+
+        expect(result.report.runId).toMatch(
+          /^(run-|[0-9]{8}-[0-9]{6}-[a-z0-9]+)/u,
+        );
+        expect(
+          infoMessages.filter(
+            (message) => message === "Voratiq initialized (.voratiq/).",
+          ),
+        ).toHaveLength(1);
+      } finally {
+        process.chdir(originalCwd);
+        process.env.PATH = originalPath;
+      }
+    },
+    RUN_INTEGRATION_TIMEOUT_MS,
+  );
 
   it(
     "executes configured agents and records run artifacts",
@@ -936,9 +997,7 @@ suite("voratiq run (integration)", () => {
     );
     expect(signalAgent).toBeDefined();
     expect(signalAgent?.status).toBe("failed");
-    expect(signalAgent?.error).toBe(
-      "Agent process failed. Please review the logs. (exit code 1)",
-    );
+    expect(signalAgent?.error).toBe("Agent process failed. (exit code 1)");
   });
 
   it("surfaces git status failures from the failure classifier", async () => {
@@ -964,9 +1023,7 @@ suite("voratiq run (integration)", () => {
     );
     expect(gitFailureAgent).toBeDefined();
     expect(gitFailureAgent?.status).toBe("failed");
-    expect(gitFailureAgent?.error).toBe(
-      "Agent process failed. Please review the logs. (exit code 1)",
-    );
+    expect(gitFailureAgent?.error).toBe("Agent process failed. (exit code 1)");
   });
 });
 

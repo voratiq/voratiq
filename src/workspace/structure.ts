@@ -65,7 +65,7 @@ function assertPathSegment(
     throw new Error(`${label} must be non-empty`);
   }
   if (value.includes("/") || value.includes("\\") || value.includes("..")) {
-    throw new Error(`${label} "${value}" must not contain path separators`);
+    throw new Error(`${label} \`${value}\` must not contain path separators`);
   }
   return value;
 }
