@@ -1,8 +1,12 @@
 import { spawnSync } from "node:child_process";
 
 export function detectBinary(command: string): string | undefined {
-  const result = spawnSync("bash", ["-lc", `command -v ${command}`], {
+  const result = spawnSync("bash", ["-c", `command -v ${command}`], {
     encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: process.env.PATH ?? "",
+    },
   });
 
   if (result.status === 0) {

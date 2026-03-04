@@ -8,6 +8,7 @@ import * as sandboxRuntime from "../../src/agents/runtime/sandbox.js";
 import { CliError } from "../../src/cli/errors.js";
 import { createSpecCommand, runSpecCommand } from "../../src/cli/spec.js";
 import { executeCompetitionWithAdapter } from "../../src/competition/command-adapter.js";
+import { readAgentsConfig } from "../../src/configs/agents/loader.js";
 import * as preflight from "../../src/preflight/index.js";
 import { renderCliError } from "../../src/render/utils/errors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
@@ -247,6 +248,17 @@ describe("voratiq spec (CLI)", () => {
           (message) => message === "Voratiq initialized (.voratiq/).",
         ),
       ).toHaveLength(1);
+
+      const agents = readAgentsConfig(
+        await readFile(join(repoRoot, ".voratiq", "agents.yaml"), "utf8"),
+      );
+      const codexEntries = agents.agents.filter(
+        (entry) => entry.provider === "codex",
+      );
+      expect(codexEntries.length).toBeGreaterThan(0);
+      for (const entry of codexEntries) {
+        expect(entry.binary).toBe(codexPath);
+      }
     } finally {
       process.env.PATH = originalPath;
     }
