@@ -10,7 +10,10 @@ describe("buildRunPrompt", () => {
     expect(prompt).toContain("Implement the following task:");
     expect(prompt).toContain("# Example\nDo the work.");
     expect(prompt).toContain(
-      "- When finished, write a 1-2 sentence summary to `.summary.txt` (in the workspace root).",
+      "- When finished, clean the workspace of temporary files/dirs you created (e.g., `tmp`, `.tmp`, etc.) unless they are intended deliverables.",
+    );
+    expect(prompt).toContain(
+      "- Then write a 1-2 sentence summary to `.summary.txt` (in the workspace root).",
     );
     expect(prompt).toContain(
       "- You are running headlessly. Do not pause for user interaction.",

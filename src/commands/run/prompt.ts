@@ -24,7 +24,8 @@ export function buildRunPrompt(options: BuildRunPromptOptions): string {
     writeAccess: workspacePath,
   });
   appendOutputRequirements(lines, [
-    "- When finished, write a 1-2 sentence summary to `.summary.txt` (in the workspace root).",
+    "- When finished, clean the workspace of temporary files/dirs you created (e.g., `tmp`, `.tmp`, etc.) unless they are intended deliverables.",
+    "- Then write a 1-2 sentence summary to `.summary.txt` (in the workspace root).",
   ]);
 
   return `${lines.join("\n")}\n`;
