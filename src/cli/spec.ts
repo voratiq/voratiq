@@ -26,6 +26,7 @@ export interface SpecCommandOptions {
 export interface SpecCommandResult {
   body: string;
   outputPath: string;
+  specPath?: string;
 }
 
 export async function runSpecCommand(
@@ -84,6 +85,7 @@ export async function runSpecCommand(
   return {
     body,
     outputPath: result.outputPath,
+    specPath: result.outputPath,
   };
 }
 

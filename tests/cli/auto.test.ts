@@ -420,7 +420,179 @@ describe("voratiq auto", () => {
       output.indexOf("APPLY BODY"),
     );
     expect(output).toContain("Auto SUCCEEDED");
+    expect(output).toContain("spec: SUCCEEDED");
+    expect(output).toContain("run: SUCCEEDED");
+    expect(output).toContain("review: SUCCEEDED");
+    expect(output).toContain("apply: SUCCEEDED");
     expect(process.exitCode).toBe(0);
+  });
+
+  it("fails on --description spec errors without running downstream stages", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runSpecCommandMock.mockRejectedValue(new Error("spec exploded"));
+
+    await runAutoCommand({
+      description: "Generate failing spec",
+      reviewerAgentIds: ["reviewer"],
+      apply: true,
+    });
+
+    expect(runRunCommandMock).not.toHaveBeenCalled();
+    expect(runReviewCommandMock).not.toHaveBeenCalled();
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain("spec exploded");
+    expect(output).toContain("Auto FAILED");
+    expect(output).toContain("spec: FAILED");
+    expect(output).toContain("run: SKIPPED");
+    expect(output).toContain("review: SKIPPED");
+    expect(output).toContain("apply: SKIPPED");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("stops --description flow at run failure before review", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runSpecCommandMock.mockResolvedValue({
+      outputPath: ".voratiq/specs/generated.md",
+      specPath: ".voratiq/specs/generated.md",
+      body: "Spec saved: .voratiq/specs/generated.md",
+    });
+    runRunCommandMock.mockResolvedValue({
+      report: {
+        runId: "run-desc-fail",
+        spec: { path: ".voratiq/specs/generated.md" },
+        status: "failed",
+        createdAt: new Date().toISOString(),
+        baseRevisionSha: "deadbeef",
+        agents: [{ agentId: "agent-a" } as never],
+        hadAgentFailure: true,
+        hadEvalFailure: false,
+      },
+      body: "run-desc-fail FAILED",
+      exitCode: 1,
+    });
+
+    await runAutoCommand({
+      description: "Generate then fail run",
+      reviewerAgentIds: ["reviewer"],
+      apply: true,
+    });
+
+    expect(runReviewCommandMock).not.toHaveBeenCalled();
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain("run-desc-fail FAILED");
+    expect(output).toContain("Auto FAILED");
+    expect(output).toContain("spec: SUCCEEDED");
+    expect(output).toContain("run: FAILED");
+    expect(output).toContain("review: SKIPPED");
+    expect(output).toContain("apply: SKIPPED");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("keeps --spec stage order deterministic through apply", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockResolvedValue({
+      report: {
+        runId: "run-spec-apply",
+        spec: { path: ".voratiq/specs/existing.md" },
+        status: "succeeded",
+        createdAt: new Date().toISOString(),
+        baseRevisionSha: "deadbeef",
+        agents: [{ agentId: "agent-good" } as never],
+        hadAgentFailure: false,
+        hadEvalFailure: false,
+      },
+      body: "run-spec-apply SUCCEEDED",
+    });
+    runReviewCommandMock.mockResolvedValue(
+      buildReviewResult({
+        reviewId: "review-spec-apply",
+        outputPath:
+          ".voratiq/reviews/sessions/review-spec-apply/reviewer/artifacts/review.md",
+        body: "review-spec-apply SUCCEEDED",
+      }),
+    );
+    runApplyCommandMock.mockResolvedValue({
+      result: {} as never,
+      body: "SPEC APPLY BODY",
+    });
+
+    await withTempRepo(async (repoRoot) => {
+      await writeRecommendationArtifact(
+        repoRoot,
+        ".voratiq/reviews/sessions/review-spec-apply/reviewer/artifacts/review.md",
+        {
+          preferred_agent: "agent-good",
+          resolved_preferred_agent: "agent-good",
+          rationale: "Best option",
+          next_actions: [
+            "voratiq apply --run run-spec-apply --agent agent-good",
+          ],
+        },
+      );
+
+      const result = await runAutoCommand({
+        specPath: ".voratiq/specs/existing.md",
+        reviewerAgentIds: ["reviewer"],
+        apply: true,
+      });
+      expect(result.auto.status).toBe("succeeded");
+      expect(result.exitCode).toBe(0);
+    });
+
+    expect(runSpecCommandMock).not.toHaveBeenCalled();
+    const runInvocation = runRunCommandMock.mock.invocationCallOrder.at(-1);
+    const reviewInvocation =
+      runReviewCommandMock.mock.invocationCallOrder.at(-1);
+    const applyInvocation = runApplyCommandMock.mock.invocationCallOrder.at(-1);
+    expect(runInvocation).toBeDefined();
+    expect(reviewInvocation).toBeDefined();
+    expect(applyInvocation).toBeDefined();
+    expect(runInvocation).toBeLessThan(
+      reviewInvocation ?? Number.POSITIVE_INFINITY,
+    );
+    expect(reviewInvocation).toBeLessThan(
+      applyInvocation ?? Number.POSITIVE_INFINITY,
+    );
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output.indexOf("run-spec-apply SUCCEEDED")).toBeLessThan(
+      output.indexOf("review-spec-apply SUCCEEDED"),
+    );
+    expect(output.indexOf("review-spec-apply SUCCEEDED")).toBeLessThan(
+      output.indexOf("SPEC APPLY BODY"),
+    );
+    expect(output.indexOf("SPEC APPLY BODY")).toBeLessThan(
+      output.indexOf("Auto SUCCEEDED"),
+    );
+    expect(output).toContain("spec: SKIPPED");
+    expect(output).toContain("run: SUCCEEDED");
+    expect(output).toContain("review: SUCCEEDED");
+    expect(output).toContain("apply: SUCCEEDED");
   });
 
   it("keeps per-phase final frames stable for auto --spec and non-success review output", async () => {

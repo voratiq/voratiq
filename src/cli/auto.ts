@@ -25,7 +25,7 @@ import { CliError, toCliError } from "./errors.js";
 import { beginChainedCommandOutput, writeCommandOutput } from "./output.js";
 import { type ReviewCommandResult, runReviewCommand } from "./review.js";
 import { runRunCommand } from "./run.js";
-import { runSpecCommand } from "./spec.js";
+import { runSpecCommand, type SpecCommandResult } from "./spec.js";
 
 export interface AutoCommandOptions {
   specPath?: string;
@@ -96,6 +96,30 @@ function assertAutoOptionCompatibility(options: AutoCommandOptions): void {
       ["Add `--apply` when using `--commit`."],
     );
   }
+}
+
+function resolveSpecPathForAuto(result: SpecCommandResult): string {
+  const specPathCandidate =
+    typeof result.specPath === "string" && result.specPath.trim().length > 0
+      ? result.specPath.trim()
+      : undefined;
+  if (specPathCandidate) {
+    return specPathCandidate;
+  }
+
+  const outputPathCandidate =
+    typeof result.outputPath === "string" && result.outputPath.trim().length > 0
+      ? result.outputPath.trim()
+      : undefined;
+  if (outputPathCandidate) {
+    return outputPathCandidate;
+  }
+
+  throw new CliError(
+    "Spec stage did not return a spec path.",
+    [],
+    ["Re-run `voratiq spec --description <text>` and verify `Spec saved:`."],
+  );
 }
 
 interface AutoRecommendationLoadResult {
@@ -297,6 +321,11 @@ export async function runAutoCommand(
   runtime: AutoRuntimeOptions = {},
 ): Promise<AutoCommandResult> {
   assertAutoOptionCompatibility(options);
+  const hasDescription =
+    typeof options.description === "string" &&
+    options.description.trim().length > 0;
+  const description =
+    typeof options.description === "string" ? options.description : undefined;
 
   const now = runtime.now ?? Date.now.bind(Date);
 
@@ -307,6 +336,11 @@ export async function runAutoCommand(
     let hardFailure = false;
     let actionRequired = false;
     let actionRequiredDetail: string | undefined;
+
+    let specStartedAt: number | undefined;
+    let specStatus: "succeeded" | "failed" | "skipped" = "skipped";
+    let specPath: string | undefined;
+    let specDetail: string | undefined;
 
     let runStartedAt: number | undefined;
     let runStatus: "succeeded" | "failed" | "skipped" = "skipped";
@@ -345,18 +379,23 @@ export async function runAutoCommand(
 
     let resolvedSpecPath = options.specPath;
 
-    if (options.description) {
+    if (hasDescription && description) {
+      specStartedAt = now();
       try {
         const specResult = await runSpecCommand({
-          description: options.description,
+          description,
           profile: options.profile,
           maxParallel: options.maxParallel,
           suppressHint: true,
           writeOutput: writeCommandOutput,
         });
-        resolvedSpecPath = specResult.outputPath;
+        specStatus = "succeeded";
+        specPath = resolveSpecPathForAuto(specResult);
+        resolvedSpecPath = specPath;
         writeCommandOutput({ body: specResult.body });
       } catch (error) {
+        specStatus = "failed";
+        specDetail = toCliError(error).headline;
         hardFailure = true;
         writeCommandOutput({ body: renderCliError(toCliError(error)) });
       }
@@ -434,7 +473,11 @@ export async function runAutoCommand(
       }
     }
 
-    if (!hardFailure || runId) {
+    const shouldAttemptReview = hasDescription
+      ? runStatus === "succeeded" && typeof runId === "string"
+      : !hardFailure || runId;
+
+    if (shouldAttemptReview) {
       if (!runId) {
         reviewStatus = "skipped";
       } else {
@@ -482,7 +525,8 @@ export async function runAutoCommand(
       options.apply &&
       runId &&
       reviewStatus === "succeeded" &&
-      reviewOutputPath
+      reviewOutputPath &&
+      (!hasDescription || runStatus === "succeeded")
     ) {
       applyStartedAt = now();
       try {
@@ -594,6 +638,8 @@ export async function runAutoCommand(
     }
 
     const overallDurationMs = now() - overallStart;
+    const specDurationMs =
+      specStartedAt !== undefined ? now() - specStartedAt : undefined;
     const runDurationMs =
       runStartedAt !== undefined ? now() - runStartedAt : undefined;
     const reviewDurationMs =
@@ -635,6 +681,14 @@ export async function runAutoCommand(
     const summaryBody = renderAutoSummaryTranscript({
       status: autoStatus,
       totalDurationMs: overallDurationMs,
+      spec: {
+        status: specStatus,
+        ...(typeof specDurationMs === "number"
+          ? { durationMs: specDurationMs }
+          : {}),
+        ...(specPath ? { specPath } : {}),
+        ...(specDetail ? { detail: specDetail } : {}),
+      },
       run: {
         status: runStatus,
         ...(typeof runDurationMs === "number"
