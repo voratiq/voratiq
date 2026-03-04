@@ -10,15 +10,6 @@ const SIGNAL_EXIT_CODES: Partial<Record<NodeJS.Signals, number>> = {
   SIGTERM: 143,
 };
 
-const ROOT_AUTO_DESCRIPTION_HELP_TEXT = [
-  "",
-  "Flat intent entrypoint (equivalent to `voratiq auto --description <text>`):",
-  "  voratiq --description <text> [--run-agent <agent-id>] [--review-agent <agent-id>] [--profile <name>] [--max-parallel <count>] [--branch] [--apply] [--commit]",
-  "",
-  "For an existing spec path, use:",
-  "  voratiq auto --spec <path> [options]",
-].join("\n");
-
 function installProcessGuards(): void {
   process.once("SIGINT", () => {
     void handleSignal("SIGINT");
@@ -168,8 +159,14 @@ export async function runCli(
 
   program
     .name("voratiq")
-    .description("Voratiq CLI")
-    .addHelpText("after", ROOT_AUTO_DESCRIPTION_HELP_TEXT)
+    .description(
+      "Voratiq CLI \u2013 run coding agents against each other, merge the winner.",
+    )
+    .enablePositionalOptions()
+    .option(
+      "--description <text>",
+      "Describe what to build, then run the full pipeline",
+    )
     .version(localVersion, "-v, --version", "print the Voratiq version")
     .exitOverride()
     .showHelpAfterError()
@@ -310,13 +307,13 @@ async function registerCommands(
     wantsHelp ||
     (commandName !== undefined &&
       ![
+        "auto",
         "init",
-        "list",
         "spec",
         "run",
         "review",
-        "auto",
         "apply",
+        "list",
         "prune",
       ].includes(commandName));
 
@@ -325,13 +322,13 @@ async function registerCommands(
   }
 
   if (loadAll) {
+    program.addCommand((await import("./cli/auto.js")).createAutoCommand());
     program.addCommand((await import("./cli/init.js")).createInitCommand());
-    program.addCommand((await import("./cli/list.js")).createListCommand());
     program.addCommand((await import("./cli/spec.js")).createSpecCommand());
     program.addCommand((await import("./cli/run.js")).createRunCommand());
     program.addCommand((await import("./cli/review.js")).createReviewCommand());
-    program.addCommand((await import("./cli/auto.js")).createAutoCommand());
     program.addCommand((await import("./cli/apply.js")).createApplyCommand());
+    program.addCommand((await import("./cli/list.js")).createListCommand());
     program.addCommand((await import("./cli/prune.js")).createPruneCommand());
     return;
   }
@@ -413,31 +410,7 @@ function safeRealpath(path: string): string {
   }
 }
 
-function shouldWriteInitPreface(argv: readonly string[]): boolean {
-  const commandName = findCommandName(argv);
-  if (commandName !== "init") {
-    return false;
-  }
-
-  if (argv.includes("--help") || argv.includes("-h")) {
-    return false;
-  }
-
-  if (argv.includes("--version") || argv.includes("-v")) {
-    return false;
-  }
-
-  return true;
-}
-
-function writeInitPreface(): void {
-  process.stdout.write("\nInitializing Voratiq…\n");
-}
-
 if (shouldAutorun()) {
-  if (shouldWriteInitPreface(process.argv)) {
-    writeInitPreface();
-  }
   installProcessGuards();
   void runCli();
 }

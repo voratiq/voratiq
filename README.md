@@ -28,31 +28,18 @@ Windows is not currently supported.
 
 ## Quick Start
 
+Get started with a single command:
+
 ```bash
-# Initialize workspace
-voratiq init --yes
-
-# Generate a spec
-voratiq spec \
-  --description "add dark mode toggle with localStorage persistence" \
-  --agent <agent-id>
-
-# Run agent ensemble against that spec
-voratiq run --spec .voratiq/specs/add-dark-mode-toggle.md
-
-# Review results
-voratiq review --run <run-id> --agent <agent-id>
-
-# Apply the best solution
-voratiq apply --run <run-id> --agent <agent-id>
-
-# Clean up workspace
-voratiq prune --run <run-id>
+voratiq --description "add dark mode toggle with localStorage persistence"
 ```
 
-Note: which agents participate in each stage is configured via the [orchestration config](https://github.com/voratiq/voratiq/blob/main/docs/configs/orchestration.md).
+This generates a spec, runs your agent ensemble against it, and reviews the results.
 
-For a detailed walkthrough, see the [tutorial](https://github.com/voratiq/voratiq/blob/main/docs/tutorial.md).
+Need lower-level control over individual stages? See:
+
+- [CLI Reference](https://github.com/voratiq/voratiq/blob/main/docs/cli-reference.md)
+- [Tutorial](https://github.com/voratiq/voratiq/blob/main/docs/tutorial.md)
 
 ## How It Works
 

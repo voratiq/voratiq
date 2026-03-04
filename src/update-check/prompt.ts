@@ -62,16 +62,11 @@ export async function showUpdatePrompt(
       try {
         execCommand(UPDATE_COMMAND, UPDATE_ARGS);
       } catch {
-        writeStatusLine(
-          "Update failed. Please try again manually.",
-          "red",
-          write,
-          writeCommandOutput,
-        );
+        writeStatusLine("Update failed.", "red", write, writeCommandOutput);
         return { shouldExit: true, exitCode: 1 };
       }
       writeStatusLine(
-        "Update completed. Please rerun your command.",
+        "Updated. Rerun your command.",
         "green",
         write,
         writeCommandOutput,
@@ -83,7 +78,7 @@ export async function showUpdatePrompt(
       return { shouldExit: false };
     }
 
-    write("Please choose 1 or 2.\n");
+    write("Choose 1 or 2.\n");
     firstPrompt = false;
   }
 }

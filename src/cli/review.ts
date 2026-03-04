@@ -365,17 +365,20 @@ function parseMaxParallelOption(value: string): number {
 
 export function createReviewCommand(): Command {
   return new Command("review")
-    .description("Generate a review of run artifacts")
-    .requiredOption("--run <run-id>", "Identifier of the recorded run")
+    .description("Review a recorded run")
+    .requiredOption("--run <run-id>", "Run ID to review")
     .addOption(
-      new Option("--agent <agent-id>", "Reviewer agent identifier (repeatable)")
+      new Option(
+        "--agent <agent-id>",
+        "Set reviewers directly (repeatable; order preserved)",
+      )
         .default([], "")
         .argParser(collectAgentOption),
     )
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
       "--max-parallel <count>",
-      "Maximum number of reviewers to run concurrently",
+      "Max concurrent reviewers (default: all)",
       parseMaxParallelOption,
     )
     .allowExcessArguments(false)

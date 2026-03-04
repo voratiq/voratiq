@@ -997,9 +997,7 @@ suite("voratiq run (integration)", () => {
     );
     expect(signalAgent).toBeDefined();
     expect(signalAgent?.status).toBe("failed");
-    expect(signalAgent?.error).toBe(
-      "Agent process failed. Please review the logs. (exit code 1)",
-    );
+    expect(signalAgent?.error).toBe("Agent process failed. (exit code 1)");
   });
 
   it("surfaces git status failures from the failure classifier", async () => {
@@ -1025,9 +1023,7 @@ suite("voratiq run (integration)", () => {
     );
     expect(gitFailureAgent).toBeDefined();
     expect(gitFailureAgent?.status).toBe("failed");
-    expect(gitFailureAgent?.error).toBe(
-      "Agent process failed. Please review the logs. (exit code 1)",
-    );
+    expect(gitFailureAgent?.error).toBe("Agent process failed. (exit code 1)");
   });
 });
 

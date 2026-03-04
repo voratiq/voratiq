@@ -98,16 +98,13 @@ describe("voratiq auto", () => {
   it("help reflects spec-or-description contract and apply flags", () => {
     const help = createAutoCommand().helpInformation();
     expect(help).toContain("--spec <path>");
-    expect(help).toContain("Path to an existing spec file");
+    expect(help).toContain("Existing spec to run");
     expect(help).toContain("--description <text>");
     expect(help).toContain("--run-agent <agent-id>");
     expect(help).toContain("--review-agent <agent-id>");
     expect(help).toContain("--profile <name>");
     expect(help).toContain("--apply");
     expect(help).toContain("--commit");
-    expect(help).toContain("Equivalent entry styles:");
-    expect(help).toContain("voratiq auto --description <text> [options]");
-    expect(help).toContain("voratiq --description <text> [options]");
     expect(help).not.toContain("--spec-agent");
     expect(help).not.toContain("--auto-init");
     expect(help).not.toContain("--no-auto-init");
@@ -434,7 +431,7 @@ describe("voratiq auto", () => {
           "",
           "---",
           "",
-          "To begin a run:",
+          "Next:",
           "  voratiq run --spec .voratiq/specs/generated.md",
         ].join("\n"),
       });
@@ -496,6 +493,12 @@ describe("voratiq auto", () => {
     expect(runRunCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
         specPath: ".voratiq/specs/generated.md",
+      }),
+    );
+    expect(runReviewCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-123",
+        suppressHint: false,
       }),
     );
     expect((output.match(/Generating specification…/gu) ?? []).length).toBe(1);
@@ -604,6 +607,7 @@ describe("voratiq auto", () => {
     expect(runReviewCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
         runId: "run-apply-123",
+        suppressHint: true,
       }),
     );
     expect(runApplyCommandMock).toHaveBeenCalledWith(
@@ -625,10 +629,6 @@ describe("voratiq auto", () => {
       output.indexOf("APPLY BODY"),
     );
     expect(output).toContain("Auto SUCCEEDED");
-    expect(output).toContain("spec: SUCCEEDED");
-    expect(output).toContain("run: SUCCEEDED");
-    expect(output).toContain("review: SUCCEEDED");
-    expect(output).toContain("apply: SUCCEEDED");
     expect(process.exitCode).toBe(0);
   });
 
@@ -656,10 +656,6 @@ describe("voratiq auto", () => {
     const output = stripAnsi(stdout.join(""));
     expect(output).toContain("spec exploded");
     expect(output).toContain("Auto FAILED");
-    expect(output).toContain("spec: FAILED");
-    expect(output).toContain("run: SKIPPED");
-    expect(output).toContain("review: SKIPPED");
-    expect(output).toContain("apply: SKIPPED");
     expect(process.exitCode).toBe(1);
   });
 
@@ -704,10 +700,6 @@ describe("voratiq auto", () => {
     const output = stripAnsi(stdout.join(""));
     expect(output).toContain("run-desc-fail FAILED");
     expect(output).toContain("Auto FAILED");
-    expect(output).toContain("spec: SUCCEEDED");
-    expect(output).toContain("run: FAILED");
-    expect(output).toContain("review: SKIPPED");
-    expect(output).toContain("apply: SKIPPED");
     expect(process.exitCode).toBe(1);
   });
 
@@ -794,10 +786,6 @@ describe("voratiq auto", () => {
     expect(output.indexOf("SPEC APPLY BODY")).toBeLessThan(
       output.indexOf("Auto SUCCEEDED"),
     );
-    expect(output).toContain("spec: SKIPPED");
-    expect(output).toContain("run: SUCCEEDED");
-    expect(output).toContain("review: SUCCEEDED");
-    expect(output).toContain("apply: SUCCEEDED");
   });
 
   it("keeps per-phase final frames stable for auto --spec and non-success review output", async () => {
@@ -1605,7 +1593,7 @@ describe("voratiq auto", () => {
     expect(output).toContain("voratiq apply --run run-123 --agent <agent-id>");
     expect((output.match(/To apply a solution:/gu) ?? []).length).toBe(1);
     expect(output).toContain(
-      "Warning: Reviewers disagreed. Review manually and apply the best solution.",
+      "Warning: Reviewers disagreed. Review results and apply manually.",
     );
     expect(output).toContain("Auto ACTION REQUIRED");
     expect(process.exitCode).toBe(1);
@@ -1680,7 +1668,7 @@ describe("voratiq auto", () => {
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     const output = stripAnsi(stdout.join(""));
     expect(output).toContain(
-      "Warning: No shared recommendation was resolved. Review manually and apply the best solution.",
+      "Warning: No shared recommendation was resolved. Review results and apply manually.",
     );
     expect(output).toContain("Auto ACTION REQUIRED");
     expect(process.exitCode).toBe(1);
@@ -1722,7 +1710,7 @@ describe("voratiq auto", () => {
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     expect(stripAnsi(stdout.join(""))).toContain(
-      "Warning: No resolvable recommendation was produced. Review manually and apply the best solution.",
+      "Warning: No resolvable recommendation was produced. Review results and apply manually.",
     );
     expect(stripAnsi(stdout.join(""))).toContain("Auto ACTION REQUIRED");
     expect(process.exitCode).toBe(1);
@@ -1764,7 +1752,7 @@ describe("voratiq auto", () => {
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     expect(stripAnsi(stdout.join(""))).toContain(
-      "Warning: No resolvable recommendation was produced. Review manually and apply the best solution.",
+      "Warning: No resolvable recommendation was produced. Review results and apply manually.",
     );
     expect(stripAnsi(stdout.join(""))).toContain("Auto ACTION REQUIRED");
     expect(process.exitCode).toBe(1);

@@ -28,16 +28,6 @@ export interface AutoSummaryInput {
   apply?: AutoPhaseSummary & { agentId?: string };
 }
 
-function formatAutoPhaseStatus(status: AutoPhaseStatus): string {
-  if (status === "succeeded") {
-    return colorize("SUCCEEDED", getRunStatusStyle("succeeded").cli);
-  }
-  if (status === "failed") {
-    return colorize("FAILED", getRunStatusStyle("failed").cli);
-  }
-  return colorize("SKIPPED", "yellow");
-}
-
 export function renderAutoSummaryTranscript(input: AutoSummaryInput): string {
   const totalDuration = formatDurationLabel(input.totalDurationMs) ?? "—";
   const statusLabel =
@@ -56,10 +46,6 @@ export function renderAutoSummaryTranscript(input: AutoSummaryInput): string {
         );
   const lines: string[] = [
     `Auto ${colorize(statusLabel, statusStyle.cli)} (${totalDuration})`,
-    `spec: ${formatAutoPhaseStatus(input.spec.status)}`,
-    `run: ${formatAutoPhaseStatus(input.run.status)}`,
-    `review: ${formatAutoPhaseStatus(input.review.status)}`,
-    `apply: ${formatAutoPhaseStatus(input.apply?.status ?? "skipped")}`,
   ];
   return renderTranscript({ sections: [lines] });
 }

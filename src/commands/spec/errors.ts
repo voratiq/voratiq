@@ -16,7 +16,7 @@ export class SpecAgentNotFoundError extends SpecError {
     super(
       `Agent \`${agentId}\` not found in \`agents.yaml\`.`,
       [],
-      ["Update `agents.yaml` with this agent or choose a configured agent."],
+      ["Add this agent to `agents.yaml`."],
     );
     this.name = "SpecAgentNotFoundError";
   }

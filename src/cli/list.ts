@@ -62,12 +62,12 @@ export function createListCommand(): Command {
     .description("List recorded runs")
     .option(
       "--limit <count>",
-      "Maximum number of runs to display",
+      "Show only the N most recent runs (default: 10)",
       parseLimitOption,
     )
-    .option("--spec <path>", "Filter runs by spec path")
-    .option("--run <id>", "Filter runs by run identifier")
-    .option("--include-pruned", "Include pruned runs in the listing")
+    .option("--spec <path>", "Filter by spec path")
+    .option("--run <run-id>", "Show only the specified run ID")
+    .option("--include-pruned", "Include runs marked as pruned")
     .allowExcessArguments(false)
     .action(async (options: ListCommandActionOptions) => {
       const result = await runListCommand({

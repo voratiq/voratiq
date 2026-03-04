@@ -58,9 +58,6 @@ interface AutoRuntimeOptions {
   now?: () => number;
 }
 
-const AUTO_ENTRYPOINT_EQUIVALENCE_TEXT =
-  "Equivalent entry styles: `voratiq auto --description <text> [options]` or `voratiq --description <text> [options]`.";
-
 function parseMaxParallelOption(value: string): number {
   return parsePositiveInteger(
     value,
@@ -88,7 +85,7 @@ function assertAutoOptionCompatibility(options: AutoCommandOptions): void {
     throw new CliError(
       "Exactly one of `--spec` or `--description` is required.",
       [],
-      ["Pass one flag, not both (or neither)."],
+      ["Pass exactly one."],
     );
   }
 
@@ -121,7 +118,7 @@ function resolveSpecPathForAuto(result: SpecCommandResult): string {
   throw new CliError(
     "Spec stage did not return a spec path.",
     [],
-    ["Re-run `voratiq spec --description <text>` and verify `Spec saved:`."],
+    ["Re-run the spec stage and check for `Spec saved:` in the output."],
   );
 }
 
@@ -445,7 +442,7 @@ export async function runAutoCommand(
               `Status: \`${runResult.report.status}\`.`,
               `Exit code: ${runResult.exitCode}.`,
             ],
-            ["Re-run the command; run outcome signaling was inconsistent."],
+            ["Re-run the command."],
           );
         }
 
@@ -495,6 +492,7 @@ export async function runAutoCommand(
             agentOverrideFlag: "--review-agent",
             profile: options.profile,
             maxParallel: options.maxParallel,
+            suppressHint: options.apply === true,
             stdout: chainedOutput.stdout,
             stderr: chainedOutput.stderr,
             suppressLeadingBlankLine: !process.stdout.isTTY,
@@ -544,8 +542,8 @@ export async function runAutoCommand(
           preferredAgent = recommendationResult.preferredAgent;
           if (!preferredAgent) {
             markActionRequired(
-              "No resolvable recommendation was produced; manual arbitration required.",
-              "No resolvable recommendation was produced. Review manually and apply the best solution.",
+              "No resolvable recommendation was produced; manual review required.",
+              "No resolvable recommendation was produced. Review results and apply manually.",
             );
           }
         } else if (reviewResults && reviewResults.length > 0) {
@@ -555,8 +553,8 @@ export async function runAutoCommand(
             });
           if (reviewerRecommendations.length === 0) {
             markActionRequired(
-              "No shared reviewer recommendation could be resolved; manual arbitration required.",
-              "No shared recommendation was resolved. Review manually and apply the best solution.",
+              "No shared reviewer recommendation could be resolved; manual review required.",
+              "No shared recommendation was resolved. Review results and apply manually.",
             );
           } else {
             const resolvedPreferredAgents = reviewerRecommendations
@@ -569,8 +567,8 @@ export async function runAutoCommand(
               resolvedPreferredAgents.length !== reviewerRecommendations.length
             ) {
               markActionRequired(
-                "No shared reviewer recommendation could be resolved; manual arbitration required.",
-                "No shared recommendation was resolved. Review manually and apply the best solution.",
+                "No shared reviewer recommendation could be resolved; manual review required.",
+                "No shared recommendation was resolved. Review results and apply manually.",
               );
             } else {
               const distinctPreferredAgents = new Set(resolvedPreferredAgents);
@@ -590,8 +588,8 @@ export async function runAutoCommand(
                 preferredAgent = unanimousPreferredAgent;
               } else {
                 markActionRequired(
-                  "Reviewers disagreed on preferred candidate; manual arbitration required.",
-                  "Reviewers disagreed. Review manually and apply the best solution.",
+                  "Reviewers disagreed on preferred candidate; manual review required.",
+                  "Reviewers disagreed. Review results and apply manually.",
                 );
               }
             }
@@ -760,21 +758,13 @@ interface AutoCommandActionOptions {
 
 export function createAutoCommand(): Command {
   return new Command("auto")
-    .description(
-      [
-        "End-to-end pipeline to run agents, review results, and optionally apply",
-        AUTO_ENTRYPOINT_EQUIVALENCE_TEXT,
-      ].join("\n"),
-    )
-    .option("--spec <path>", "Path to an existing spec file")
-    .option(
-      "--description <text>",
-      "Generate a spec from a plain-language description",
-    )
+    .description("Run spec, run, review, and apply as one command")
+    .option("--spec <path>", "Existing spec to run")
+    .option("--description <text>", "Generate a spec, then run and review it")
     .addOption(
       new Option(
         "--run-agent <agent-id>",
-        "Override run-stage agents (repeatable)",
+        "Set run-stage agents directly (repeatable; order preserved)",
       )
         .default([], "")
         .argParser(collectRunAgentOption),
@@ -782,7 +772,7 @@ export function createAutoCommand(): Command {
     .addOption(
       new Option(
         "--review-agent <agent-id>",
-        "Override review-stage agents (repeatable)",
+        "Set review-stage agents directly (repeatable)",
       )
         .default([], "")
         .argParser(collectReviewAgentOption),
@@ -790,16 +780,16 @@ export function createAutoCommand(): Command {
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
       "--max-parallel <count>",
-      "Maximum number of agents to run concurrently",
+      "Max concurrent agents/reviewers",
       parseMaxParallelOption,
     )
-    .option("--branch", "Checkout or create a branch named after the spec")
+    .option("--branch", "Create or checkout a branch named after the spec")
     .option(
       "--apply",
-      "Apply the recommended agent's output after review",
+      "Apply the recommended candidate after review",
       () => true,
     )
-    .option("--commit", "Commit after applying (requires --apply)", () => true)
+    .option("--commit", "Commit after apply (requires --apply)", () => true)
     .allowExcessArguments(false)
     .action(async (options: AutoCommandActionOptions) => {
       await runAutoCommand({

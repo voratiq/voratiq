@@ -128,14 +128,18 @@ describe("voratiq init (cli)", () => {
       return Promise.resolve(result);
     });
 
+    const stdout: string[] = [];
     const stdoutSpy = jest
       .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
 
     try {
       const result = await runInitCommand({ yes: true, preset: "lite" });
       expect(result.body).not.toContain("Configuring workspace…");
-      expect(stdoutSpy).toHaveBeenCalledWith("\nConfiguring workspace…\n");
+      expect(stdout.join("")).toContain("\nConfiguring workspace…\n");
     } finally {
       stdoutSpy.mockRestore();
     }

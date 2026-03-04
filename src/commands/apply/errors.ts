@@ -16,7 +16,7 @@ export class ApplyRunDeletedError extends ApplyError {
     super(
       `Run \`${runId}\` has been deleted.`,
       [],
-      ["Re-run the spec to generate fresh artifacts before applying."],
+      ["Re-run the spec to regenerate artifacts."],
     );
     this.name = "ApplyRunDeletedError";
   }
@@ -27,9 +27,7 @@ export class ApplyRunMetadataCorruptedError extends ApplyError {
     super(
       "Run history is corrupted.",
       [detail],
-      [
-        "Inspect `runs/index.json` and the affected run directory under `runs/sessions/<id>`, then retry.",
-      ],
+      ["Check `runs/index.json` and the affected session directory."],
     );
     this.name = "ApplyRunMetadataCorruptedError";
   }
@@ -132,7 +130,7 @@ export class ApplyAgentDiffMissingOnDiskError extends ApplyError {
     super(
       "Recorded diff is missing from disk.",
       [`Expected diff: \`${diffPath}\`.`],
-      ["Re-run the run to regenerate artifacts."],
+      ["Re-run to regenerate artifacts."],
     );
     this.name = "ApplyAgentDiffMissingOnDiskError";
   }
@@ -157,7 +155,7 @@ export class ApplyAgentSummaryMissingOnDiskError extends ApplyError {
     super(
       "Recorded summary is missing from disk.",
       [`Expected summary: \`${summaryPath}\`.`],
-      ["Re-run the run to regenerate artifacts."],
+      ["Re-run to regenerate artifacts."],
     );
     this.name = "ApplyAgentSummaryMissingOnDiskError";
   }

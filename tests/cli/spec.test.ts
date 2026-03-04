@@ -274,7 +274,7 @@ describe("voratiq spec (CLI)", () => {
         "Spec saved: .voratiq/specs/payment-flow.md",
       );
       expect(result.body).toContain(
-        "To begin a run:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
+        "Next:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
       );
     } finally {
       if (originalDescriptor) {
@@ -605,7 +605,7 @@ describe("voratiq spec (CLI)", () => {
       [
         "Error: Agent `missing` not found in `agents.yaml`.",
         "",
-        "Update `agents.yaml` with this agent or choose a configured agent.",
+        "Add this agent to `agents.yaml`.",
       ].join("\n"),
     );
   });
@@ -675,7 +675,7 @@ describe("voratiq spec (CLI)", () => {
     );
     expect(result.body).toContain("Spec saved: .voratiq/specs/payment-flow.md");
     expect(result.body).toContain(
-      "To begin a run:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
+      "Next:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
     );
 
     expect(executeCompetitionWithAdapterMock).toHaveBeenCalledTimes(1);

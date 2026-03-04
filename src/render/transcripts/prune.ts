@@ -121,7 +121,7 @@ export function renderPruneTranscript(result: PruneResult): string {
     return renderTranscript({
       sections,
       hint: {
-        message: `Re-run \`voratiq prune --run ${result.runId}\` when you are ready.`,
+        message: `Run \`voratiq prune --run ${result.runId}\` when ready.`,
       },
     });
   }
@@ -142,7 +142,7 @@ export function renderPruneAllTranscript(result: PruneAllResult): string {
     return renderTranscript({
       sections: [[colorize("Prune aborted; no changes were made.", "yellow")]],
       hint: {
-        message: "Re-run `voratiq prune --all` when you are ready.",
+        message: "Run `voratiq prune --all` when ready.",
       },
     });
   }

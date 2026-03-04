@@ -157,20 +157,23 @@ function parseMaxParallelOption(value: string): number {
 
 export function createRunCommand(): Command {
   return new Command("run")
-    .description("Execute configured agents against a spec")
+    .description("Execute agents against a spec")
     .requiredOption("--spec <path>", "Path to the spec file")
     .addOption(
-      new Option("--agent <agent-id>", "Override agents to run (repeatable)")
+      new Option(
+        "--agent <agent-id>",
+        "Set agents directly (repeatable; order preserved)",
+      )
         .default([], "")
         .argParser(collectAgentOption),
     )
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
       "--max-parallel <count>",
-      "Maximum number of agents to run concurrently",
+      "Max concurrent agents (default: all)",
       parseMaxParallelOption,
     )
-    .option("--branch", "Checkout or create a branch named after the spec")
+    .option("--branch", "Create or checkout a branch named after the spec")
     .allowExcessArguments(false)
     .action(async (options: RunCommandActionOptions) => {
       const runOptions: RunCommandOptions = {

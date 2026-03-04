@@ -98,21 +98,23 @@ export function createSpecCommand(): Command {
     );
 
   return new Command("spec")
-    .description("Generate a structured spec via a sandboxed agent")
-    .requiredOption(
-      "--description <text>",
-      "Human description to convert into a spec",
+    .description("Generate a spec from a task description")
+    .requiredOption("--description <text>", "Task description")
+    .option(
+      "--agent <agent-id>",
+      "Agent to draft the spec (uses orchestration config if omitted)",
     )
-    .option("--agent <agent-id>", "Agent identifier to use")
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .addOption(
-      new Option(
-        "--max-parallel <count>",
-        "Maximum number of spec agents to run concurrently",
-      ).argParser(parseMaxParallelOption),
+      new Option("--max-parallel <count>", "Max concurrent agents")
+        .argParser(parseMaxParallelOption)
+        .hideHelp(),
     )
-    .option("--title <text>", "Optional spec title")
-    .option("--output <path>", "Optional output path within .voratiq/specs/")
+    .option("--title <text>", "Spec title; agent infers if omitted")
+    .option(
+      "--output <path>",
+      "Output path (default: .voratiq/specs/<slug>.md)",
+    )
     .allowExcessArguments(false)
     .action(async (commandOptions: SpecCommandOptions) => {
       const result = await runSpecCommand(commandOptions);

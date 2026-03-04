@@ -8,7 +8,7 @@ import type { AgentPreset } from "../workspace/templates.js";
 import { AGENT_PRESET_CHOICES } from "../workspace/templates.js";
 import { createConfirmationWorkflow } from "./confirmation.js";
 import { NonInteractiveShellError } from "./errors.js";
-import { writeCommandOutput, writeCommandPreface } from "./output.js";
+import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface RunInitCommandResult extends InitCommandResult {
   body: string;
@@ -18,11 +18,17 @@ export interface InitCommandOptions {
   yes?: boolean;
   preset?: AgentPreset;
   presetProvided?: boolean;
+  writeOutput?: CommandOutputWriter;
 }
 
 export async function runInitCommand(
   options: InitCommandOptions = {},
 ): Promise<RunInitCommandResult> {
+  const { writeOutput = writeCommandOutput } = options;
+  writeOutput({
+    alerts: [{ severity: "info", message: "Initializing Voratiq…" }],
+  });
+
   const { root } = await resolveCliContext({ requireWorkspace: false });
 
   const assumeYes = Boolean(options.yes);
@@ -42,7 +48,9 @@ export async function runInitCommand(
       preset,
       presetProvided,
       onPresetResolved: () => {
-        writeCommandPreface("Configuring workspace…");
+        writeOutput({
+          alerts: [{ severity: "info", message: "Configuring workspace…" }],
+        });
         wroteConfiguringPreface = true;
       },
       assumeYes,
@@ -62,17 +70,14 @@ export async function runInitCommand(
 }
 
 export function createInitCommand(): Command {
-  const presetOption = new Option(
-    "--preset <preset>",
-    "Select the workspace preset",
-  )
+  const presetOption = new Option("--preset <preset>", "Select a preset")
     .choices(AGENT_PRESET_CHOICES)
     .default("pro");
 
   return new Command("init")
-    .description("Bootstrap the Voratiq workspace")
-    .option("-y, --yes", "Assume yes for all prompts")
+    .description("Initialize the Voratiq workspace")
     .addOption(presetOption)
+    .option("-y, --yes", "Assume yes and accept defaults")
     .allowExcessArguments(false)
     .action(async (commandOptions: InitCommandOptions, command: Command) => {
       const presetSource = command.getOptionValueSource("preset");

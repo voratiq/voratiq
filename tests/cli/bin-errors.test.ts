@@ -148,7 +148,7 @@ describe("CLI entrypoint error handling", () => {
     expect(process.exitCode).toBe(0);
   });
 
-  it("documents flat and subcommand auto entry styles in root help", async () => {
+  it("documents root description intent option in help", async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];
 
@@ -169,11 +169,10 @@ describe("CLI entrypoint error handling", () => {
     await runCli(["node", "voratiq", "--help"]);
 
     const help = stripAnsi(stdout.join(""));
+    expect(help).toContain("--description <text>");
     expect(help).toContain(
-      "Flat intent entrypoint (equivalent to `voratiq auto --description <text>`):",
+      "Describe what to build, then run the full pipeline",
     );
-    expect(help).toContain("voratiq --description <text>");
-    expect(help).toContain("voratiq auto --spec <path> [options]");
     expect(stderr.join("")).toHaveLength(0);
     expect(process.exitCode).toBe(0);
   });
