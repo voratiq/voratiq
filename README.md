@@ -4,7 +4,7 @@ Run coding agents against each other. Merge the winner.
 
 ![`voratiq run --spec .voratiq/specs/standardize-docker-test-scripts.md`](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/run-demo.png)
 
-Why? Because no single model is best for every task. We use selection because it leads to [higher quality code](https://voratiq.com/blog/selection-rather-than-prediction/).
+No single model wins every task. Run several, keep the best result. [Here's why that works](https://voratiq.com/blog/selection-rather-than-prediction/).
 
 ## Installation
 
@@ -14,7 +14,8 @@ Install via npm:
 npm install -g voratiq
 ```
 
-### Requirements
+<details>
+<summary>Requirements</summary>
 
 - Node 20+
 - git
@@ -25,6 +26,8 @@ npm install -g voratiq
 See the [sandbox runtime docs](https://github.com/anthropic-experimental/sandbox-runtime/blob/1bafa66a2c3ebc52569fc0c1a868e85e778f66a0/README.md#platform-specific-dependencies) for guidance on the platform-specific dependencies.
 
 Windows is not currently supported.
+
+</details>
 
 ## Quick Start
 
@@ -45,7 +48,7 @@ Need lower-level control over individual stages? See:
 
 Voratiq positions you as the architect and reviewer, and shifts implementation onto an ensemble of agents.
 
-In practice, the same spec goes to all agents, evals run automatically, and you pick the winner.
+The same spec goes to all agents, evals run automatically, and you pick the winner.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/voratiq/voratiq/main/assets/voratiq-workflow.svg" alt="Voratiq workflow" width="600">
