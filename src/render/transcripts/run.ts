@@ -30,7 +30,6 @@ interface RunProgressContext {
   workspacePath: string;
   createdAt: string;
   baseRevisionSha: string;
-  outcome?: string;
 }
 
 interface RunRendererOptions {
@@ -105,55 +104,6 @@ function formatErrorDetail(error: unknown): string {
   }
 
   return "unknown error";
-}
-
-function summarizeAgentOutcomes(report: RunReport): string | undefined {
-  const totalAgents = report.agents.length;
-  if (totalAgents === 0) {
-    return undefined;
-  }
-
-  let succeeded = 0;
-  let failed = 0;
-  let errored = 0;
-  let skipped = 0;
-  let aborted = 0;
-  let other = 0;
-
-  for (const agent of report.agents) {
-    switch (agent.status) {
-      case "succeeded":
-        succeeded += 1;
-        break;
-      case "failed":
-        failed += 1;
-        break;
-      case "errored":
-        errored += 1;
-        break;
-      case "skipped":
-        skipped += 1;
-        break;
-      case "aborted":
-        aborted += 1;
-        break;
-      default:
-        other += 1;
-        break;
-    }
-  }
-
-  const summary = `${succeeded}/${totalAgents} agents succeeded`;
-  const remainder: string[] = [];
-  if (failed > 0) remainder.push(`${failed} failed`);
-  if (errored > 0) remainder.push(`${errored} errored`);
-  if (skipped > 0) remainder.push(`${skipped} skipped`);
-  if (aborted > 0) remainder.push(`${aborted} aborted`);
-  if (other > 0) remainder.push(`${other} pending`);
-
-  return remainder.length > 0
-    ? `${summary} (${remainder.join(", ")})`
-    : summary;
 }
 
 export function createRunRenderer(
@@ -253,7 +203,6 @@ export function createRunRenderer(
   }
 
   function resolveFinalContext(report: RunReport): RunProgressContext {
-    const outcome = context?.outcome ?? summarizeAgentOutcomes(report);
     return {
       runId: context?.runId ?? report.runId,
       status: report.status,
@@ -261,7 +210,6 @@ export function createRunRenderer(
       workspacePath: context?.workspacePath ?? "",
       createdAt: context?.createdAt ?? report.createdAt,
       baseRevisionSha: context?.baseRevisionSha ?? report.baseRevisionSha,
-      ...(outcome ? { outcome } : {}),
     };
   }
 
@@ -287,7 +235,6 @@ export function createRunRenderer(
           elapsed: elapsedLabel,
           createdAt: formatRunTimestamp(source.createdAt),
           baseRevisionSha: source.baseRevisionSha,
-          outcome: source.outcome,
         },
         style,
       ),
@@ -516,10 +463,6 @@ export function createRunRenderer(
     complete(report: RunReport, options?: { suppressHint?: boolean }): string {
       stopRefreshLoop();
       syncRecordsFromReport(report);
-      const outcome = summarizeAgentOutcomes(report);
-      if (context) {
-        context = { ...context, outcome };
-      }
       guard(() => {
         this.onProgressEvent({
           type: "stage.status",
