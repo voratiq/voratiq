@@ -358,6 +358,7 @@ export async function runAutoCommand(
     let reviewDetail: string | undefined;
     let reviewResultCount = 0;
     let reviewResults: ReviewCommandResult["reviews"] | undefined;
+    let reviewTranscriptEmitted = false;
 
     let applyStartedAt: number | undefined;
     let applyStatus: AutoApplyStatus = "skipped";
@@ -372,8 +373,13 @@ export async function runAutoCommand(
       actionRequiredDetail = detail;
       applyStatus = "skipped";
       applyDetail = detail;
+      const warningBody = formatAlertMessage(
+        "Warning",
+        "yellow",
+        warningMessage,
+      );
       writeCommandOutput({
-        body: formatAlertMessage("Warning", "yellow", warningMessage),
+        body: reviewTranscriptEmitted ? `---\n\n${warningBody}` : warningBody,
       });
     };
 
@@ -513,6 +519,7 @@ export async function runAutoCommand(
             body: reviewResult.body,
             stderr: reviewResult.stderr,
           });
+          reviewTranscriptEmitted = true;
         } catch (error) {
           reviewStatus = "failed";
           reviewDetail = toCliError(error).headline;
