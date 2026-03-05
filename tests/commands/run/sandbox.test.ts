@@ -88,7 +88,12 @@ describe("sandbox", () => {
         });
 
         expect(settings.network).toEqual({
-          allowedDomains: ["api.openai.com", "auth.openai.com", "chatgpt.com"],
+          allowedDomains: [
+            "ab.chatgpt.com",
+            "api.openai.com",
+            "auth.openai.com",
+            "chatgpt.com",
+          ],
           deniedDomains: [],
         });
         const baseline = expectedRunBaselinePaths(root);

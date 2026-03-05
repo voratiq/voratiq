@@ -27,7 +27,12 @@ export const DEFAULT_SANDBOX_PROVIDERS: readonly SandboxProviderDefault[] = [
   {
     id: "codex",
     network: {
-      allowedDomains: ["api.openai.com", "chatgpt.com", "auth.openai.com"],
+      allowedDomains: [
+        "ab.chatgpt.com",
+        "api.openai.com",
+        "auth.openai.com",
+        "chatgpt.com",
+      ],
       deniedDomains: [],
       allowLocalBinding: false,
     },

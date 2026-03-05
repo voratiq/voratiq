@@ -41,9 +41,10 @@ providers:
 
     const codex = config.providers.codex;
     expect(codex.network.allowedDomains).toEqual([
+      "ab.chatgpt.com",
       "api.openai.com",
-      "chatgpt.com",
       "auth.openai.com",
+      "chatgpt.com",
     ]);
     expect(codex.network.deniedDomains).toEqual(["blocked.local"]);
     expect(codex.network.allowLocalBinding).toBe(true);
