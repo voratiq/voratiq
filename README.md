@@ -1,6 +1,6 @@
 # Voratiq
 
-Agent ensembles to design, generate, and select the best implementation for every task.
+Agent ensembles to design, generate, and select the best code for every task.
 
 ![`voratiq auto --spec .voratiq/specs/categorical-performance-by-taxonomy.md`](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/run-demo.png)
 
