@@ -7,10 +7,10 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../../../src/commands/shared/session-id.js";
 import { executeSpecCommand } from "../../../src/commands/spec/command.js";
-import * as specAdapter from "../../../src/commands/spec/competition-adapter.js";
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
 import { loadEnvironmentConfig } from "../../../src/configs/environment/loader.js";
-import { readSpecRecords } from "../../../src/specs/records/persistence.js";
+import * as specAdapter from "../../../src/domains/specs/competition/adapter.js";
+import { readSpecRecords } from "../../../src/domains/specs/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
 jest.mock("../../../src/competition/command-adapter.js", () => ({

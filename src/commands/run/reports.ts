@@ -3,7 +3,7 @@ import type {
   AgentReport,
   RunRecord,
   RunReport,
-} from "../../runs/records/types.js";
+} from "../../domains/runs/model/types.js";
 import {
   buildAgentArtifactPaths,
   buildAgentEvalViews,

@@ -16,12 +16,12 @@ import {
   type AgentInvocationEnhanced,
   buildRunRecordEnhanced,
   type RunRecordEnhanced,
-} from "../../src/runs/records/enhanced.js";
+} from "../../src/domains/runs/model/enhanced.js";
 import type {
   AgentReport,
   RunRecord,
   RunReport,
-} from "../../src/runs/records/types.js";
+} from "../../src/domains/runs/model/types.js";
 import { pathExists } from "../../src/utils/fs.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
 import {

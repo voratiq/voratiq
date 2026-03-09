@@ -5,14 +5,18 @@ import { executeCompetitionWithAdapter } from "../../competition/command-adapter
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
-import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
+import {
+  createSpecCompetitionAdapter,
+  type SpecCompetitionExecution,
+} from "../../domains/specs/competition/adapter.js";
+import type { SpecRecord } from "../../domains/specs/model/types.js";
 import {
   appendSpecRecord,
   finalizeSpecRecord,
   flushSpecRecordBuffer,
   rewriteSpecRecord,
-} from "../../specs/records/persistence.js";
-import type { SpecRecord } from "../../specs/records/types.js";
+} from "../../domains/specs/persistence/adapter.js";
+import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { pathExists } from "../../utils/fs.js";
 import {
@@ -27,10 +31,6 @@ import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
-import {
-  createSpecCompetitionAdapter,
-  type SpecCompetitionExecution,
-} from "./competition-adapter.js";
 import {
   SpecAgentNotFoundError,
   SpecGenerationFailedError,

@@ -1,13 +1,13 @@
 import { describe } from "@jest/globals";
 
+import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
+import type { AgentDefinition } from "../../../src/configs/agents/types.js";
+import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
 import {
   createSpecCompetitionAdapter,
   type PreparedSpecCompetitionCandidate,
   type SpecCompetitionExecution,
-} from "../../../src/commands/spec/competition-adapter.js";
-import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
-import type { AgentDefinition } from "../../../src/configs/agents/types.js";
-import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
+} from "../../../src/domains/specs/competition/adapter.js";
 import type { AgentWorkspacePaths } from "../../../src/workspace/layout.js";
 import {
   type AdapterContractScenarioInput,

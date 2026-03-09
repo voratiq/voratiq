@@ -1,21 +1,21 @@
 import {
   RunRecordNotFoundError,
   RunRecordParseError,
-} from "../../src/runs/records/errors.js";
+} from "../../src/domains/runs/model/errors.js";
+import type {
+  AgentInvocationRecord,
+  RunRecord,
+} from "../../src/domains/runs/model/types.js";
 import type {
   ReadRunRecordsOptions,
   RunRecordWarning,
-} from "../../src/runs/records/persistence.js";
+} from "../../src/domains/runs/persistence/adapter.js";
 import {
   buildRunPredicate,
   fetchRuns,
   fetchRunsSafely,
   type RunQueryFilters,
-} from "../../src/runs/records/persistence.js";
-import type {
-  AgentInvocationRecord,
-  RunRecord,
-} from "../../src/runs/records/types.js";
+} from "../../src/domains/runs/persistence/adapter.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,

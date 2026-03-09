@@ -2,24 +2,24 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { verifyAgentProviders } from "../../../src/agents/runtime/auth.js";
 import { executeReviewCommand } from "../../../src/commands/review/command.js";
-import * as reviewAdapter from "../../../src/commands/review/competition-adapter.js";
 import { ReviewPreflightError } from "../../../src/commands/review/errors.js";
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../../../src/commands/shared/session-id.js";
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
 import { loadEnvironmentConfig } from "../../../src/configs/environment/loader.js";
-import { buildRunRecordView } from "../../../src/runs/records/enhanced.js";
-import { fetchRunsSafely } from "../../../src/runs/records/persistence.js";
+import * as reviewAdapter from "../../../src/domains/reviews/competition/adapter.js";
+import { buildRunRecordView } from "../../../src/domains/runs/model/enhanced.js";
+import { fetchRunsSafely } from "../../../src/domains/runs/persistence/adapter.js";
 
 jest.mock("../../../src/competition/command-adapter.js", () => ({
   executeCompetitionWithAdapter: jest.fn(),
 }));
 
-jest.mock("../../../src/runs/records/persistence.js", () => ({
+jest.mock("../../../src/domains/runs/persistence/adapter.js", () => ({
   fetchRunsSafely: jest.fn(),
 }));
 
-jest.mock("../../../src/runs/records/enhanced.js", () => ({
+jest.mock("../../../src/domains/runs/model/enhanced.js", () => ({
   buildRunRecordView: jest.fn(),
 }));
 

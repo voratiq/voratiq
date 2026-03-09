@@ -9,15 +9,15 @@ import {
   registerActiveRun,
   terminateActiveRun,
 } from "../../src/commands/run/lifecycle.js";
+import type {
+  RunApplyStatus,
+  RunRecord,
+} from "../../src/domains/runs/model/types.js";
 import {
   appendRunRecord,
   flushAllRunRecordBuffers,
   rewriteRunRecord,
-} from "../../src/runs/records/persistence.js";
-import type {
-  RunApplyStatus,
-  RunRecord,
-} from "../../src/runs/records/types.js";
+} from "../../src/domains/runs/persistence/adapter.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,

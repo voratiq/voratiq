@@ -4,11 +4,15 @@ import { executeCompetitionWithAdapter } from "../../competition/command-adapter
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
+import {
+  createReviewCompetitionAdapter,
+  type ReviewCompetitionExecution,
+} from "../../domains/reviews/competition/adapter.js";
+import type { RunRecordEnhanced } from "../../domains/runs/model/enhanced.js";
+import { buildRunRecordView } from "../../domains/runs/model/enhanced.js";
+import { RunRecordNotFoundError } from "../../domains/runs/model/errors.js";
+import { fetchRunsSafely } from "../../domains/runs/persistence/adapter.js";
 import type { ReviewProgressRenderer } from "../../render/transcripts/review.js";
-import type { RunRecordEnhanced } from "../../runs/records/enhanced.js";
-import { buildRunRecordView } from "../../runs/records/enhanced.js";
-import { RunRecordNotFoundError } from "../../runs/records/errors.js";
-import { fetchRunsSafely } from "../../runs/records/persistence.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
 import {
@@ -20,10 +24,6 @@ import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
-import {
-  createReviewCompetitionAdapter,
-  type ReviewCompetitionExecution,
-} from "./competition-adapter.js";
 import {
   ReviewAgentNotFoundError,
   ReviewError,

@@ -18,7 +18,7 @@ import {
 } from "../../configs/evals/loader.js";
 import type { EvalDefinition } from "../../configs/evals/types.js";
 import { loadRepoSettings } from "../../configs/settings/loader.js";
-import { RunOptionValidationError } from "../../runs/records/errors.js";
+import { RunOptionValidationError } from "../../domains/runs/model/errors.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { WorkspaceMissingEntryError } from "../../workspace/errors.js";

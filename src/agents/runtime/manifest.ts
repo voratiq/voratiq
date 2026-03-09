@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { delimiter, dirname, relative as relativePath } from "node:path";
 
-import type { AgentManifest } from "../../commands/run/shim/agent-manifest.js";
+import type { AgentManifest } from "../../agents/runtime/shim/agent-manifest.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import {
   type EnvironmentConfig,

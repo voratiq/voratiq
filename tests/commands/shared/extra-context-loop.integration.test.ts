@@ -11,7 +11,7 @@ import { resolveExtraContextFiles } from "../../../src/commands/shared/extra-con
 import { resolveReductionCompetitors } from "../../../src/commands/shared/resolve-reduction-competitors.js";
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import { executeSpecCommand } from "../../../src/commands/spec/command.js";
-import { appendSpecRecord } from "../../../src/specs/records/persistence.js";
+import { appendSpecRecord } from "../../../src/domains/specs/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
 jest.mock("../../../src/agents/runtime/harness.js", () => ({

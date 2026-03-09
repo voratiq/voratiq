@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { getActiveTerminationStatus } from "../../src/commands/run/lifecycle.js";
-import { createAgentRecordMutators } from "../../src/runs/records/mutators.js";
-import { rewriteRunRecord } from "../../src/runs/records/persistence.js";
-import type { RunRecord } from "../../src/runs/records/types.js";
+import { createAgentRecordMutators } from "../../src/domains/runs/model/mutators.js";
+import type { RunRecord } from "../../src/domains/runs/model/types.js";
+import { rewriteRunRecord } from "../../src/domains/runs/persistence/adapter.js";
 
-jest.mock("../../src/runs/records/persistence.js", () => ({
+jest.mock("../../src/domains/runs/persistence/adapter.js", () => ({
   rewriteRunRecord: jest.fn(),
 }));
 

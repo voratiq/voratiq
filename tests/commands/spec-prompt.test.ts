@@ -1,4 +1,4 @@
-import { buildSpecPrompt } from "../../src/commands/spec/prompt.js";
+import { buildSpecPrompt } from "../../src/domains/specs/competition/prompt.js";
 
 describe("buildSpecPrompt", () => {
   it("includes required headings, structure, and constraints", () => {

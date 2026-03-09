@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { parseReductionArtifact } from "../../../src/commands/reduce/reduction.js";
+import { parseReductionArtifact } from "../../../src/domains/reductions/competition/reduction.js";
 
 describe("parseReductionArtifact", () => {
   it("accepts the compact propagated payload", () => {

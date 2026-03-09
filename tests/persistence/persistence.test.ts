@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { createSessionPersistence } from "../../src/persistence/persistence.js";
+import { createSessionStore } from "../../src/persistence/session-store.js";
 
 type TestStatus = "running" | "done";
 
@@ -28,7 +28,7 @@ describe("shared session persistence", () => {
     lockPath: string;
   };
   let persistence: ReturnType<
-    typeof createSessionPersistence<TestRecord, TestIndexEntry, TestStatus>
+    typeof createSessionStore<TestRecord, TestIndexEntry, TestStatus>
   >;
 
   beforeEach(async () => {
@@ -41,11 +41,7 @@ describe("shared session persistence", () => {
     };
     await mkdir(dirname(paths.indexPath), { recursive: true });
 
-    persistence = createSessionPersistence<
-      TestRecord,
-      TestIndexEntry,
-      TestStatus
-    >({
+    persistence = createSessionStore<TestRecord, TestIndexEntry, TestStatus>({
       recordFilename: "record.json",
       indexVersion: 1,
       acquireLock: async (lockPath) => {

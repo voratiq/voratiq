@@ -1,6 +1,6 @@
-import { RunRecordNotFoundError } from "../runs/records/errors.js";
-import { fetchRunsSafely } from "../runs/records/persistence.js";
-import type { RunRecord } from "../runs/records/types.js";
+import { RunRecordNotFoundError } from "../domains/runs/model/errors.js";
+import type { RunRecord } from "../domains/runs/model/types.js";
+import { fetchRunsSafely } from "../domains/runs/persistence/adapter.js";
 import { RunNotFoundCliError } from "./errors.js";
 
 export interface FetchRunsCLIOptions {

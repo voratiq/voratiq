@@ -1,7 +1,7 @@
 import type {
   AgentInvocationRecord,
   RunReport,
-} from "../../runs/records/types.js";
+} from "../../domains/runs/model/types.js";
 import { getEvalStatusStyle } from "../../status/colors.js";
 import { colorize } from "../../utils/colors.js";
 import { formatCompactDiffStatistics } from "../../utils/diff.js";

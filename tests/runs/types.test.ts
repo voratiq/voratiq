@@ -1,4 +1,4 @@
-import { runRecordSchema } from "../../src/runs/records/types.js";
+import { runRecordSchema } from "../../src/domains/runs/model/types.js";
 
 const baseRunRecord = {
   runId: "run-123",

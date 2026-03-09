@@ -11,16 +11,16 @@ import {
 import {
   readReviewRecommendation,
   type ReviewRecommendation,
-} from "../commands/review/recommendation.js";
-import { resolveCliContext } from "../preflight/index.js";
-import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
-import { renderCliError } from "../render/utils/errors.js";
-import { rewriteRunRecord } from "../runs/records/persistence.js";
+} from "../domains/reviews/competition/recommendation.js";
 import type {
   AutoApplyStatus,
   AutoTerminalStatus,
   RunAutoOutcome,
-} from "../runs/records/types.js";
+} from "../domains/runs/model/types.js";
+import { rewriteRunRecord } from "../domains/runs/persistence/adapter.js";
+import { resolveCliContext } from "../preflight/index.js";
+import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
+import { renderCliError } from "../render/utils/errors.js";
 import { formatAlertMessage } from "../utils/output.js";
 import { normalizePathForDisplay, resolveDisplayPath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";

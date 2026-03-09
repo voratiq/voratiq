@@ -3,7 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   BLINDED_ALIAS_PATTERN,
   generateBlindedCandidateAlias,
-} from "../../src/reviews/candidates.js";
+} from "../../src/domains/reviews/candidates.js";
 
 describe("blinded candidate aliases", () => {
   it("generates aliases matching the required format", () => {

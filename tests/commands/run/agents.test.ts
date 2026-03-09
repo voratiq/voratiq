@@ -12,26 +12,29 @@ import {
 } from "@jest/globals";
 
 import { runSandboxedAgent } from "../../../src/agents/runtime/harness.js";
-import { runPostProcessingAndEvaluations } from "../../../src/commands/run/agents/eval-runner.js";
-import { runPreparedAgent } from "../../../src/commands/run/agents/lifecycle.js";
-import { AgentRunContext } from "../../../src/commands/run/agents/run-context.js";
-import type { PreparedAgentExecution } from "../../../src/commands/run/agents/types.js";
-import { buildRunAgentWorkspacePaths } from "../../../src/commands/run/agents/workspace.js";
 import type { AgentExecutionResult } from "../../../src/commands/run/reports.js";
 import { runPreparedWithLimit } from "../../../src/competition/core.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
 import type { EvalDefinition } from "../../../src/configs/evals/types.js";
-import type { AgentInvocationRecord } from "../../../src/runs/records/types.js";
+import { runPostProcessingAndEvaluations } from "../../../src/domains/runs/competition/agents/eval-runner.js";
+import { runPreparedAgent } from "../../../src/domains/runs/competition/agents/lifecycle.js";
+import { AgentRunContext } from "../../../src/domains/runs/competition/agents/run-context.js";
+import type { PreparedAgentExecution } from "../../../src/domains/runs/competition/agents/types.js";
+import { buildRunAgentWorkspacePaths } from "../../../src/domains/runs/competition/agents/workspace.js";
+import type { AgentInvocationRecord } from "../../../src/domains/runs/model/types.js";
 import { buildAgentWorkspacePaths } from "../../../src/workspace/layout.js";
 
 jest.mock("../../../src/agents/runtime/harness.js", () => ({
   runSandboxedAgent: jest.fn(),
 }));
 
-jest.mock("../../../src/commands/run/agents/eval-runner.js", () => ({
-  runPostProcessingAndEvaluations: jest.fn(),
-}));
+jest.mock(
+  "../../../src/domains/runs/competition/agents/eval-runner.js",
+  () => ({
+    runPostProcessingAndEvaluations: jest.fn(),
+  }),
+);
 
 const runSandboxedAgentMock = jest.mocked(runSandboxedAgent);
 const runPostProcessingAndEvaluationsMock = jest.mocked(

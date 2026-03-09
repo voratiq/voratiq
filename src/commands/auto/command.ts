@@ -1,7 +1,7 @@
 import type {
   AutoApplyStatus,
   AutoTerminalStatus,
-} from "../../runs/records/types.js";
+} from "../../domains/runs/model/types.js";
 import { mapRunStatusToExitCode, type RunStatus } from "../../status/index.js";
 import { HintedError, toErrorMessage } from "../../utils/errors.js";
 

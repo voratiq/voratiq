@@ -5,13 +5,13 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { runSandboxedAgent } from "../../../src/agents/runtime/harness.js";
+import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
 import {
   createReduceCompetitionAdapter,
   type ReduceCompetitionCandidate,
-} from "../../../src/commands/reduce/competition-adapter.js";
-import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
-import { readReductionRecords } from "../../../src/reductions/records/persistence.js";
-import { appendSpecRecord } from "../../../src/specs/records/persistence.js";
+} from "../../../src/domains/reductions/competition/adapter.js";
+import { readReductionRecords } from "../../../src/domains/reductions/persistence/adapter.js";
+import { appendSpecRecord } from "../../../src/domains/specs/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
 jest.mock("../../../src/agents/runtime/harness.js", () => ({

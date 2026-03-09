@@ -1,4 +1,4 @@
-import { generateRunId } from "../../src/commands/run/id.js";
+import { generateRunId } from "../../src/domains/runs/model/id.js";
 
 describe("generateRunId", () => {
   it("builds a timestamped identifier with slug", () => {

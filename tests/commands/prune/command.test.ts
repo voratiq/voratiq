@@ -15,15 +15,15 @@ import type {
   PruneCommandInput,
   PruneConfirmationHandler,
 } from "../../../src/commands/prune/types.js";
+import type { RunRecord } from "../../../src/domains/runs/model/types.js";
+import {
+  fetchRunsSafely,
+  rewriteRunRecord,
+} from "../../../src/domains/runs/persistence/adapter.js";
 import {
   renderPruneAllTranscript,
   renderPruneTranscript,
 } from "../../../src/render/transcripts/prune.js";
-import {
-  fetchRunsSafely,
-  rewriteRunRecord,
-} from "../../../src/runs/records/persistence.js";
-import type { RunRecord } from "../../../src/runs/records/types.js";
 import { pathExists } from "../../../src/utils/fs.js";
 import { runGitCommand } from "../../../src/utils/git.js";
 import {
@@ -65,7 +65,7 @@ jest.mock("../../../src/utils/git.js", () => ({
   getGitStderr: jest.fn(),
 }));
 
-jest.mock("../../../src/runs/records/persistence.js", () => ({
+jest.mock("../../../src/domains/runs/persistence/adapter.js", () => ({
   fetchRunsSafely: jest.fn(),
   rewriteRunRecord: jest.fn(),
   RUN_RECORD_FILENAME: "record.json",

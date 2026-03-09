@@ -2,7 +2,7 @@ import type {
   PruneAllResult,
   PruneResult,
 } from "../../commands/prune/types.js";
-import type { RunRecord } from "../../runs/records/types.js";
+import type { RunRecord } from "../../domains/runs/model/types.js";
 import type { RunStatus } from "../../status/index.js";
 import { colorize } from "../../utils/colors.js";
 import { formatRunTimestamp } from "../utils/records.js";

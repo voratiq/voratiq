@@ -6,12 +6,12 @@ import { checkPlatformSupport } from "../../src/agents/runtime/sandbox.js";
 import { runReviewCommand } from "../../src/cli/review.js";
 import { executeReviewCommand } from "../../src/commands/review/command.js";
 import { ReviewGenerationFailedError } from "../../src/commands/review/errors.js";
-import { readReviewRecommendation } from "../../src/commands/review/recommendation.js";
+import { readReviewRecommendation } from "../../src/domains/reviews/competition/recommendation.js";
+import { readReviewRecords } from "../../src/domains/reviews/persistence/adapter.js";
 import {
   ensureSandboxDependencies,
   resolveCliContext,
 } from "../../src/preflight/index.js";
-import { readReviewRecords } from "../../src/reviews/records/persistence.js";
 import { REVIEW_RECOMMENDATION_FILENAME } from "../../src/workspace/structure.js";
 
 jest.mock("../../src/agents/runtime/sandbox.js", () => ({
@@ -27,11 +27,11 @@ jest.mock("../../src/commands/review/command.js", () => ({
   executeReviewCommand: jest.fn(),
 }));
 
-jest.mock("../../src/reviews/records/persistence.js", () => ({
+jest.mock("../../src/domains/reviews/persistence/adapter.js", () => ({
   readReviewRecords: jest.fn(),
 }));
 
-jest.mock("../../src/commands/review/recommendation.js", () => ({
+jest.mock("../../src/domains/reviews/competition/recommendation.js", () => ({
   readReviewRecommendation: jest.fn(),
 }));
 

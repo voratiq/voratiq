@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 
 import { initializeRunRecord } from "../../../src/commands/run/record-init.js";
-import { readRunRecords } from "../../../src/runs/records/persistence.js";
+import { readRunRecords } from "../../../src/domains/runs/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
 describe("initializeRunRecord", () => {

@@ -7,8 +7,8 @@ import { describe, expect, it, jest } from "@jest/globals";
 import {
   createReviewCompetitionAdapter,
   type ReviewCompetitionCandidate,
-} from "../../../src/commands/review/competition-adapter.js";
-import { readReviewRecords } from "../../../src/reviews/records/persistence.js";
+} from "../../../src/domains/reviews/competition/adapter.js";
+import { readReviewRecords } from "../../../src/domains/reviews/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 import {
   createAgentInvocationRecord,

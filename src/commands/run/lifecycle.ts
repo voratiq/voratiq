@@ -1,10 +1,10 @@
 import { teardownSessionAuth } from "../../agents/runtime/registry.js";
+import type { AgentInvocationRecord } from "../../domains/runs/model/types.js";
 import {
   disposeRunRecordBuffer,
   getRunRecordSnapshot,
   rewriteRunRecord,
-} from "../../runs/records/persistence.js";
-import type { AgentInvocationRecord } from "../../runs/records/types.js";
+} from "../../domains/runs/persistence/adapter.js";
 import type { RunStatus } from "../../status/index.js";
 import { TERMINABLE_RUN_STATUSES } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";

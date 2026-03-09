@@ -1,22 +1,22 @@
 import {
+  RunHistoryLockTimeoutError,
+  RunOptionValidationError,
+  RunRecordMutationError,
+  RunRecordNotFoundError,
+  RunRecordParseError,
+} from "../../src/domains/runs/model/errors.js";
+import { runStoreErrorMapper } from "../../src/domains/runs/persistence/error-mapping.js";
+import {
+  mapSessionStoreError,
+  sessionStoreErrorMapper,
+} from "../../src/persistence/error-mapping.js";
+import {
   SessionHistoryLockTimeoutError,
   SessionOptionValidationError,
   SessionRecordMutationError,
   SessionRecordNotFoundError,
   SessionRecordParseError,
 } from "../../src/persistence/errors.js";
-import {
-  mapSessionPersistenceError,
-  sessionPersistenceErrorMapper,
-} from "../../src/persistence/persistence-errors.js";
-import {
-  RunHistoryLockTimeoutError,
-  RunOptionValidationError,
-  RunRecordMutationError,
-  RunRecordNotFoundError,
-  RunRecordParseError,
-} from "../../src/runs/records/errors.js";
-import { runPersistenceErrorMapper } from "../../src/runs/records/persistence-errors.js";
 
 describe("shared session persistence error mapping", () => {
   it("normalizes filesystem failures into mutation errors for every operator contract", () => {
@@ -27,14 +27,11 @@ describe("shared session persistence error mapping", () => {
       },
     );
 
-    const sessionError = mapSessionPersistenceError(
+    const sessionError = mapSessionStoreError(
       fileSystemError,
-      sessionPersistenceErrorMapper,
+      sessionStoreErrorMapper,
     );
-    const runError = mapSessionPersistenceError(
-      fileSystemError,
-      runPersistenceErrorMapper,
-    );
+    const runError = mapSessionStoreError(fileSystemError, runStoreErrorMapper);
 
     expect(sessionError).toBeInstanceOf(SessionRecordMutationError);
     expect(sessionError.message).toContain("permission denied");
@@ -43,17 +40,17 @@ describe("shared session persistence error mapping", () => {
   });
 
   it("maps shared session parse, missing, and option errors into the run contract", () => {
-    const optionError = mapSessionPersistenceError(
+    const optionError = mapSessionStoreError(
       new SessionOptionValidationError("limit", "must be a positive integer"),
-      runPersistenceErrorMapper,
+      runStoreErrorMapper,
     );
-    const parseError = mapSessionPersistenceError(
+    const parseError = mapSessionStoreError(
       new SessionRecordParseError("runs/record.json", "invalid json"),
-      runPersistenceErrorMapper,
+      runStoreErrorMapper,
     );
-    const notFoundError = mapSessionPersistenceError(
+    const notFoundError = mapSessionStoreError(
       new SessionRecordNotFoundError("run-123"),
-      runPersistenceErrorMapper,
+      runStoreErrorMapper,
     );
 
     expect(optionError).toBeInstanceOf(RunOptionValidationError);
@@ -65,9 +62,9 @@ describe("shared session persistence error mapping", () => {
   });
 
   it("normalizes run history lock timeouts back into the shared session contract", () => {
-    const mapped = mapSessionPersistenceError(
+    const mapped = mapSessionStoreError(
       new RunHistoryLockTimeoutError("/tmp/history.lock"),
-      sessionPersistenceErrorMapper,
+      sessionStoreErrorMapper,
     );
 
     expect(mapped).toBeInstanceOf(SessionHistoryLockTimeoutError);
@@ -76,9 +73,9 @@ describe("shared session persistence error mapping", () => {
   });
 
   it("preserves the run history lock timeout contract for run persistence", () => {
-    const mapped = mapSessionPersistenceError(
+    const mapped = mapSessionStoreError(
       new SessionHistoryLockTimeoutError("/tmp/history.lock"),
-      runPersistenceErrorMapper,
+      runStoreErrorMapper,
     );
 
     expect(mapped).toBeInstanceOf(RunHistoryLockTimeoutError);

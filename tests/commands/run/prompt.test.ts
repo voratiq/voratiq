@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { buildRunPrompt } from "../../../src/commands/run/prompt.js";
+import { buildRunPrompt } from "../../../src/domains/runs/competition/prompt.js";
 
 describe("buildRunPrompt", () => {
   it("lists staged extra-context files when provided", () => {

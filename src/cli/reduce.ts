@@ -4,21 +4,21 @@ import { Command, Option } from "commander";
 
 import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
 import { executeReduceCommand } from "../commands/reduce/command.js";
-import {
-  readReductionArtifact,
-  type ReductionArtifact,
-} from "../commands/reduce/reduction.js";
 import { resolveExtraContextFiles } from "../commands/shared/extra-context.js";
 import {
   buildMarkdownPreviewLines,
   extractMarkdownSection,
 } from "../commands/shared/preview.js";
 import {
+  readReductionArtifact,
+  type ReductionArtifact,
+} from "../domains/reductions/competition/reduction.js";
+import type { ReductionTarget } from "../domains/reductions/model/types.js";
+import { readReductionRecords } from "../domains/reductions/persistence/adapter.js";
+import {
   ensureSandboxDependencies,
   resolveCliContext,
 } from "../preflight/index.js";
-import { readReductionRecords } from "../reductions/records/persistence.js";
-import type { ReductionTarget } from "../reductions/records/types.js";
 import {
   createReduceRenderer,
   formatReduceElapsed,

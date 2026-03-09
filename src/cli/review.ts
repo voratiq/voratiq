@@ -3,18 +3,20 @@ import { dirname, resolve } from "node:path";
 import { Command, Option } from "commander";
 
 import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
-import { resolveBlindedRecommendation } from "../commands/review/blinded.js";
 import {
   executeReviewCommand,
   type ReviewCommandResult as ReviewExecutionResult,
 } from "../commands/review/command.js";
 import { ReviewGenerationFailedError } from "../commands/review/errors.js";
+import { resolveExtraContextFiles } from "../commands/shared/extra-context.js";
+import { buildMarkdownPreviewLines } from "../commands/shared/preview.js";
+import { resolveBlindedRecommendation } from "../domains/reviews/competition/blinded.js";
 import {
   readReviewRecommendation,
   type ReviewRecommendation,
-} from "../commands/review/recommendation.js";
-import { resolveExtraContextFiles } from "../commands/shared/extra-context.js";
-import { buildMarkdownPreviewLines } from "../commands/shared/preview.js";
+} from "../domains/reviews/competition/recommendation.js";
+import type { ReviewRecord } from "../domains/reviews/model/types.js";
+import { readReviewRecords } from "../domains/reviews/persistence/adapter.js";
 import {
   ensureSandboxDependencies,
   resolveCliContext,
@@ -25,8 +27,6 @@ import {
 } from "../render/transcripts/review.js";
 import { formatDurationLabel } from "../render/utils/agents.js";
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
-import { readReviewRecords } from "../reviews/records/persistence.js";
-import type { ReviewRecord } from "../reviews/records/types.js";
 import { normalizePathForDisplay, relativeToRoot } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import {

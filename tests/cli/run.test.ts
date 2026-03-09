@@ -12,13 +12,13 @@ import { Command } from "commander";
 
 import * as authRuntime from "../../src/auth/runtime.js";
 import { createRunCommand, runRunCommand } from "../../src/cli/run.js";
-import * as runAgentPreparationModule from "../../src/commands/run/agent-preparation.js";
 import { executeRunCommand } from "../../src/commands/run/command.js";
 import * as commandAdapter from "../../src/competition/command-adapter.js";
+import * as runAgentPreparationModule from "../../src/domains/runs/competition/agent-preparation.js";
+import { buildRunRecordEnhanced } from "../../src/domains/runs/model/enhanced.js";
+import type { RunRecord } from "../../src/domains/runs/model/types.js";
+import * as persistence from "../../src/domains/runs/persistence/adapter.js";
 import { DirtyWorkingTreeError } from "../../src/preflight/errors.js";
-import { buildRunRecordEnhanced } from "../../src/runs/records/enhanced.js";
-import * as persistence from "../../src/runs/records/persistence.js";
-import type { RunRecord } from "../../src/runs/records/types.js";
 import { HintedError } from "../../src/utils/errors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
 import { silenceCommander } from "../support/commander.js";

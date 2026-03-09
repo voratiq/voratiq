@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import { collectAgentArtifacts } from "../../../../src/commands/run/agents/artifacts.js";
-import { runPostProcessingAndEvaluations } from "../../../../src/commands/run/agents/eval-runner.js";
-import { buildRunAgentWorkspacePaths } from "../../../../src/commands/run/agents/workspace.js";
+import { collectAgentArtifacts } from "../../../../src/domains/runs/competition/agents/artifacts.js";
+import { runPostProcessingAndEvaluations } from "../../../../src/domains/runs/competition/agents/eval-runner.js";
+import { buildRunAgentWorkspacePaths } from "../../../../src/domains/runs/competition/agents/workspace.js";
 import { executeEvaluations } from "../../../../src/evals/runner.js";
 import { buildAgentWorkspacePaths } from "../../../../src/workspace/layout.js";
 
-jest.mock("../../../../src/commands/run/agents/artifacts.js", () => ({
-  collectAgentArtifacts: jest.fn(),
-}));
+jest.mock(
+  "../../../../src/domains/runs/competition/agents/artifacts.js",
+  () => ({
+    collectAgentArtifacts: jest.fn(),
+  }),
+);
 
 jest.mock("../../../../src/evals/runner.js", () => ({
   executeEvaluations: jest.fn(),
