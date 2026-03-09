@@ -6,6 +6,7 @@ import {
   extraContextMetadataEntrySchema,
   persistedExtraContextPathSchema,
 } from "../../records/extra-context.js";
+import { repoRelativeRecordPathSchema } from "../../records/path-schema.js";
 import {
   type AgentStatus,
   agentStatusSchema,
@@ -15,7 +16,6 @@ import {
   runStatusSchema,
   TERMINAL_AGENT_STATUSES,
 } from "../../status/index.js";
-import { assertRepoRelativePath } from "../../utils/path.js";
 import type { ChatArtifactFormat } from "../../workspace/chat/types.js";
 
 export type { AgentStatus };
@@ -26,24 +26,8 @@ export {
   TERMINAL_AGENT_STATUSES,
 };
 
-function validateRepoRelativePath(value: string, ctx: z.RefinementCtx): void {
-  try {
-    assertRepoRelativePath(value);
-  } catch (error) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message:
-        error instanceof Error ? error.message : "invalid repo-relative path",
-    });
-  }
-}
-
-const repoRelativePathSchema = z
-  .string()
-  .superRefine((value, ctx) => validateRepoRelativePath(value, ctx));
-
 export const runSpecDescriptorSchema = z.object({
-  path: repoRelativePathSchema,
+  path: repoRelativeRecordPathSchema,
 });
 
 export type RunSpecDescriptor = z.infer<typeof runSpecDescriptorSchema>;
@@ -218,7 +202,7 @@ export type RunAutoOutcome = z.infer<typeof autoOutcomeSchema>;
 export const runRecordSchema = z.object({
   runId: z.string(),
   baseRevisionSha: z.string(),
-  rootPath: repoRelativePathSchema,
+  rootPath: repoRelativeRecordPathSchema,
   spec: runSpecDescriptorSchema,
   extraContext: z.array(persistedExtraContextPathSchema).optional(),
   extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),

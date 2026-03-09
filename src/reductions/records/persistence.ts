@@ -1,19 +1,16 @@
 import { dirname, join } from "node:path";
 
-import { acquireHistoryLock } from "../../runs/records/history-lock.js";
 import {
-  SessionOptionValidationError,
-  SessionRecordMutationError,
-  SessionRecordNotFoundError,
-  SessionRecordParseError,
-} from "../../sessions/errors.js";
+  mapSessionPersistenceError,
+  sessionPersistenceErrorMapper,
+} from "../../records/persistence-errors.js";
+import { acquireHistoryLock } from "../../runs/records/history-lock.js";
+import { SessionRecordParseError } from "../../sessions/errors.js";
 import {
   createSessionPersistence,
   type SessionPersistencePaths,
   type SessionRecordWarning,
 } from "../../sessions/persistence.js";
-import { toErrorMessage } from "../../utils/errors.js";
-import { isFileSystemError } from "../../utils/fs.js";
 import type {
   ReductionIndexEntry,
   ReductionRecord,
@@ -119,7 +116,7 @@ export async function readReductionRecords(
         : undefined,
     });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, sessionPersistenceErrorMapper);
   }
 }
 
@@ -132,7 +129,7 @@ export async function appendReductionRecord(
   try {
     await reductionPersistence.appendRecord({ paths, record });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, sessionPersistenceErrorMapper);
   }
 }
 
@@ -156,7 +153,7 @@ export async function rewriteReductionRecord(
       forceFlush,
     });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, sessionPersistenceErrorMapper);
   }
 }
 
@@ -193,7 +190,7 @@ export async function flushReductionRecordBuffer(options: {
   try {
     await reductionPersistence.flushRecordBuffer({ paths, sessionId });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, sessionPersistenceErrorMapper);
   }
 }
 
@@ -201,7 +198,7 @@ export async function flushAllReductionRecordBuffers(): Promise<void> {
   try {
     await reductionPersistence.flushAllRecordBuffers();
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, sessionPersistenceErrorMapper);
   }
 }
 
@@ -237,21 +234,4 @@ function mapWarning(warning: SessionRecordWarning): ReductionRecordWarning {
     recordPath: missing.recordPath,
     displayPath: missing.displayPath,
   };
-}
-
-function mapSessionError(error: unknown): never {
-  if (
-    error instanceof SessionOptionValidationError ||
-    error instanceof SessionRecordMutationError ||
-    error instanceof SessionRecordNotFoundError ||
-    error instanceof SessionRecordParseError
-  ) {
-    throw error;
-  }
-
-  if (isFileSystemError(error)) {
-    throw new SessionRecordMutationError(toErrorMessage(error));
-  }
-
-  throw error;
 }

@@ -5,31 +5,15 @@ import {
   extraContextMetadataEntrySchema,
   persistedExtraContextPathSchema,
 } from "../../records/extra-context.js";
+import { repoRelativeRecordPathSchema } from "../../records/path-schema.js";
 import {
   type ReductionStatus,
   reductionStatusSchema,
   TERMINAL_REDUCTION_STATUSES,
 } from "../../status/index.js";
-import { assertRepoRelativePath } from "../../utils/path.js";
 
 export type { ReductionStatus };
 export { reductionStatusSchema, TERMINAL_REDUCTION_STATUSES };
-
-function validateRepoRelativePath(value: string, ctx: z.RefinementCtx): void {
-  try {
-    assertRepoRelativePath(value);
-  } catch (error) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message:
-        error instanceof Error ? error.message : "invalid repo-relative path",
-    });
-  }
-}
-
-const repoRelativePathSchema = z
-  .string()
-  .superRefine((value, ctx) => validateRepoRelativePath(value, ctx));
 
 export const reductionTargetTypeSchema = z.enum([
   "spec",
@@ -52,8 +36,8 @@ export type ReductionTarget = z.infer<typeof reductionTargetSchema>;
 export const reductionRecordReducerSchema = z.object({
   agentId: agentIdSchema,
   status: reductionStatusSchema,
-  outputPath: repoRelativePathSchema,
-  dataPath: repoRelativePathSchema.optional(),
+  outputPath: repoRelativeRecordPathSchema,
+  dataPath: repoRelativeRecordPathSchema.optional(),
   startedAt: z.string().optional(),
   completedAt: z.string().optional(),
   error: z.string().nullable().optional(),

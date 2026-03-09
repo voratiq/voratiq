@@ -1,19 +1,16 @@
 import { dirname, join } from "node:path";
 
-import { acquireHistoryLock } from "../../runs/records/history-lock.js";
 import {
-  SessionOptionValidationError,
-  SessionRecordMutationError,
-  SessionRecordNotFoundError,
-  SessionRecordParseError,
-} from "../../sessions/errors.js";
+  mapSessionPersistenceError,
+  sessionPersistenceErrorMapper,
+} from "../../records/persistence-errors.js";
+import { acquireHistoryLock } from "../../runs/records/history-lock.js";
+import { SessionRecordParseError } from "../../sessions/errors.js";
 import {
   createSessionPersistence,
   type SessionPersistencePaths,
   type SessionRecordWarning,
 } from "../../sessions/persistence.js";
-import { toErrorMessage } from "../../utils/errors.js";
-import { isFileSystemError } from "../../utils/fs.js";
 import {
   type SpecIndexEntry,
   type SpecRecord,
@@ -118,7 +115,7 @@ const readSpecRecordsInternal = async (
         : undefined,
     });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, sessionPersistenceErrorMapper);
   }
 };
 
@@ -137,7 +134,7 @@ export async function appendSpecRecord(
   try {
     await specPersistence.appendRecord({ paths, record });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, sessionPersistenceErrorMapper);
   }
 }
 
@@ -150,7 +147,7 @@ export async function rewriteSpecRecord(
   try {
     return await specPersistence.rewriteRecord({ paths, sessionId, mutate });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, sessionPersistenceErrorMapper);
   }
 }
 
@@ -187,7 +184,7 @@ export async function flushSpecRecordBuffer(options: {
   try {
     await specPersistence.flushRecordBuffer({ paths, sessionId });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, sessionPersistenceErrorMapper);
   }
 }
 
@@ -195,7 +192,7 @@ export async function flushAllSpecRecordBuffers(): Promise<void> {
   try {
     await specPersistence.flushAllRecordBuffers();
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, sessionPersistenceErrorMapper);
   }
 }
 
@@ -231,23 +228,4 @@ function mapWarning(warning: SessionRecordWarning): SpecRecordWarning {
     recordPath: missingWarning.recordPath,
     displayPath: missingWarning.displayPath,
   };
-}
-
-function mapSessionError(error: unknown): never {
-  if (error instanceof SessionOptionValidationError) {
-    throw error;
-  }
-  if (error instanceof SessionRecordParseError) {
-    throw error;
-  }
-  if (error instanceof SessionRecordNotFoundError) {
-    throw error;
-  }
-  if (error instanceof SessionRecordMutationError) {
-    throw error;
-  }
-  if (isFileSystemError(error)) {
-    throw error;
-  }
-  throw new Error(toErrorMessage(error));
 }

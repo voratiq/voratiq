@@ -1,25 +1,18 @@
 import { dirname, join } from "node:path";
 
 import {
-  SessionOptionValidationError,
-  SessionRecordMutationError,
-  SessionRecordNotFoundError,
-  SessionRecordParseError,
-} from "../../sessions/errors.js";
+  mapSessionPersistenceError,
+  runPersistenceErrorMapper,
+} from "../../records/persistence-errors.js";
+import { SessionRecordParseError } from "../../sessions/errors.js";
 import {
   createSessionPersistence,
   type SessionPersistencePaths,
   type SessionRecordWarning,
 } from "../../sessions/persistence.js";
 import { assertTestHookRegistrationEnabled } from "../../testing/test-hooks.js";
-import { toErrorMessage } from "../../utils/errors.js";
 import { isFileSystemError } from "../../utils/fs.js";
-import {
-  RunOptionValidationError,
-  RunRecordMutationError,
-  RunRecordNotFoundError,
-  RunRecordParseError,
-} from "./errors.js";
+import { RunRecordNotFoundError, RunRecordParseError } from "./errors.js";
 import { acquireHistoryLock } from "./history-lock.js";
 import {
   type RunApplyStatus,
@@ -168,7 +161,7 @@ const readRunRecordsInternal: ReadRunRecordsFn = async (
         : undefined,
     });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, runPersistenceErrorMapper);
   }
 };
 
@@ -199,7 +192,7 @@ export async function appendRunRecord(
   try {
     await runPersistence.appendRecord({ paths, record });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, runPersistenceErrorMapper);
   }
 }
 
@@ -217,7 +210,7 @@ export async function rewriteRunRecord(
       forceFlush,
     });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, runPersistenceErrorMapper);
   }
 }
 
@@ -234,7 +227,7 @@ export async function getRunRecordSnapshot(options: {
       sessionId: runId,
     });
   } catch (error) {
-    mapSessionError(error);
+    throw mapSessionPersistenceError(error, runPersistenceErrorMapper);
   }
 }
 
@@ -507,25 +500,6 @@ function mapWarning(warning: SessionRecordWarning): RunRecordWarning {
     recordPath: missingWarning.recordPath,
     displayPath: missingWarning.displayPath,
   };
-}
-
-function mapSessionError(error: unknown): never {
-  if (error instanceof SessionOptionValidationError) {
-    throw new RunOptionValidationError(error.option, error.detail);
-  }
-  if (error instanceof SessionRecordParseError) {
-    throw new RunRecordParseError(error.displayPath, error.details);
-  }
-  if (error instanceof SessionRecordNotFoundError) {
-    throw new RunRecordNotFoundError(error.sessionId);
-  }
-  if (error instanceof SessionRecordMutationError) {
-    throw new RunRecordMutationError(error.detail);
-  }
-  if (error instanceof Error) {
-    throw error;
-  }
-  throw new Error(toErrorMessage(error));
 }
 
 const RUN_RECORDS_TEST_HOOKS = Symbol.for(

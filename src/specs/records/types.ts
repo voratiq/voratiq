@@ -5,31 +5,15 @@ import {
   extraContextMetadataEntrySchema,
   persistedExtraContextPathSchema,
 } from "../../records/extra-context.js";
+import { repoRelativeRecordPathSchema } from "../../records/path-schema.js";
 import {
   type SpecRecordStatus,
   specRecordStatusSchema,
   TERMINAL_SPEC_STATUSES,
 } from "../../status/index.js";
-import { assertRepoRelativePath } from "../../utils/path.js";
 
 export type { SpecRecordStatus };
 export { specRecordStatusSchema, TERMINAL_SPEC_STATUSES };
-
-function validateRepoRelativePath(value: string, ctx: z.RefinementCtx): void {
-  try {
-    assertRepoRelativePath(value);
-  } catch (error) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message:
-        error instanceof Error ? error.message : "invalid repo-relative path",
-    });
-  }
-}
-
-const repoRelativePathSchema = z
-  .string()
-  .superRefine((value, ctx) => validateRepoRelativePath(value, ctx));
 
 export const specRecordSchema = z.object({
   sessionId: z.string(),
@@ -41,7 +25,7 @@ export const specRecordSchema = z.object({
   agentId: agentIdSchema,
   title: z.string(),
   slug: z.string(),
-  outputPath: repoRelativePathSchema,
+  outputPath: repoRelativeRecordPathSchema,
   error: z.string().nullable().optional(),
 });
 

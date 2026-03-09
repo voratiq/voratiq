@@ -5,32 +5,16 @@ import {
   extraContextMetadataEntrySchema,
   persistedExtraContextPathSchema,
 } from "../../records/extra-context.js";
+import { repoRelativeRecordPathSchema } from "../../records/path-schema.js";
 import {
   type ReviewStatus,
   reviewStatusSchema,
   TERMINAL_REVIEW_STATUSES,
 } from "../../status/index.js";
-import { assertRepoRelativePath } from "../../utils/path.js";
 import { BLINDED_ALIAS_PATTERN } from "../candidates.js";
 
 export type { ReviewStatus };
 export { reviewStatusSchema, TERMINAL_REVIEW_STATUSES };
-
-function validateRepoRelativePath(value: string, ctx: z.RefinementCtx): void {
-  try {
-    assertRepoRelativePath(value);
-  } catch (error) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message:
-        error instanceof Error ? error.message : "invalid repo-relative path",
-    });
-  }
-}
-
-const repoRelativePathSchema = z
-  .string()
-  .superRefine((value, ctx) => validateRepoRelativePath(value, ctx));
 
 const blindedAliasSchema = z.string().regex(BLINDED_ALIAS_PATTERN, {
   message: "Blinded alias must match /^r_[a-z0-9]{10,16}$/",
@@ -41,7 +25,7 @@ const blindedAliasMapSchema = z.record(blindedAliasSchema, agentIdSchema);
 export const reviewRecordReviewerSchema = z.object({
   agentId: agentIdSchema,
   status: reviewStatusSchema,
-  outputPath: repoRelativePathSchema,
+  outputPath: repoRelativeRecordPathSchema,
   startedAt: z.string().optional(),
   completedAt: z.string().optional(),
   error: z.string().nullable().optional(),
