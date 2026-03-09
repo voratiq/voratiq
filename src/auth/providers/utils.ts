@@ -4,7 +4,6 @@ import {
   chmod,
   copyFile,
   mkdir,
-  readdir,
   rm,
   stat,
   writeFile,
@@ -145,74 +144,6 @@ export async function copyOptionalFileWithPermissions(
       throw createError(error);
     }
     throw error;
-  }
-}
-
-export async function copyOptionalDirectoryWithPermissions(
-  source: string,
-  destination: string,
-  createError?: ErrorFactory,
-  fileMode: number = STAGED_FILE_MODE,
-  dirMode: number = 0o700,
-): Promise<void> {
-  try {
-    const sourceStats = await stat(source);
-    if (!sourceStats.isDirectory()) {
-      if (createError) {
-        throw createError();
-      }
-      return;
-    }
-  } catch (error) {
-    if (isMissing(error)) {
-      return;
-    }
-    if (createError) {
-      throw createError(error);
-    }
-    throw error;
-  }
-
-  try {
-    await copyDirectoryRecursive(source, destination, fileMode, dirMode);
-  } catch (error) {
-    if (isMissing(error)) {
-      return;
-    }
-    if (createError) {
-      throw createError(error);
-    }
-    throw error;
-  }
-}
-
-async function copyDirectoryRecursive(
-  source: string,
-  destination: string,
-  fileMode: number,
-  dirMode: number,
-): Promise<void> {
-  await mkdir(destination, { recursive: true, mode: dirMode });
-  await chmod(destination, dirMode).catch(() => {});
-
-  const entries = await readdir(source, { withFileTypes: true });
-  for (const entry of entries) {
-    const sourcePath = resolveChildPath(source, entry.name);
-    const destinationPath = resolveChildPath(destination, entry.name);
-
-    if (entry.isDirectory()) {
-      await copyDirectoryRecursive(
-        sourcePath,
-        destinationPath,
-        fileMode,
-        dirMode,
-      );
-      continue;
-    }
-
-    if (entry.isFile()) {
-      await copyFileWithPermissions(sourcePath, destinationPath, fileMode);
-    }
   }
 }
 

@@ -160,29 +160,6 @@ export async function rewriteReductionRecord(
   }
 }
 
-export async function finalizeReductionRecord(options: {
-  root: string;
-  reductionsFilePath: string;
-  sessionId: string;
-  status: ReductionStatus;
-  error?: string | null;
-  completedAt?: string;
-}): Promise<ReductionRecord> {
-  const { root, reductionsFilePath, sessionId, status, error, completedAt } =
-    options;
-  return await rewriteReductionRecord({
-    root,
-    reductionsFilePath,
-    sessionId,
-    mutate: (existing) => ({
-      ...existing,
-      status,
-      error: error ?? existing.error ?? null,
-      completedAt: completedAt ?? new Date().toISOString(),
-    }),
-  });
-}
-
 export async function flushReductionRecordBuffer(options: {
   reductionsFilePath: string;
   sessionId: string;

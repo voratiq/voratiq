@@ -160,57 +160,6 @@ export async function rewriteReviewRecord(
   }
 }
 
-export async function finalizeReviewRecord(options: {
-  root: string;
-  reviewsFilePath: string;
-  sessionId: string;
-  status: ReviewStatus;
-  error?: string | null;
-  completedAt?: string;
-}): Promise<ReviewRecord> {
-  const { root, reviewsFilePath, sessionId, status, error, completedAt } =
-    options;
-  return await rewriteReviewRecord({
-    root,
-    reviewsFilePath,
-    sessionId,
-    mutate: (existing) => {
-      const finalizedAt = completedAt ?? new Date().toISOString();
-      const sessionError = error ?? existing.error ?? null;
-      const reviewers =
-        status === "running"
-          ? existing.reviewers
-          : existing.reviewers.map((reviewer) => {
-              if (reviewer.status !== "running") {
-                return reviewer;
-              }
-              if (status === "succeeded") {
-                return {
-                  ...reviewer,
-                  status: "succeeded" as const,
-                  completedAt: reviewer.completedAt ?? finalizedAt,
-                  error: null,
-                };
-              }
-              return {
-                ...reviewer,
-                status,
-                completedAt: reviewer.completedAt ?? finalizedAt,
-                error: reviewer.error ?? sessionError,
-              };
-            });
-
-      return {
-        ...existing,
-        status,
-        error: sessionError,
-        completedAt: finalizedAt,
-        reviewers,
-      };
-    },
-  });
-}
-
 export async function flushReviewRecordBuffer(options: {
   reviewsFilePath: string;
   sessionId: string;
