@@ -155,6 +155,26 @@ export const TERMINAL_REVIEW_STATUSES: readonly ReviewStatus[] = [
   "aborted",
 ] as const satisfies readonly ReviewStatus[];
 
+export const REDUCTION_STATUS_VALUES = [
+  "running",
+  "succeeded",
+  "failed",
+  "aborted",
+] as const;
+
+export type ReductionStatus = (typeof REDUCTION_STATUS_VALUES)[number];
+
+export const reductionStatusSchema = z.enum(REDUCTION_STATUS_VALUES);
+
+/**
+ * Reduction statuses that indicate the reduction session has finished.
+ */
+export const TERMINAL_REDUCTION_STATUSES: readonly ReductionStatus[] = [
+  "succeeded",
+  "failed",
+  "aborted",
+] as const satisfies readonly ReductionStatus[];
+
 export const SPEC_RECORD_STATUS_VALUES = [
   "drafting",
   "saving",

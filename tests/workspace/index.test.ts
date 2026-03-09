@@ -47,12 +47,15 @@ describe("workspace bootstrap", () => {
       expect.arrayContaining([
         normalizeForAssertion(".voratiq"),
         normalizeForAssertion(join(".voratiq", "runs")),
+        normalizeForAssertion(join(".voratiq", "reductions")),
         normalizeForAssertion(join(".voratiq", "runs", "sessions")),
+        normalizeForAssertion(join(".voratiq", "reductions", "sessions")),
       ]),
     );
     expect(createdFiles).toEqual(
       expect.arrayContaining([
         normalizeForAssertion(join(".voratiq", "runs", "index.json")),
+        normalizeForAssertion(join(".voratiq", "reductions", "index.json")),
         normalizeForAssertion(join(".voratiq", "agents.yaml")),
         normalizeForAssertion(join(".voratiq", "evals.yaml")),
         normalizeForAssertion(join(".voratiq", "environment.yaml")),
@@ -68,6 +71,20 @@ describe("workspace bootstrap", () => {
     await createWorkspace(repoRoot);
     const runsPath = resolveWorkspacePath(repoRoot, "runs", "index.json");
     await rm(runsPath, { force: true });
+
+    await expect(validateWorkspace(repoRoot)).rejects.toBeInstanceOf(
+      WorkspaceMissingEntryError,
+    );
+  });
+
+  it("fails validation when the reduction index is missing", async () => {
+    await createWorkspace(repoRoot);
+    const reductionsPath = resolveWorkspacePath(
+      repoRoot,
+      "reductions",
+      "index.json",
+    );
+    await rm(reductionsPath, { force: true });
 
     await expect(validateWorkspace(repoRoot)).rejects.toBeInstanceOf(
       WorkspaceMissingEntryError,

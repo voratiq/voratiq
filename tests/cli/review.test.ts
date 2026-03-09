@@ -228,6 +228,34 @@ describe("voratiq review", () => {
       expect((received as { maxParallel?: number }).maxParallel).toBe(2);
     });
 
+    it("parses repeatable --extra-context preserving order", async () => {
+      let received: unknown;
+      const reviewCommand = silenceCommander(createReviewCommand());
+      reviewCommand.exitOverride().action((options) => {
+        received = options;
+      });
+
+      const program = silenceCommander(new Command());
+      program.exitOverride().addCommand(reviewCommand);
+
+      await program.parseAsync([
+        "node",
+        "voratiq",
+        "review",
+        "--run",
+        "20250101-abcde",
+        "--extra-context",
+        "notes/a.md",
+        "--extra-context",
+        "notes/b.json",
+      ]);
+
+      expect((received as { extraContext?: string[] }).extraContext).toEqual([
+        "notes/a.md",
+        "notes/b.json",
+      ]);
+    });
+
     it("parses --profile", async () => {
       let received: unknown;
       const reviewCommand = silenceCommander(createReviewCommand());

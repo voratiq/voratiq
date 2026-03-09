@@ -42,6 +42,7 @@ export const orchestrationProfileSchema = z
     run: orchestrationStageSchema,
     review: orchestrationStageSchema,
     spec: orchestrationStageSchema,
+    reduce: orchestrationStageSchema.optional(),
   })
   .strict();
 

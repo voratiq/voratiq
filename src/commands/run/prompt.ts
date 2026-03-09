@@ -1,4 +1,8 @@
 import {
+  appendExtraContextPromptSection,
+  type ResolvedExtraContextFile,
+} from "../shared/extra-context.js";
+import {
   appendConstraints,
   appendOutputRequirements,
 } from "../shared/prompt-helpers.js";
@@ -6,10 +10,11 @@ import {
 export interface BuildRunPromptOptions {
   specContent: string;
   workspacePath: string;
+  extraContextFiles?: readonly ResolvedExtraContextFile[];
 }
 
 export function buildRunPrompt(options: BuildRunPromptOptions): string {
-  const { specContent, workspacePath } = options;
+  const { specContent, workspacePath, extraContextFiles = [] } = options;
 
   const lines = [
     "Implement the following task:",
@@ -23,6 +28,7 @@ export function buildRunPrompt(options: BuildRunPromptOptions): string {
     readAccess: workspacePath,
     writeAccess: workspacePath,
   });
+  appendExtraContextPromptSection(lines, extraContextFiles);
   appendOutputRequirements(lines, [
     "- When finished, clean the workspace of temporary files/dirs you created (e.g., `tmp`, `.tmp`, etc.) unless they are intended deliverables.",
     "- Then write a 1-2 sentence summary to `.summary.txt` (in the workspace root).",

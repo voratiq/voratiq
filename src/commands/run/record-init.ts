@@ -13,6 +13,7 @@ export interface RecordInitInput {
   readonly repoDisplayPath: string;
   readonly createdAt: string;
   readonly runRoot: string;
+  readonly extraContext?: string[];
 }
 
 /**
@@ -30,6 +31,7 @@ export async function initializeRunRecord(
     repoDisplayPath,
     createdAt,
     runRoot,
+    extraContext,
   } = input;
 
   const initialRecord: RunRecord = {
@@ -37,6 +39,7 @@ export async function initializeRunRecord(
     spec: {
       path: normalizePathForDisplay(specDisplayPath),
     },
+    extraContext,
     createdAt,
     baseRevisionSha,
     rootPath: repoDisplayPath,

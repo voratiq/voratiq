@@ -1,4 +1,5 @@
 import { ensureWorkspaceError } from "../../../workspace/agents.js";
+import { stageExtraContextFiles } from "../../shared/extra-context.js";
 import { RunCommandError } from "../errors.js";
 import { buildRunPrompt } from "../prompt.js";
 import { AgentRunContext } from "./run-context.js";
@@ -18,6 +19,7 @@ export async function prepareAgentForExecution(
     runId,
     root,
     specContent,
+    extraContextFiles,
     evalPlan,
     environment,
   } = context;
@@ -46,9 +48,22 @@ export async function prepareAgentForExecution(
     };
   }
 
+  try {
+    await stageExtraContextFiles({
+      contextPath: workspacePaths.contextPath,
+      files: extraContextFiles,
+    });
+  } catch (error) {
+    return {
+      status: "failed",
+      result: await agentContext.failWith(ensureWorkspaceFailure(error)),
+    };
+  }
+
   const prompt = buildRunPrompt({
     specContent,
     workspacePath: workspacePaths.workspacePath,
+    extraContextFiles,
   });
 
   return {

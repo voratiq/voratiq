@@ -49,6 +49,7 @@ export const reviewRecordSchema = z.object({
   createdAt: z.string(),
   completedAt: z.string().optional(),
   status: reviewStatusSchema,
+  extraContext: z.array(repoRelativePathSchema).optional(),
   reviewers: z
     .array(reviewRecordReviewerSchema)
     .min(1)

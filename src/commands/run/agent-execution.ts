@@ -4,6 +4,7 @@ import type { EnvironmentConfig } from "../../configs/environment/types.js";
 import type { EvalDefinition } from "../../configs/evals/types.js";
 import type { AgentRecordMutators } from "../../runs/records/mutators.js";
 import { toError } from "../../utils/errors.js";
+import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
 import { createRunCompetitionAdapter } from "./competition-adapter.js";
 import { RunProcessStreamError } from "./errors.js";
 import type { AgentExecutionPhaseResult } from "./phases.js";
@@ -15,6 +16,7 @@ export interface AgentExecutionInput {
   readonly runId: string;
   readonly root: string;
   readonly specContent: string;
+  readonly extraContextFiles: readonly ResolvedExtraContextFile[];
   readonly evalPlan: readonly EvalDefinition[];
   readonly effectiveMaxParallel: number;
   readonly mutators: AgentRecordMutators;
@@ -33,6 +35,7 @@ export async function executeAgents(
     runId,
     root,
     specContent,
+    extraContextFiles,
     evalPlan,
     effectiveMaxParallel,
     mutators,
@@ -51,6 +54,7 @@ export async function executeAgents(
         runId,
         root,
         specContent,
+        extraContextFiles,
         evalPlan,
         mutators,
         environment,

@@ -18,6 +18,7 @@ import {
   formatRunWorkspaceRelative,
 } from "../../workspace/layout.js";
 import { prepareRunWorkspace } from "../../workspace/run.js";
+import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { executeAgents } from "./agent-execution.js";
 import { RunCommandError, RunProcessStreamError } from "./errors.js";
@@ -36,6 +37,7 @@ export interface RunCommandInput {
   agentOverrideFlag?: string;
   profileName?: string;
   maxParallel?: number;
+  extraContextFiles?: readonly ResolvedExtraContextFile[];
   renderer?: RunProgressRenderer;
 }
 
@@ -54,6 +56,7 @@ export async function executeRunCommand(
     agentOverrideFlag,
     profileName,
     maxParallel: requestedMaxParallel,
+    extraContextFiles = [],
     renderer,
   } = input;
 
@@ -93,6 +96,10 @@ export async function executeRunCommand(
     repoDisplayPath,
     createdAt,
     runRoot,
+    extraContext:
+      extraContextFiles.length > 0
+        ? extraContextFiles.map((file) => file.displayPath)
+        : undefined,
   });
 
   const agentAbortContexts = validation.agents.map((agent) => {
@@ -146,6 +153,7 @@ export async function executeRunCommand(
       runId,
       root,
       specContent: validation.specContent,
+      extraContextFiles,
       evalPlan: validation.evalPlan,
       effectiveMaxParallel: validation.effectiveMaxParallel,
       environment: validation.environment,

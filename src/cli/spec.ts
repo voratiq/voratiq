@@ -1,6 +1,7 @@
 import { Command, Option } from "commander";
 
 import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
+import { resolveExtraContextFiles } from "../commands/shared/extra-context.js";
 import { executeSpecCommand } from "../commands/spec/command.js";
 import {
   ensureSandboxDependencies,
@@ -19,6 +20,7 @@ export interface SpecCommandOptions {
   maxParallel?: number;
   title?: string;
   output?: string;
+  extraContext?: string[];
   suppressHint?: boolean;
   writeOutput?: CommandOutputWriter;
 }
@@ -39,6 +41,7 @@ export async function runSpecCommand(
     maxParallel,
     title,
     output,
+    extraContext,
     suppressHint,
     writeOutput = writeCommandOutput,
   } = options;
@@ -59,6 +62,10 @@ export async function runSpecCommand(
 
   checkPlatformSupport();
   ensureSandboxDependencies();
+  const extraContextFiles = await resolveExtraContextFiles({
+    root,
+    paths: extraContext,
+  });
 
   const startLine = createStageStartLineEmitter((message) => {
     writeOutput({
@@ -75,6 +82,7 @@ export async function runSpecCommand(
     maxParallel,
     title,
     outputPath: output,
+    extraContextFiles,
     onStatus: (message) => {
       startLine.emit(message);
     },
@@ -96,6 +104,10 @@ export function createSpecCommand(): Command {
       "Expected positive integer after --max-parallel",
       "--max-parallel must be greater than 0",
     );
+  const collectExtraContextOption = (
+    value: string,
+    previous: string[],
+  ): string[] => [...previous, value];
 
   return new Command("spec")
     .description("Generate a spec from a task description")
@@ -114,6 +126,14 @@ export function createSpecCommand(): Command {
     .option(
       "--output <path>",
       "Output path (default: .voratiq/specs/<slug>.md)",
+    )
+    .addOption(
+      new Option(
+        "--extra-context <path>",
+        "Stage an extra context file into the spec workspace (repeatable)",
+      )
+        .default([], "")
+        .argParser(collectExtraContextOption),
     )
     .allowExcessArguments(false)
     .action(async (commandOptions: SpecCommandOptions) => {

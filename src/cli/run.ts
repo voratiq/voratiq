@@ -4,6 +4,7 @@ import { Command, Option } from "commander";
 
 import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
 import { executeRunCommand } from "../commands/run/command.js";
+import { resolveExtraContextFiles } from "../commands/shared/extra-context.js";
 import { checkoutOrCreateBranch } from "../preflight/branch.js";
 import {
   ensureCleanWorkingTree,
@@ -27,6 +28,7 @@ export interface RunCommandOptions {
   profile?: string;
   maxParallel?: number;
   branch?: boolean;
+  extraContext?: string[];
   suppressHint?: boolean;
   suppressLeadingBlankLine?: boolean;
   suppressTrailingBlankLine?: boolean;
@@ -51,6 +53,7 @@ export async function runRunCommand(
     profile,
     maxParallel,
     branch,
+    extraContext,
     suppressHint,
     suppressLeadingBlankLine,
     suppressTrailingBlankLine,
@@ -77,6 +80,10 @@ export async function runRunCommand(
   ensureSandboxDependencies();
   await ensureCleanWorkingTree(root);
   const { absolutePath, displayPath } = await ensureSpecPath(specPath, root);
+  const extraContextFiles = await resolveExtraContextFiles({
+    root,
+    paths: extraContext,
+  });
 
   if (branch) {
     const branchName = deriveBranchNameFromSpecPath(displayPath);
@@ -108,6 +115,7 @@ export async function runRunCommand(
     agentOverrideFlag,
     profileName: profile,
     maxParallel,
+    extraContextFiles,
     renderer,
   });
 
@@ -141,9 +149,17 @@ interface RunCommandActionOptions {
   profile?: string;
   maxParallel?: number;
   branch?: boolean;
+  extraContext?: string[];
 }
 
 function collectAgentOption(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
+function collectExtraContextOption(
+  value: string,
+  previous: string[],
+): string[] {
   return [...previous, value];
 }
 
@@ -174,6 +190,14 @@ export function createRunCommand(): Command {
       parseMaxParallelOption,
     )
     .option("--branch", "Create or checkout a branch named after the spec")
+    .addOption(
+      new Option(
+        "--extra-context <path>",
+        "Stage an extra context file into each agent workspace (repeatable)",
+      )
+        .default([], "")
+        .argParser(collectExtraContextOption),
+    )
     .allowExcessArguments(false)
     .action(async (options: RunCommandActionOptions) => {
       const runOptions: RunCommandOptions = {
@@ -182,6 +206,7 @@ export function createRunCommand(): Command {
         profile: options.profile,
         maxParallel: options.maxParallel,
         branch: options.branch,
+        extraContext: options.extraContext,
         writeOutput: writeCommandOutput,
       };
 

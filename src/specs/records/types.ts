@@ -32,6 +32,7 @@ export const specRecordSchema = z.object({
   createdAt: z.string(),
   completedAt: z.string().optional(),
   status: specRecordStatusSchema,
+  extraContext: z.array(repoRelativePathSchema).optional(),
   agentId: agentIdSchema,
   title: z.string(),
   slug: z.string(),

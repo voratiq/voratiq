@@ -14,6 +14,9 @@ export const VORATIQ_RUNS_SESSIONS_DIR = "runs/sessions";
 export const VORATIQ_REVIEWS_DIR = "reviews";
 export const VORATIQ_REVIEWS_FILE = "reviews/index.json";
 export const VORATIQ_REVIEWS_SESSIONS_DIR = "reviews/sessions";
+export const VORATIQ_REDUCTIONS_DIR = "reductions";
+export const VORATIQ_REDUCTIONS_FILE = "reductions/index.json";
+export const VORATIQ_REDUCTIONS_SESSIONS_DIR = "reductions/sessions";
 export const VORATIQ_SPECS_DIR = "specs";
 export const VORATIQ_SPECS_FILE = "specs/index.json";
 export const VORATIQ_SPECS_SESSIONS_DIR = "specs/sessions";
@@ -27,6 +30,7 @@ export const VORATIQ_SANDBOX_FILE = "sandbox.yaml";
 export const VORATIQ_ORCHESTRATION_FILE = "orchestration.yaml";
 
 export const WORKSPACE_DIRNAME = "workspace";
+export const CONTEXT_DIRNAME = "context";
 export const EVALS_DIRNAME = "evals";
 export const STDOUT_FILENAME = "stdout.log";
 export const STDERR_FILENAME = "stderr.log";
@@ -36,10 +40,13 @@ export const CHAT_JSON_FILENAME = "chat.json";
 export const CHAT_JSONL_FILENAME = "chat.jsonl";
 export const REVIEW_FILENAME = "review.md";
 export const REVIEW_RECOMMENDATION_FILENAME = "recommendation.json";
+export const REDUCTION_FILENAME = "reduction.md";
+export const REDUCTION_DATA_FILENAME = "reduction.json";
 export const RUNTIME_DIRNAME = "runtime";
 export const ARTIFACTS_DIRNAME = "artifacts";
 export const MANIFEST_FILENAME = "manifest.json";
 export const REVIEW_ARTIFACT_INFO_FILENAME = "artifact-information.json";
+export const REDUCTION_ARTIFACT_INFO_FILENAME = "artifact-information.json";
 export const SANDBOX_DIRNAME = "sandbox";
 export const SANDBOX_SETTINGS_FILENAME = "sandbox.json";
 
@@ -160,6 +167,18 @@ export function getSpecsSessionsDirectoryPath(): string {
   return getDomainSessionsDirectoryPath(VORATIQ_SPECS_DIR);
 }
 
+export function getReductionsDirectoryPath(): string {
+  return getDomainDirectoryPath(VORATIQ_REDUCTIONS_DIR);
+}
+
+export function getReductionsIndexPath(): string {
+  return getDomainIndexPath(VORATIQ_REDUCTIONS_DIR);
+}
+
+export function getReductionsSessionsDirectoryPath(): string {
+  return getDomainSessionsDirectoryPath(VORATIQ_REDUCTIONS_DIR);
+}
+
 export function getDomainSessionsDirectoryPath(domain: string): string {
   return formatDomainScopedPath(domain, VORATIQ_SESSIONS_DIRNAME);
 }
@@ -173,6 +192,10 @@ export function getSessionDirectoryPath(
 
 export function getSpecSessionDirectoryPath(sessionId: string): string {
   return getSessionDirectoryPath(VORATIQ_SPECS_DIR, sessionId);
+}
+
+export function getReductionSessionDirectoryPath(sessionId: string): string {
+  return getSessionDirectoryPath(VORATIQ_REDUCTIONS_DIR, sessionId);
 }
 
 export function getAgentSessionDirectoryPath(
@@ -227,6 +250,19 @@ export function getAgentSessionWorkspaceDirectoryPath(
     sessionId,
     agentId,
     WORKSPACE_DIRNAME,
+  );
+}
+
+export function getAgentSessionContextDirectoryPath(
+  domain: string,
+  sessionId: string,
+  agentId: string,
+): string {
+  return formatAgentSessionScopedPath(
+    domain,
+    sessionId,
+    agentId,
+    CONTEXT_DIRNAME,
   );
 }
 
@@ -310,6 +346,34 @@ export function getAgentSessionReviewPath(
     agentId,
     ARTIFACTS_DIRNAME,
     REVIEW_FILENAME,
+  );
+}
+
+export function getAgentSessionReductionPath(
+  domain: string,
+  sessionId: string,
+  agentId: string,
+): string {
+  return formatAgentSessionScopedPath(
+    domain,
+    sessionId,
+    agentId,
+    ARTIFACTS_DIRNAME,
+    REDUCTION_FILENAME,
+  );
+}
+
+export function getAgentSessionReductionDataPath(
+  domain: string,
+  sessionId: string,
+  agentId: string,
+): string {
+  return formatAgentSessionScopedPath(
+    domain,
+    sessionId,
+    agentId,
+    ARTIFACTS_DIRNAME,
+    REDUCTION_DATA_FILENAME,
   );
 }
 
@@ -421,6 +485,13 @@ export function getAgentWorkspaceDirectoryPath(
     runId,
     agentId,
   );
+}
+
+export function getAgentContextDirectoryPath(
+  runId: string,
+  agentId: string,
+): string {
+  return getAgentSessionContextDirectoryPath(VORATIQ_RUNS_DIR, runId, agentId);
 }
 
 export function getAgentArtifactsDirectoryPath(

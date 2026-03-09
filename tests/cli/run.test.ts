@@ -129,6 +129,34 @@ describe("voratiq run command options", () => {
     expect((received as { profile?: string }).profile).toBe("quality");
   });
 
+  it("parses repeatable --extra-context preserving order", async () => {
+    let received: unknown;
+    const runCommand = silenceCommander(createRunCommand());
+    runCommand.exitOverride().action((options) => {
+      received = options;
+    });
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(runCommand);
+
+    await program.parseAsync([
+      "node",
+      "voratiq",
+      "run",
+      "--spec",
+      "specs/sample.md",
+      "--extra-context",
+      "notes/a.md",
+      "--extra-context",
+      "notes/b.json",
+    ]);
+
+    expect((received as { extraContext?: string[] }).extraContext).toEqual([
+      "notes/a.md",
+      "notes/b.json",
+    ]);
+  });
+
   it("does not expose auto-init toggles in help output", () => {
     const help = createRunCommand().helpInformation();
     expect(help).not.toContain("--auto-init");

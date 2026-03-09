@@ -11,6 +11,7 @@ import {
   VORATIQ_EVALS_FILE,
   VORATIQ_HISTORY_LOCK_FILENAME,
   VORATIQ_ORCHESTRATION_FILE,
+  VORATIQ_REDUCTIONS_DIR,
   VORATIQ_REVIEWS_DIR,
   VORATIQ_RUNS_DIR,
   VORATIQ_RUNS_FILE,
@@ -19,7 +20,7 @@ import {
 } from "../../workspace/structure.js";
 import type { SandboxPolicyOverrides } from "./types.js";
 
-export type SandboxStageId = "run" | "spec" | "review";
+export type SandboxStageId = "run" | "spec" | "review" | "reduce";
 
 export interface BuildSandboxPolicyInput {
   stageId: SandboxStageId;
@@ -244,8 +245,21 @@ function resolveStageRoots(
       symmetric: [
         resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
         resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR),
+        resolveWorkspacePath(root, VORATIQ_REDUCTIONS_DIR),
       ],
       readOnly: [],
+    };
+  }
+
+  if (stageId === "review") {
+    return {
+      symmetric: [
+        resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
+        resolveWorkspacePath(root, VORATIQ_SPECS_DIR),
+        resolveWorkspacePath(root, VORATIQ_REDUCTIONS_DIR),
+      ],
+      // Reviewers should never inspect repository metadata during blinded review.
+      readOnly: [resolveAbsolute(root, ".git")],
     };
   }
 
@@ -253,8 +267,8 @@ function resolveStageRoots(
     symmetric: [
       resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
       resolveWorkspacePath(root, VORATIQ_SPECS_DIR),
+      resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR),
     ],
-    // Reviewers should never inspect repository metadata during blinded review.
     readOnly: [resolveAbsolute(root, ".git")],
   };
 }

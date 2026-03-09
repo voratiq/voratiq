@@ -39,4 +39,25 @@ describe("buildSpecPrompt", () => {
 
     expect(prompt).toContain("Title to use: Onboarding Improvements");
   });
+
+  it("lists staged extra-context files when provided", () => {
+    const prompt = buildSpecPrompt({
+      description: "Define the onboarding flow.",
+      outputPath: "spec.md",
+      repoRootPath: "/repo",
+      workspacePath: "/repo/.voratiq/specs/sessions/123/workspace",
+      extraContextFiles: [
+        {
+          absolutePath: "/repo/notes/a.md",
+          displayPath: "notes/a.md",
+          stagedRelativePath: "../context/a.md",
+        },
+      ],
+    });
+
+    expect(prompt).toContain(
+      "Extra context files (staged alongside the workspace):",
+    );
+    expect(prompt).toContain("`../context/a.md` (source: `notes/a.md`)");
+  });
 });
