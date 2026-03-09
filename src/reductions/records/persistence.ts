@@ -1,16 +1,16 @@
 import { dirname, join } from "node:path";
 
-import {
-  mapSessionPersistenceError,
-  sessionPersistenceErrorMapper,
-} from "../../records/persistence-errors.js";
-import { acquireHistoryLock } from "../../runs/records/history-lock.js";
 import { SessionRecordParseError } from "../../sessions/errors.js";
+import { acquireHistoryLock } from "../../sessions/history-lock.js";
 import {
   createSessionPersistence,
   type SessionPersistencePaths,
   type SessionRecordWarning,
 } from "../../sessions/persistence.js";
+import {
+  mapSessionPersistenceError,
+  sessionPersistenceErrorMapper,
+} from "../../sessions/persistence-errors.js";
 import type {
   ReductionIndexEntry,
   ReductionRecord,

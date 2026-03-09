@@ -1,15 +1,11 @@
 import {
-  mapSessionPersistenceError,
-  runPersistenceErrorMapper,
-  sessionPersistenceErrorMapper,
-} from "../../src/records/persistence-errors.js";
-import {
   RunHistoryLockTimeoutError,
   RunOptionValidationError,
   RunRecordMutationError,
   RunRecordNotFoundError,
   RunRecordParseError,
 } from "../../src/runs/records/errors.js";
+import { runPersistenceErrorMapper } from "../../src/runs/records/persistence-errors.js";
 import {
   SessionHistoryLockTimeoutError,
   SessionOptionValidationError,
@@ -17,6 +13,10 @@ import {
   SessionRecordNotFoundError,
   SessionRecordParseError,
 } from "../../src/sessions/errors.js";
+import {
+  mapSessionPersistenceError,
+  sessionPersistenceErrorMapper,
+} from "../../src/sessions/persistence-errors.js";
 
 describe("shared session persistence error mapping", () => {
   it("normalizes filesystem failures into mutation errors for every operator contract", () => {
