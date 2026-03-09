@@ -13,12 +13,12 @@ import { runSandboxedAgent } from "../../../agents/runtime/harness.js";
 import {
   ReviewGenerationFailedError,
   ReviewNoEligibleCandidatesError,
-} from "../../../commands/review/errors.js";
+} from "../../../domains/reviews/competition/errors.js";
 import {
   type ResolvedExtraContextFile,
   stageExtraContextFiles,
-} from "../../../commands/shared/extra-context.js";
-import { pruneWorkspace } from "../../../commands/shared/prune.js";
+} from "../../../competition/shared/extra-context.js";
+import { pruneWorkspace } from "../../../competition/shared/prune.js";
 import type {
   CompetitionCommandAdapter,
   CompetitionPreparationResult,

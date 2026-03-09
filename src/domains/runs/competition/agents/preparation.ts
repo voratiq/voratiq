@@ -1,5 +1,5 @@
-import { RunCommandError } from "../../../../commands/run/errors.js";
-import { stageExtraContextFiles } from "../../../../commands/shared/extra-context.js";
+import { RunCommandError } from "../../../../domains/runs/competition/errors.js";
+import { stageExtraContextFiles } from "../../../../competition/shared/extra-context.js";
 import { ensureWorkspaceError } from "../../../../workspace/agents.js";
 import { buildRunPrompt } from "../prompt.js";
 import { AgentRunContext } from "./run-context.js";

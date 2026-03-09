@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { checkPlatformSupport } from "../../src/agents/runtime/sandbox.js";
 import { runReviewCommand } from "../../src/cli/review.js";
 import { executeReviewCommand } from "../../src/commands/review/command.js";
-import { ReviewGenerationFailedError } from "../../src/commands/review/errors.js";
+import { ReviewGenerationFailedError } from "../../src/domains/reviews/competition/errors.js";
 import { readReviewRecommendation } from "../../src/domains/reviews/competition/recommendation.js";
 import { readReviewRecords } from "../../src/domains/reviews/persistence/adapter.js";
 import {

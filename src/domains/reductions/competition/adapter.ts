@@ -3,12 +3,12 @@ import { dirname, join } from "node:path";
 
 import { detectAgentProcessFailureDetail } from "../../../agents/runtime/failures.js";
 import { runSandboxedAgent } from "../../../agents/runtime/harness.js";
-import { RunNotFoundCliError } from "../../../commands/errors.js";
+import { RunNotFoundCliError } from "../../../cli/errors.js";
 import {
   type ResolvedExtraContextFile,
   stageExtraContextFiles,
-} from "../../../commands/shared/extra-context.js";
-import { pruneWorkspace } from "../../../commands/shared/prune.js";
+} from "../../../competition/shared/extra-context.js";
+import { pruneWorkspace } from "../../../competition/shared/prune.js";
 import type {
   CompetitionCommandAdapter,
   CompetitionPreparationResult,

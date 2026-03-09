@@ -1,6 +1,6 @@
 import { rm } from "node:fs/promises";
 
-import { WorkspaceSetupRunError } from "../commands/run/errors.js";
+import { WorkspaceSetupRunError } from "../domains/runs/competition/errors.js";
 import type { AgentId } from "../configs/agents/types.js";
 import type { EnvironmentConfig } from "../configs/environment/types.js";
 import { toErrorMessage } from "../utils/errors.js";

@@ -3,13 +3,13 @@ import type {
   AgentReport,
   RunRecord,
   RunReport,
-} from "../../domains/runs/model/types.js";
+} from "../../../domains/runs/model/types.js";
 import {
   buildAgentArtifactPaths,
   buildAgentEvalViews,
   getAgentDirectoryPath,
   getAgentManifestPath,
-} from "../../workspace/structure.js";
+} from "../../../workspace/structure.js";
 import { RunReportInvariantError } from "./errors.js";
 
 export interface AgentExecutionState {

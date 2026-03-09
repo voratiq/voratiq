@@ -27,7 +27,7 @@ import {
   NoAgentsEnabledError,
   type PreflightIssue,
   RunPreflightError,
-} from "./errors.js";
+} from "../../domains/runs/competition/errors.js";
 
 export interface ValidationInput {
   readonly root: string;

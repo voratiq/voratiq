@@ -27,7 +27,7 @@ import {
 } from "../../utils/path.js";
 import { slugify } from "../../utils/slug.js";
 import { getSpecsDirectoryPath } from "../../workspace/structure.js";
-import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
+import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";

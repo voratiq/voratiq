@@ -25,6 +25,15 @@ export class NonInteractiveShellError extends CliError {
   }
 }
 
+export class RunNotFoundCliError extends CliError {
+  constructor(runId: string) {
+    super(`Run \`${runId}\` not found.`, [], [
+      "Check available runs with `voratiq list`.",
+    ]);
+    this.name = "RunNotFoundCliError";
+  }
+}
+
 export function toCliError(error: unknown): CliError {
   if (error instanceof CliError) {
     return error;

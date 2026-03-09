@@ -1,7 +1,7 @@
 import { Command, Option } from "commander";
 
 import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
-import { resolveExtraContextFiles } from "../commands/shared/extra-context.js";
+import { resolveExtraContextFiles } from "../competition/shared/extra-context.js";
 import { executeSpecCommand } from "../commands/spec/command.js";
 import {
   ensureSandboxDependencies,

@@ -3,7 +3,7 @@ import {
   formatPreflightIssueLines,
   PREFLIGHT_HINT,
   type PreflightIssue,
-} from "../shared/preflight.js";
+} from "../../competition/shared/preflight.js";
 
 export type ReducePreflightIssue = PreflightIssue;
 

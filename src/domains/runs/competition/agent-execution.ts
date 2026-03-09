@@ -1,7 +1,7 @@
-import { RunProcessStreamError } from "../../../commands/run/errors.js";
-import type { AgentExecutionPhaseResult } from "../../../commands/run/phases.js";
-import { hasEvalFailures } from "../../../commands/run/reports.js";
-import type { ResolvedExtraContextFile } from "../../../commands/shared/extra-context.js";
+import { RunProcessStreamError } from "../../../domains/runs/competition/errors.js";
+import type { AgentExecutionPhaseResult } from "../../../domains/runs/competition/phases.js";
+import { hasEvalFailures } from "../../../domains/runs/competition/reports.js";
+import type { ResolvedExtraContextFile } from "../../../competition/shared/extra-context.js";
 import { executeCompetitionWithAdapter } from "../../../competition/command-adapter.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";

@@ -12,7 +12,7 @@ import {
 } from "@jest/globals";
 
 import { runSandboxedAgent } from "../../../src/agents/runtime/harness.js";
-import type { AgentExecutionResult } from "../../../src/commands/run/reports.js";
+import type { AgentExecutionResult } from "../../../src/domains/runs/competition/reports.js";
 import { runPreparedWithLimit } from "../../../src/competition/core.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";

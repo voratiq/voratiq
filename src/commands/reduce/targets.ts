@@ -24,7 +24,7 @@ import {
   REDUCTION_DATA_FILENAME,
   REVIEW_RECOMMENDATION_FILENAME,
 } from "../../workspace/structure.js";
-import { RunNotFoundCliError } from "../errors.js";
+import { RunNotFoundCliError } from "../../cli/errors.js";
 
 export interface ReductionTargetValidationInput {
   root: string;

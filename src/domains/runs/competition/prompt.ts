@@ -1,11 +1,11 @@
 import {
   appendExtraContextPromptSection,
   type ResolvedExtraContextFile,
-} from "../../../commands/shared/extra-context.js";
+} from "../../../competition/shared/extra-context.js";
 import {
   appendConstraints,
   appendOutputRequirements,
-} from "../../../commands/shared/prompt-helpers.js";
+} from "../../../competition/shared/prompt-helpers.js";
 
 export interface BuildRunPromptOptions {
   specContent: string;

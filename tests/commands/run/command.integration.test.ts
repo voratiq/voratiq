@@ -6,14 +6,14 @@ import {
   clearActiveRun,
   registerActiveRun,
 } from "../../../src/commands/run/lifecycle.js";
-import type { AgentExecutionPhaseResult } from "../../../src/commands/run/phases.js";
+import type { AgentExecutionPhaseResult } from "../../../src/domains/runs/competition/phases.js";
 import { initializeRunRecord } from "../../../src/commands/run/record-init.js";
-import { toRunReport } from "../../../src/commands/run/reports.js";
+import { toRunReport } from "../../../src/domains/runs/competition/reports.js";
 import {
   validateAndPrepare,
   type ValidationResult,
 } from "../../../src/commands/run/validation.js";
-import type { ResolvedExtraContextFile } from "../../../src/commands/shared/extra-context.js";
+import type { ResolvedExtraContextFile } from "../../../src/competition/shared/extra-context.js";
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import { executeAgents } from "../../../src/domains/runs/competition/agent-execution.js";
@@ -56,7 +56,7 @@ jest.mock("../../../src/domains/runs/persistence/adapter.js", () => ({
   flushRunRecordBuffer: jest.fn(),
 }));
 
-jest.mock("../../../src/commands/run/reports.js", () => ({
+jest.mock("../../../src/domains/runs/competition/reports.js", () => ({
   toRunReport: jest.fn(),
 }));
 

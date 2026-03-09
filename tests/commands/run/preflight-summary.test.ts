@@ -12,7 +12,7 @@ import {
 } from "@jest/globals";
 
 import { verifyAgentProviders } from "../../../src/agents/runtime/auth.js";
-import { RunPreflightError } from "../../../src/commands/run/errors.js";
+import { RunPreflightError } from "../../../src/domains/runs/competition/errors.js";
 import { validateAndPrepare } from "../../../src/commands/run/validation.js";
 import {
   type AgentCatalogDiagnostics,

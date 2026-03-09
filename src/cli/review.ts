@@ -7,8 +7,8 @@ import {
   executeReviewCommand,
   type ReviewCommandResult as ReviewExecutionResult,
 } from "../commands/review/command.js";
-import { ReviewGenerationFailedError } from "../commands/review/errors.js";
-import { resolveExtraContextFiles } from "../commands/shared/extra-context.js";
+import { ReviewGenerationFailedError } from "../domains/reviews/competition/errors.js";
+import { resolveExtraContextFiles } from "../competition/shared/extra-context.js";
 import { buildMarkdownPreviewLines } from "../commands/shared/preview.js";
 import { resolveBlindedRecommendation } from "../domains/reviews/competition/blinded.js";
 import {

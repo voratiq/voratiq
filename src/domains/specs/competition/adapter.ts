@@ -3,8 +3,8 @@ import { runSandboxedAgent } from "../../../agents/runtime/harness.js";
 import {
   type ResolvedExtraContextFile,
   stageExtraContextFiles,
-} from "../../../commands/shared/extra-context.js";
-import { pruneWorkspace } from "../../../commands/shared/prune.js";
+} from "../../../competition/shared/extra-context.js";
+import { pruneWorkspace } from "../../../competition/shared/prune.js";
 import type {
   CompetitionCommandAdapter,
   CompetitionPreparationResult,
@@ -12,6 +12,7 @@ import type {
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import { buildSpecPrompt } from "../../../domains/specs/competition/prompt.js";
+import { composeSpecSandboxPolicy } from "../../../domains/specs/competition/sandbox-policy.js";
 import { toErrorMessage } from "../../../utils/errors.js";
 import {
   normalizePathForDisplay,
@@ -150,6 +151,7 @@ export function createSpecCompetitionAdapter(
             stderrPath: workspacePaths.stderrPath,
           },
           captureChat: true,
+          ...composeSpecSandboxPolicy(),
         });
 
         if (result.exitCode !== 0 || result.errorMessage) {

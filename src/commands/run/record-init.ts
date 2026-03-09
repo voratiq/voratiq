@@ -2,7 +2,7 @@ import type { RunRecord } from "../../domains/runs/model/types.js";
 import { appendRunRecord } from "../../domains/runs/persistence/adapter.js";
 import { normalizePathForDisplay } from "../../utils/path.js";
 import { cleanupRunWorkspace } from "../../workspace/cleanup.js";
-import type { RunRecordInitResult } from "./phases.js";
+import type { RunRecordInitResult } from "../../domains/runs/competition/phases.js";
 
 export interface RecordInitInput {
   readonly root: string;

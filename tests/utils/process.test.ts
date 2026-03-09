@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 
-import { RunProcessStreamError } from "../../src/commands/run/errors.js";
+import { RunProcessStreamError } from "../../src/domains/runs/competition/errors.js";
 import { spawnStreamingProcess } from "../../src/utils/process.js";
 
 jest.mock("node:child_process", () => ({

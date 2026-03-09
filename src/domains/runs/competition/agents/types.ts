@@ -1,5 +1,5 @@
-import type { AgentExecutionResult } from "../../../../commands/run/reports.js";
-import type { ResolvedExtraContextFile } from "../../../../commands/shared/extra-context.js";
+import type { AgentExecutionResult } from "../../../../domains/runs/competition/reports.js";
+import type { ResolvedExtraContextFile } from "../../../../competition/shared/extra-context.js";
 import type { AgentDefinition } from "../../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../../configs/environment/types.js";
 import type { EvalDefinition } from "../../../../configs/evals/types.js";

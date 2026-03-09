@@ -1,14 +1,14 @@
 import {
   DisplayableError,
   type HintedErrorOptions,
-} from "../../utils/errors.js";
+} from "../../../utils/errors.js";
 import {
   formatPreflightIssueLines,
   PREFLIGHT_HINT,
   type PreflightIssue,
-} from "../shared/preflight.js";
+} from "../../../competition/shared/preflight.js";
 
-export type { PreflightIssue } from "../shared/preflight.js";
+export type { PreflightIssue } from "../../../competition/shared/preflight.js";
 
 export type RunErrorKind =
   | "workspace-setup"

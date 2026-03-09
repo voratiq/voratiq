@@ -17,7 +17,7 @@ import { CliError } from "../../../src/cli/errors.js";
 import {
   resolveExtraContextFiles,
   stageExtraContextFiles,
-} from "../../../src/commands/shared/extra-context.js";
+} from "../../../src/competition/shared/extra-context.js";
 
 describe("extra-context staging", () => {
   it("resolves files deterministically and stages them under sibling context paths", async () => {

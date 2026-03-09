@@ -21,12 +21,12 @@ import {
   formatRunWorkspaceRelative,
 } from "../../workspace/layout.js";
 import { prepareRunWorkspace } from "../../workspace/run.js";
-import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
+import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
-import { RunCommandError, RunProcessStreamError } from "./errors.js";
+import { RunCommandError, RunProcessStreamError } from "../../domains/runs/competition/errors.js";
 import { clearActiveRun, registerActiveRun } from "./lifecycle.js";
 import { initializeRunRecord } from "./record-init.js";
-import { toRunReport } from "./reports.js";
+import { toRunReport } from "../../domains/runs/competition/reports.js";
 import { validateAndPrepare } from "./validation.js";
 
 export interface RunCommandInput {

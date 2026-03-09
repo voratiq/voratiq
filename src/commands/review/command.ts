@@ -19,8 +19,8 @@ import {
   resolveWorkspacePath,
   VORATIQ_REVIEWS_SESSIONS_DIR,
 } from "../../workspace/structure.js";
-import { RunNotFoundCliError } from "../errors.js";
-import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
+import { RunNotFoundCliError } from "../../cli/errors.js";
+import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
@@ -29,7 +29,7 @@ import {
   ReviewError,
   ReviewGenerationFailedError,
   ReviewPreflightError,
-} from "./errors.js";
+} from "../../domains/reviews/competition/errors.js";
 import { clearActiveReview, registerActiveReview } from "./lifecycle.js";
 
 export interface ReviewCommandInput {

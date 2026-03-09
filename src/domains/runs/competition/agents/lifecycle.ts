@@ -9,8 +9,8 @@ import {
   AgentProcessError,
   GitOperationError,
   RunCommandError,
-} from "../../../../commands/run/errors.js";
-import type { AgentExecutionResult } from "../../../../commands/run/reports.js";
+} from "../../../../domains/runs/competition/errors.js";
+import type { AgentExecutionResult } from "../../../../domains/runs/competition/reports.js";
 import type {
   AgentInvocationRecord,
   WatchdogMetadata,
@@ -19,6 +19,7 @@ import { toErrorMessage } from "../../../../utils/errors.js";
 import { GIT_AUTHOR_EMAIL, GIT_AUTHOR_NAME } from "../../../../utils/git.js";
 import { runPostProcessingAndEvaluations } from "./eval-runner.js";
 import { AgentRunContext } from "./run-context.js";
+import { composeRunSandboxPolicy } from "../sandbox-policy.js";
 import type { PreparedAgentExecution } from "./types.js";
 
 export async function runPreparedAgent(
@@ -100,8 +101,10 @@ export async function executeAgentLifecycle(
       },
       captureChat: true,
       teardownAuthOnExit: false,
-      extraWriteProtectedPaths: [workspacePaths.evalsDirPath],
-      extraReadProtectedPaths: [workspacePaths.evalsDirPath],
+      ...composeRunSandboxPolicy({
+        stageWriteProtectedPaths: [workspacePaths.evalsDirPath],
+        stageReadProtectedPaths: [workspacePaths.evalsDirPath],
+      }),
       onWatchdogTrigger,
     });
 

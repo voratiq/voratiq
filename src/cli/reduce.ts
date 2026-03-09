@@ -4,7 +4,7 @@ import { Command, Option } from "commander";
 
 import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
 import { executeReduceCommand } from "../commands/reduce/command.js";
-import { resolveExtraContextFiles } from "../commands/shared/extra-context.js";
+import { resolveExtraContextFiles } from "../competition/shared/extra-context.js";
 import {
   buildMarkdownPreviewLines,
   extractMarkdownSection,

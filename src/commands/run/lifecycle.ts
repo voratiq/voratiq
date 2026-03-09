@@ -5,13 +5,16 @@ import {
   getRunRecordSnapshot,
   rewriteRunRecord,
 } from "../../domains/runs/persistence/adapter.js";
+import {
+  getActiveTerminationStatus,
+  RUN_ABORT_WARNING,
+  setActiveTerminationStatus,
+} from "../../domains/runs/competition/termination-state.js";
 import type { RunStatus } from "../../status/index.js";
 import { TERMINABLE_RUN_STATUSES } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { preserveProviderChatTranscripts } from "../../workspace/chat/artifacts.js";
 import type { ChatArtifactFormat } from "../../workspace/chat/types.js";
-
-export const RUN_ABORT_WARNING = "Run aborted before agent completed.";
 
 interface ActiveRunContext {
   root: string;
@@ -28,7 +31,6 @@ interface ActiveRunAgentContext {
 
 let activeRun: ActiveRunContext | undefined;
 let terminationInFlight = false;
-let activeTerminationStatus: RunStatus | undefined;
 
 export function registerActiveRun(context: ActiveRunContext): void {
   activeRun = context;
@@ -44,19 +46,7 @@ export function clearActiveRun(runId: string): void {
   }
 }
 
-export function getActiveTerminationStatus(
-  runId: string,
-): RunStatus | undefined {
-  if (!terminationInFlight) {
-    return undefined;
-  }
-
-  if (!activeRun || activeRun.runId !== runId) {
-    return undefined;
-  }
-
-  return activeTerminationStatus;
-}
+export { getActiveTerminationStatus, RUN_ABORT_WARNING };
 
 export async function terminateActiveRun(
   status: Extract<RunStatus, (typeof TERMINABLE_RUN_STATUSES)[number]>,
@@ -70,8 +60,8 @@ export async function terminateActiveRun(
   }
 
   terminationInFlight = true;
-  activeTerminationStatus = status;
   const context = activeRun;
+  setActiveTerminationStatus(context.runId, status);
   let finalized = false;
   const chatArtifactsByAgent: Map<string, ChatArtifactFormat> = new Map();
   let persistenceError: Error | undefined;
@@ -170,7 +160,7 @@ export async function terminateActiveRun(
     await teardownSessionAuth(context.runId);
   } finally {
     terminationInFlight = false;
-    activeTerminationStatus = undefined;
+    setActiveTerminationStatus(context.runId, undefined);
     activeRun = undefined;
   }
 

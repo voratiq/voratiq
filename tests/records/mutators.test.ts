@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import { getActiveTerminationStatus } from "../../src/commands/run/lifecycle.js";
+import { getActiveTerminationStatus } from "../../src/domains/runs/competition/termination-state.js";
 import { createAgentRecordMutators } from "../../src/domains/runs/model/mutators.js";
 import type { RunRecord } from "../../src/domains/runs/model/types.js";
 import { rewriteRunRecord } from "../../src/domains/runs/persistence/adapter.js";
@@ -9,7 +9,7 @@ jest.mock("../../src/domains/runs/persistence/adapter.js", () => ({
   rewriteRunRecord: jest.fn(),
 }));
 
-jest.mock("../../src/commands/run/lifecycle.js", () => ({
+jest.mock("../../src/domains/runs/competition/termination-state.js", () => ({
   getActiveTerminationStatus: jest.fn(),
   RUN_ABORT_WARNING: "Run aborted before agent completed.",
 }));

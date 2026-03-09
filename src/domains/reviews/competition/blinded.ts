@@ -1,4 +1,4 @@
-import { ReviewGenerationFailedError } from "../../../commands/review/errors.js";
+import { ReviewGenerationFailedError } from "../../../domains/reviews/competition/errors.js";
 import { isBlindedCandidateAlias } from "../../../domains/reviews/candidates.js";
 import type { ReviewRecommendation } from "./recommendation.js";
 

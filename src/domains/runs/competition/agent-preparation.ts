@@ -1,4 +1,4 @@
-import type { AgentExecutionResult } from "../../../commands/run/reports.js";
+import type { AgentExecutionResult } from "../../../domains/runs/competition/reports.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import type { EvalDefinition } from "../../../configs/evals/types.js";
@@ -14,7 +14,7 @@ export async function prepareAgents(options: {
   runId: string;
   root: string;
   specContent: string;
-  extraContextFiles: readonly import("../../../commands/shared/extra-context.js").ResolvedExtraContextFile[];
+  extraContextFiles: readonly import("../../../competition/shared/extra-context.js").ResolvedExtraContextFile[];
   evalPlan: readonly EvalDefinition[];
   environment: EnvironmentConfig;
 }): Promise<AgentPreparationResult> {

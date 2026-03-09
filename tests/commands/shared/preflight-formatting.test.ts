@@ -1,6 +1,6 @@
 import { ReducePreflightError } from "../../../src/commands/reduce/errors.js";
-import { ReviewPreflightError } from "../../../src/commands/review/errors.js";
-import { RunPreflightError } from "../../../src/commands/run/errors.js";
+import { ReviewPreflightError } from "../../../src/domains/reviews/competition/errors.js";
+import { RunPreflightError } from "../../../src/domains/runs/competition/errors.js";
 
 describe("shared preflight issue formatting", () => {
   it("normalizes multiline issues consistently across run, review, and reduce", () => {

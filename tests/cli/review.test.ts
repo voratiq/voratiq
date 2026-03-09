@@ -21,7 +21,7 @@ import {
   type ReviewCommandOptions,
   runReviewCommand,
 } from "../../src/cli/review.js";
-import { RunNotFoundCliError } from "../../src/commands/errors.js";
+import { RunNotFoundCliError } from "../../src/cli/errors.js";
 import { executeCompetitionWithAdapter } from "../../src/competition/command-adapter.js";
 import { parseReviewRecommendation } from "../../src/domains/reviews/competition/recommendation.js";
 import type { RunRecord } from "../../src/domains/runs/model/types.js";

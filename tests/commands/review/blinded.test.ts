@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { ReviewGenerationFailedError } from "../../../src/commands/review/errors.js";
+import { ReviewGenerationFailedError } from "../../../src/domains/reviews/competition/errors.js";
 import { resolveBlindedRecommendation } from "../../../src/domains/reviews/competition/blinded.js";
 
 describe("blinded review recommendation resolution", () => {
