@@ -1,4 +1,6 @@
+import { constants as fsConstants } from "node:fs";
 import {
+  access,
   chmod,
   mkdir,
   mkdtemp,
@@ -131,7 +133,7 @@ describe("extra-context staging", () => {
   });
 
   it("fails fast when a file is not readable", async () => {
-    if (process.platform === "win32") {
+    if (process.platform === "win32" || process.getuid?.() === 0) {
       return;
     }
 
@@ -141,6 +143,11 @@ describe("extra-context staging", () => {
       const secretPath = join(root, "notes", "secret.txt");
       await writeFile(secretPath, "shh\n", "utf8");
       await chmod(secretPath, 0o000);
+
+      // Some environments still allow reads here due to elevated privileges.
+      await expect(access(secretPath, fsConstants.R_OK)).rejects.toMatchObject({
+        code: expect.stringMatching(/^(EACCES|EPERM)$/),
+      });
 
       let caught: unknown;
       try {
