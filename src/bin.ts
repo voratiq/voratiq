@@ -91,6 +91,16 @@ async function flushPendingHistory(): Promise<void> {
       `[voratiq] Failed to flush spec history buffers: ${(error as Error).message}`,
     );
   }
+  try {
+    const { flushAllReductionRecordBuffers } = await import(
+      "./reductions/records/persistence.js"
+    );
+    await flushAllReductionRecordBuffers();
+  } catch (error) {
+    console.warn(
+      `[voratiq] Failed to flush reduction history buffers: ${(error as Error).message}`,
+    );
+  }
 }
 
 async function terminateActiveRunSafe(
@@ -312,6 +322,7 @@ async function registerCommands(
         "spec",
         "run",
         "review",
+        "reduce",
         "apply",
         "list",
         "prune",
@@ -327,6 +338,7 @@ async function registerCommands(
     program.addCommand((await import("./cli/spec.js")).createSpecCommand());
     program.addCommand((await import("./cli/run.js")).createRunCommand());
     program.addCommand((await import("./cli/review.js")).createReviewCommand());
+    program.addCommand((await import("./cli/reduce.js")).createReduceCommand());
     program.addCommand((await import("./cli/apply.js")).createApplyCommand());
     program.addCommand((await import("./cli/list.js")).createListCommand());
     program.addCommand((await import("./cli/prune.js")).createPruneCommand());
@@ -349,6 +361,11 @@ async function registerCommands(
     case "review":
       program.addCommand(
         (await import("./cli/review.js")).createReviewCommand(),
+      );
+      break;
+    case "reduce":
+      program.addCommand(
+        (await import("./cli/reduce.js")).createReduceCommand(),
       );
       break;
     case "auto":

@@ -22,6 +22,7 @@ import {
 } from "../../utils/path.js";
 import { slugify } from "../../utils/slug.js";
 import { getSpecsDirectoryPath } from "../../workspace/structure.js";
+import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
@@ -45,6 +46,7 @@ export interface ExecuteSpecCommandInput {
   maxParallel?: number;
   title?: string;
   outputPath?: string;
+  extraContextFiles?: readonly ResolvedExtraContextFile[];
   onStatus?: (message: string) => void;
 }
 
@@ -68,6 +70,7 @@ export async function executeSpecCommand(
     maxParallel: requestedMaxParallel,
     title: providedTitle,
     outputPath: customOutputPath,
+    extraContextFiles = [],
     onStatus,
   } = input;
 
@@ -134,6 +137,10 @@ export async function executeSpecCommand(
     sessionId,
     createdAt,
     status: "drafting",
+    extraContext:
+      extraContextFiles.length > 0
+        ? extraContextFiles.map((file) => file.displayPath)
+        : undefined,
     agentId: agent.id,
     title,
     slug,
@@ -160,6 +167,7 @@ export async function executeSpecCommand(
         description,
         specTitle,
         environment,
+        extraContextFiles,
       }),
     });
 

@@ -15,12 +15,14 @@ import {
 } from "../../src/workspace/layout.js";
 import {
   getAgentArtifactsDirectoryPath,
+  getAgentContextDirectoryPath,
   getAgentManifestPath,
   getAgentReviewPath,
   getAgentRuntimeDirectoryPath,
   getAgentSandboxDirectoryPath,
   getAgentSandboxHomePath,
   getAgentSandboxSettingsPath,
+  getAgentSessionContextDirectoryPath,
   getAgentSessionWorkspaceDirectoryPath,
   getAgentStderrPath,
   getAgentStdoutPath,
@@ -39,6 +41,7 @@ const ARTIFACT_BUILDERS: Record<
 > = {
   artifactsPath: (runId, agentId) =>
     getAgentArtifactsDirectoryPath(runId, agentId),
+  contextPath: (runId, agentId) => getAgentContextDirectoryPath(runId, agentId),
   stdoutPath: (runId, agentId) => getAgentStdoutPath(runId, agentId),
   stderrPath: (runId, agentId) => getAgentStderrPath(runId, agentId),
   reviewPath: (runId, agentId) => getAgentReviewPath(runId, agentId),
@@ -56,6 +59,7 @@ const SCAFFOLD_FILE_KEYS: ArtifactKey[] = ["stdoutPath", "stderrPath"];
 
 const SCAFFOLD_DIR_KEYS: ArtifactKey[] = [
   "artifactsPath",
+  "contextPath",
   "workspacePath",
   "runtimePath",
   "sandboxPath",
@@ -82,6 +86,7 @@ describe("workspace layout helpers", () => {
 
     expect(paths.agentRoot).toBe(join(runRoot, agentId));
     expect(paths.workspacePath).toBe(join(runRoot, agentId, WORKSPACE_DIRNAME));
+    expect(paths.contextPath).toBe(join(runRoot, agentId, "context"));
     expect(paths.stdoutPath).toBe(
       join(runRoot, agentId, "artifacts", "stdout.log"),
     );
@@ -94,6 +99,9 @@ describe("workspace layout helpers", () => {
 
     expect(relativeDisplay(paths.workspacePath)).toBe(
       getAgentWorkspaceDirectoryPath(runId, agentId),
+    );
+    expect(relativeDisplay(paths.contextPath)).toBe(
+      getAgentContextDirectoryPath(runId, agentId),
     );
     expect(relativeDisplay(paths.stdoutPath)).toBe(
       getAgentStdoutPath(runId, agentId),
@@ -118,12 +126,16 @@ describe("workspace layout helpers", () => {
     expect(paths.workspacePath).toBe(
       join(sessionRoot, agentId, WORKSPACE_DIRNAME),
     );
+    expect(paths.contextPath).toBe(join(sessionRoot, agentId, "context"));
 
     const relativeDisplay = (absolutePath: string) =>
       normalizePathForDisplay(relativeToRoot(root, absolutePath));
 
     expect(relativeDisplay(paths.workspacePath)).toBe(
       getAgentSessionWorkspaceDirectoryPath(domain, sessionId, agentId),
+    );
+    expect(relativeDisplay(paths.contextPath)).toBe(
+      getAgentSessionContextDirectoryPath(domain, sessionId, agentId),
     );
   });
 

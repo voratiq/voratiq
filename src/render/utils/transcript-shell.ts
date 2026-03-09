@@ -32,10 +32,11 @@ interface BadgeStyle {
   padding?: number;
 }
 
-export type TranscriptBadgeVariant = "run" | "review" | "agent";
+export type TranscriptBadgeVariant = "run" | "review" | "reduce" | "agent";
 
 const BRAND_COLOR = "164;203;153";
 const REVIEW_COLOR = "255;238;140";
+const REDUCE_COLOR = "226;159;115";
 
 const BADGE_STYLES: Record<TranscriptBadgeVariant, BadgeStyle> = {
   run: {
@@ -46,6 +47,11 @@ const BADGE_STYLES: Record<TranscriptBadgeVariant, BadgeStyle> = {
   review: {
     foreground: `${ESC}38;2;0;0;0m`,
     background: `${ESC}48;2;${REVIEW_COLOR}m`,
+    bold: true,
+  },
+  reduce: {
+    foreground: `${ESC}38;2;0;0;0m`,
+    background: `${ESC}48;2;${REDUCE_COLOR}m`,
     bold: true,
   },
   agent: {

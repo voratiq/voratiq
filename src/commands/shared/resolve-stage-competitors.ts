@@ -21,7 +21,7 @@ import {
 
 export interface ResolveStageCompetitorsInput {
   root: string;
-  stageId: OrchestrationStageId;
+  stageId: OperatorCompetitorStageId;
   cliAgentIds?: readonly string[];
   cliOverrideFlag?: string;
   profileName?: string;
@@ -37,6 +37,7 @@ export interface CompetitionPlan {
 }
 
 export type StageCompetitorResolution = CompetitionPlan;
+export type OperatorCompetitorStageId = OrchestrationStageId | "reduce";
 
 const ORCHESTRATION_CONFIG_DISPLAY_PATH = VORATIQ_ORCHESTRATION_FILE;
 const DEFAULT_PROFILE_NAME = "default";
@@ -74,7 +75,7 @@ export function resolveStageCompetitors(
   const resolvedAgentIds =
     source === "cli"
       ? normalizedCliAgentIds
-      : (selectedProfile?.[stageId].agents.map((agent) => agent.id) ?? []);
+      : getProfileAgentIds(selectedProfile, stageId);
 
   assertResolvedAgentCount({
     stageId,
@@ -134,7 +135,7 @@ function normalizeAgentIds(agentIds: readonly string[] | undefined): string[] {
 }
 
 function assertNoDuplicateCliAgentIds(
-  stageId: OrchestrationStageId,
+  stageId: OperatorCompetitorStageId,
   cliAgentIds: readonly string[],
   cliOverrideFlag: string,
 ): void {
@@ -160,13 +161,10 @@ function assertNoDuplicateCliAgentIds(
     .sort((left, right) => left.localeCompare(right))
     .map((agentId) => `\`${agentId}\``)
     .join(", ");
-  throw new HintedError(
-    `Duplicate \`${cliOverrideFlag}\` values for stage \`${stageId}\`.`,
-    {
-      detailLines: [`Duplicate agent ids: ${duplicateList}.`],
-      hintLines: [`Pass each \`${cliOverrideFlag}\` value once.`],
-    },
-  );
+  throw new HintedError(duplicateAgentHeadline(stageId, cliOverrideFlag), {
+    detailLines: [`Duplicate agent ids: ${duplicateList}.`],
+    hintLines: [`Pass each \`${cliOverrideFlag}\` value once.`],
+  });
 }
 
 function validateResolvedAgentIds(options: {
@@ -193,24 +191,30 @@ function validateResolvedAgentIds(options: {
 }
 
 function assertResolvedAgentCount(options: {
-  stageId: OrchestrationStageId;
+  stageId: OperatorCompetitorStageId;
   agentIds: readonly string[];
   selectedProfileName: string;
   enforceSingleCompetitor: boolean;
 }): void {
   const { stageId, agentIds, selectedProfileName, enforceSingleCompetitor } =
     options;
-  const stageAgentsPath = `profiles.${selectedProfileName}.${stageId}.agents`;
+  const stageAgentsPath = profileAgentPath(selectedProfileName, stageId);
 
   if (agentIds.length === 0) {
     const configInstruction = enforceSingleCompetitor
       ? `Configure exactly one agent under \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`
       : `Configure at least one agent under \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`;
-    throw new HintedError(`No agents configured for stage \`${stageId}\`.`, {
-      detailLines: [
-        `Checked \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`,
-      ],
-      hintLines: [configInstruction],
+    throw new HintedError(missingAgentsHeadline(stageId), {
+      detailLines:
+        stageId === "reduce"
+          ? []
+          : [
+              `Checked \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`,
+            ],
+      hintLines:
+        stageId === "reduce"
+          ? [configInstruction, "Or pass one or more `--agent` overrides."]
+          : [configInstruction],
     });
   }
 
@@ -218,15 +222,55 @@ function assertResolvedAgentCount(options: {
     return;
   }
 
-  throw new HintedError(
-    `Multiple agents configured for stage \`${stageId}\`.`,
-    {
-      detailLines: [
-        `This command supports one agent for stage \`${stageId}\`.`,
-      ],
-      hintLines: [
-        `Configure exactly one agent under \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`,
-      ],
-    },
-  );
+  throw new HintedError(multipleAgentsHeadline(stageId), {
+    detailLines: [`This command supports one agent for ${stageNoun(stageId)}.`],
+    hintLines: [
+      `Configure exactly one agent under \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`,
+    ],
+  });
+}
+
+function getProfileAgentIds(
+  profile: OrchestrationProfile | undefined,
+  stageId: OperatorCompetitorStageId,
+): string[] {
+  if (!profile) {
+    return [];
+  }
+  if (stageId === "reduce") {
+    return profile.reduce?.agents.map((agent) => agent.id) ?? [];
+  }
+  return profile[stageId].agents.map((agent) => agent.id);
+}
+
+function profileAgentPath(
+  profileName: string,
+  stageId: OperatorCompetitorStageId,
+): string {
+  return `profiles.${profileName}.${stageId}.agents`;
+}
+
+function stageNoun(stageId: OperatorCompetitorStageId): string {
+  return stageId === "reduce" ? "reduce" : `stage \`${stageId}\``;
+}
+
+function duplicateAgentHeadline(
+  stageId: OperatorCompetitorStageId,
+  cliOverrideFlag: string,
+): string {
+  return stageId === "reduce"
+    ? `Duplicate \`${cliOverrideFlag}\` values for reduce.`
+    : `Duplicate \`${cliOverrideFlag}\` values for stage \`${stageId}\`.`;
+}
+
+function missingAgentsHeadline(stageId: OperatorCompetitorStageId): string {
+  return stageId === "reduce"
+    ? "No reducer agents configured."
+    : `No agents configured for stage \`${stageId}\`.`;
+}
+
+function multipleAgentsHeadline(stageId: OperatorCompetitorStageId): string {
+  return stageId === "reduce"
+    ? "Multiple agents configured for reduce."
+    : `Multiple agents configured for stage \`${stageId}\`.`;
 }

@@ -5,6 +5,7 @@ import type { AgentId } from "../configs/agents/types.js";
 import { normalizePathForDisplay, resolvePath } from "../utils/path.js";
 import {
   getAgentSessionArtifactsDirectoryPath,
+  getAgentSessionContextDirectoryPath,
   getAgentSessionDirectoryPath,
   getAgentSessionManifestPath,
   getAgentSessionReviewPath,
@@ -40,6 +41,7 @@ export function formatRunWorkspaceRelative(runId: string): string {
 export interface AgentWorkspacePaths {
   agentRoot: string;
   artifactsPath: string;
+  contextPath: string;
   stdoutPath: string;
   stderrPath: string;
   reviewPath: string;
@@ -96,6 +98,11 @@ const AGENT_WORKSPACE_ARTIFACTS = {
   artifactsPath: {
     getRelativePath: ({ domain, sessionId, agentId }) =>
       getAgentSessionArtifactsDirectoryPath(domain, sessionId, agentId),
+    ensureDir: true,
+  },
+  contextPath: {
+    getRelativePath: ({ domain, sessionId, agentId }) =>
+      getAgentSessionContextDirectoryPath(domain, sessionId, agentId),
     ensureDir: true,
   },
   stdoutPath: {

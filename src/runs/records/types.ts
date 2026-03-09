@@ -216,6 +216,7 @@ export const runRecordSchema = z.object({
   baseRevisionSha: z.string(),
   rootPath: repoRelativePathSchema,
   spec: runSpecDescriptorSchema,
+  extraContext: z.array(repoRelativePathSchema).optional(),
   status: runStatusSchema,
   createdAt: z.string(),
   agents: z.array(agentInvocationRecordSchema),

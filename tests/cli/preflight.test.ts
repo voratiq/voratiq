@@ -39,6 +39,9 @@ describe("CLI Context", () => {
       await fs.promises.mkdir(`${root}/.voratiq/runs/sessions`, {
         recursive: true,
       });
+      await fs.promises.mkdir(`${root}/.voratiq/reductions/sessions`, {
+        recursive: true,
+      });
       await fs.promises.mkdir(`${root}/.voratiq/reviews/sessions`, {
         recursive: true,
       });
@@ -49,6 +52,10 @@ describe("CLI Context", () => {
       await fs.promises.writeFile(
         `${root}/.voratiq/runs/index.json`,
         '{"version":2,"sessions":[]}\n',
+      );
+      await fs.promises.writeFile(
+        `${root}/.voratiq/reductions/index.json`,
+        '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
         `${root}/.voratiq/reviews/index.json`,
@@ -253,6 +260,9 @@ describe("CLI Context", () => {
         "/app/voratiq/.voratiq/runs/index.json": "",
         "/app/voratiq/.voratiq/runs": null,
         "/app/voratiq/.voratiq/runs/sessions": null,
+        "/app/voratiq/.voratiq/reductions/index.json": "",
+        "/app/voratiq/.voratiq/reductions": null,
+        "/app/voratiq/.voratiq/reductions/sessions": null,
         "/app/voratiq/.voratiq/reviews/index.json": "",
         "/app/voratiq/.voratiq/reviews": null,
         "/app/voratiq/.voratiq/reviews/sessions": null,

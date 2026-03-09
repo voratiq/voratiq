@@ -148,6 +148,34 @@ describe("voratiq spec command options", () => {
     expect((received as { maxParallel?: number }).maxParallel).toBe(2);
   });
 
+  it("parses repeatable --extra-context preserving order", async () => {
+    let received: unknown;
+    const specCommand = silenceCommander(createSpecCommand());
+    specCommand.exitOverride().action((options) => {
+      received = options;
+    });
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(specCommand);
+
+    await program.parseAsync([
+      "node",
+      "voratiq",
+      "spec",
+      "--description",
+      "Generate a spec",
+      "--extra-context",
+      "notes/a.md",
+      "--extra-context",
+      "notes/b.json",
+    ]);
+
+    expect((received as { extraContext?: string[] }).extraContext).toEqual([
+      "notes/a.md",
+      "notes/b.json",
+    ]);
+  });
+
   it("does not expose auto-init toggles in help output", () => {
     const help = createSpecCommand().helpInformation();
     expect(help).not.toContain("--auto-init");

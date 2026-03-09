@@ -2,6 +2,7 @@ import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import type { EvalDefinition } from "../../../configs/evals/types.js";
 import type { AgentInvocationRecord } from "../../../runs/records/types.js";
+import type { ResolvedExtraContextFile } from "../../shared/extra-context.js";
 import type { AgentExecutionResult } from "../reports.js";
 import { AgentRunContext } from "./run-context.js";
 import type { RunAgentWorkspacePaths } from "./workspace.js";
@@ -12,6 +13,7 @@ export interface AgentExecutionContext {
   runId: string;
   root: string;
   specContent: string;
+  extraContextFiles: readonly ResolvedExtraContextFile[];
   evalPlan: readonly EvalDefinition[];
   environment: EnvironmentConfig;
 }

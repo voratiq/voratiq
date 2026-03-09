@@ -1,4 +1,8 @@
 import {
+  appendExtraContextPromptSection,
+  type ResolvedExtraContextFile,
+} from "../shared/extra-context.js";
+import {
   appendConstraints,
   appendOutputRequirements,
 } from "../shared/prompt-helpers.js";
@@ -9,11 +13,18 @@ export interface BuildSpecPromptOptions {
   outputPath: string;
   repoRootPath: string;
   workspacePath: string;
+  extraContextFiles?: readonly ResolvedExtraContextFile[];
 }
 
 export function buildSpecPrompt(options: BuildSpecPromptOptions): string {
-  const { description, title, outputPath, repoRootPath, workspacePath } =
-    options;
+  const {
+    description,
+    title,
+    outputPath,
+    repoRootPath,
+    workspacePath,
+    extraContextFiles = [],
+  } = options;
 
   const lines: string[] = [
     "Translate the user description into a concise, repo-grounded Markdown spec.",
@@ -42,6 +53,7 @@ export function buildSpecPrompt(options: BuildSpecPromptOptions): string {
     readAccess: repoRootPath,
     writeAccess: workspacePath,
   });
+  appendExtraContextPromptSection(lines, extraContextFiles);
   appendOutputRequirements(lines, [
     `- Save the full spec to \`${outputPath}\` in the workspace root.`,
   ]);

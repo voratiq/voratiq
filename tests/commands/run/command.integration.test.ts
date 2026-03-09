@@ -15,6 +15,7 @@ import {
   validateAndPrepare,
   type ValidationResult,
 } from "../../../src/commands/run/validation.js";
+import type { ResolvedExtraContextFile } from "../../../src/commands/shared/extra-context.js";
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import {
@@ -864,5 +865,97 @@ describe("executeRunCommand integration", () => {
 
     expect(teardownSessionAuthMock).toHaveBeenCalledTimes(1);
     expect(teardownSessionAuthMock).toHaveBeenCalledWith("run-fail");
+  });
+
+  it("passes staged extra-context references through to agent execution", async () => {
+    generateRunIdMock.mockReturnValue("run-xyz");
+    validateAndPrepareMock.mockResolvedValue({
+      specContent: "Implement feature",
+      baseRevisionSha: "abc123",
+      agents: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+      evalPlan: [],
+      effectiveMaxParallel: 1,
+      environment: {},
+    });
+
+    prepareRunWorkspaceMock.mockResolvedValue({
+      runWorkspace: {
+        absolute: "/tmp/run-workspace",
+        relative: ".voratiq/runs/sessions/run-xyz",
+      },
+    });
+
+    initializeRunRecordMock.mockResolvedValue({
+      initialRecord: {
+        runId: "run-xyz",
+        baseRevisionSha: "abc123",
+        rootPath: ".",
+        spec: { path: "spec.md" },
+        status: "running",
+        createdAt: "2025-11-10T00:00:00.000Z",
+        agents: [],
+        deletedAt: null,
+      },
+      recordPersisted: true,
+    });
+    createAgentRecordMutatorsMock.mockReturnValue({
+      recordAgentQueued: jest.fn(() => Promise.resolve()),
+      recordAgentSnapshot: jest.fn(() => Promise.resolve()),
+    });
+    executeAgentsMock.mockResolvedValue({
+      agentRecords: [],
+      agentReports: [],
+      hadAgentFailure: false,
+      hadEvalFailure: false,
+    } satisfies AgentExecutionPhaseResult);
+    rewriteRunRecordMock.mockResolvedValue({
+      runId: "run-xyz",
+      baseRevisionSha: "abc123",
+      rootPath: ".",
+      spec: { path: "spec.md" },
+      status: "succeeded",
+      createdAt: "2025-11-10T00:00:00.000Z",
+      agents: [],
+    });
+    toRunReportMock.mockReturnValue({
+      runId: "run-xyz",
+      spec: { path: "spec.md" },
+      status: "succeeded",
+      createdAt: "2025-11-10T00:00:00.000Z",
+      baseRevisionSha: "abc123",
+      agents: [],
+      hadAgentFailure: false,
+      hadEvalFailure: false,
+    });
+
+    const extraContextFiles: ResolvedExtraContextFile[] = [
+      {
+        absolutePath: "/repo/notes/a.md",
+        displayPath: "notes/a.md",
+        stagedRelativePath: "../context/a.md",
+      },
+    ];
+
+    await executeRunCommand({
+      root: "/repo",
+      runsFilePath: "/repo/runs.json",
+      specAbsolutePath: "/repo/spec.md",
+      specDisplayPath: "spec.md",
+      extraContextFiles,
+    });
+
+    expect(executeAgentsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extraContextFiles,
+      }),
+    );
   });
 });

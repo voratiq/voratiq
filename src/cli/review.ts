@@ -13,6 +13,7 @@ import {
   readReviewRecommendation,
   type ReviewRecommendation,
 } from "../commands/review/recommendation.js";
+import { resolveExtraContextFiles } from "../commands/shared/extra-context.js";
 import { buildMarkdownPreviewLines } from "../commands/shared/preview.js";
 import {
   ensureSandboxDependencies,
@@ -41,6 +42,7 @@ export interface ReviewCommandOptions {
   agentOverrideFlag?: string;
   profile?: string;
   maxParallel?: number;
+  extraContext?: string[];
   suppressHint?: boolean;
   suppressLeadingBlankLine?: boolean;
   suppressTrailingBlankLine?: boolean;
@@ -64,6 +66,7 @@ export async function runReviewCommand(
     agentOverrideFlag,
     profile,
     maxParallel,
+    extraContext,
     suppressHint,
     suppressLeadingBlankLine,
     suppressTrailingBlankLine,
@@ -74,6 +77,10 @@ export async function runReviewCommand(
   const { root, workspacePaths } = await resolveCliContext();
   checkPlatformSupport();
   ensureSandboxDependencies();
+  const extraContextFiles = await resolveExtraContextFiles({
+    root,
+    paths: extraContext,
+  });
 
   const startLine = createStageStartLineEmitter((message) => {
     writeOutput({
@@ -98,6 +105,7 @@ export async function runReviewCommand(
     agentOverrideFlag,
     profileName: profile,
     maxParallel,
+    extraContextFiles,
     renderer,
   });
 
@@ -349,9 +357,17 @@ interface ReviewCommandActionOptions {
   agent?: string[];
   profile?: string;
   maxParallel?: number;
+  extraContext?: string[];
 }
 
 function collectAgentOption(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
+function collectExtraContextOption(
+  value: string,
+  previous: string[],
+): string[] {
   return [...previous, value];
 }
 
@@ -381,6 +397,14 @@ export function createReviewCommand(): Command {
       "Max concurrent reviewers (default: all)",
       parseMaxParallelOption,
     )
+    .addOption(
+      new Option(
+        "--extra-context <path>",
+        "Stage an extra context file into each reviewer workspace (repeatable)",
+      )
+        .default([], "")
+        .argParser(collectExtraContextOption),
+    )
     .allowExcessArguments(false)
     .action(async (options: ReviewCommandActionOptions) => {
       const result = await runReviewCommand({
@@ -388,6 +412,7 @@ export function createReviewCommand(): Command {
         agentIds: options.agent,
         profile: options.profile,
         maxParallel: options.maxParallel,
+        extraContext: options.extraContext,
       });
 
       writeCommandOutput({

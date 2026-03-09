@@ -88,21 +88,34 @@ function validateStageAgentReferences(
     for (const stageId of ORCHESTRATION_STAGE_IDS) {
       const stage = profile[stageId];
       for (const stageAgent of stage.agents) {
-        const matchingAgent = agentsById.get(stageAgent.id);
-
-        if (!matchingAgent) {
-          throw new OrchestrationSchemaValidationError(
-            `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: Agent ${formatAgentId(stageAgent.id)} is not defined in \`agents.yaml\`.`,
-          );
-        }
-
-        if (matchingAgent.enabled === false) {
-          throw new OrchestrationSchemaValidationError(
-            `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: Agent ${formatAgentId(stageAgent.id)} is disabled in \`agents.yaml\`.`,
-          );
-        }
+        assertAgentEnabled(stageAgent.id, agentsById);
       }
     }
+    const reduction = profile.reduce;
+    if (reduction) {
+      for (const stageAgent of reduction.agents) {
+        assertAgentEnabled(stageAgent.id, agentsById);
+      }
+    }
+  }
+}
+
+function assertAgentEnabled(
+  agentId: string,
+  agentsById: Map<string, { enabled: boolean }>,
+): void {
+  const matchingAgent = agentsById.get(agentId);
+
+  if (!matchingAgent) {
+    throw new OrchestrationSchemaValidationError(
+      `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: Agent ${formatAgentId(agentId)} is not defined in \`agents.yaml\`.`,
+    );
+  }
+
+  if (matchingAgent.enabled === false) {
+    throw new OrchestrationSchemaValidationError(
+      `${DEFAULT_ORCHESTRATION_ERROR_CONTEXT}: Agent ${formatAgentId(agentId)} is disabled in \`agents.yaml\`.`,
+    );
   }
 }
 

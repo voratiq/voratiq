@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { verifyAgentProviders } from "../../../src/agents/runtime/auth.js";
 import { executeReviewCommand } from "../../../src/commands/review/command.js";
+import * as reviewAdapter from "../../../src/commands/review/competition-adapter.js";
 import { ReviewPreflightError } from "../../../src/commands/review/errors.js";
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../../../src/commands/shared/session-id.js";
@@ -118,6 +119,76 @@ describe("executeReviewCommand integration", () => {
       missingArtifacts: [],
     });
     expect(result.reviews).toHaveLength(1);
+  });
+
+  it("passes staged extra-context references into the review adapter", async () => {
+    const createAdapterSpy = jest.spyOn(
+      reviewAdapter,
+      "createReviewCompetitionAdapter",
+    );
+
+    fetchRunsSafelyMock.mockResolvedValue({
+      records: [{ runId: "run-123" }],
+    } as Awaited<ReturnType<typeof fetchRunsSafely>>);
+    buildRunRecordViewMock.mockResolvedValue({
+      runId: "run-123",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      status: "succeeded",
+      baseRevisionSha: "abc123",
+      rootPath: ".",
+      spec: { path: "spec.md" },
+      agents: [],
+    });
+
+    resolveStageCompetitorsMock.mockReturnValue({
+      source: "cli",
+      agentIds: ["reviewer"],
+      competitors: [
+        {
+          id: "reviewer",
+          provider: "codex",
+          model: "gpt-5",
+          binary: "node",
+          argv: [],
+        },
+      ],
+    });
+    loadEnvironmentConfigMock.mockReturnValue({});
+
+    generateSessionIdMock.mockReturnValue("review-123");
+    executeCompetitionWithAdapterMock.mockResolvedValue([
+      {
+        agentId: "reviewer",
+        outputPath:
+          ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
+        status: "succeeded",
+        missingArtifacts: [],
+      },
+    ]);
+
+    const extraContextFiles = [
+      {
+        absolutePath: "/repo/notes/a.md",
+        displayPath: "notes/a.md",
+        stagedRelativePath: "../context/a.md",
+      },
+    ];
+
+    await executeReviewCommand({
+      root: "/repo",
+      runsFilePath: "/repo/.voratiq/runs/index.json",
+      reviewsFilePath: "/repo/.voratiq/reviews/index.json",
+      runId: "run-123",
+      extraContextFiles,
+    });
+
+    expect(createAdapterSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extraContextFiles,
+      }),
+    );
+
+    createAdapterSpy.mockRestore();
   });
 
   it("clamps max-parallel to resolved reviewer count and preserves reviewer order", async () => {

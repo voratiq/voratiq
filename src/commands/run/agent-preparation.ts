@@ -14,6 +14,7 @@ export async function prepareAgents(options: {
   runId: string;
   root: string;
   specContent: string;
+  extraContextFiles: readonly import("../shared/extra-context.js").ResolvedExtraContextFile[];
   evalPlan: readonly EvalDefinition[];
   environment: EnvironmentConfig;
 }): Promise<AgentPreparationResult> {
@@ -23,6 +24,7 @@ export async function prepareAgents(options: {
     runId,
     root,
     specContent,
+    extraContextFiles,
     evalPlan,
     environment,
   } = options;
@@ -37,6 +39,7 @@ export async function prepareAgents(options: {
       runId,
       root,
       specContent,
+      extraContextFiles,
       evalPlan,
       environment,
     });

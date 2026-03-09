@@ -6,6 +6,7 @@ import type { AgentDefinition } from "../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
 import type { EvalDefinition } from "../../configs/evals/types.js";
 import type { AgentRecordMutators } from "../../runs/records/mutators.js";
+import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
 import { prepareAgents } from "./agent-preparation.js";
 import { runPreparedAgent } from "./agents/lifecycle.js";
 import type { PreparedAgentExecution } from "./agents/types.js";
@@ -16,6 +17,7 @@ export interface CreateRunCompetitionAdapterInput {
   readonly runId: string;
   readonly root: string;
   readonly specContent: string;
+  readonly extraContextFiles?: readonly ResolvedExtraContextFile[];
   readonly evalPlan: readonly EvalDefinition[];
   readonly mutators: AgentRecordMutators;
   readonly environment: EnvironmentConfig;
@@ -28,6 +30,7 @@ interface RunCompetitionAdapterDependencies {
     runId: string;
     root: string;
     specContent: string;
+    extraContextFiles: readonly ResolvedExtraContextFile[];
     evalPlan: readonly EvalDefinition[];
     environment: EnvironmentConfig;
   }) => Promise<
@@ -51,6 +54,7 @@ export function createRunCompetitionAdapter(
     runId,
     root,
     specContent,
+    extraContextFiles = [],
     evalPlan,
     mutators,
     environment,
@@ -73,6 +77,7 @@ export function createRunCompetitionAdapter(
         runId,
         root,
         specContent,
+        extraContextFiles,
         evalPlan,
         environment,
       }),

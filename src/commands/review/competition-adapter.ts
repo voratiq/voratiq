@@ -50,6 +50,10 @@ import {
   VORATIQ_REVIEWS_FILE,
   VORATIQ_REVIEWS_SESSIONS_DIR,
 } from "../../workspace/structure.js";
+import {
+  type ResolvedExtraContextFile,
+  stageExtraContextFiles,
+} from "../shared/extra-context.js";
 import { pruneWorkspace } from "../shared/prune.js";
 import { resolveBlindedRecommendation } from "./blinded.js";
 import { resolveEligibleReviewCandidateAgents } from "./eligibility.js";
@@ -122,6 +126,7 @@ export interface CreateReviewCompetitionAdapterInput {
   readonly reviewsFilePath: string;
   readonly run: RunRecordEnhanced;
   readonly environment: EnvironmentConfig;
+  readonly extraContextFiles?: readonly ResolvedExtraContextFile[];
   readonly renderer?: ReviewProgressRenderer;
 }
 
@@ -139,6 +144,7 @@ export function createReviewCompetitionAdapter(
     reviewsFilePath,
     run,
     environment,
+    extraContextFiles = [],
     renderer,
   } = input;
 
@@ -181,6 +187,10 @@ export function createReviewCompetitionAdapter(
           runId: run.runId,
           createdAt,
           status: "running",
+          extraContext:
+            extraContextFiles.length > 0
+              ? extraContextFiles.map((file) => file.displayPath)
+              : undefined,
           reviewers: candidates.map((candidate) => ({
             agentId: candidate.id,
             status: "running",
@@ -219,6 +229,10 @@ export function createReviewCompetitionAdapter(
           await attachSharedInputsToReviewerWorkspace({
             workspacePath: workspacePaths.workspacePath,
             sharedInputsAbsolute: sharedInputs.sharedInputsAbsolute,
+          });
+          await stageExtraContextFiles({
+            contextPath: workspacePaths.contextPath,
+            files: extraContextFiles,
           });
 
           const blinded = buildReviewerBlindedPreparation({
@@ -273,6 +287,7 @@ export function createReviewCompetitionAdapter(
             })),
             repoRootPath: workspacePaths.workspacePath,
             workspacePath: workspacePaths.workspacePath,
+            extraContextFiles,
           });
 
           assertNoCandidateIdentityLeak({

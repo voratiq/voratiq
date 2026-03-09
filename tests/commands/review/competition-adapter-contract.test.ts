@@ -171,6 +171,7 @@ function toWorkspacePaths(id: string): AgentWorkspacePaths {
   return {
     agentRoot: base,
     artifactsPath: `${base}/artifacts`,
+    contextPath: `${base}/context`,
     stdoutPath: `${base}/artifacts/stdout.log`,
     stderrPath: `${base}/artifacts/stderr.log`,
     reviewPath: `${base}/artifacts/review.md`,

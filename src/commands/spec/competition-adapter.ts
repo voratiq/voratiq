@@ -19,6 +19,10 @@ import {
 } from "../../workspace/layout.js";
 import { promoteWorkspaceFile } from "../../workspace/promotion.js";
 import { VORATIQ_SPECS_DIR } from "../../workspace/structure.js";
+import {
+  type ResolvedExtraContextFile,
+  stageExtraContextFiles,
+} from "../shared/extra-context.js";
 import { pruneWorkspace } from "../shared/prune.js";
 import { buildSpecPrompt } from "./prompt.js";
 
@@ -45,6 +49,7 @@ export interface CreateSpecCompetitionAdapterInput {
   readonly description: string;
   readonly specTitle?: string;
   readonly environment: EnvironmentConfig;
+  readonly extraContextFiles?: readonly ResolvedExtraContextFile[];
 }
 
 export function createSpecCompetitionAdapter(
@@ -54,7 +59,14 @@ export function createSpecCompetitionAdapter(
   PreparedSpecCompetitionCandidate,
   SpecCompetitionExecution
 > {
-  const { root, sessionId, description, specTitle, environment } = input;
+  const {
+    root,
+    sessionId,
+    description,
+    specTitle,
+    environment,
+    extraContextFiles = [],
+  } = input;
 
   const workspacesToPrune = new Set<string>();
 
@@ -81,6 +93,10 @@ export function createSpecCompetitionAdapter(
 
         try {
           await scaffoldAgentWorkspace(workspacePaths);
+          await stageExtraContextFiles({
+            contextPath: workspacePaths.contextPath,
+            files: extraContextFiles,
+          });
 
           const prompt = buildSpecPrompt({
             description,
@@ -88,6 +104,7 @@ export function createSpecCompetitionAdapter(
             outputPath: SPEC_ARTIFACT_FILENAME,
             repoRootPath: root,
             workspacePath: workspacePaths.workspacePath,
+            extraContextFiles,
           });
 
           ready.push({

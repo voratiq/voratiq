@@ -16,6 +16,7 @@ import {
   VORATIQ_REVIEWS_SESSIONS_DIR,
 } from "../../workspace/structure.js";
 import { RunNotFoundCliError } from "../errors.js";
+import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
@@ -40,6 +41,7 @@ export interface ReviewCommandInput {
   agentOverrideFlag?: string;
   profileName?: string;
   maxParallel?: number;
+  extraContextFiles?: readonly ResolvedExtraContextFile[];
   renderer?: ReviewProgressRenderer;
 }
 
@@ -64,6 +66,7 @@ export async function executeReviewCommand(
     agentOverrideFlag,
     profileName,
     maxParallel: requestedMaxParallel,
+    extraContextFiles = [],
     renderer,
   } = input;
 
@@ -140,6 +143,7 @@ export async function executeReviewCommand(
         reviewsFilePath,
         run: enhanced,
         environment,
+        extraContextFiles,
         renderer,
       }),
     });

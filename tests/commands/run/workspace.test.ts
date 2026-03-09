@@ -87,6 +87,7 @@ describe("collectAgentArtifacts", () => {
     workspacePaths = {
       agentRoot: join(repoRoot, "agent"),
       artifactsPath,
+      contextPath: join(repoRoot, "agent", "context"),
       stdoutPath: join(artifactsPath, "stdout.log"),
       stderrPath: join(artifactsPath, "stderr.log"),
       reviewPath: join(artifactsPath, "review.md"),

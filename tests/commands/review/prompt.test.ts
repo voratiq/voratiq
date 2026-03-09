@@ -56,4 +56,38 @@ describe("review prompt generation", () => {
       result.prompt.indexOf("  - r_bbbbbbbbbb"),
     );
   });
+
+  it("lists staged extra-context files when provided", () => {
+    const result = buildReviewPrompt({
+      runId: "run-1",
+      runStatus: "succeeded",
+      specPath: ".voratiq/specs/spec.md",
+      baseRevisionSha: "deadbeef",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      artifactInfoPath: "review-artifact-info.json",
+      outputPath: "review.md",
+      baseSnapshotPath: ".voratiq/reviews/sessions/review-1/reviewer/base",
+      candidates: [
+        {
+          candidateId: "r_aaaaaaaaaa",
+          diffPath: "inputs/candidates/r_a/diff.patch",
+        },
+      ],
+      repoRootPath: "/repo",
+      workspacePath:
+        "/repo/.voratiq/reviews/sessions/review-1/reviewer/workspace",
+      extraContextFiles: [
+        {
+          absolutePath: "/repo/notes/a.md",
+          displayPath: "notes/a.md",
+          stagedRelativePath: "../context/a.md",
+        },
+      ],
+    });
+
+    expect(result.prompt).toContain(
+      "Extra context files (staged alongside the workspace):",
+    );
+    expect(result.prompt).toContain("`../context/a.md` (source: `notes/a.md`)");
+  });
 });

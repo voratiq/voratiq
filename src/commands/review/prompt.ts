@@ -1,4 +1,8 @@
 import {
+  appendExtraContextPromptSection,
+  type ResolvedExtraContextFile,
+} from "../shared/extra-context.js";
+import {
   appendConstraints,
   appendOutputRequirements,
 } from "../shared/prompt-helpers.js";
@@ -19,6 +23,7 @@ export interface BuildReviewPromptOptions {
   }>;
   repoRootPath: string;
   workspacePath: string;
+  extraContextFiles?: readonly ResolvedExtraContextFile[];
 }
 
 export interface ReviewPromptBuildResult {
@@ -38,6 +43,7 @@ export function buildReviewPrompt(
     candidates,
     repoRootPath,
     workspacePath,
+    extraContextFiles = [],
   } = options;
 
   const sortedCandidates = [...candidates].sort((left, right) =>
@@ -165,6 +171,7 @@ export function buildReviewPrompt(
     readAccess: repoRootPath,
     writeAccess: workspacePath,
   });
+  appendExtraContextPromptSection(lines, extraContextFiles);
   appendOutputRequirements(lines, [
     `- Save the full review to \`${outputPath}\` in the workspace root.`,
     "- Save the machine-readable recommendation to `recommendation.json` in the workspace root.",
