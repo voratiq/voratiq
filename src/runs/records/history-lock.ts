@@ -1,4 +1,4 @@
-import { SessionHistoryLockTimeoutError } from "../../sessions/errors.js";
+import { SessionHistoryLockTimeoutError } from "../../persistence/errors.js";
 import {
   acquireHistoryLock as acquireSessionHistoryLock,
   type AcquireHistoryLockOptions,
@@ -9,7 +9,7 @@ import {
   type HistoryLockMetadata,
   type HistoryLockStalenessResult,
   readHistoryLockInfo,
-} from "../../sessions/history-lock.js";
+} from "../../persistence/history-lock.js";
 import { RunHistoryLockTimeoutError } from "./errors.js";
 
 export type {
@@ -26,7 +26,7 @@ export {
 };
 
 // Retained only for callers that still use the historical run-owned path.
-// Shared session lock ownership lives under src/sessions/history-lock.ts.
+// Shared persistence lock ownership lives under src/persistence/history-lock.ts.
 export async function acquireHistoryLock(
   lockPath: string,
   options: AcquireHistoryLockOptions = {},

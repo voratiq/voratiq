@@ -5,8 +5,8 @@ import { evalSlugSchema, evalStatusSchema } from "../../configs/evals/types.js";
 import {
   extraContextMetadataEntrySchema,
   persistedExtraContextPathSchema,
-} from "../../sessions/extra-context.js";
-import { repoRelativeRecordPathSchema } from "../../sessions/record-path-schema.js";
+} from "../../persistence/extra-context.js";
+import { repoRelativeRecordPathSchema } from "../../persistence/record-path-schema.js";
 import {
   type AgentStatus,
   agentStatusSchema,

@@ -5,16 +5,16 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 
-import { RunHistoryLockTimeoutError } from "../../src/runs/records/errors.js";
-import { acquireHistoryLock as acquireRunHistoryLock } from "../../src/runs/records/history-lock.js";
-import { HISTORY_LOCK_STALE_GRACE_MS } from "../../src/runs/records/persistence.js";
-import { SessionHistoryLockTimeoutError } from "../../src/sessions/errors.js";
+import { SessionHistoryLockTimeoutError } from "../../src/persistence/errors.js";
 import {
   createHistoryLockMetadata,
   detectStaleHistoryLock,
   type HistoryLockMetadata,
-} from "../../src/sessions/history-lock.js";
-import { acquireHistoryLock } from "../../src/sessions/history-lock.js";
+} from "../../src/persistence/history-lock.js";
+import { acquireHistoryLock } from "../../src/persistence/history-lock.js";
+import { RunHistoryLockTimeoutError } from "../../src/runs/records/errors.js";
+import { acquireHistoryLock as acquireRunHistoryLock } from "../../src/runs/records/history-lock.js";
+import { HISTORY_LOCK_STALE_GRACE_MS } from "../../src/runs/records/persistence.js";
 
 describe("history locks", () => {
   let tempDir: string;

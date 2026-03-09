@@ -1,16 +1,16 @@
 import { dirname, join } from "node:path";
 
-import { SessionRecordParseError } from "../../sessions/errors.js";
-import { acquireHistoryLock } from "../../sessions/history-lock.js";
+import { SessionRecordParseError } from "../../persistence/errors.js";
+import { acquireHistoryLock } from "../../persistence/history-lock.js";
 import {
   createSessionPersistence,
   type SessionPersistencePaths,
   type SessionRecordWarning,
-} from "../../sessions/persistence.js";
+} from "../../persistence/persistence.js";
 import {
   mapSessionPersistenceError,
   sessionPersistenceErrorMapper,
-} from "../../sessions/persistence-errors.js";
+} from "../../persistence/persistence-errors.js";
 import type { ReviewIndexEntry, ReviewRecord, ReviewStatus } from "./types.js";
 import { reviewRecordSchema, TERMINAL_REVIEW_STATUSES } from "./types.js";
 

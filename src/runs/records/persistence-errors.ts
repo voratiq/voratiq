@@ -1,4 +1,4 @@
-import { type SessionPersistenceErrorMapper } from "../../sessions/persistence-errors.js";
+import { type SessionPersistenceErrorMapper } from "../../persistence/persistence-errors.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import {
   RunHistoryLockTimeoutError,

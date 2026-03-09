@@ -1,13 +1,13 @@
 import { dirname, join } from "node:path";
 
-import { SessionRecordParseError } from "../../sessions/errors.js";
-import { acquireHistoryLock } from "../../sessions/history-lock.js";
+import { SessionRecordParseError } from "../../persistence/errors.js";
+import { acquireHistoryLock } from "../../persistence/history-lock.js";
 import {
   createSessionPersistence,
   type SessionPersistencePaths,
   type SessionRecordWarning,
-} from "../../sessions/persistence.js";
-import { mapSessionPersistenceError } from "../../sessions/persistence-errors.js";
+} from "../../persistence/persistence.js";
+import { mapSessionPersistenceError } from "../../persistence/persistence-errors.js";
 import { assertTestHookRegistrationEnabled } from "../../testing/test-hooks.js";
 import { isFileSystemError } from "../../utils/fs.js";
 import { RunRecordNotFoundError, RunRecordParseError } from "./errors.js";
@@ -19,7 +19,7 @@ import {
   runRecordSchema,
 } from "./types.js";
 
-export { HISTORY_LOCK_STALE_GRACE_MS } from "../../sessions/history-lock.js";
+export { HISTORY_LOCK_STALE_GRACE_MS } from "../../persistence/history-lock.js";
 
 export type RunRecordPredicate = (record: RunRecord) => boolean;
 

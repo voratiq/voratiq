@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { createSessionPersistence } from "../../src/sessions/persistence.js";
+import { createSessionPersistence } from "../../src/persistence/persistence.js";
 
 type TestStatus = "running" | "done";
 
