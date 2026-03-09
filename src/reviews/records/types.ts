@@ -2,6 +2,10 @@ import { z } from "zod";
 
 import { agentIdSchema } from "../../configs/agents/types.js";
 import {
+  extraContextMetadataEntrySchema,
+  persistedExtraContextPathSchema,
+} from "../../records/extra-context.js";
+import {
   type ReviewStatus,
   reviewStatusSchema,
   TERMINAL_REVIEW_STATUSES,
@@ -49,7 +53,8 @@ export const reviewRecordSchema = z.object({
   createdAt: z.string(),
   completedAt: z.string().optional(),
   status: reviewStatusSchema,
-  extraContext: z.array(repoRelativePathSchema).optional(),
+  extraContext: z.array(persistedExtraContextPathSchema).optional(),
+  extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),
   reviewers: z
     .array(reviewRecordReviewerSchema)
     .min(1)

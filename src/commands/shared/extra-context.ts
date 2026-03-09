@@ -4,8 +4,13 @@ import { basename, dirname, extname, join } from "node:path";
 import { isAbsolute } from "node:path";
 
 import { CliError } from "../../cli/errors.js";
+import {
+  EXTRA_CONTEXT_STAGED_PREFIX,
+  toExtraContextContextSubpath,
+} from "../../extra-context/contract.js";
 import { isFileSystemError } from "../../utils/fs.js";
 import {
+  assertPathWithinRoot,
   normalizePathForDisplay,
   relativeToRoot,
   resolvePath,
@@ -83,9 +88,7 @@ export async function resolveExtraContextFiles(options: {
       throw error;
     }
 
-    const displayPath = normalizePathForDisplay(
-      relativeToRoot(root, absolutePath),
-    );
+    const displayPath = resolveExtraContextDisplayPath(root, absolutePath);
     const originalBasename = basename(absolutePath);
     const allocatedBasename = allocateContextBasename(
       originalBasename,
@@ -94,7 +97,7 @@ export async function resolveExtraContextFiles(options: {
     resolved.push({
       absolutePath,
       displayPath,
-      stagedRelativePath: join("..", "context", allocatedBasename),
+      stagedRelativePath: `${EXTRA_CONTEXT_STAGED_PREFIX}${allocatedBasename}`,
     });
   }
 
@@ -159,5 +162,17 @@ function resolveStagedDestinationPath(options: {
   stagedRelativePath: string;
 }): string {
   const { contextPath, stagedRelativePath } = options;
-  return join(contextPath, basename(stagedRelativePath));
+  return join(contextPath, toExtraContextContextSubpath(stagedRelativePath));
+}
+
+function resolveExtraContextDisplayPath(
+  root: string,
+  absolutePath: string,
+): string {
+  try {
+    assertPathWithinRoot(root, absolutePath);
+    return normalizePathForDisplay(relativeToRoot(root, absolutePath));
+  } catch {
+    return normalizePathForDisplay(absolutePath);
+  }
 }

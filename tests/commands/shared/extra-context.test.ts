@@ -97,6 +97,41 @@ describe("extra-context staging", () => {
     }
   });
 
+  it("accepts readable files outside the repo and preserves source provenance separately", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-extra-context-root-"));
+    const external = await mkdtemp(
+      join(tmpdir(), "voratiq-extra-context-external-"),
+    );
+    try {
+      const externalFilePath = join(external, "carry-forward.md");
+      await writeFile(externalFilePath, "External\n", "utf8");
+
+      const files = await resolveExtraContextFiles({
+        root,
+        paths: [externalFilePath],
+      });
+
+      expect(files).toEqual([
+        {
+          absolutePath: externalFilePath,
+          displayPath: externalFilePath,
+          stagedRelativePath: "../context/carry-forward.md",
+        },
+      ]);
+
+      const contextPath = join(root, "context");
+      await mkdir(contextPath, { recursive: true });
+      await stageExtraContextFiles({ contextPath, files });
+
+      await expect(
+        readFile(join(contextPath, "carry-forward.md"), "utf8"),
+      ).resolves.toBe("External\n");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      await rm(external, { recursive: true, force: true });
+    }
+  });
+
   it("fails fast when a path does not exist", async () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-extra-context-"));
     try {

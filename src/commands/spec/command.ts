@@ -5,6 +5,7 @@ import { executeCompetitionWithAdapter } from "../../competition/command-adapter
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
+import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import {
   appendSpecRecord,
   finalizeSpecRecord,
@@ -137,14 +138,11 @@ export async function executeSpecCommand(
     sessionId,
     createdAt,
     status: "drafting",
-    extraContext:
-      extraContextFiles.length > 0
-        ? extraContextFiles.map((file) => file.displayPath)
-        : undefined,
     agentId: agent.id,
     title,
     slug,
     outputPath: normalizePathForDisplay(relativeToRoot(root, outputAbsolute)),
+    ...buildPersistedExtraContextFields(extraContextFiles),
   };
 
   await appendSpecRecord({

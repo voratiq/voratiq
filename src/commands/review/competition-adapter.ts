@@ -16,6 +16,7 @@ import type {
 } from "../../competition/command-adapter.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
+import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import type { ReviewProgressRenderer } from "../../render/transcripts/review.js";
 import { emitStageProgressEvent } from "../../render/transcripts/stage-progress.js";
 import { generateBlindedCandidateAlias } from "../../reviews/candidates.js";
@@ -187,10 +188,6 @@ export function createReviewCompetitionAdapter(
           runId: run.runId,
           createdAt,
           status: "running",
-          extraContext:
-            extraContextFiles.length > 0
-              ? extraContextFiles.map((file) => file.displayPath)
-              : undefined,
           reviewers: candidates.map((candidate) => ({
             agentId: candidate.id,
             status: "running",
@@ -204,6 +201,7 @@ export function createReviewCompetitionAdapter(
             enabled: true,
             aliasMap: sharedInputs.aliasMap,
           },
+          ...buildPersistedExtraContextFields(extraContextFiles),
         };
         await appendReviewRecord({
           root,

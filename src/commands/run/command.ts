@@ -1,4 +1,5 @@
 import { teardownSessionAuth } from "../../agents/runtime/registry.js";
+import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import type { RunProgressRenderer } from "../../render/transcripts/run.js";
 import { createAgentRecordMutators } from "../../runs/records/mutators.js";
 import {
@@ -96,10 +97,7 @@ export async function executeRunCommand(
     repoDisplayPath,
     createdAt,
     runRoot,
-    extraContext:
-      extraContextFiles.length > 0
-        ? extraContextFiles.map((file) => file.displayPath)
-        : undefined,
+    ...buildPersistedExtraContextFields(extraContextFiles),
   });
 
   const agentAbortContexts = validation.agents.map((agent) => {

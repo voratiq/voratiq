@@ -957,5 +957,16 @@ describe("executeRunCommand integration", () => {
         extraContextFiles,
       }),
     );
+    expect(initializeRunRecordMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extraContext: ["../context/a.md"],
+        extraContextMetadata: [
+          {
+            stagedPath: "../context/a.md",
+            sourcePath: "notes/a.md",
+          },
+        ],
+      }),
+    );
   });
 });

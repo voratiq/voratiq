@@ -2,6 +2,10 @@ import { z } from "zod";
 
 import { agentIdSchema } from "../../configs/agents/types.js";
 import {
+  extraContextMetadataEntrySchema,
+  persistedExtraContextPathSchema,
+} from "../../records/extra-context.js";
+import {
   type ReductionStatus,
   reductionStatusSchema,
   TERMINAL_REDUCTION_STATUSES,
@@ -61,7 +65,8 @@ export const reductionRecordSchema = z.object({
   createdAt: z.string(),
   completedAt: z.string().optional(),
   status: reductionStatusSchema,
-  extraContext: z.array(repoRelativePathSchema).optional(),
+  extraContext: z.array(persistedExtraContextPathSchema).optional(),
+  extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),
   reducers: z
     .array(reductionRecordReducerSchema)
     .min(1)

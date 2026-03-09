@@ -9,6 +9,7 @@ import type {
 } from "../../competition/command-adapter.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
+import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import {
   readReductionRecords,
   rewriteReductionRecord,
@@ -154,10 +155,6 @@ export function createReduceCompetitionAdapter(
         target,
         createdAt,
         status: "running",
-        extraContext:
-          extraContextFiles.length > 0
-            ? extraContextFiles.map((file) => file.displayPath)
-            : undefined,
         reducers: candidates.map((candidate) => ({
           agentId: candidate.id,
           status: "running",
@@ -172,6 +169,7 @@ export function createReduceCompetitionAdapter(
             reducerAgentId: candidate.id,
           }),
         })),
+        ...buildPersistedExtraContextFields(extraContextFiles),
       };
 
       await rewriteOrAppendReductionRecord({

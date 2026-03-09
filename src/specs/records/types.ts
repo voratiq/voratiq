@@ -2,6 +2,10 @@ import { z } from "zod";
 
 import { agentIdSchema } from "../../configs/agents/types.js";
 import {
+  extraContextMetadataEntrySchema,
+  persistedExtraContextPathSchema,
+} from "../../records/extra-context.js";
+import {
   type SpecRecordStatus,
   specRecordStatusSchema,
   TERMINAL_SPEC_STATUSES,
@@ -32,7 +36,8 @@ export const specRecordSchema = z.object({
   createdAt: z.string(),
   completedAt: z.string().optional(),
   status: specRecordStatusSchema,
-  extraContext: z.array(repoRelativePathSchema).optional(),
+  extraContext: z.array(persistedExtraContextPathSchema).optional(),
+  extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),
   agentId: agentIdSchema,
   title: z.string(),
   slug: z.string(),

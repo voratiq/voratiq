@@ -3,6 +3,10 @@ import { z } from "zod";
 import { agentIdSchema } from "../../configs/agents/types.js";
 import { evalSlugSchema, evalStatusSchema } from "../../configs/evals/types.js";
 import {
+  extraContextMetadataEntrySchema,
+  persistedExtraContextPathSchema,
+} from "../../records/extra-context.js";
+import {
   type AgentStatus,
   agentStatusSchema,
   applyStatusSchema as applyStatusValueSchema,
@@ -216,7 +220,8 @@ export const runRecordSchema = z.object({
   baseRevisionSha: z.string(),
   rootPath: repoRelativePathSchema,
   spec: runSpecDescriptorSchema,
-  extraContext: z.array(repoRelativePathSchema).optional(),
+  extraContext: z.array(persistedExtraContextPathSchema).optional(),
+  extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),
   status: runStatusSchema,
   createdAt: z.string(),
   agents: z.array(agentInvocationRecordSchema),
