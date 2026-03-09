@@ -1,6 +1,8 @@
 import { verifyAgentProviders } from "../../agents/runtime/auth.js";
 import { teardownSessionAuth } from "../../agents/runtime/registry.js";
+import { RunNotFoundCliError } from "../../cli/errors.js";
 import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
+import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
@@ -8,6 +10,12 @@ import {
   createReviewCompetitionAdapter,
   type ReviewCompetitionExecution,
 } from "../../domains/reviews/competition/adapter.js";
+import {
+  ReviewAgentNotFoundError,
+  ReviewError,
+  ReviewGenerationFailedError,
+  ReviewPreflightError,
+} from "../../domains/reviews/competition/errors.js";
 import type { RunRecordEnhanced } from "../../domains/runs/model/enhanced.js";
 import { buildRunRecordView } from "../../domains/runs/model/enhanced.js";
 import { RunRecordNotFoundError } from "../../domains/runs/model/errors.js";
@@ -19,17 +27,9 @@ import {
   resolveWorkspacePath,
   VORATIQ_REVIEWS_SESSIONS_DIR,
 } from "../../workspace/structure.js";
-import { RunNotFoundCliError } from "../../cli/errors.js";
-import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
-import {
-  ReviewAgentNotFoundError,
-  ReviewError,
-  ReviewGenerationFailedError,
-  ReviewPreflightError,
-} from "../../domains/reviews/competition/errors.js";
 import { clearActiveReview, registerActiveReview } from "./lifecycle.js";
 
 export interface ReviewCommandInput {

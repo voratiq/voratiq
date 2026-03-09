@@ -1,7 +1,7 @@
-import type { AgentExecutionResult } from "../../../domains/runs/competition/reports.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import type { EvalDefinition } from "../../../configs/evals/types.js";
+import type { AgentExecutionResult } from "../../../domains/runs/competition/reports.js";
 import { prepareAgentForExecution } from "./agents/preparation.js";
 import type {
   AgentPreparationResult,

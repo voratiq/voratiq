@@ -1,15 +1,15 @@
-import type { AgentExecutionResult } from "../../../domains/runs/competition/reports.js";
-import type { ResolvedExtraContextFile } from "../../../competition/shared/extra-context.js";
 import type {
   CompetitionCommandAdapter,
   CompetitionPreparationResult,
 } from "../../../competition/command-adapter.js";
+import type { ResolvedExtraContextFile } from "../../../competition/shared/extra-context.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import type { EvalDefinition } from "../../../configs/evals/types.js";
 import { prepareAgents } from "../../../domains/runs/competition/agent-preparation.js";
 import { runPreparedAgent } from "../../../domains/runs/competition/agents/lifecycle.js";
 import type { PreparedAgentExecution } from "../../../domains/runs/competition/agents/types.js";
+import type { AgentExecutionResult } from "../../../domains/runs/competition/reports.js";
 import type { AgentRecordMutators } from "../../../domains/runs/model/mutators.js";
 
 export interface CreateRunCompetitionAdapterInput {

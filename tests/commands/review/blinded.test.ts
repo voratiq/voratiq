@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { ReviewGenerationFailedError } from "../../../src/domains/reviews/competition/errors.js";
 import { resolveBlindedRecommendation } from "../../../src/domains/reviews/competition/blinded.js";
+import { ReviewGenerationFailedError } from "../../../src/domains/reviews/competition/errors.js";
 
 describe("blinded review recommendation resolution", () => {
   it("keeps blinded preferred agent and writes resolved canonical id", () => {

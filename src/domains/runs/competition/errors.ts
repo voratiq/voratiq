@@ -1,12 +1,12 @@
 import {
-  DisplayableError,
-  type HintedErrorOptions,
-} from "../../../utils/errors.js";
-import {
   formatPreflightIssueLines,
   PREFLIGHT_HINT,
   type PreflightIssue,
 } from "../../../competition/shared/preflight.js";
+import {
+  DisplayableError,
+  type HintedErrorOptions,
+} from "../../../utils/errors.js";
 
 export type { PreflightIssue } from "../../../competition/shared/preflight.js";
 

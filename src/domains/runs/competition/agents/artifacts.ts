@@ -1,11 +1,11 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { relative } from "node:path";
 
+import type { EnvironmentConfig } from "../../../../configs/environment/types.js";
 import {
   AgentProcessError,
   GitOperationError,
 } from "../../../../domains/runs/competition/errors.js";
-import type { EnvironmentConfig } from "../../../../configs/environment/types.js";
 import { toErrorMessage } from "../../../../utils/errors.js";
 import { isFileSystemError } from "../../../../utils/fs.js";
 import {

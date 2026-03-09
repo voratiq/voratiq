@@ -10,24 +10,24 @@ import { dirname, join } from "node:path";
 
 import { detectAgentProcessFailureDetail } from "../../../agents/runtime/failures.js";
 import { runSandboxedAgent } from "../../../agents/runtime/harness.js";
-import {
-  ReviewGenerationFailedError,
-  ReviewNoEligibleCandidatesError,
-} from "../../../domains/reviews/competition/errors.js";
+import type {
+  CompetitionCommandAdapter,
+  CompetitionPreparationResult,
+} from "../../../competition/command-adapter.js";
 import {
   type ResolvedExtraContextFile,
   stageExtraContextFiles,
 } from "../../../competition/shared/extra-context.js";
 import { pruneWorkspace } from "../../../competition/shared/prune.js";
-import type {
-  CompetitionCommandAdapter,
-  CompetitionPreparationResult,
-} from "../../../competition/command-adapter.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import { generateBlindedCandidateAlias } from "../../../domains/reviews/candidates.js";
 import { resolveBlindedRecommendation } from "../../../domains/reviews/competition/blinded.js";
 import { resolveEligibleReviewCandidateAgents } from "../../../domains/reviews/competition/eligibility.js";
+import {
+  ReviewGenerationFailedError,
+  ReviewNoEligibleCandidatesError,
+} from "../../../domains/reviews/competition/errors.js";
 import { buildBlindedReviewManifest } from "../../../domains/reviews/competition/manifest.js";
 import { validateReviewOutputContract } from "../../../domains/reviews/competition/output-validation.js";
 import { buildReviewPrompt } from "../../../domains/reviews/competition/prompt.js";

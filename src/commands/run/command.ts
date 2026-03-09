@@ -1,5 +1,11 @@
 import { teardownSessionAuth } from "../../agents/runtime/registry.js";
+import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { executeAgents } from "../../domains/runs/competition/agent-execution.js";
+import {
+  RunCommandError,
+  RunProcessStreamError,
+} from "../../domains/runs/competition/errors.js";
+import { toRunReport } from "../../domains/runs/competition/reports.js";
 import { generateRunId } from "../../domains/runs/model/id.js";
 import { createAgentRecordMutators } from "../../domains/runs/model/mutators.js";
 import type {
@@ -21,12 +27,9 @@ import {
   formatRunWorkspaceRelative,
 } from "../../workspace/layout.js";
 import { prepareRunWorkspace } from "../../workspace/run.js";
-import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
-import { RunCommandError, RunProcessStreamError } from "../../domains/runs/competition/errors.js";
 import { clearActiveRun, registerActiveRun } from "./lifecycle.js";
 import { initializeRunRecord } from "./record-init.js";
-import { toRunReport } from "../../domains/runs/competition/reports.js";
 import { validateAndPrepare } from "./validation.js";
 
 export interface RunCommandInput {

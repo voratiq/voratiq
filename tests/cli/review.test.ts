@@ -16,12 +16,12 @@ import { Command } from "commander";
 import { verifyAgentProviders } from "../../src/agents/runtime/auth.js";
 import { runSandboxedAgent } from "../../src/agents/runtime/harness.js";
 import { checkPlatformSupport } from "../../src/agents/runtime/sandbox.js";
+import { RunNotFoundCliError } from "../../src/cli/errors.js";
 import {
   createReviewCommand,
   type ReviewCommandOptions,
   runReviewCommand,
 } from "../../src/cli/review.js";
-import { RunNotFoundCliError } from "../../src/cli/errors.js";
 import { executeCompetitionWithAdapter } from "../../src/competition/command-adapter.js";
 import { parseReviewRecommendation } from "../../src/domains/reviews/competition/recommendation.js";
 import type { RunRecord } from "../../src/domains/runs/model/types.js";

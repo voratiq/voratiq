@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { verifyAgentProviders } from "../../../src/agents/runtime/auth.js";
 import { executeReviewCommand } from "../../../src/commands/review/command.js";
-import { ReviewPreflightError } from "../../../src/domains/reviews/competition/errors.js";
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../../../src/commands/shared/session-id.js";
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
 import { loadEnvironmentConfig } from "../../../src/configs/environment/loader.js";
 import * as reviewAdapter from "../../../src/domains/reviews/competition/adapter.js";
+import { ReviewPreflightError } from "../../../src/domains/reviews/competition/errors.js";
 import { buildRunRecordView } from "../../../src/domains/runs/model/enhanced.js";
 import { fetchRunsSafely } from "../../../src/domains/runs/persistence/adapter.js";
 

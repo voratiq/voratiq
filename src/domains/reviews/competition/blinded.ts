@@ -1,5 +1,5 @@
-import { ReviewGenerationFailedError } from "../../../domains/reviews/competition/errors.js";
 import { isBlindedCandidateAlias } from "../../../domains/reviews/candidates.js";
+import { ReviewGenerationFailedError } from "../../../domains/reviews/competition/errors.js";
 import type { ReviewRecommendation } from "./recommendation.js";
 
 export interface ResolvedBlindedRecommendation {

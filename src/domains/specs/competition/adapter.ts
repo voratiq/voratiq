@@ -1,14 +1,14 @@
 import { detectAgentProcessFailureDetail } from "../../../agents/runtime/failures.js";
 import { runSandboxedAgent } from "../../../agents/runtime/harness.js";
+import type {
+  CompetitionCommandAdapter,
+  CompetitionPreparationResult,
+} from "../../../competition/command-adapter.js";
 import {
   type ResolvedExtraContextFile,
   stageExtraContextFiles,
 } from "../../../competition/shared/extra-context.js";
 import { pruneWorkspace } from "../../../competition/shared/prune.js";
-import type {
-  CompetitionCommandAdapter,
-  CompetitionPreparationResult,
-} from "../../../competition/command-adapter.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import { buildSpecPrompt } from "../../../domains/specs/competition/prompt.js";

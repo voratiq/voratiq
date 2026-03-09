@@ -1,15 +1,15 @@
 import { teardownSessionAuth } from "../../agents/runtime/registry.js";
+import {
+  getActiveTerminationStatus,
+  RUN_ABORT_WARNING,
+  setActiveTerminationStatus,
+} from "../../domains/runs/competition/termination-state.js";
 import type { AgentInvocationRecord } from "../../domains/runs/model/types.js";
 import {
   disposeRunRecordBuffer,
   getRunRecordSnapshot,
   rewriteRunRecord,
 } from "../../domains/runs/persistence/adapter.js";
-import {
-  getActiveTerminationStatus,
-  RUN_ABORT_WARNING,
-  setActiveTerminationStatus,
-} from "../../domains/runs/competition/termination-state.js";
 import type { RunStatus } from "../../status/index.js";
 import { TERMINABLE_RUN_STATUSES } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";

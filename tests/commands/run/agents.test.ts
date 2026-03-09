@@ -12,7 +12,6 @@ import {
 } from "@jest/globals";
 
 import { runSandboxedAgent } from "../../../src/agents/runtime/harness.js";
-import type { AgentExecutionResult } from "../../../src/domains/runs/competition/reports.js";
 import { runPreparedWithLimit } from "../../../src/competition/core.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
@@ -22,6 +21,7 @@ import { runPreparedAgent } from "../../../src/domains/runs/competition/agents/l
 import { AgentRunContext } from "../../../src/domains/runs/competition/agents/run-context.js";
 import type { PreparedAgentExecution } from "../../../src/domains/runs/competition/agents/types.js";
 import { buildRunAgentWorkspacePaths } from "../../../src/domains/runs/competition/agents/workspace.js";
+import type { AgentExecutionResult } from "../../../src/domains/runs/competition/reports.js";
 import type { AgentInvocationRecord } from "../../../src/domains/runs/model/types.js";
 import { buildAgentWorkspacePaths } from "../../../src/workspace/layout.js";
 

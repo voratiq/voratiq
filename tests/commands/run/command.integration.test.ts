@@ -6,17 +6,17 @@ import {
   clearActiveRun,
   registerActiveRun,
 } from "../../../src/commands/run/lifecycle.js";
-import type { AgentExecutionPhaseResult } from "../../../src/domains/runs/competition/phases.js";
 import { initializeRunRecord } from "../../../src/commands/run/record-init.js";
-import { toRunReport } from "../../../src/domains/runs/competition/reports.js";
 import {
   validateAndPrepare,
   type ValidationResult,
 } from "../../../src/commands/run/validation.js";
-import type { ResolvedExtraContextFile } from "../../../src/competition/shared/extra-context.js";
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
+import type { ResolvedExtraContextFile } from "../../../src/competition/shared/extra-context.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import { executeAgents } from "../../../src/domains/runs/competition/agent-execution.js";
+import type { AgentExecutionPhaseResult } from "../../../src/domains/runs/competition/phases.js";
+import { toRunReport } from "../../../src/domains/runs/competition/reports.js";
 import { generateRunId } from "../../../src/domains/runs/model/id.js";
 import {
   type AgentRecordMutators,

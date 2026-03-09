@@ -1,11 +1,11 @@
-import {
-  getActiveTerminationStatus,
-  RUN_ABORT_WARNING,
-} from "../competition/termination-state.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { RunProgressRenderer } from "../../../render/transcripts/run.js";
 import { emitStageProgressEvent } from "../../../render/transcripts/stage-progress.js";
 import { normalizeDiffStatistics } from "../../../utils/diff.js";
+import {
+  getActiveTerminationStatus,
+  RUN_ABORT_WARNING,
+} from "../competition/termination-state.js";
 import { rewriteRunRecord } from "../persistence/adapter.js";
 import type { AgentInvocationRecord } from "./types.js";
 import {

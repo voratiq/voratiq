@@ -1,15 +1,15 @@
 import type { SandboxFailFastInfo } from "../../../../agents/runtime/sandbox.js";
+import type { AgentDefinition } from "../../../../configs/agents/types.js";
+import type {
+  AgentEvalResult,
+  EvalDefinition,
+} from "../../../../configs/evals/types.js";
 import type { RunCommandError } from "../../../../domains/runs/competition/errors.js";
 import {
   type AgentExecutionResult,
   type AgentExecutionState,
   finalizeAgentResult,
 } from "../../../../domains/runs/competition/reports.js";
-import type { AgentDefinition } from "../../../../configs/agents/types.js";
-import type {
-  AgentEvalResult,
-  EvalDefinition,
-} from "../../../../configs/evals/types.js";
 import type {
   AgentArtifactState,
   AgentEvalSnapshot,
