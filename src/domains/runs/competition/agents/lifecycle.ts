@@ -5,6 +5,7 @@ import {
   WATCHDOG_DEFAULTS,
   type WatchdogTrigger,
 } from "../../../../agents/runtime/watchdog.js";
+import { composeStageSandboxPolicy } from "../../../../competition/shared/sandbox-policy.js";
 import {
   AgentProcessError,
   GitOperationError,
@@ -17,7 +18,6 @@ import type {
 } from "../../../../domains/runs/model/types.js";
 import { toErrorMessage } from "../../../../utils/errors.js";
 import { GIT_AUTHOR_EMAIL, GIT_AUTHOR_NAME } from "../../../../utils/git.js";
-import { composeRunSandboxPolicy } from "../sandbox-policy.js";
 import { runPostProcessingAndEvaluations } from "./eval-runner.js";
 import { AgentRunContext } from "./run-context.js";
 import type { PreparedAgentExecution } from "./types.js";
@@ -101,7 +101,7 @@ export async function executeAgentLifecycle(
       },
       captureChat: true,
       teardownAuthOnExit: false,
-      ...composeRunSandboxPolicy({
+      ...composeStageSandboxPolicy({
         stageWriteProtectedPaths: [workspacePaths.evalsDirPath],
         stageReadProtectedPaths: [workspacePaths.evalsDirPath],
       }),

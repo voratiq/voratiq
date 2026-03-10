@@ -1,16 +1,16 @@
-export interface ComposeSpecSandboxPolicyInput {
+export interface ComposeStageSandboxPolicyInput {
   stageWriteProtectedPaths?: readonly string[];
   stageReadProtectedPaths?: readonly string[];
 }
 
-export interface SpecSandboxPolicy {
+export interface StageSandboxPolicy {
   extraWriteProtectedPaths: string[];
   extraReadProtectedPaths: string[];
 }
 
-export function composeSpecSandboxPolicy(
-  input: ComposeSpecSandboxPolicyInput = {},
-): SpecSandboxPolicy {
+export function composeStageSandboxPolicy(
+  input: ComposeStageSandboxPolicyInput = {},
+): StageSandboxPolicy {
   const { stageWriteProtectedPaths = [], stageReadProtectedPaths = [] } = input;
 
   return {

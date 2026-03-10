@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { composeReviewSandboxPolicy } from "../../../src/domains/reviews/competition/sandbox-policy.js";
+import { composeStageSandboxPolicy } from "../../../src/competition/shared/sandbox-policy.js";
 
-describe("review sandbox policy composition", () => {
+describe("stage sandbox policy composition", () => {
   it("forwards stage overlays without local dedupe or sorting", () => {
-    const policy = composeReviewSandboxPolicy({
+    const policy = composeStageSandboxPolicy({
       stageWriteProtectedPaths: [
         "/repo/.voratiq/reviews/sessions/review-123/.shared",
         "/repo/.voratiq/specs",

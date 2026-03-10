@@ -9,10 +9,10 @@ import {
   stageExtraContextFiles,
 } from "../../../competition/shared/extra-context.js";
 import { pruneWorkspace } from "../../../competition/shared/prune.js";
+import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import { buildSpecPrompt } from "../../../domains/specs/competition/prompt.js";
-import { composeSpecSandboxPolicy } from "../../../domains/specs/competition/sandbox-policy.js";
 import { toErrorMessage } from "../../../utils/errors.js";
 import {
   normalizePathForDisplay,
@@ -151,7 +151,7 @@ export function createSpecCompetitionAdapter(
             stderrPath: workspacePaths.stderrPath,
           },
           captureChat: true,
-          ...composeSpecSandboxPolicy(),
+          ...composeStageSandboxPolicy(),
         });
 
         if (result.exitCode !== 0 || result.errorMessage) {
