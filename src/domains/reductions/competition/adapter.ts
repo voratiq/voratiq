@@ -13,12 +13,12 @@ import {
   stageExtraContextFiles,
 } from "../../../competition/shared/extra-context.js";
 import { pruneWorkspace } from "../../../competition/shared/prune.js";
+import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import { validateReductionOutputContract } from "../../../domains/reductions/competition/output-validation.js";
 import { buildReducePrompt } from "../../../domains/reductions/competition/prompt.js";
 import { parseReductionArtifact } from "../../../domains/reductions/competition/reduction.js";
-import { composeReduceSandboxPolicy } from "../../../domains/reductions/competition/sandbox-policy.js";
 import type {
   ReductionRecord,
   ReductionTarget,
@@ -255,7 +255,7 @@ export function createReduceCompetitionAdapter(
     ): Promise<ReductionCompetitionExecution> => {
       const { candidate, workspacePaths, prompt, outputPath, dataPath } =
         prepared;
-      const sandboxPolicy = composeReduceSandboxPolicy({
+      const sandboxPolicy = composeStageSandboxPolicy({
         stageWriteProtectedPaths: [],
         stageReadProtectedPaths: [],
       });

@@ -19,6 +19,7 @@ import {
   stageExtraContextFiles,
 } from "../../../competition/shared/extra-context.js";
 import { pruneWorkspace } from "../../../competition/shared/prune.js";
+import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import { generateBlindedCandidateAlias } from "../../../domains/reviews/candidates.js";
@@ -35,7 +36,6 @@ import {
   assertRecommendationMatchesRanking,
   parseReviewRecommendation,
 } from "../../../domains/reviews/competition/recommendation.js";
-import { composeReviewSandboxPolicy } from "../../../domains/reviews/competition/sandbox-policy.js";
 import type { ReviewRecord } from "../../../domains/reviews/model/types.js";
 import {
   appendReviewRecord,
@@ -359,7 +359,7 @@ export function createReviewCompetitionAdapter(
       const { candidate, workspacePaths, prompt, blinded, outputPath } =
         prepared;
       const agent = candidate;
-      const sandboxPolicy = composeReviewSandboxPolicy({
+      const sandboxPolicy = composeStageSandboxPolicy({
         stageWriteProtectedPaths: blinded.extraWriteProtectedPaths,
         stageReadProtectedPaths: blinded.extraReadProtectedPaths,
       });
