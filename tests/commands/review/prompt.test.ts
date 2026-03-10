@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { buildReviewPrompt } from "../../../src/commands/review/prompt.js";
+import { buildReviewPrompt } from "../../../src/domains/reviews/competition/prompt.js";
 
 describe("review prompt generation", () => {
   it("fails when no eligible candidates are provided", () => {

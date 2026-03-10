@@ -1,8 +1,8 @@
-import { appendRunRecord } from "../../runs/records/persistence.js";
-import type { RunRecord } from "../../runs/records/types.js";
+import type { RunRecordInitResult } from "../../domains/runs/competition/phases.js";
+import type { RunRecord } from "../../domains/runs/model/types.js";
+import { appendRunRecord } from "../../domains/runs/persistence/adapter.js";
 import { normalizePathForDisplay } from "../../utils/path.js";
 import { cleanupRunWorkspace } from "../../workspace/cleanup.js";
-import type { RunRecordInitResult } from "./phases.js";
 
 export interface RecordInitInput {
   readonly root: string;
@@ -14,6 +14,7 @@ export interface RecordInitInput {
   readonly createdAt: string;
   readonly runRoot: string;
   readonly extraContext?: string[];
+  readonly extraContextMetadata?: import("../../extra-context/contract.js").PersistedExtraContextMetadataEntry[];
 }
 
 /**
@@ -32,6 +33,7 @@ export async function initializeRunRecord(
     createdAt,
     runRoot,
     extraContext,
+    extraContextMetadata,
   } = input;
 
   const initialRecord: RunRecord = {
@@ -40,6 +42,7 @@ export async function initializeRunRecord(
       path: normalizePathForDisplay(specDisplayPath),
     },
     extraContext,
+    extraContextMetadata,
     createdAt,
     baseRevisionSha,
     rootPath: repoDisplayPath,

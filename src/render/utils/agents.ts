@@ -1,12 +1,12 @@
 import type {
   AgentEvalEnhanced,
   AgentInvocationEnhanced,
-} from "../../runs/records/enhanced.js";
+} from "../../domains/runs/model/enhanced.js";
 import type {
   AgentEvalView,
   AgentReport,
   AgentStatus,
-} from "../../runs/records/types.js";
+} from "../../domains/runs/model/types.js";
 import {
   getAgentStatusStyle,
   getEvalStatusStyle,

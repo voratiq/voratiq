@@ -18,16 +18,16 @@ import {
   registerActiveRun,
   terminateActiveRun,
 } from "../../../src/commands/run/lifecycle.js";
+import type { RunRecord } from "../../../src/domains/runs/model/types.js";
 import {
   disposeRunRecordBuffer,
   getRunRecordSnapshot,
   rewriteRunRecord,
-} from "../../../src/runs/records/persistence.js";
-import type { RunRecord } from "../../../src/runs/records/types.js";
+} from "../../../src/domains/runs/persistence/adapter.js";
 import { pathExists } from "../../../src/utils/fs.js";
 import { preserveProviderChatTranscripts } from "../../../src/workspace/chat/artifacts.js";
 
-jest.mock("../../../src/runs/records/persistence.js", () => ({
+jest.mock("../../../src/domains/runs/persistence/adapter.js", () => ({
   rewriteRunRecord: jest.fn(),
   getRunRecordSnapshot: jest.fn(),
   disposeRunRecordBuffer: jest.fn(),

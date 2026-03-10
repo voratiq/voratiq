@@ -1,4 +1,4 @@
-import { buildRunPrompt } from "../../src/commands/run/prompt.js";
+import { buildRunPrompt } from "../../src/domains/runs/competition/prompt.js";
 
 describe("buildRunPrompt", () => {
   it("includes spec metadata, constraints, and workspace boundary instructions", () => {

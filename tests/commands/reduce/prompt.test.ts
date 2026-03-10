@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { buildReducePrompt } from "../../../src/commands/reduce/prompt.js";
+import { buildReducePrompt } from "../../../src/domains/reductions/competition/prompt.js";
 
 describe("buildReducePrompt", () => {
   it("lists staged extra-context files when provided", () => {

@@ -4,8 +4,8 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "@jest/globals";
 
-import { resolveEligibleReviewCandidateAgents } from "../../../src/commands/review/eligibility.js";
-import { buildRunRecordEnhanced } from "../../../src/runs/records/enhanced.js";
+import { resolveEligibleReviewCandidateAgents } from "../../../src/domains/reviews/competition/eligibility.js";
+import { buildRunRecordEnhanced } from "../../../src/domains/runs/model/enhanced.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,

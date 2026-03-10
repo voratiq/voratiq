@@ -3,19 +3,24 @@ import { dirname, join } from "node:path";
 import { Command, Option } from "commander";
 
 import {
+  type AutoCommandDependencies,
+  type AutoCommandEvent,
+  type AutoReviewStageReview,
+  executeAutoCommand,
+} from "../commands/auto/command.js";
+import {
   readReviewRecommendation,
   type ReviewRecommendation,
-} from "../commands/review/recommendation.js";
-import { resolveCliContext } from "../preflight/index.js";
-import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
-import { renderCliError } from "../render/utils/errors.js";
-import { rewriteRunRecord } from "../runs/records/persistence.js";
+} from "../domains/reviews/competition/recommendation.js";
 import type {
   AutoApplyStatus,
   AutoTerminalStatus,
   RunAutoOutcome,
-} from "../runs/records/types.js";
-import { mapRunStatusToExitCode, type RunStatus } from "../status/index.js";
+} from "../domains/runs/model/types.js";
+import { rewriteRunRecord } from "../domains/runs/persistence/adapter.js";
+import { resolveCliContext } from "../preflight/index.js";
+import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
+import { renderCliError } from "../render/utils/errors.js";
 import { formatAlertMessage } from "../utils/output.js";
 import { normalizePathForDisplay, resolveDisplayPath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
@@ -23,9 +28,9 @@ import { REVIEW_RECOMMENDATION_FILENAME } from "../workspace/structure.js";
 import { runApplyCommand } from "./apply.js";
 import { CliError, toCliError } from "./errors.js";
 import { beginChainedCommandOutput, writeCommandOutput } from "./output.js";
-import { type ReviewCommandResult, runReviewCommand } from "./review.js";
+import { runReviewCommand } from "./review.js";
 import { runRunCommand } from "./run.js";
-import { runSpecCommand, type SpecCommandResult } from "./spec.js";
+import { runSpecCommand } from "./spec.js";
 
 export interface AutoCommandOptions {
   specPath?: string;
@@ -74,66 +79,12 @@ function collectReviewAgentOption(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
 
-function assertAutoOptionCompatibility(options: AutoCommandOptions): void {
-  const hasSpecPath =
-    typeof options.specPath === "string" && options.specPath.trim().length > 0;
-  const hasDescription =
-    typeof options.description === "string" &&
-    options.description.trim().length > 0;
-
-  if (hasSpecPath === hasDescription) {
-    throw new CliError(
-      "Exactly one of `--spec` or `--description` is required.",
-      [],
-      ["Pass exactly one."],
-    );
-  }
-
-  if (options.commit && !options.apply) {
-    throw new CliError(
-      "Option `--commit` requires `--apply`.",
-      [],
-      ["Add `--apply` when using `--commit`."],
-    );
-  }
-}
-
-function resolveSpecPathForAuto(result: SpecCommandResult): string {
-  const specPathCandidate =
-    typeof result.specPath === "string" && result.specPath.trim().length > 0
-      ? result.specPath.trim()
-      : undefined;
-  if (specPathCandidate) {
-    return specPathCandidate;
-  }
-
-  const outputPathCandidate =
-    typeof result.outputPath === "string" && result.outputPath.trim().length > 0
-      ? result.outputPath.trim()
-      : undefined;
-  if (outputPathCandidate) {
-    return outputPathCandidate;
-  }
-
-  throw new CliError(
-    "Spec stage did not return a spec path.",
-    [],
-    ["Re-run the spec stage and check for `Spec saved:` in the output."],
-  );
-}
-
-interface AutoRecommendationLoadResult {
-  recommendationPath: string;
-  preferredAgent?: string;
-}
-
-interface ReviewerRecommendation extends AutoRecommendationLoadResult {
-  reviewerAgentId: string;
-}
-
 async function loadAutoRecommendation(options: {
   reviewOutputPath: string;
-}): Promise<AutoRecommendationLoadResult> {
+}): Promise<{
+  recommendationPath: string;
+  preferredAgent?: string;
+}> {
   const recommendationPath = normalizePathForDisplay(
     join(dirname(options.reviewOutputPath), REVIEW_RECOMMENDATION_FILENAME),
   );
@@ -153,10 +104,9 @@ async function loadAutoRecommendation(options: {
     const recommendation = await readReviewRecommendation(
       recommendationAbsolutePath,
     );
-    const preferredAgent = resolvePreferredAgentForAuto({ recommendation });
     return {
       recommendationPath,
-      preferredAgent,
+      preferredAgent: resolvePreferredAgentForAuto({ recommendation }),
     };
   } catch (error) {
     throw new CliError(
@@ -168,14 +118,17 @@ async function loadAutoRecommendation(options: {
 }
 
 async function loadReviewerRecommendationsForAuto(options: {
-  reviews: ReviewCommandResult["reviews"];
-}): Promise<ReviewerRecommendation[]> {
+  reviews: readonly AutoReviewStageReview[];
+}): Promise<
+  Array<{
+    reviewerAgentId: string;
+    recommendationPath: string;
+    preferredAgent?: string;
+  }>
+> {
   const successfulReviews = options.reviews.filter(
-    (
-      review,
-    ): review is (typeof options.reviews)[number] & {
-      status: "succeeded";
-    } => review.status === "succeeded",
+    (review): review is AutoReviewStageReview & { status: "succeeded" } =>
+      review.status === "succeeded",
   );
 
   return Promise.all(
@@ -195,98 +148,36 @@ async function loadReviewerRecommendationsForAuto(options: {
 function resolvePreferredAgentForAuto(options: {
   recommendation: ReviewRecommendation;
 }): string | undefined {
-  const { recommendation } = options;
   const resolvedPreferredAgent =
-    recommendation.resolved_preferred_agent?.trim();
+    options.recommendation.resolved_preferred_agent?.trim();
   return resolvedPreferredAgent && resolvedPreferredAgent.length > 0
     ? resolvedPreferredAgent
     : undefined;
 }
 
-function resolveRecommendedAgent(options: {
-  recommendationPath: string;
-  preferredAgent: string;
-  availableAgents: readonly string[];
-}): string {
-  const { recommendationPath, preferredAgent, availableAgents } = options;
-
-  const normalizedPreferredAgent = preferredAgent.trim();
-  if (normalizedPreferredAgent.length === 0) {
-    throw new CliError(
-      `No preferred agent in \`${recommendationPath}\`.`,
-      [],
-      ["Re-run `voratiq review` to regenerate the recommendation."],
-    );
+function replayAutoCommandEvent(event: AutoCommandEvent): void {
+  if (event.kind === "body") {
+    writeCommandOutput({
+      body: event.body,
+      stderr: event.stderr,
+      exitCode: event.exitCode,
+    });
+    return;
   }
 
-  const availableSet = new Set(availableAgents);
-  if (!availableSet.has(normalizedPreferredAgent)) {
-    const availableDisplay = availableAgents
-      .map((agentId) => `\`${agentId}\``)
-      .join(", ");
-    throw new CliError(
-      "Recommendation did not match any run agent.",
-      [
-        `Preferred agent: \`${normalizedPreferredAgent}\`.`,
-        ...(availableDisplay.length > 0
-          ? [`Available agents: ${availableDisplay}.`]
-          : []),
-      ],
-      ["Use an agent id present in the run report or review output."],
-    );
+  if (event.kind === "error") {
+    writeCommandOutput({ body: renderCliError(toCliError(event.error)) });
+    return;
   }
 
-  return normalizedPreferredAgent;
-}
-
-function resolveAutoTerminalStatus(options: {
-  hardFailure: boolean;
-  actionRequired: boolean;
-}): AutoTerminalStatus {
-  if (options.hardFailure) {
-    return "failed";
-  }
-  if (options.actionRequired) {
-    return "action_required";
-  }
-  return "succeeded";
-}
-
-function mapAutoTerminalStatusToExitCode(status: AutoTerminalStatus): number {
-  return status === "succeeded" ? 0 : 1;
-}
-
-function truncateOutcomeDetail(detail?: string): string | undefined {
-  if (!detail) {
-    return undefined;
-  }
-  const trimmed = detail.trim();
-  if (trimmed.length === 0) {
-    return undefined;
-  }
-  return trimmed.length > 256 ? trimmed.slice(0, 256) : trimmed;
-}
-
-function resolveAutoTerminalDetail(options: {
-  status: AutoTerminalStatus;
-  actionRequiredDetail?: string;
-  applyDetail?: string;
-  reviewDetail?: string;
-  runDetail?: string;
-}): string | undefined {
-  if (options.status === "action_required") {
-    return truncateOutcomeDetail(
-      options.actionRequiredDetail ?? options.applyDetail,
-    );
-  }
-
-  if (options.status === "failed") {
-    return truncateOutcomeDetail(
-      options.applyDetail ?? options.reviewDetail ?? options.runDetail,
-    );
-  }
-
-  return undefined;
+  const warningBody = formatAlertMessage(
+    "Warning",
+    "yellow",
+    event.warningMessage,
+  );
+  writeCommandOutput({
+    body: event.separateWithDivider ? `---\n\n${warningBody}` : warningBody,
+  });
 }
 
 async function persistAutoOutcome(options: {
@@ -320,108 +211,30 @@ export async function runAutoCommand(
   options: AutoCommandOptions,
   runtime: AutoRuntimeOptions = {},
 ): Promise<AutoCommandResult> {
-  assertAutoOptionCompatibility(options);
-  const hasDescription =
-    typeof options.description === "string" &&
-    options.description.trim().length > 0;
-  const description =
-    typeof options.description === "string" ? options.description : undefined;
-
   const now = runtime.now ?? Date.now.bind(Date);
-
-  const overallStart = now();
   const chainedOutput = beginChainedCommandOutput();
 
   try {
-    let hardFailure = false;
-    let actionRequired = false;
-    let actionRequiredDetail: string | undefined;
-
-    let specStartedAt: number | undefined;
-    let specStatus: "succeeded" | "failed" | "skipped" = "skipped";
-    let specPath: string | undefined;
-    let specDetail: string | undefined;
-
-    let runStartedAt: number | undefined;
-    let runStatus: "succeeded" | "failed" | "skipped" = "skipped";
-    let runId: string | undefined;
-    let runDetail: string | undefined;
-    let runRecordStatus: RunStatus | undefined;
-    let runCreatedAt: string | undefined;
-    let runSpecPath: string | undefined;
-    let runBaseRevisionSha: string | undefined;
-    let runAgentIds: string[] = [];
-
-    let reviewStartedAt: number | undefined;
-    let reviewStatus: "succeeded" | "failed" | "skipped" = "skipped";
-    let reviewOutputPath: string | undefined;
-    let reviewDetail: string | undefined;
-    let reviewResultCount = 0;
-    let reviewResults: ReviewCommandResult["reviews"] | undefined;
-    let reviewTranscriptEmitted = false;
-
-    let applyStartedAt: number | undefined;
-    let applyStatus: AutoApplyStatus = "skipped";
-    let applyAgentId: string | undefined;
-    let applyDetail: string | undefined;
-
-    const markActionRequired = (
-      detail: string,
-      warningMessage: string,
-    ): void => {
-      actionRequired = true;
-      actionRequiredDetail = detail;
-      applyStatus = "skipped";
-      applyDetail = detail;
-      const warningBody = formatAlertMessage(
-        "Warning",
-        "yellow",
-        warningMessage,
-      );
-      writeCommandOutput({
-        body: reviewTranscriptEmitted ? `---\n\n${warningBody}` : warningBody,
-      });
-    };
-
-    let resolvedSpecPath = options.specPath;
-
-    if (hasDescription && description) {
-      specStartedAt = now();
-      try {
-        const specResult = await runSpecCommand({
-          description,
-          profile: options.profile,
-          maxParallel: options.maxParallel,
-          suppressHint: true,
+    const dependencies: AutoCommandDependencies = {
+      now,
+      onEvent: replayAutoCommandEvent,
+      runSpecStage: async (input) =>
+        runSpecCommand({
+          description: input.description,
+          profile: input.profile,
+          maxParallel: input.maxParallel,
+          suppressHint: input.suppressHint,
           writeOutput: writeCommandOutput,
-        });
-        specStatus = "succeeded";
-        specPath = resolveSpecPathForAuto(specResult);
-        resolvedSpecPath = specPath;
-        writeCommandOutput({ body: specResult.body });
-      } catch (error) {
-        specStatus = "failed";
-        specDetail = toCliError(error).headline;
-        hardFailure = true;
-        writeCommandOutput({ body: renderCliError(toCliError(error)) });
-      }
-    }
-
-    if (!hardFailure && resolvedSpecPath) {
-      runStartedAt = now();
-
-      try {
-        // For non-TTY, suppress run renderer blank lines and let the chained
-        // output system handle spacing. For TTY, let the run renderer handle
-        // its own spacing since cursor control requires precise line counts.
+        }),
+      runRunStage: async (input) => {
         const suppressBlankLines = !process.stdout.isTTY;
-        const runResult = await runRunCommand({
-          specPath: resolvedSpecPath,
-          agentIds: options.runAgentIds ? [...options.runAgentIds] : undefined,
-          agentOverrideFlag: "--run-agent",
-          profile: options.profile,
-          maxParallel: options.maxParallel,
-          branch: options.branch,
+        return runRunCommand({
+          specPath: input.specPath,
+          agentIds: input.agentIds ? [...input.agentIds] : undefined,
+          agentOverrideFlag: input.agentOverrideFlag,
+          profile: input.profile,
+          maxParallel: input.maxParallel,
+          branch: input.branch,
           writeOutput: writeCommandOutput,
           suppressHint: true,
           suppressLeadingBlankLine: suppressBlankLines,
@@ -429,322 +242,64 @@ export async function runAutoCommand(
           stdout: chainedOutput.stdout,
           stderr: chainedOutput.stderr,
         });
+      },
+      runReviewStage: async (input) =>
+        runReviewCommand({
+          runId: input.runId,
+          agentIds: input.agentIds ? [...input.agentIds] : undefined,
+          agentOverrideFlag: input.agentOverrideFlag,
+          profile: input.profile,
+          maxParallel: input.maxParallel,
+          suppressHint: input.suppressHint,
+          stdout: chainedOutput.stdout,
+          stderr: chainedOutput.stderr,
+          suppressLeadingBlankLine: !process.stdout.isTTY,
+          suppressTrailingBlankLine: !process.stdout.isTTY,
+        }),
+      runApplyStage: async (input) =>
+        runApplyCommand({
+          runId: input.runId,
+          agentId: input.agentId,
+          commit: input.commit,
+        }),
+      loadRecommendation: loadAutoRecommendation,
+      loadReviewerRecommendations: loadReviewerRecommendationsForAuto,
+    };
 
-        const expectedRunExitCode = mapRunStatusToExitCode(
-          runResult.report.status,
-        );
-        const resolvedRunExitCode =
-          typeof runResult.exitCode === "number"
-            ? runResult.exitCode
-            : expectedRunExitCode;
-
-        if (
-          typeof runResult.exitCode === "number" &&
-          runResult.exitCode !== expectedRunExitCode
-        ) {
-          throw new CliError(
-            "Run status/exit code mismatch.",
-            [
-              `Status: \`${runResult.report.status}\`.`,
-              `Exit code: ${runResult.exitCode}.`,
-            ],
-            ["Re-run the command."],
-          );
-        }
-
-        runStatus = resolvedRunExitCode === 0 ? "succeeded" : "failed";
-        runId = runResult.report.runId;
-        runRecordStatus = runResult.report.status;
-        runCreatedAt = runResult.report.createdAt;
-        runSpecPath = runResult.report.spec?.path;
-        runBaseRevisionSha = runResult.report.baseRevisionSha;
-        runAgentIds = runResult.report.agents.map((agent) => agent.agentId);
-
-        if (runStatus === "failed") {
-          const statusDetail = runRecordStatus
-            ? `status \`${runRecordStatus}\``
-            : "a non-success status";
-          runDetail =
-            runDetail ??
-            `Run completed with ${statusDetail} (exit code ${resolvedRunExitCode}).`;
-          hardFailure = true;
-        }
-
-        writeCommandOutput({ body: runResult.body });
-      } catch (error) {
-        runStatus = "failed";
-        runDetail = toCliError(error).headline;
-        hardFailure = true;
-        writeCommandOutput({ body: renderCliError(toCliError(error)) });
-      }
-    }
-
-    const shouldAttemptReview = hasDescription
-      ? runStatus === "succeeded" && typeof runId === "string"
-      : !hardFailure || runId;
-
-    if (shouldAttemptReview) {
-      if (!runId) {
-        reviewStatus = "skipped";
-      } else {
-        reviewStartedAt = now();
-
-        try {
-          const reviewResult = await runReviewCommand({
-            runId,
-            agentIds: options.reviewerAgentIds
-              ? [...options.reviewerAgentIds]
-              : undefined,
-            agentOverrideFlag: "--review-agent",
-            profile: options.profile,
-            maxParallel: options.maxParallel,
-            suppressHint: options.apply === true,
-            stdout: chainedOutput.stdout,
-            stderr: chainedOutput.stderr,
-            suppressLeadingBlankLine: !process.stdout.isTTY,
-            suppressTrailingBlankLine: !process.stdout.isTTY,
-          });
-
-          reviewStatus = "succeeded";
-          reviewOutputPath = reviewResult.outputPath;
-          reviewResultCount = reviewResult.reviews?.length ?? 1;
-          reviewResults = reviewResult.reviews;
-          if (reviewResult.exitCode === 1) {
-            reviewStatus = "failed";
-            reviewDetail = "One or more reviewers failed.";
-            hardFailure = true;
-          }
-
-          writeCommandOutput({
-            body: reviewResult.body,
-            stderr: reviewResult.stderr,
-          });
-          reviewTranscriptEmitted = true;
-        } catch (error) {
-          reviewStatus = "failed";
-          reviewDetail = toCliError(error).headline;
-          hardFailure = true;
-          writeCommandOutput({ body: renderCliError(toCliError(error)) });
-        }
-      }
-    }
-
-    if (
-      options.apply &&
-      runId &&
-      reviewStatus === "succeeded" &&
-      reviewOutputPath &&
-      (!hasDescription || runStatus === "succeeded")
-    ) {
-      applyStartedAt = now();
-      try {
-        let recommendationPath: string | undefined;
-        let preferredAgent: string | undefined;
-
-        if (reviewResultCount <= 1) {
-          const recommendationResult = await loadAutoRecommendation({
-            reviewOutputPath,
-          });
-          recommendationPath = recommendationResult.recommendationPath;
-          preferredAgent = recommendationResult.preferredAgent;
-          if (!preferredAgent) {
-            markActionRequired(
-              "No resolvable recommendation was produced; manual review required.",
-              "No resolvable recommendation was produced. Review results and apply manually.",
-            );
-          }
-        } else if (reviewResults && reviewResults.length > 0) {
-          const reviewerRecommendations =
-            await loadReviewerRecommendationsForAuto({
-              reviews: reviewResults,
-            });
-          if (reviewerRecommendations.length === 0) {
-            markActionRequired(
-              "No shared reviewer recommendation could be resolved; manual review required.",
-              "No shared recommendation was resolved. Review results and apply manually.",
-            );
-          } else {
-            const resolvedPreferredAgents = reviewerRecommendations
-              .map(
-                (recommendation) => recommendation.preferredAgent?.trim() ?? "",
-              )
-              .filter((agent): agent is string => agent.length > 0);
-
-            if (
-              resolvedPreferredAgents.length !== reviewerRecommendations.length
-            ) {
-              markActionRequired(
-                "No shared reviewer recommendation could be resolved; manual review required.",
-                "No shared recommendation was resolved. Review results and apply manually.",
-              );
-            } else {
-              const distinctPreferredAgents = new Set(resolvedPreferredAgents);
-
-              if (distinctPreferredAgents.size === 1) {
-                const unanimousPreferredAgent =
-                  [...distinctPreferredAgents][0] ?? "";
-                const firstRecommendation = reviewerRecommendations[0];
-                if (!firstRecommendation) {
-                  throw new CliError(
-                    "Failed to resolve reviewer recommendation.",
-                    [],
-                    ["Re-run `voratiq review` to regenerate review artifacts."],
-                  );
-                }
-                recommendationPath = firstRecommendation.recommendationPath;
-                preferredAgent = unanimousPreferredAgent;
-              } else {
-                markActionRequired(
-                  "Reviewers disagreed on preferred candidate; manual review required.",
-                  "Reviewers disagreed. Review results and apply manually.",
-                );
-              }
-            }
-          }
-        } else {
-          throw new CliError(
-            "Failed to resolve reviewer recommendations.",
-            [],
-            ["Re-run `voratiq review` to regenerate review artifacts."],
-          );
-        }
-
-        if (!preferredAgent || !recommendationPath) {
-          // Apply intentionally skipped because reviewers did not converge.
-        } else {
-          const recommendedAgentId = resolveRecommendedAgent({
-            recommendationPath,
-            preferredAgent,
-            availableAgents: runAgentIds,
-          });
-
-          const applyResult = await runApplyCommand({
-            runId,
-            agentId: recommendedAgentId,
-            commit: options.commit ?? false,
-          });
-
-          applyStatus = "succeeded";
-          applyAgentId = recommendedAgentId;
-
-          writeCommandOutput({
-            body: applyResult.body,
-            exitCode: applyResult.exitCode,
-          });
-          if (applyResult.exitCode === 1) {
-            applyStatus = "failed";
-            applyDetail = "Apply stage reported a non-zero exit code.";
-            hardFailure = true;
-          }
-        }
-      } catch (error) {
-        applyStatus = "failed";
-        applyDetail = toCliError(error).headline;
-        hardFailure = true;
-        writeCommandOutput({ body: renderCliError(toCliError(error)) });
-      }
-    }
-
-    const overallDurationMs = now() - overallStart;
-    const specDurationMs =
-      specStartedAt !== undefined ? now() - specStartedAt : undefined;
-    const runDurationMs =
-      runStartedAt !== undefined ? now() - runStartedAt : undefined;
-    const reviewDurationMs =
-      reviewStartedAt !== undefined ? now() - reviewStartedAt : undefined;
-    const applyDurationMs =
-      applyStartedAt !== undefined ? now() - applyStartedAt : undefined;
-
-    const autoStatus = resolveAutoTerminalStatus({
-      hardFailure,
-      actionRequired,
-    });
-    const autoDetail = resolveAutoTerminalDetail({
-      status: autoStatus,
-      actionRequiredDetail,
-      applyDetail,
-      reviewDetail,
-      runDetail,
-    });
-    const normalizedApplyDetail = truncateOutcomeDetail(applyDetail);
+    const execution = await executeAutoCommand(options, dependencies);
 
     const autoOutcome: RunAutoOutcome = {
-      status: autoStatus,
+      status: execution.auto.status,
       completedAt: new Date(now()).toISOString(),
-      ...(autoDetail ? { detail: autoDetail } : {}),
+      ...(execution.auto.detail ? { detail: execution.auto.detail } : {}),
       apply: {
-        status: applyStatus,
-        ...(applyAgentId ? { agentId: applyAgentId } : {}),
-        ...(normalizedApplyDetail ? { detail: normalizedApplyDetail } : {}),
+        status: execution.apply.status,
+        ...(execution.appliedAgentId
+          ? { agentId: execution.appliedAgentId }
+          : {}),
+        ...(execution.apply.detail ? { detail: execution.apply.detail } : {}),
       },
     };
 
     await persistAutoOutcome({
-      runId,
+      runId: execution.runId,
       outcome: autoOutcome,
     });
 
-    const exitCode = mapAutoTerminalStatusToExitCode(autoStatus);
-
-    const summaryBody = renderAutoSummaryTranscript({
-      status: autoStatus,
-      totalDurationMs: overallDurationMs,
-      spec: {
-        status: specStatus,
-        ...(typeof specDurationMs === "number"
-          ? { durationMs: specDurationMs }
-          : {}),
-        ...(specPath ? { specPath } : {}),
-        ...(specDetail ? { detail: specDetail } : {}),
-      },
-      run: {
-        status: runStatus,
-        ...(typeof runDurationMs === "number"
-          ? { durationMs: runDurationMs }
-          : {}),
-        ...(runId ? { runId } : {}),
-        ...(runRecordStatus ? { runStatus: runRecordStatus } : {}),
-        ...(runCreatedAt ? { createdAt: runCreatedAt } : {}),
-        ...(runSpecPath ? { specPath: runSpecPath } : {}),
-        ...(runBaseRevisionSha ? { baseRevisionSha: runBaseRevisionSha } : {}),
-        ...(runDetail ? { detail: runDetail } : {}),
-      },
-      review: {
-        status: reviewStatus,
-        ...(typeof reviewDurationMs === "number"
-          ? { durationMs: reviewDurationMs }
-          : {}),
-        ...(reviewOutputPath ? { outputPath: reviewOutputPath } : {}),
-        ...(reviewDetail ? { detail: reviewDetail } : {}),
-      },
-      apply: {
-        status: applyStatus,
-        ...(typeof applyDurationMs === "number"
-          ? { durationMs: applyDurationMs }
-          : {}),
-        ...(applyAgentId ? { agentId: applyAgentId } : {}),
-        ...(normalizedApplyDetail ? { detail: normalizedApplyDetail } : {}),
-      },
-    });
-
     writeCommandOutput({
-      body: summaryBody,
-      exitCode,
+      body: renderAutoSummaryTranscript(execution.summary),
+      exitCode: execution.exitCode,
     });
 
     return {
-      exitCode,
-      runId,
-      reviewOutputPath,
-      ...(applyAgentId ? { appliedAgentId: applyAgentId } : {}),
-      auto: {
-        status: autoStatus,
-        ...(autoDetail ? { detail: autoDetail } : {}),
-      },
-      apply: {
-        status: applyStatus,
-        ...(normalizedApplyDetail ? { detail: normalizedApplyDetail } : {}),
-      },
+      exitCode: execution.exitCode,
+      runId: execution.runId,
+      reviewOutputPath: execution.reviewOutputPath,
+      ...(execution.appliedAgentId
+        ? { appliedAgentId: execution.appliedAgentId }
+        : {}),
+      auto: execution.auto,
+      apply: execution.apply,
     };
   } finally {
     chainedOutput.end();

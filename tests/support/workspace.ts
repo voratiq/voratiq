@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { runCli } from "../../src/bin.js";
-import { appendRunRecord } from "../../src/runs/records/persistence.js";
-import type { RunRecord } from "../../src/runs/records/types.js";
+import type { RunRecord } from "../../src/domains/runs/model/types.js";
+import { appendRunRecord } from "../../src/domains/runs/persistence/adapter.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
 import {
   resolveWorkspacePath,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { validateReviewOutputContract } from "../../../src/commands/review/output-validation.js";
+import { validateReviewOutputContract } from "../../../src/domains/reviews/competition/output-validation.js";
 
 describe("review output contract validation", () => {
   it("accepts full required structure with a single candidate", () => {

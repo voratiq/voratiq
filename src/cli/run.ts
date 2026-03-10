@@ -4,7 +4,8 @@ import { Command, Option } from "commander";
 
 import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
 import { executeRunCommand } from "../commands/run/command.js";
-import { resolveExtraContextFiles } from "../commands/shared/extra-context.js";
+import { resolveExtraContextFiles } from "../competition/shared/extra-context.js";
+import type { RunReport } from "../domains/runs/model/types.js";
 import { checkoutOrCreateBranch } from "../preflight/branch.js";
 import {
   ensureCleanWorkingTree,
@@ -15,7 +16,6 @@ import {
 import { createRunRenderer } from "../render/transcripts/run.js";
 import { renderWorkspaceAutoInitializedNotice } from "../render/transcripts/shared.js";
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
-import type { RunReport } from "../runs/records/types.js";
 import { mapRunStatusToExitCode } from "../status/index.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import type { CommandOutputWriter } from "./output.js";

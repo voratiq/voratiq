@@ -3,7 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   assertRecommendationMatchesRanking,
   parseReviewRecommendation,
-} from "../../../src/commands/review/recommendation.js";
+} from "../../../src/domains/reviews/competition/recommendation.js";
 
 describe("review recommendation schema", () => {
   it("accepts singular preferred_agent shape", () => {

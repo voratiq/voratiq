@@ -1,15 +1,24 @@
 import { teardownSessionAuth } from "../../agents/runtime/registry.js";
-import type { RunProgressRenderer } from "../../render/transcripts/run.js";
-import { createAgentRecordMutators } from "../../runs/records/mutators.js";
+import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
+import { executeAgents } from "../../domains/runs/competition/agent-execution.js";
 import {
-  flushRunRecordBuffer,
-  rewriteRunRecord,
-} from "../../runs/records/persistence.js";
+  RunCommandError,
+  RunProcessStreamError,
+} from "../../domains/runs/competition/errors.js";
+import { toRunReport } from "../../domains/runs/competition/reports.js";
+import { generateRunId } from "../../domains/runs/model/id.js";
+import { createAgentRecordMutators } from "../../domains/runs/model/mutators.js";
 import type {
   AgentInvocationRecord,
   RunRecord,
   RunReport,
-} from "../../runs/records/types.js";
+} from "../../domains/runs/model/types.js";
+import {
+  flushRunRecordBuffer,
+  rewriteRunRecord,
+} from "../../domains/runs/persistence/adapter.js";
+import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
+import type { RunProgressRenderer } from "../../render/transcripts/run.js";
 import { deriveRunStatusFromAgents } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
@@ -18,14 +27,9 @@ import {
   formatRunWorkspaceRelative,
 } from "../../workspace/layout.js";
 import { prepareRunWorkspace } from "../../workspace/run.js";
-import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
-import { executeAgents } from "./agent-execution.js";
-import { RunCommandError, RunProcessStreamError } from "./errors.js";
-import { generateRunId } from "./id.js";
 import { clearActiveRun, registerActiveRun } from "./lifecycle.js";
 import { initializeRunRecord } from "./record-init.js";
-import { toRunReport } from "./reports.js";
 import { validateAndPrepare } from "./validation.js";
 
 export interface RunCommandInput {
@@ -96,10 +100,7 @@ export async function executeRunCommand(
     repoDisplayPath,
     createdAt,
     runRoot,
-    extraContext:
-      extraContextFiles.length > 0
-        ? extraContextFiles.map((file) => file.displayPath)
-        : undefined,
+    ...buildPersistedExtraContextFields(extraContextFiles),
   });
 
   const agentAbortContexts = validation.agents.map((agent) => {

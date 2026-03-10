@@ -9,10 +9,6 @@ const resolvedTimeZone = (() => {
   }
 })();
 
-export function getLocalTimeZone(): string | undefined {
-  return resolvedTimeZone;
-}
-
 export function createLocalDateTimeFormatter(
   options: Intl.DateTimeFormatOptions,
   locales: Intl.LocalesArgument = "en-CA",

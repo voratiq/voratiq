@@ -2,7 +2,7 @@ import { teardownSessionAuth } from "../../agents/runtime/registry.js";
 import {
   flushReviewRecordBuffer,
   rewriteReviewRecord,
-} from "../../reviews/records/persistence.js";
+} from "../../domains/reviews/persistence/adapter.js";
 import type { ReviewStatus } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 

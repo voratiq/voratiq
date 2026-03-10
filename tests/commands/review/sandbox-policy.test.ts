@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { composeReviewSandboxPolicy } from "../../../src/commands/review/sandbox-policy.js";
+import { composeReviewSandboxPolicy } from "../../../src/domains/reviews/competition/sandbox-policy.js";
 
 describe("review sandbox policy composition", () => {
   it("forwards stage overlays without local dedupe or sorting", () => {

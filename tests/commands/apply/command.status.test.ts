@@ -1,10 +1,10 @@
 import { executeApplyCommand } from "../../../src/commands/apply/command.js";
 import { ApplyPatchApplicationError } from "../../../src/commands/apply/errors.js";
+import type { RunRecord } from "../../../src/domains/runs/model/types.js";
 import {
   fetchRunsSafely,
   rewriteRunRecord,
-} from "../../../src/runs/records/persistence.js";
-import type { RunRecord } from "../../../src/runs/records/types.js";
+} from "../../../src/domains/runs/persistence/adapter.js";
 import { ensureFileExists } from "../../../src/utils/fs.js";
 import { getHeadRevision, runGitCommand } from "../../../src/utils/git.js";
 import {
@@ -12,10 +12,10 @@ import {
   createRunRecord,
 } from "../../support/factories/run-records.js";
 
-jest.mock("../../../src/runs/records/persistence.js", () => {
+jest.mock("../../../src/domains/runs/persistence/adapter.js", () => {
   const actual = jest.requireActual<
-    typeof import("../../../src/runs/records/persistence.js")
-  >("../../../src/runs/records/persistence.js");
+    typeof import("../../../src/domains/runs/persistence/adapter.js")
+  >("../../../src/domains/runs/persistence/adapter.js");
   return {
     ...actual,
     fetchRunsSafely: jest.fn(),

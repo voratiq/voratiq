@@ -12,12 +12,12 @@ import {
 } from "@jest/globals";
 
 import { verifyAgentProviders } from "../../../src/agents/runtime/auth.js";
-import { RunPreflightError } from "../../../src/commands/run/errors.js";
 import { validateAndPrepare } from "../../../src/commands/run/validation.js";
 import {
   type AgentCatalogDiagnostics,
   loadAgentCatalogDiagnostics,
 } from "../../../src/configs/agents/loader.js";
+import { RunPreflightError } from "../../../src/domains/runs/competition/errors.js";
 import { getHeadRevision } from "../../../src/utils/git.js";
 jest.mock("../../../src/agents/runtime/auth.js", () => ({
   verifyAgentProviders: jest.fn(),

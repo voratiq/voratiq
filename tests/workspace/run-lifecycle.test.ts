@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { jest } from "@jest/globals";
 
-import { RunDirectoryExistsError } from "../../src/commands/run/errors.js";
+import { RunDirectoryExistsError } from "../../src/domains/runs/competition/errors.js";
 import { cleanupRunWorkspace } from "../../src/workspace/cleanup.js";
 import { WorkspaceSetupError } from "../../src/workspace/errors.js";
 import {

@@ -7,9 +7,10 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../../../src/commands/shared/session-id.js";
 import { executeSpecCommand } from "../../../src/commands/spec/command.js";
-import * as specAdapter from "../../../src/commands/spec/competition-adapter.js";
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
 import { loadEnvironmentConfig } from "../../../src/configs/environment/loader.js";
+import * as specAdapter from "../../../src/domains/specs/competition/adapter.js";
+import { readSpecRecords } from "../../../src/domains/specs/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
 jest.mock("../../../src/competition/command-adapter.js", () => ({
@@ -98,6 +99,24 @@ describe("executeSpecCommand integration", () => {
         }),
       );
       expect(result.sessionId).toBe("spec-123");
+      await expect(
+        readSpecRecords({
+          root,
+          specsFilePath: join(root, ".voratiq", "specs", "index.json"),
+          predicate: (record) => record.sessionId === "spec-123",
+        }),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          sessionId: "spec-123",
+          extraContext: ["../context/a.md"],
+          extraContextMetadata: [
+            {
+              stagedPath: "../context/a.md",
+              sourcePath: "notes/a.md",
+            },
+          ],
+        }),
+      ]);
 
       createAdapterSpy.mockRestore();
     } finally {

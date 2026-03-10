@@ -5,13 +5,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 
 import { assertReductionTargetEligible } from "../../../src/commands/reduce/targets.js";
-import { appendReductionRecord } from "../../../src/reductions/records/persistence.js";
-import type { ReductionRecord } from "../../../src/reductions/records/types.js";
-import { appendReviewRecord } from "../../../src/reviews/records/persistence.js";
-import type { ReviewRecord } from "../../../src/reviews/records/types.js";
-import { appendRunRecord } from "../../../src/runs/records/persistence.js";
-import { appendSpecRecord } from "../../../src/specs/records/persistence.js";
-import type { SpecRecord } from "../../../src/specs/records/types.js";
+import type { ReductionRecord } from "../../../src/domains/reductions/model/types.js";
+import { appendReductionRecord } from "../../../src/domains/reductions/persistence/adapter.js";
+import type { ReviewRecord } from "../../../src/domains/reviews/model/types.js";
+import { appendReviewRecord } from "../../../src/domains/reviews/persistence/adapter.js";
+import { appendRunRecord } from "../../../src/domains/runs/persistence/adapter.js";
+import type { SpecRecord } from "../../../src/domains/specs/model/types.js";
+import { appendSpecRecord } from "../../../src/domains/specs/persistence/adapter.js";
 import { resolvePath } from "../../../src/utils/path.js";
 import {
   getAgentSessionReductionPath,

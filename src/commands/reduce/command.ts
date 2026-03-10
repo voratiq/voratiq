@@ -1,26 +1,26 @@
 import { verifyAgentProviders } from "../../agents/runtime/auth.js";
 import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
+import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import {
-  flushReductionRecordBuffer,
-  readReductionRecords,
-} from "../../reductions/records/persistence.js";
+  createReduceCompetitionAdapter,
+  type ReductionCompetitionExecution,
+} from "../../domains/reductions/competition/adapter.js";
 import type {
   ReductionRecord,
   ReductionTarget,
-} from "../../reductions/records/types.js";
+} from "../../domains/reductions/model/types.js";
+import {
+  flushReductionRecordBuffer,
+  readReductionRecords,
+} from "../../domains/reductions/persistence/adapter.js";
 import type { ReduceProgressRenderer } from "../../render/transcripts/reduce.js";
 import { toErrorMessage } from "../../utils/errors.js";
-import type { ResolvedExtraContextFile } from "../shared/extra-context.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveReductionCompetitors } from "../shared/resolve-reduction-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
-import {
-  createReduceCompetitionAdapter,
-  type ReductionCompetitionExecution,
-} from "./competition-adapter.js";
 import {
   ReduceAgentNotFoundError,
   ReduceGenerationFailedError,

@@ -14,12 +14,12 @@ import {
   ApplyBaseMismatchError,
   ApplyPatchApplicationError,
 } from "../../../src/commands/apply/errors.js";
-import { appendReviewRecord } from "../../../src/reviews/records/persistence.js";
+import { appendReviewRecord } from "../../../src/domains/reviews/persistence/adapter.js";
+import type { RunRecord } from "../../../src/domains/runs/model/types.js";
 import {
   appendRunRecord,
   rewriteRunRecord,
-} from "../../../src/runs/records/persistence.js";
-import type { RunRecord } from "../../../src/runs/records/types.js";
+} from "../../../src/domains/runs/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 import {
   createAgentInvocationRecord,

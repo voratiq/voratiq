@@ -1,13 +1,13 @@
 import { describe } from "@jest/globals";
 
-import type { PreparedAgentExecution } from "../../../src/commands/run/agents/types.js";
-import { createRunCompetitionAdapter } from "../../../src/commands/run/competition-adapter.js";
-import type { AgentExecutionResult } from "../../../src/commands/run/reports.js";
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
 import type { EvalDefinition } from "../../../src/configs/evals/types.js";
-import type { AgentRecordMutators } from "../../../src/runs/records/mutators.js";
+import { createRunCompetitionAdapter } from "../../../src/domains/runs/competition/adapter.js";
+import type { PreparedAgentExecution } from "../../../src/domains/runs/competition/agents/types.js";
+import type { AgentExecutionResult } from "../../../src/domains/runs/competition/reports.js";
+import type { AgentRecordMutators } from "../../../src/domains/runs/model/mutators.js";
 import {
   type AdapterContractScenarioInput,
   type AdapterContractSubject,

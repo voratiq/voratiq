@@ -1,18 +1,19 @@
 import { dirname } from "node:path";
 
 import { CliError } from "../../cli/errors.js";
-import { readReductionRecords } from "../../reductions/records/persistence.js";
+import { RunNotFoundCliError } from "../../cli/errors.js";
 import {
   type ReductionTarget,
   TERMINAL_REDUCTION_STATUSES,
-} from "../../reductions/records/types.js";
-import { readReviewRecords } from "../../reviews/records/persistence.js";
-import { TERMINAL_REVIEW_STATUSES } from "../../reviews/records/types.js";
-import { buildRunRecordView } from "../../runs/records/enhanced.js";
-import { RunRecordNotFoundError } from "../../runs/records/errors.js";
-import { fetchRunsSafely } from "../../runs/records/persistence.js";
-import { readSpecRecords } from "../../specs/records/persistence.js";
-import { TERMINAL_SPEC_STATUSES } from "../../specs/records/types.js";
+} from "../../domains/reductions/model/types.js";
+import { readReductionRecords } from "../../domains/reductions/persistence/adapter.js";
+import { TERMINAL_REVIEW_STATUSES } from "../../domains/reviews/model/types.js";
+import { readReviewRecords } from "../../domains/reviews/persistence/adapter.js";
+import { buildRunRecordView } from "../../domains/runs/model/enhanced.js";
+import { RunRecordNotFoundError } from "../../domains/runs/model/errors.js";
+import { fetchRunsSafely } from "../../domains/runs/persistence/adapter.js";
+import { TERMINAL_SPEC_STATUSES } from "../../domains/specs/model/types.js";
+import { readSpecRecords } from "../../domains/specs/persistence/adapter.js";
 import { type RunStatus, TERMINAL_RUN_STATUSES } from "../../status/index.js";
 import { pathExists } from "../../utils/fs.js";
 import {
@@ -24,7 +25,6 @@ import {
   REDUCTION_DATA_FILENAME,
   REVIEW_RECOMMENDATION_FILENAME,
 } from "../../workspace/structure.js";
-import { RunNotFoundCliError } from "../errors.js";
 
 export interface ReductionTargetValidationInput {
   root: string;

@@ -20,10 +20,10 @@ import {
   jest,
 } from "@jest/globals";
 
-import { collectAgentArtifacts } from "../../../src/commands/run/agents/artifacts.js";
-import type { RunAgentWorkspacePaths } from "../../../src/commands/run/agents/workspace.js";
-import { WORKSPACE_SUMMARY_FILENAME } from "../../../src/commands/run/agents/workspace.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
+import { collectAgentArtifacts } from "../../../src/domains/runs/competition/agents/artifacts.js";
+import type { RunAgentWorkspacePaths } from "../../../src/domains/runs/competition/agents/workspace.js";
+import { WORKSPACE_SUMMARY_FILENAME } from "../../../src/domains/runs/competition/agents/workspace.js";
 import { pathExists } from "../../../src/utils/fs.js";
 import {
   gitAddAll,

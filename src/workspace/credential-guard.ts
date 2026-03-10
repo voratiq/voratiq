@@ -2,7 +2,7 @@ import { Dirent } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 
-import { AgentProcessError } from "../commands/run/errors.js";
+import { AgentProcessError } from "../domains/runs/competition/errors.js";
 
 const FORBIDDEN_SEGMENTS = new Set([".gemini", ".codex", ".claude"]);
 

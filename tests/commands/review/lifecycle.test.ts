@@ -14,13 +14,13 @@ import {
   REVIEW_ABORT_DETAIL,
   terminateActiveReview,
 } from "../../../src/commands/review/lifecycle.js";
+import type { ReviewRecord } from "../../../src/domains/reviews/model/types.js";
 import {
   flushReviewRecordBuffer,
   rewriteReviewRecord,
-} from "../../../src/reviews/records/persistence.js";
-import type { ReviewRecord } from "../../../src/reviews/records/types.js";
+} from "../../../src/domains/reviews/persistence/adapter.js";
 
-jest.mock("../../../src/reviews/records/persistence.js", () => ({
+jest.mock("../../../src/domains/reviews/persistence/adapter.js", () => ({
   rewriteReviewRecord: jest.fn(),
   flushReviewRecordBuffer: jest.fn(),
 }));

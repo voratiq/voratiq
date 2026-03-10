@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { createRunRenderer } from "../../../src/render/transcripts/run.js";
 import type {
   AgentInvocationRecord,
   RunReport,
-} from "../../../src/runs/records/types.js";
+} from "../../../src/domains/runs/model/types.js";
+import { createRunRenderer } from "../../../src/render/transcripts/run.js";
 import { formatCliOutput } from "../../../src/utils/output.js";
 import { createRunReport } from "../../support/factories/run-records.js";
 

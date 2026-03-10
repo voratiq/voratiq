@@ -1,9 +1,9 @@
-import { renderListTranscript } from "../../render/transcripts/list.js";
 import {
   fetchRunsSafely,
   type RunQueryFilters,
   type RunRecordWarning,
-} from "../../runs/records/persistence.js";
+} from "../../domains/runs/persistence/adapter.js";
+import { renderListTranscript } from "../../render/transcripts/list.js";
 import { pathExists } from "../../utils/fs.js";
 
 const DEFAULT_LIMIT = 10;

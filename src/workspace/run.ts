@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 
-import { RunDirectoryExistsError } from "../commands/run/errors.js";
+import { RunDirectoryExistsError } from "../domains/runs/competition/errors.js";
 import { pathExists } from "../utils/fs.js";
 import { normalizePathForDisplay, relativeToRoot } from "../utils/path.js";
 import type { RunWorkspacePaths } from "./layout.js";

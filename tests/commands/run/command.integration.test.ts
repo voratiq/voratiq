@@ -1,34 +1,34 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { teardownSessionAuth } from "../../../src/agents/runtime/registry.js";
-import { executeAgents } from "../../../src/commands/run/agent-execution.js";
 import { executeRunCommand } from "../../../src/commands/run/command.js";
-import { generateRunId } from "../../../src/commands/run/id.js";
 import {
   clearActiveRun,
   registerActiveRun,
 } from "../../../src/commands/run/lifecycle.js";
-import type { AgentExecutionPhaseResult } from "../../../src/commands/run/phases.js";
 import { initializeRunRecord } from "../../../src/commands/run/record-init.js";
-import { toRunReport } from "../../../src/commands/run/reports.js";
 import {
   validateAndPrepare,
   type ValidationResult,
 } from "../../../src/commands/run/validation.js";
-import type { ResolvedExtraContextFile } from "../../../src/commands/shared/extra-context.js";
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
+import type { ResolvedExtraContextFile } from "../../../src/competition/shared/extra-context.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
+import { executeAgents } from "../../../src/domains/runs/competition/agent-execution.js";
+import type { AgentExecutionPhaseResult } from "../../../src/domains/runs/competition/phases.js";
+import { toRunReport } from "../../../src/domains/runs/competition/reports.js";
+import { generateRunId } from "../../../src/domains/runs/model/id.js";
 import {
   type AgentRecordMutators,
   createAgentRecordMutators,
-} from "../../../src/runs/records/mutators.js";
-import { rewriteRunRecord } from "../../../src/runs/records/persistence.js";
+} from "../../../src/domains/runs/model/mutators.js";
 import type {
   AgentInvocationRecord,
   AgentReport,
   RunRecord,
   RunReport,
-} from "../../../src/runs/records/types.js";
+} from "../../../src/domains/runs/model/types.js";
+import { rewriteRunRecord } from "../../../src/domains/runs/persistence/adapter.js";
 import { prepareRunWorkspace } from "../../../src/workspace/run.js";
 
 jest.mock("../../../src/commands/run/validation.js", () => ({
@@ -43,20 +43,20 @@ jest.mock("../../../src/commands/run/record-init.js", () => ({
   initializeRunRecord: jest.fn(),
 }));
 
-jest.mock("../../../src/runs/records/mutators.js", () => ({
+jest.mock("../../../src/domains/runs/model/mutators.js", () => ({
   createAgentRecordMutators: jest.fn(),
 }));
 
-jest.mock("../../../src/commands/run/agent-execution.js", () => ({
+jest.mock("../../../src/domains/runs/competition/agent-execution.js", () => ({
   executeAgents: jest.fn(),
 }));
 
-jest.mock("../../../src/runs/records/persistence.js", () => ({
+jest.mock("../../../src/domains/runs/persistence/adapter.js", () => ({
   rewriteRunRecord: jest.fn(),
   flushRunRecordBuffer: jest.fn(),
 }));
 
-jest.mock("../../../src/commands/run/reports.js", () => ({
+jest.mock("../../../src/domains/runs/competition/reports.js", () => ({
   toRunReport: jest.fn(),
 }));
 
@@ -69,7 +69,7 @@ jest.mock("../../../src/commands/shared/resolve-stage-competitors.js", () => ({
   resolveStageCompetitors: jest.fn(),
 }));
 
-jest.mock("../../../src/commands/run/id.js", () => ({
+jest.mock("../../../src/domains/runs/model/id.js", () => ({
   generateRunId: jest.fn(),
 }));
 
@@ -955,6 +955,17 @@ describe("executeRunCommand integration", () => {
     expect(executeAgentsMock).toHaveBeenCalledWith(
       expect.objectContaining({
         extraContextFiles,
+      }),
+    );
+    expect(initializeRunRecordMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extraContext: ["../context/a.md"],
+        extraContextMetadata: [
+          {
+            stagedPath: "../context/a.md",
+            sourcePath: "notes/a.md",
+          },
+        ],
       }),
     );
   });

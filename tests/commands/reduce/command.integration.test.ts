@@ -2,18 +2,18 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { verifyAgentProviders } from "../../../src/agents/runtime/auth.js";
 import { executeReduceCommand } from "../../../src/commands/reduce/command.js";
-import * as reduceAdapter from "../../../src/commands/reduce/competition-adapter.js";
 import { ReducePreflightError } from "../../../src/commands/reduce/errors.js";
 import { assertReductionTargetEligible } from "../../../src/commands/reduce/targets.js";
 import { resolveReductionCompetitors } from "../../../src/commands/shared/resolve-reduction-competitors.js";
 import { generateSessionId } from "../../../src/commands/shared/session-id.js";
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
 import { loadEnvironmentConfig } from "../../../src/configs/environment/loader.js";
+import * as reduceAdapter from "../../../src/domains/reductions/competition/adapter.js";
+import type { ReductionRecord } from "../../../src/domains/reductions/model/types.js";
 import {
   flushReductionRecordBuffer,
   readReductionRecords,
-} from "../../../src/reductions/records/persistence.js";
-import type { ReductionRecord } from "../../../src/reductions/records/types.js";
+} from "../../../src/domains/reductions/persistence/adapter.js";
 import type { ReduceProgressRenderer } from "../../../src/render/transcripts/reduce.js";
 
 jest.mock("../../../src/competition/command-adapter.js", () => ({
@@ -43,7 +43,7 @@ jest.mock("../../../src/commands/reduce/targets.js", () => ({
   assertReductionTargetEligible: jest.fn(),
 }));
 
-jest.mock("../../../src/reductions/records/persistence.js", () => ({
+jest.mock("../../../src/domains/reductions/persistence/adapter.js", () => ({
   flushReductionRecordBuffer: jest.fn(),
   readReductionRecords: jest.fn(),
 }));

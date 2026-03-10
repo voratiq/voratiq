@@ -7,11 +7,11 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { verifyAgentProviders } from "../../../src/agents/runtime/auth.js";
 import * as harness from "../../../src/agents/runtime/harness.js";
 import { executeReduceCommand } from "../../../src/commands/reduce/command.js";
-import { resolveExtraContextFiles } from "../../../src/commands/shared/extra-context.js";
 import { resolveReductionCompetitors } from "../../../src/commands/shared/resolve-reduction-competitors.js";
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import { executeSpecCommand } from "../../../src/commands/spec/command.js";
-import { appendSpecRecord } from "../../../src/specs/records/persistence.js";
+import { resolveExtraContextFiles } from "../../../src/competition/shared/extra-context.js";
+import { appendSpecRecord } from "../../../src/domains/specs/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
 jest.mock("../../../src/agents/runtime/harness.js", () => ({

@@ -1,8 +1,11 @@
-import { toAgentReport, toRunReport } from "../../src/commands/run/reports.js";
+import {
+  toAgentReport,
+  toRunReport,
+} from "../../src/domains/runs/competition/reports.js";
 import type {
   AgentInvocationRecord,
   AgentReport,
-} from "../../src/runs/records/types.js";
+} from "../../src/domains/runs/model/types.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,

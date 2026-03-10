@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 
-import { readReviewRecords } from "../../reviews/records/persistence.js";
-import { buildRunRecordEnhanced } from "../../runs/records/enhanced.js";
-import { rewriteRunRecord } from "../../runs/records/persistence.js";
-import type { RunApplyStatus } from "../../runs/records/types.js";
+import { readReviewRecords } from "../../domains/reviews/persistence/adapter.js";
+import { buildRunRecordEnhanced } from "../../domains/runs/model/enhanced.js";
+import type { RunApplyStatus } from "../../domains/runs/model/types.js";
+import { rewriteRunRecord } from "../../domains/runs/persistence/adapter.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { ensureFileExists } from "../../utils/fs.js";
 import {

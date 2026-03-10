@@ -5,11 +5,11 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { checkPlatformSupport } from "../../src/agents/runtime/sandbox.js";
 import { runReduceCommand } from "../../src/cli/reduce.js";
 import { executeReduceCommand } from "../../src/commands/reduce/command.js";
+import { readReductionRecords } from "../../src/domains/reductions/persistence/adapter.js";
 import {
   ensureSandboxDependencies,
   resolveCliContext,
 } from "../../src/preflight/index.js";
-import { readReductionRecords } from "../../src/reductions/records/persistence.js";
 
 jest.mock("node:fs/promises", () => ({
   readFile: jest.fn(),
@@ -28,7 +28,7 @@ jest.mock("../../src/commands/reduce/command.js", () => ({
   executeReduceCommand: jest.fn(),
 }));
 
-jest.mock("../../src/reductions/records/persistence.js", () => ({
+jest.mock("../../src/domains/reductions/persistence/adapter.js", () => ({
   readReductionRecords: jest.fn(),
 }));
 
