@@ -22,6 +22,18 @@ export class WorkspaceMissingEntryError extends WorkspaceError {
   }
 }
 
+export class WorkspaceWrongTypeEntryError extends WorkspaceError {
+  constructor(
+    public readonly entryPath: string,
+    public readonly expectedType: "file" | "directory",
+  ) {
+    super(
+      `Wrong workspace entry type: \`${entryPath}\` must be a ${expectedType}.`,
+    );
+    this.name = "WorkspaceWrongTypeEntryError";
+  }
+}
+
 export class WorkspaceNotInitializedError extends WorkspaceError {
   constructor(public readonly missingEntries: readonly string[]) {
     super(

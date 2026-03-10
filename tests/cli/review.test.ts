@@ -1388,7 +1388,7 @@ describe("voratiq review", () => {
     it("preserves run lookup error shape when run is missing", async () => {
       await writeFile(
         join(repoRoot, ".voratiq", "runs", "index.json"),
-        "",
+        '{\n  "version": 2,\n  "sessions": []\n}\n',
         "utf8",
       );
 
@@ -1416,7 +1416,9 @@ describe("voratiq review", () => {
         withRepoCwd(repoRoot, () =>
           runReviewCommand({ runId: "any-run", agentIds: ["reviewer"] }),
         ),
-      ).rejects.toThrow("Failed to parse `.voratiq/runs/index.json`:");
+      ).rejects.toThrow(
+        "Failed to parse workspace index `.voratiq/runs/index.json`:",
+      );
     });
 
     it("preserves reviewer process-failure error shape", async () => {

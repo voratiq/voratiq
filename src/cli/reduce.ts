@@ -70,6 +70,7 @@ export async function runReduceCommand(
   } = options;
 
   const { root, workspacePaths } = await resolveCliContext();
+
   checkPlatformSupport();
   ensureSandboxDependencies();
   const extraContextFiles = await resolveExtraContextFiles({

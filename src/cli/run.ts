@@ -67,11 +67,13 @@ export async function runRunCommand(
       workspaceAutoInitMode: "when-missing",
     });
 
-  if (workspaceAutoInitialized && writeOutput) {
+  const workspaceNotice = workspaceAutoInitialized
+    ? renderWorkspaceAutoInitializedNotice()
+    : undefined;
+
+  if (workspaceNotice && writeOutput) {
     writeOutput({
-      alerts: [
-        { severity: "info", message: renderWorkspaceAutoInitializedNotice() },
-      ],
+      alerts: [{ severity: "info", message: workspaceNotice }],
       leadingNewline: false,
     });
   }

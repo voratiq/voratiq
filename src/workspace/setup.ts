@@ -2,16 +2,14 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 import { readAgentsConfig } from "../configs/agents/loader.js";
 import { buildDefaultOrchestrationTemplate } from "../configs/orchestration/bootstrap.js";
-import {
-  ensureDirectoryExists,
-  ensureFileExists,
-  isDirectory,
-  pathExists,
-} from "../utils/fs.js";
+import { toErrorMessage } from "../utils/errors.js";
+import { isDirectory, isFile, pathExists } from "../utils/fs.js";
 import { relativeToRoot } from "../utils/path.js";
 import {
   WorkspaceMissingEntryError,
   WorkspaceNotInitializedError,
+  WorkspaceSetupError,
+  WorkspaceWrongTypeEntryError,
 } from "./errors.js";
 import {
   resolveWorkspacePath,
@@ -41,6 +39,62 @@ import {
 } from "./templates.js";
 import type { CreateWorkspaceResult } from "./types.js";
 
+interface WorkspaceDomainStructureDefinition {
+  readonly directorySegment: string;
+  readonly sessionsSegment: string;
+  readonly indexSegment: string;
+  readonly indexVersion: number;
+}
+
+interface ResolvedWorkspaceDomainStructure {
+  readonly directoryPath: string;
+  readonly sessionsPath: string;
+  readonly indexPath: string;
+  readonly indexVersion: number;
+}
+
+export interface RepairWorkspaceStructureResult {
+  readonly repaired: boolean;
+  readonly createdDirectories: string[];
+  readonly createdFiles: string[];
+}
+
+const DOMAIN_STRUCTURE_DEFINITIONS: readonly WorkspaceDomainStructureDefinition[] =
+  [
+    {
+      directorySegment: VORATIQ_RUNS_DIR,
+      sessionsSegment: VORATIQ_RUNS_SESSIONS_DIR,
+      indexSegment: VORATIQ_RUNS_FILE,
+      indexVersion: 2,
+    },
+    {
+      directorySegment: VORATIQ_REDUCTIONS_DIR,
+      sessionsSegment: VORATIQ_REDUCTIONS_SESSIONS_DIR,
+      indexSegment: VORATIQ_REDUCTIONS_FILE,
+      indexVersion: 1,
+    },
+    {
+      directorySegment: VORATIQ_REVIEWS_DIR,
+      sessionsSegment: VORATIQ_REVIEWS_SESSIONS_DIR,
+      indexSegment: VORATIQ_REVIEWS_FILE,
+      indexVersion: 1,
+    },
+    {
+      directorySegment: VORATIQ_SPECS_DIR,
+      sessionsSegment: VORATIQ_SPECS_SESSIONS_DIR,
+      indexSegment: VORATIQ_SPECS_FILE,
+      indexVersion: 1,
+    },
+  ];
+
+const WORKSPACE_CONFIG_SEGMENTS: readonly string[] = [
+  VORATIQ_AGENTS_FILE,
+  VORATIQ_EVALS_FILE,
+  VORATIQ_ENVIRONMENT_FILE,
+  VORATIQ_SANDBOX_FILE,
+  VORATIQ_ORCHESTRATION_FILE,
+];
+
 export async function createWorkspace(
   root: string,
 ): Promise<CreateWorkspaceResult> {
@@ -48,32 +102,7 @@ export async function createWorkspace(
   const createdFiles: string[] = [];
 
   const workspaceDir = resolveWorkspacePath(root);
-  const runsDir = resolveWorkspacePath(root, VORATIQ_RUNS_DIR);
-  const reductionsDir = resolveWorkspacePath(root, VORATIQ_REDUCTIONS_DIR);
-  const reviewsDir = resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR);
-  const specsDir = resolveWorkspacePath(root, VORATIQ_SPECS_DIR);
-
-  const sessionsDir = resolveWorkspacePath(root, VORATIQ_RUNS_SESSIONS_DIR);
-  const reductionSessionsDir = resolveWorkspacePath(
-    root,
-    VORATIQ_REDUCTIONS_SESSIONS_DIR,
-  );
-  const reviewSessionsDir = resolveWorkspacePath(
-    root,
-    VORATIQ_REVIEWS_SESSIONS_DIR,
-  );
-  const specSessionsDir = resolveWorkspacePath(
-    root,
-    VORATIQ_SPECS_SESSIONS_DIR,
-  );
-
-  const runsIndexPath = resolveWorkspacePath(root, VORATIQ_RUNS_FILE);
-  const reductionsIndexPath = resolveWorkspacePath(
-    root,
-    VORATIQ_REDUCTIONS_FILE,
-  );
-  const reviewsIndexPath = resolveWorkspacePath(root, VORATIQ_REVIEWS_FILE);
-  const specsIndexPath = resolveWorkspacePath(root, VORATIQ_SPECS_FILE);
+  const domainStructures = resolveWorkspaceDomainStructures(root);
 
   const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const evalsConfigPath = resolveWorkspacePath(root, VORATIQ_EVALS_FILE);
@@ -87,42 +116,14 @@ export async function createWorkspace(
     VORATIQ_ORCHESTRATION_FILE,
   );
 
-  const [
-    workspaceExists,
-    runsExists,
-    reductionsExists,
-    reviewsExists,
-    specsExists,
-    runsSessionsExists,
-    reductionsSessionsExists,
-    reviewsSessionsExists,
-    specsSessionsExists,
-    runsIndexExists,
-    reductionsIndexExists,
-    reviewsIndexExists,
-    specsIndexExists,
-    agentsConfigExists,
-    evalsConfigExists,
-    environmentConfigExists,
-    sandboxConfigExists,
-    orchestrationConfigExists,
-  ] = await Promise.all([
-    pathExists(workspaceDir),
-    pathExists(runsDir),
-    pathExists(reductionsDir),
-    pathExists(reviewsDir),
-    pathExists(specsDir),
-    pathExists(sessionsDir),
-    pathExists(reductionSessionsDir),
-    pathExists(reviewSessionsDir),
-    pathExists(specSessionsDir),
-    pathExists(runsIndexPath),
-    pathExists(reductionsIndexPath),
-    pathExists(reviewsIndexPath),
-    pathExists(specsIndexPath),
-    pathExists(agentsConfigPath),
-    pathExists(evalsConfigPath),
-    pathExists(environmentConfigPath),
+  const workspaceExists = await pathExists(workspaceDir);
+  const [agentsConfigExists, evalsConfigExists, environmentConfigExists] =
+    await Promise.all([
+      pathExists(agentsConfigPath),
+      pathExists(evalsConfigPath),
+      pathExists(environmentConfigPath),
+    ]);
+  const [sandboxConfigExists, orchestrationConfigExists] = await Promise.all([
     pathExists(sandboxConfigPath),
     pathExists(orchestrationConfigPath),
   ]);
@@ -132,72 +133,21 @@ export async function createWorkspace(
     createdDirectories.push(relativeToRoot(root, workspaceDir));
   }
 
-  if (!runsExists) {
-    await mkdir(runsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, runsDir));
-  }
+  for (const domain of domainStructures) {
+    if (!(await pathExists(domain.directoryPath))) {
+      await mkdir(domain.directoryPath, { recursive: true });
+      createdDirectories.push(relativeToRoot(root, domain.directoryPath));
+    }
 
-  if (!reductionsExists) {
-    await mkdir(reductionsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, reductionsDir));
-  }
+    if (!(await pathExists(domain.sessionsPath))) {
+      await mkdir(domain.sessionsPath, { recursive: true });
+      createdDirectories.push(relativeToRoot(root, domain.sessionsPath));
+    }
 
-  if (!reviewsExists) {
-    await mkdir(reviewsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, reviewsDir));
-  }
-
-  if (!specsExists) {
-    await mkdir(specsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, specsDir));
-  }
-
-  if (!runsSessionsExists) {
-    await mkdir(sessionsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, sessionsDir));
-  }
-
-  if (!reductionsSessionsExists) {
-    await mkdir(reductionSessionsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, reductionSessionsDir));
-  }
-
-  if (!reviewsSessionsExists) {
-    await mkdir(reviewSessionsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, reviewSessionsDir));
-  }
-
-  if (!specsSessionsExists) {
-    await mkdir(specSessionsDir, { recursive: true });
-    createdDirectories.push(relativeToRoot(root, specSessionsDir));
-  }
-
-  if (!runsIndexExists) {
-    const initialIndex = JSON.stringify({ version: 2, sessions: [] }, null, 2);
-    await writeFile(runsIndexPath, `${initialIndex}\n`, { encoding: "utf8" });
-    createdFiles.push(relativeToRoot(root, runsIndexPath));
-  }
-
-  if (!reductionsIndexExists) {
-    const initialIndex = JSON.stringify({ version: 1, sessions: [] }, null, 2);
-    await writeFile(reductionsIndexPath, `${initialIndex}\n`, {
-      encoding: "utf8",
-    });
-    createdFiles.push(relativeToRoot(root, reductionsIndexPath));
-  }
-
-  if (!reviewsIndexExists) {
-    const initialIndex = JSON.stringify({ version: 1, sessions: [] }, null, 2);
-    await writeFile(reviewsIndexPath, `${initialIndex}\n`, {
-      encoding: "utf8",
-    });
-    createdFiles.push(relativeToRoot(root, reviewsIndexPath));
-  }
-
-  if (!specsIndexExists) {
-    const initialIndex = JSON.stringify({ version: 1, sessions: [] }, null, 2);
-    await writeFile(specsIndexPath, `${initialIndex}\n`, { encoding: "utf8" });
-    createdFiles.push(relativeToRoot(root, specsIndexPath));
+    if (!(await pathExists(domain.indexPath))) {
+      await writeInitialIndex(domain.indexPath, domain.indexVersion);
+      createdFiles.push(relativeToRoot(root, domain.indexPath));
+    }
   }
 
   if (!agentsConfigExists) {
@@ -242,163 +192,265 @@ export async function createWorkspace(
   return { createdDirectories, createdFiles };
 }
 
+export async function repairWorkspaceStructure(
+  root: string,
+): Promise<RepairWorkspaceStructureResult> {
+  const createdDirectories: string[] = [];
+  const createdFiles: string[] = [];
+
+  const workspaceDir = resolveWorkspacePath(root);
+  await ensureWorkspaceDirectoryEntry(root, workspaceDir);
+
+  // Additive repair must not mutate config semantics.
+  for (const configPath of resolveWorkspaceConfigPaths(root)) {
+    await ensureWorkspaceFileEntry(root, configPath);
+  }
+
+  const domainStructures = resolveWorkspaceDomainStructures(root);
+  const missingDirectories: string[] = [];
+  const missingIndexes: ResolvedWorkspaceDomainStructure[] = [];
+  const existingIndexes: ResolvedWorkspaceDomainStructure[] = [];
+
+  for (const domain of domainStructures) {
+    await classifyExpectedDirectory({
+      root,
+      path: domain.directoryPath,
+      onMissing: () => {
+        missingDirectories.push(domain.directoryPath);
+      },
+    });
+
+    await classifyExpectedDirectory({
+      root,
+      path: domain.sessionsPath,
+      onMissing: () => {
+        missingDirectories.push(domain.sessionsPath);
+      },
+    });
+
+    await classifyExpectedFile({
+      root,
+      path: domain.indexPath,
+      onMissing: () => {
+        missingIndexes.push(domain);
+      },
+      onPresent: () => {
+        existingIndexes.push(domain);
+      },
+    });
+  }
+
+  const repaired = missingDirectories.length > 0 || missingIndexes.length > 0;
+  if (!repaired) {
+    return { repaired: false, createdDirectories, createdFiles };
+  }
+
+  for (const domain of existingIndexes) {
+    await validateWorkspaceIndexFile(root, domain);
+  }
+
+  for (const directoryPath of missingDirectories) {
+    await mkdir(directoryPath, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, directoryPath));
+  }
+
+  for (const domain of missingIndexes) {
+    await writeInitialIndex(domain.indexPath, domain.indexVersion);
+    createdFiles.push(relativeToRoot(root, domain.indexPath));
+  }
+
+  return { repaired: true, createdDirectories, createdFiles };
+}
+
 export async function validateWorkspace(root: string): Promise<void> {
   const workspaceDir = resolveWorkspacePath(root);
-  const runsDir = resolveWorkspacePath(root, VORATIQ_RUNS_DIR);
-  const reductionsDir = resolveWorkspacePath(root, VORATIQ_REDUCTIONS_DIR);
-  const reviewsDir = resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR);
-  const specsDir = resolveWorkspacePath(root, VORATIQ_SPECS_DIR);
-  const sessionsDir = resolveWorkspacePath(root, VORATIQ_RUNS_SESSIONS_DIR);
-  const reductionSessionsDir = resolveWorkspacePath(
-    root,
-    VORATIQ_REDUCTIONS_SESSIONS_DIR,
-  );
-  const reviewSessionsDir = resolveWorkspacePath(
-    root,
-    VORATIQ_REVIEWS_SESSIONS_DIR,
-  );
-  const specSessionsDir = resolveWorkspacePath(
-    root,
-    VORATIQ_SPECS_SESSIONS_DIR,
-  );
-  const runsIndexPath = resolveWorkspacePath(root, VORATIQ_RUNS_FILE);
-  const reductionsIndexPath = resolveWorkspacePath(
-    root,
-    VORATIQ_REDUCTIONS_FILE,
-  );
-  const reviewsIndexPath = resolveWorkspacePath(root, VORATIQ_REVIEWS_FILE);
-  const specsIndexPath = resolveWorkspacePath(root, VORATIQ_SPECS_FILE);
-  const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
-  const evalsConfigPath = resolveWorkspacePath(root, VORATIQ_EVALS_FILE);
-  const environmentConfigPath = resolveWorkspacePath(
-    root,
-    VORATIQ_ENVIRONMENT_FILE,
-  );
-  const sandboxConfigPath = resolveWorkspacePath(root, VORATIQ_SANDBOX_FILE);
-  const orchestrationConfigPath = resolveWorkspacePath(
-    root,
-    VORATIQ_ORCHESTRATION_FILE,
-  );
+  const domainStructures = resolveWorkspaceDomainStructures(root);
+  const configPaths = resolveWorkspaceConfigPaths(root);
 
   if (!(await isDirectory(workspaceDir))) {
-    const missingEntries = [
-      `${relativeToRoot(root, workspaceDir)}/`,
-      `${relativeToRoot(root, runsDir)}/`,
-      `${relativeToRoot(root, reductionsDir)}/`,
-      `${relativeToRoot(root, reviewsDir)}/`,
-      `${relativeToRoot(root, specsDir)}/`,
-      `${relativeToRoot(root, sessionsDir)}/`,
-      `${relativeToRoot(root, reductionSessionsDir)}/`,
-      `${relativeToRoot(root, reviewSessionsDir)}/`,
-      `${relativeToRoot(root, specSessionsDir)}/`,
-      relativeToRoot(root, runsIndexPath),
-      relativeToRoot(root, reductionsIndexPath),
-      relativeToRoot(root, reviewsIndexPath),
-      relativeToRoot(root, specsIndexPath),
-      relativeToRoot(root, agentsConfigPath),
-      relativeToRoot(root, environmentConfigPath),
-      relativeToRoot(root, sandboxConfigPath),
-      relativeToRoot(root, orchestrationConfigPath),
-    ];
+    const missingEntries = buildWorkspaceMissingEntryList({
+      root,
+      workspaceDir,
+      domainStructures,
+      configPaths,
+    });
     throw new WorkspaceNotInitializedError(missingEntries);
   }
 
-  await ensureDirectoryExists(
-    runsDir,
-    () => new WorkspaceMissingEntryError(relativeToRoot(root, runsDir)),
-  );
+  for (const domain of domainStructures) {
+    await ensureWorkspaceDirectoryEntry(root, domain.directoryPath);
+    await ensureWorkspaceDirectoryEntry(root, domain.sessionsPath);
+    await ensureWorkspaceFileEntry(root, domain.indexPath);
+    await validateWorkspaceIndexFile(root, domain);
+  }
 
-  await ensureDirectoryExists(
-    reductionsDir,
-    () => new WorkspaceMissingEntryError(relativeToRoot(root, reductionsDir)),
-  );
+  for (const configPath of configPaths) {
+    await ensureWorkspaceFileEntry(root, configPath);
+  }
+}
 
-  await ensureDirectoryExists(
-    reviewsDir,
-    () => new WorkspaceMissingEntryError(relativeToRoot(root, reviewsDir)),
-  );
+function resolveWorkspaceDomainStructures(
+  root: string,
+): readonly ResolvedWorkspaceDomainStructure[] {
+  return DOMAIN_STRUCTURE_DEFINITIONS.map((domain) => ({
+    directoryPath: resolveWorkspacePath(root, domain.directorySegment),
+    sessionsPath: resolveWorkspacePath(root, domain.sessionsSegment),
+    indexPath: resolveWorkspacePath(root, domain.indexSegment),
+    indexVersion: domain.indexVersion,
+  }));
+}
 
-  await ensureDirectoryExists(
-    specsDir,
-    () => new WorkspaceMissingEntryError(relativeToRoot(root, specsDir)),
+function resolveWorkspaceConfigPaths(root: string): readonly string[] {
+  return WORKSPACE_CONFIG_SEGMENTS.map((segment) =>
+    resolveWorkspacePath(root, segment),
   );
+}
 
-  await ensureDirectoryExists(
-    sessionsDir,
-    () => new WorkspaceMissingEntryError(relativeToRoot(root, sessionsDir)),
-  );
+function buildWorkspaceMissingEntryList(options: {
+  root: string;
+  workspaceDir: string;
+  domainStructures: readonly ResolvedWorkspaceDomainStructure[];
+  configPaths: readonly string[];
+}): string[] {
+  const { root, workspaceDir, domainStructures, configPaths } = options;
+  const missing: string[] = [`${relativeToRoot(root, workspaceDir)}/`];
 
-  await ensureDirectoryExists(
-    reductionSessionsDir,
-    () =>
-      new WorkspaceMissingEntryError(
-        relativeToRoot(root, reductionSessionsDir),
-      ),
-  );
+  for (const domain of domainStructures) {
+    missing.push(`${relativeToRoot(root, domain.directoryPath)}/`);
+    missing.push(`${relativeToRoot(root, domain.sessionsPath)}/`);
+    missing.push(relativeToRoot(root, domain.indexPath));
+  }
 
-  await ensureDirectoryExists(
-    reviewSessionsDir,
-    () =>
-      new WorkspaceMissingEntryError(relativeToRoot(root, reviewSessionsDir)),
-  );
+  for (const configPath of configPaths) {
+    missing.push(relativeToRoot(root, configPath));
+  }
 
-  await ensureDirectoryExists(
-    specSessionsDir,
-    () => new WorkspaceMissingEntryError(relativeToRoot(root, specSessionsDir)),
-  );
+  return missing;
+}
 
-  await ensureFileExists(
-    runsIndexPath,
-    () => new WorkspaceMissingEntryError(relativeToRoot(root, runsIndexPath)),
-  );
+async function classifyExpectedDirectory(options: {
+  root: string;
+  path: string;
+  onMissing: () => void;
+}): Promise<void> {
+  const { root, path, onMissing } = options;
+  const kind = await detectPathKind(path);
+  if (kind === "missing") {
+    onMissing();
+    return;
+  }
+  if (kind !== "directory") {
+    throw new WorkspaceWrongTypeEntryError(
+      relativeToRoot(root, path),
+      "directory",
+    );
+  }
+}
 
-  await ensureFileExists(
-    reductionsIndexPath,
-    () =>
-      new WorkspaceMissingEntryError(relativeToRoot(root, reductionsIndexPath)),
-  );
+async function classifyExpectedFile(options: {
+  root: string;
+  path: string;
+  onMissing: () => void;
+  onPresent: () => void;
+}): Promise<void> {
+  const { root, path, onMissing, onPresent } = options;
+  const kind = await detectPathKind(path);
+  if (kind === "missing") {
+    onMissing();
+    return;
+  }
+  if (kind !== "file") {
+    throw new WorkspaceWrongTypeEntryError(relativeToRoot(root, path), "file");
+  }
+  onPresent();
+}
 
-  await ensureFileExists(
-    reviewsIndexPath,
-    () =>
-      new WorkspaceMissingEntryError(relativeToRoot(root, reviewsIndexPath)),
-  );
+async function ensureWorkspaceDirectoryEntry(
+  root: string,
+  path: string,
+): Promise<void> {
+  const kind = await detectPathKind(path);
+  if (kind === "missing") {
+    throw new WorkspaceMissingEntryError(relativeToRoot(root, path));
+  }
+  if (kind !== "directory") {
+    throw new WorkspaceWrongTypeEntryError(
+      relativeToRoot(root, path),
+      "directory",
+    );
+  }
+}
 
-  await ensureFileExists(
-    specsIndexPath,
-    () => new WorkspaceMissingEntryError(relativeToRoot(root, specsIndexPath)),
-  );
+async function ensureWorkspaceFileEntry(
+  root: string,
+  path: string,
+): Promise<void> {
+  const kind = await detectPathKind(path);
+  if (kind === "missing") {
+    throw new WorkspaceMissingEntryError(relativeToRoot(root, path));
+  }
+  if (kind !== "file") {
+    throw new WorkspaceWrongTypeEntryError(relativeToRoot(root, path), "file");
+  }
+}
 
-  await ensureFileExists(
-    agentsConfigPath,
-    () =>
-      new WorkspaceMissingEntryError(relativeToRoot(root, agentsConfigPath)),
-  );
+async function detectPathKind(
+  path: string,
+): Promise<"missing" | "directory" | "file" | "other"> {
+  if (!(await pathExists(path))) {
+    return "missing";
+  }
+  if (await isDirectory(path)) {
+    return "directory";
+  }
+  if (await isFile(path)) {
+    return "file";
+  }
+  return "other";
+}
 
-  await ensureFileExists(
-    evalsConfigPath,
-    () => new WorkspaceMissingEntryError(relativeToRoot(root, evalsConfigPath)),
-  );
+async function validateWorkspaceIndexFile(
+  root: string,
+  domain: ResolvedWorkspaceDomainStructure,
+): Promise<void> {
+  const displayPath = relativeToRoot(root, domain.indexPath);
+  let raw: string;
+  try {
+    raw = await readFile(domain.indexPath, "utf8");
+  } catch (error) {
+    throw new WorkspaceSetupError(
+      `Failed to read workspace index \`${displayPath}\`: ${toErrorMessage(error)}`,
+    );
+  }
 
-  await ensureFileExists(
-    environmentConfigPath,
-    () =>
-      new WorkspaceMissingEntryError(
-        relativeToRoot(root, environmentConfigPath),
-      ),
-  );
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch (error) {
+    throw new WorkspaceSetupError(
+      `Failed to parse workspace index \`${displayPath}\`: ${toErrorMessage(error)}`,
+    );
+  }
 
-  await ensureFileExists(
-    sandboxConfigPath,
-    () =>
-      new WorkspaceMissingEntryError(relativeToRoot(root, sandboxConfigPath)),
-  );
+  if (!isValidWorkspaceIndexPayload(parsed, domain.indexVersion)) {
+    throw new WorkspaceSetupError(
+      `Invalid workspace index \`${displayPath}\`: expected \`{ version: ${domain.indexVersion}, sessions: [] }\`.`,
+    );
+  }
+}
 
-  await ensureFileExists(
-    orchestrationConfigPath,
-    () =>
-      new WorkspaceMissingEntryError(
-        relativeToRoot(root, orchestrationConfigPath),
-      ),
-  );
+function isValidWorkspaceIndexPayload(
+  payload: unknown,
+  version: number,
+): boolean {
+  if (typeof payload !== "object" || payload === null) {
+    return false;
+  }
+  const candidate = payload as { version?: unknown; sessions?: unknown };
+  return candidate.version === version && Array.isArray(candidate.sessions);
+}
+
+async function writeInitialIndex(path: string, version: number): Promise<void> {
+  const initialIndex = JSON.stringify({ version, sessions: [] }, null, 2);
+  await writeFile(path, `${initialIndex}\n`, { encoding: "utf8" });
 }

@@ -51,11 +51,13 @@ export async function runSpecCommand(
       workspaceAutoInitMode: "when-missing",
     });
 
-  if (workspaceAutoInitialized) {
+  const workspaceNotice = workspaceAutoInitialized
+    ? renderWorkspaceAutoInitializedNotice()
+    : undefined;
+
+  if (workspaceNotice) {
     writeOutput({
-      alerts: [
-        { severity: "info", message: renderWorkspaceAutoInitializedNotice() },
-      ],
+      alerts: [{ severity: "info", message: workspaceNotice }],
       leadingNewline: false,
     });
   }

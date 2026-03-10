@@ -7,13 +7,14 @@ import {
   resolveCliContext,
 } from "../preflight/index.js";
 import { renderApplyTranscript } from "../render/transcripts/apply.js";
-import { writeCommandOutput } from "./output.js";
+import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface ApplyCommandOptions {
   runId: string;
   agentId: string;
   ignoreBaseMismatch?: boolean;
   commit?: boolean;
+  writeOutput?: CommandOutputWriter;
 }
 
 export interface ApplyCommandResult {
@@ -33,6 +34,7 @@ export async function runApplyCommand(
   } = options;
 
   const { root, workspacePaths } = await resolveCliContext();
+
   await ensureCleanWorkingTree(root);
 
   const result = await executeApplyCommand({
@@ -75,6 +77,7 @@ export function createApplyCommand(): Command {
         agentId: options.agent,
         ignoreBaseMismatch: options.ignoreBaseMismatch ?? false,
         commit: options.commit ?? false,
+        writeOutput: writeCommandOutput,
       });
 
       writeCommandOutput({

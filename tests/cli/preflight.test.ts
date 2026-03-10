@@ -18,6 +18,8 @@ import { GitRepositoryError } from "../../src/utils/errors.js";
 import * as git from "../../src/utils/git.js";
 import { WorkspaceMissingEntryError } from "../../src/workspace/errors.js";
 import { WorkspaceNotInitializedError } from "../../src/workspace/errors.js";
+import { WorkspaceSetupError } from "../../src/workspace/errors.js";
+import { WorkspaceWrongTypeEntryError } from "../../src/workspace/errors.js";
 import * as workspaceSetup from "../../src/workspace/setup.js";
 
 jest.mock("node:fs/promises", () => fs.promises);
@@ -29,6 +31,33 @@ jest.mock("../../src/commands/init/command.js", () => ({
 }));
 const execFileMock = jest.mocked(execFile);
 const executeInitCommandMock = jest.mocked(executeInitCommand);
+
+function buildValidWorkspaceTree(
+  root = "/app/voratiq",
+): Record<string, null | string> {
+  return {
+    [`${root}/.git`]: "",
+    [`${root}/.voratiq`]: null,
+    [`${root}/.voratiq/runs`]: null,
+    [`${root}/.voratiq/runs/sessions`]: null,
+    [`${root}/.voratiq/runs/index.json`]: '{"version":2,"sessions":[]}\n',
+    [`${root}/.voratiq/reductions`]: null,
+    [`${root}/.voratiq/reductions/sessions`]: null,
+    [`${root}/.voratiq/reductions/index.json`]: '{"version":1,"sessions":[]}\n',
+    [`${root}/.voratiq/reviews`]: null,
+    [`${root}/.voratiq/reviews/sessions`]: null,
+    [`${root}/.voratiq/reviews/index.json`]: '{"version":1,"sessions":[]}\n',
+    [`${root}/.voratiq/specs`]: null,
+    [`${root}/.voratiq/specs/sessions`]: null,
+    [`${root}/.voratiq/specs/index.json`]: '{"version":1,"sessions":[]}\n',
+    [`${root}/.voratiq/agents.yaml`]: "agents: []\n",
+    [`${root}/.voratiq/evals.yaml`]: "\n",
+    [`${root}/.voratiq/environment.yaml`]: "\n",
+    [`${root}/.voratiq/sandbox.yaml`]: "providers: {}\n",
+    [`${root}/.voratiq/orchestration.yaml`]:
+      "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    review:\n      agents: []\n",
+  };
+}
 
 describe("CLI Context", () => {
   beforeEach(() => {
@@ -217,6 +246,209 @@ describe("CLI Context", () => {
       expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
+    it("repairs a legacy workspace missing one domain directory", async () => {
+      vol.fromJSON(buildValidWorkspaceTree());
+      await fs.promises.rm("/app/voratiq/.voratiq/reductions", {
+        recursive: true,
+        force: true,
+      });
+
+      const context = await resolveCliContext();
+
+      expect(context.workspaceAutoRepaired).toBe(true);
+      await expect(
+        fs.promises.access("/app/voratiq/.voratiq/reductions"),
+      ).resolves.toBeUndefined();
+      await expect(
+        fs.promises.access("/app/voratiq/.voratiq/reductions/sessions"),
+      ).resolves.toBeUndefined();
+      await expect(
+        fs.promises.readFile("/app/voratiq/.voratiq/reductions/index.json", {
+          encoding: "utf8",
+        }),
+      ).resolves.toContain('"version": 1');
+      expect(executeInitCommandMock).not.toHaveBeenCalled();
+    });
+
+    it("repairs a legacy workspace missing one domain index file", async () => {
+      vol.fromJSON(buildValidWorkspaceTree());
+      await fs.promises.rm("/app/voratiq/.voratiq/reviews/index.json", {
+        force: true,
+      });
+
+      const context = await resolveCliContext();
+
+      expect(context.workspaceAutoRepaired).toBe(true);
+      await expect(
+        fs.promises.readFile("/app/voratiq/.voratiq/reviews/index.json", {
+          encoding: "utf8",
+        }),
+      ).resolves.toContain('"version": 1');
+      expect(executeInitCommandMock).not.toHaveBeenCalled();
+    });
+
+    it("repairs a legacy workspace missing one domain sessions directory", async () => {
+      vol.fromJSON(buildValidWorkspaceTree());
+      await fs.promises.rm("/app/voratiq/.voratiq/specs/sessions", {
+        recursive: true,
+        force: true,
+      });
+
+      const context = await resolveCliContext();
+
+      expect(context.workspaceAutoRepaired).toBe(true);
+      await expect(
+        fs.promises.access("/app/voratiq/.voratiq/specs/sessions"),
+      ).resolves.toBeUndefined();
+      expect(executeInitCommandMock).not.toHaveBeenCalled();
+    });
+
+    it("repairs multiple missing domain storage entries in one pass", async () => {
+      vol.fromJSON(buildValidWorkspaceTree());
+      await fs.promises.rm("/app/voratiq/.voratiq/reviews", {
+        recursive: true,
+        force: true,
+      });
+      await fs.promises.rm("/app/voratiq/.voratiq/specs/index.json", {
+        force: true,
+      });
+      await fs.promises.rm("/app/voratiq/.voratiq/runs/sessions", {
+        recursive: true,
+        force: true,
+      });
+
+      const context = await resolveCliContext();
+
+      expect(context.workspaceAutoRepaired).toBe(true);
+      await expect(
+        fs.promises.access("/app/voratiq/.voratiq/reviews/sessions"),
+      ).resolves.toBeUndefined();
+      await expect(
+        fs.promises.readFile("/app/voratiq/.voratiq/specs/index.json", "utf8"),
+      ).resolves.toContain('"version": 1');
+      await expect(
+        fs.promises.access("/app/voratiq/.voratiq/runs/sessions"),
+      ).resolves.toBeUndefined();
+      expect(executeInitCommandMock).not.toHaveBeenCalled();
+    });
+
+    it("fails when a required path exists with the wrong type", async () => {
+      vol.fromJSON(buildValidWorkspaceTree());
+      await fs.promises.rm("/app/voratiq/.voratiq/reductions", {
+        recursive: true,
+        force: true,
+      });
+      await fs.promises.writeFile("/app/voratiq/.voratiq/reductions", "");
+
+      await expect(resolveCliContext()).rejects.toThrow(
+        WorkspaceWrongTypeEntryError,
+      );
+      await expect(resolveCliContext()).rejects.toThrow(
+        "Wrong workspace entry type: `.voratiq/reductions` must be a directory.",
+      );
+      expect(executeInitCommandMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["/app/voratiq/.voratiq/runs/index.json", ".voratiq/runs/index.json"],
+      [
+        "/app/voratiq/.voratiq/reviews/index.json",
+        ".voratiq/reviews/index.json",
+      ],
+      ["/app/voratiq/.voratiq/specs/index.json", ".voratiq/specs/index.json"],
+      [
+        "/app/voratiq/.voratiq/reductions/index.json",
+        ".voratiq/reductions/index.json",
+      ],
+    ])(
+      "fails preflight when %s is malformed even with no missing entries",
+      async (indexPath, displayPath) => {
+        vol.fromJSON(buildValidWorkspaceTree());
+        await fs.promises.writeFile(indexPath, '{"version":2,');
+
+        await expect(resolveCliContext()).rejects.toThrow(WorkspaceSetupError);
+        await expect(resolveCliContext()).rejects.toThrow(
+          `Failed to parse workspace index \`${displayPath}\`:`,
+        );
+      },
+    );
+
+    it("fails when an existing index is malformed instead of overwriting it during repair", async () => {
+      vol.fromJSON(buildValidWorkspaceTree());
+      await fs.promises.writeFile(
+        "/app/voratiq/.voratiq/runs/index.json",
+        '{"version":2,',
+      );
+      await fs.promises.rm("/app/voratiq/.voratiq/reductions/sessions", {
+        recursive: true,
+        force: true,
+      });
+
+      await expect(resolveCliContext()).rejects.toThrow(WorkspaceSetupError);
+      await expect(resolveCliContext()).rejects.toThrow(
+        "Failed to parse workspace index `.voratiq/runs/index.json`:",
+      );
+    });
+
+    it("fails when a required sessions directory path exists as a file", async () => {
+      vol.fromJSON(buildValidWorkspaceTree());
+      await fs.promises.rm("/app/voratiq/.voratiq/specs/sessions", {
+        recursive: true,
+        force: true,
+      });
+      await fs.promises.writeFile("/app/voratiq/.voratiq/specs/sessions", "");
+
+      await expect(resolveCliContext()).rejects.toThrow(
+        WorkspaceWrongTypeEntryError,
+      );
+      await expect(resolveCliContext()).rejects.toThrow(
+        "Wrong workspace entry type: `.voratiq/specs/sessions` must be a directory.",
+      );
+    });
+
+    it("fails when a required index path exists as a directory", async () => {
+      vol.fromJSON(buildValidWorkspaceTree());
+      await fs.promises.rm("/app/voratiq/.voratiq/reviews/index.json", {
+        force: true,
+      });
+      await fs.promises.mkdir("/app/voratiq/.voratiq/reviews/index.json");
+
+      await expect(resolveCliContext()).rejects.toThrow(
+        WorkspaceWrongTypeEntryError,
+      );
+      await expect(resolveCliContext()).rejects.toThrow(
+        "Wrong workspace entry type: `.voratiq/reviews/index.json` must be a file.",
+      );
+    });
+
+    it("fails when a required config path exists as a directory", async () => {
+      vol.fromJSON(buildValidWorkspaceTree());
+      await fs.promises.rm("/app/voratiq/.voratiq/evals.yaml", {
+        force: true,
+      });
+      await fs.promises.mkdir("/app/voratiq/.voratiq/evals.yaml");
+
+      await expect(resolveCliContext()).rejects.toThrow(
+        WorkspaceWrongTypeEntryError,
+      );
+      await expect(resolveCliContext()).rejects.toThrow(
+        "Wrong workspace entry type: `.voratiq/evals.yaml` must be a file.",
+      );
+      expect(executeInitCommandMock).not.toHaveBeenCalled();
+    });
+
+    it("fails when a required config file is missing", async () => {
+      vol.fromJSON(buildValidWorkspaceTree());
+      await fs.promises.rm("/app/voratiq/.voratiq/evals.yaml", {
+        force: true,
+      });
+
+      await expect(resolveCliContext()).rejects.toThrow(
+        WorkspaceMissingEntryError,
+      );
+      expect(executeInitCommandMock).not.toHaveBeenCalled();
+    });
+
     it("runs preflight in deterministic order: git check, init decision, validation", async () => {
       vol.fromJSON({
         "/app/voratiq/.git": "",
@@ -255,29 +487,11 @@ describe("CLI Context", () => {
     });
 
     it("should return the CLI context if workspace is valid", async () => {
-      vol.fromJSON({
-        "/app/voratiq/.git": "",
-        "/app/voratiq/.voratiq/runs/index.json": "",
-        "/app/voratiq/.voratiq/runs": null,
-        "/app/voratiq/.voratiq/runs/sessions": null,
-        "/app/voratiq/.voratiq/reductions/index.json": "",
-        "/app/voratiq/.voratiq/reductions": null,
-        "/app/voratiq/.voratiq/reductions/sessions": null,
-        "/app/voratiq/.voratiq/reviews/index.json": "",
-        "/app/voratiq/.voratiq/reviews": null,
-        "/app/voratiq/.voratiq/reviews/sessions": null,
-        "/app/voratiq/.voratiq/specs/index.json": "",
-        "/app/voratiq/.voratiq/specs": null,
-        "/app/voratiq/.voratiq/specs/sessions": null,
-        "/app/voratiq/.voratiq/agents.yaml": "",
-        "/app/voratiq/.voratiq/orchestration.yaml": "",
-        "/app/voratiq/.voratiq/evals.yaml": "",
-        "/app/voratiq/.voratiq/environment.yaml": "",
-        "/app/voratiq/.voratiq/sandbox.yaml": "",
-      });
+      vol.fromJSON(buildValidWorkspaceTree());
       const context: CliContext = await resolveCliContext();
       expect(context.root).toBe("/app/voratiq");
       expect(context.workspacePaths.workspaceDir).toBe("/app/voratiq/.voratiq");
+      expect(context.workspaceAutoRepaired).toBe(false);
     });
   });
 
