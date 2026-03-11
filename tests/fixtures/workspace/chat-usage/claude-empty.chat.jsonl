@@ -1,0 +1,3 @@
+{"type":"message_start","message":{"id":"msg-1","model":"claude-opus-4-6"}}
+{"type":"message_delta","delta":{"text":"hello"}}
+{"type":"message_stop","message":{"id":"msg-1"}}

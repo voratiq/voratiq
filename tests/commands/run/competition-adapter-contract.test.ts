@@ -163,6 +163,12 @@ function buildExecutionResult(
     report: {
       agentId,
       status,
+      tokenUsageResult: {
+        status: "unavailable",
+        reason: "chat_not_captured",
+        provider: "unknown",
+        modelId: "mock",
+      },
       runtimeManifestPath: `runs/run-id/agents/${agentId}/runtime-manifest.json`,
       baseDirectory: `runs/run-id/agents/${agentId}`,
       assets: {},

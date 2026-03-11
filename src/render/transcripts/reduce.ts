@@ -1,4 +1,6 @@
+import type { ExtractedTokenUsage } from "../../domains/runs/model/types.js";
 import { getAgentStatusStyle, getRunStatusStyle } from "../../status/colors.js";
+import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
 import { formatAgentErrorLine, formatDurationLabel } from "../utils/agents.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import {
@@ -31,6 +33,8 @@ export interface ReduceProgressReducerRecord {
   status: "queued" | "running" | "succeeded" | "failed" | "aborted";
   startedAt?: string;
   completedAt?: string;
+  tokenUsage?: ExtractedTokenUsage;
+  tokenUsageResult?: TokenUsageResult;
 }
 
 interface ReduceRendererOptions {

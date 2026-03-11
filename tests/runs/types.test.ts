@@ -83,4 +83,31 @@ describe("runRecordSchema", () => {
     expect(parsed.auto?.status).toBe("action_required");
     expect(parsed.auto?.apply.status).toBe("skipped");
   });
+
+  it("parses run agent provider-native token usage payloads", () => {
+    const withTokenUsage = {
+      ...baseRunRecord,
+      agents: [
+        {
+          ...baseRunRecord.agents[0],
+          tokenUsage: {
+            input_tokens: 120,
+            cached_input_tokens: 30,
+            output_tokens: 45,
+            reasoning_output_tokens: 7,
+            total_tokens: 202,
+          },
+        },
+      ],
+    };
+
+    const parsed = runRecordSchema.parse(withTokenUsage);
+    expect(parsed.agents[0]?.tokenUsage).toEqual({
+      input_tokens: 120,
+      cached_input_tokens: 30,
+      output_tokens: 45,
+      reasoning_output_tokens: 7,
+      total_tokens: 202,
+    });
+  });
 });

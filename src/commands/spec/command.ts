@@ -6,6 +6,7 @@ import type { ResolvedExtraContextFile } from "../../competition/shared/extra-co
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
+import type { ExtractedTokenUsage } from "../../domains/runs/model/types.js";
 import {
   createSpecCompetitionAdapter,
   type SpecCompetitionExecution,
@@ -27,6 +28,7 @@ import {
   resolvePath,
 } from "../../utils/path.js";
 import { slugify } from "../../utils/slug.js";
+import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
 import { getSpecsDirectoryPath } from "../../workspace/structure.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
@@ -56,6 +58,8 @@ export interface ExecuteSpecCommandResult {
   slug: string;
   outputPath: string;
   record: SpecRecord;
+  tokenUsage?: ExtractedTokenUsage;
+  tokenUsageResult: TokenUsageResult;
   exitCode?: number;
 }
 
@@ -202,6 +206,17 @@ export async function executeSpecCommand(
   }
 
   if (generationResult.status === "failed") {
+    if (generationResult.tokenUsage) {
+      latestRecord = await rewriteSpecRecord({
+        root,
+        specsFilePath,
+        sessionId,
+        mutate: (existing) => ({
+          ...existing,
+          tokenUsage: generationResult.tokenUsage,
+        }),
+      });
+    }
     latestRecord = await finalizeSpecRecord({
       root,
       specsFilePath,
@@ -213,6 +228,18 @@ export async function executeSpecCommand(
     throw new SpecGenerationFailedError(
       generationResult.error ? [generationResult.error] : [],
     );
+  }
+
+  if (generationResult.tokenUsage) {
+    latestRecord = await rewriteSpecRecord({
+      root,
+      specsFilePath,
+      sessionId,
+      mutate: (existing) => ({
+        ...existing,
+        tokenUsage: generationResult.tokenUsage,
+      }),
+    });
   }
 
   let generatedSpecContent: string;
@@ -333,6 +360,8 @@ export async function executeSpecCommand(
     slug,
     outputPath: latestRecord.outputPath,
     record: latestRecord,
+    tokenUsage: latestRecord.tokenUsage,
+    tokenUsageResult: generationResult.tokenUsageResult,
   };
 }
 

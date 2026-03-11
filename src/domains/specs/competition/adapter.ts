@@ -12,6 +12,7 @@ import { pruneWorkspace } from "../../../competition/shared/prune.js";
 import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
+import type { ExtractedTokenUsage } from "../../../domains/runs/model/types.js";
 import { buildSpecPrompt } from "../../../domains/specs/competition/prompt.js";
 import { toErrorMessage } from "../../../utils/errors.js";
 import {
@@ -19,6 +20,8 @@ import {
   relativeToRoot,
   resolvePath,
 } from "../../../utils/path.js";
+import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
+import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import {
   type AgentWorkspacePaths,
   buildAgentSessionWorkspacePaths,
@@ -28,6 +31,19 @@ import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
 import { VORATIQ_SPECS_DIR } from "../../../workspace/structure.js";
 
 const SPEC_ARTIFACT_FILENAME = "spec.md";
+
+function buildDefaultUnavailableTokenUsageResult(
+  candidate: SpecCompetitionCandidate,
+  message = "Chat usage capture was not enabled or did not produce an artifact.",
+): TokenUsageResult {
+  return {
+    status: "unavailable",
+    reason: "chat_not_captured",
+    provider: candidate.provider,
+    modelId: candidate.model,
+    message,
+  };
+}
 
 export type SpecCompetitionCandidate = AgentDefinition;
 
@@ -41,6 +57,8 @@ export interface SpecCompetitionExecution {
   readonly agentId: string;
   readonly specPath: string;
   readonly status: "generated" | "failed";
+  readonly tokenUsage?: ExtractedTokenUsage;
+  readonly tokenUsageResult: TokenUsageResult;
   readonly error?: string;
 }
 
@@ -118,6 +136,10 @@ export function createSpecCompetitionAdapter(
             agentId: candidate.id,
             specPath: resolveDraftSpecPath(root, workspacePaths.workspacePath),
             status: "failed",
+            tokenUsageResult: buildDefaultUnavailableTokenUsageResult(
+              candidate,
+              toErrorMessage(error),
+            ),
             error: toErrorMessage(error),
           });
         }
@@ -153,6 +175,22 @@ export function createSpecCompetitionAdapter(
           captureChat: true,
           ...composeStageSandboxPolicy(),
         });
+        const tokenUsageResult =
+          await extractProviderNativeTokenUsageForSession({
+            root,
+            domain: VORATIQ_SPECS_DIR,
+            sessionId,
+            agentId: candidate.id,
+            provider: candidate.provider,
+            modelId: candidate.model,
+            chatCaptured: result.chat?.captured === true,
+            format: result.chat?.format,
+            artifactPath: result.chat?.artifactPath,
+          });
+        const tokenUsage =
+          tokenUsageResult.status === "available"
+            ? tokenUsageResult.tokenUsage
+            : undefined;
 
         if (result.exitCode !== 0 || result.errorMessage) {
           const detectedDetail =
@@ -171,6 +209,8 @@ export function createSpecCompetitionAdapter(
             agentId: candidate.id,
             specPath: resolveDraftSpecPath(root, workspacePaths.workspacePath),
             status: "failed",
+            tokenUsage,
+            tokenUsageResult,
             error: detail,
           };
         }
@@ -189,12 +229,18 @@ export function createSpecCompetitionAdapter(
             relativeToRoot(root, promoteResult.artifactPath),
           ),
           status: "generated",
+          tokenUsage,
+          tokenUsageResult,
         };
       } catch (error) {
         return {
           agentId: candidate.id,
           specPath: resolveDraftSpecPath(root, workspacePaths.workspacePath),
           status: "failed",
+          tokenUsageResult: buildDefaultUnavailableTokenUsageResult(
+            candidate,
+            toErrorMessage(error),
+          ),
           error: toErrorMessage(error),
         };
       }

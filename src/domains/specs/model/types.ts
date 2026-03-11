@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { agentIdSchema } from "../../../configs/agents/types.js";
+import { extractedTokenUsageSchema } from "../../../domains/runs/model/types.js";
 import {
   extraContextMetadataEntrySchema,
   persistedExtraContextPathSchema,
@@ -23,6 +24,7 @@ export const specRecordSchema = z.object({
   extraContext: z.array(persistedExtraContextPathSchema).optional(),
   extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),
   agentId: agentIdSchema,
+  tokenUsage: extractedTokenUsageSchema.optional(),
   title: z.string(),
   slug: z.string(),
   outputPath: repoRelativeRecordPathSchema,

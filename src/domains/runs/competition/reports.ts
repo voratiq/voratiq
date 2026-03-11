@@ -1,9 +1,11 @@
 import type {
   AgentInvocationRecord,
   AgentReport,
+  ExtractedTokenUsage,
   RunRecord,
   RunReport,
 } from "../../../domains/runs/model/types.js";
+import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import {
   buildAgentArtifactPaths,
   buildAgentEvalViews,
@@ -16,6 +18,8 @@ export interface AgentExecutionState {
   diffAttempted: boolean;
   diffCaptured: boolean;
   diffStatistics?: string;
+  tokenUsage?: ExtractedTokenUsage;
+  tokenUsageResult: TokenUsageResult;
 }
 
 export interface AgentExecutionResult {
@@ -60,6 +64,8 @@ export function toAgentReport(
   return {
     agentId: record.agentId,
     status: record.status,
+    tokenUsage: record.tokenUsage ?? derivations.tokenUsage,
+    tokenUsageResult: derivations.tokenUsageResult,
     runtimeManifestPath: getAgentManifestPath(runId, record.agentId),
     baseDirectory: getAgentDirectoryPath(runId, record.agentId),
     diffStatistics: derivations.diffStatistics,

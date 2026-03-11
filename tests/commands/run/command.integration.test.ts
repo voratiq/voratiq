@@ -90,6 +90,15 @@ const resolveStageCompetitorsMock = jest.mocked(resolveStageCompetitors);
 const generateRunIdMock = jest.mocked(generateRunId);
 const teardownSessionAuthMock = jest.mocked(teardownSessionAuth);
 
+function buildUnavailableTokenUsageResult(modelId = "unknown") {
+  return {
+    status: "unavailable" as const,
+    reason: "chat_not_captured" as const,
+    provider: "unknown",
+    modelId,
+  };
+}
+
 describe("executeRunCommand integration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -187,6 +196,7 @@ describe("executeRunCommand integration", () => {
     const agentReport: AgentReport = {
       agentId: "alpha",
       status: "succeeded",
+      tokenUsageResult: buildUnavailableTokenUsageResult("claude-3"),
       runtimeManifestPath: "/repo/agent.json",
       baseDirectory: "/repo/agent",
       assets: {
@@ -368,6 +378,7 @@ describe("executeRunCommand integration", () => {
       {
         agentId: "alpha",
         status: "succeeded",
+        tokenUsageResult: buildUnavailableTokenUsageResult("claude-3"),
         runtimeManifestPath: "/repo/alpha.json",
         baseDirectory: "/repo/alpha",
         assets: {},
@@ -380,6 +391,7 @@ describe("executeRunCommand integration", () => {
       {
         agentId: "beta",
         status: "failed",
+        tokenUsageResult: buildUnavailableTokenUsageResult("claude-3"),
         runtimeManifestPath: "/repo/beta.json",
         baseDirectory: "/repo/beta",
         assets: {},
@@ -531,6 +543,7 @@ describe("executeRunCommand integration", () => {
       {
         agentId: "alpha",
         status: "errored",
+        tokenUsageResult: buildUnavailableTokenUsageResult("claude-3"),
         runtimeManifestPath: "/repo/alpha.json",
         baseDirectory: "/repo/alpha",
         assets: {},
@@ -544,6 +557,7 @@ describe("executeRunCommand integration", () => {
       {
         agentId: "beta",
         status: "errored",
+        tokenUsageResult: buildUnavailableTokenUsageResult("claude-3"),
         runtimeManifestPath: "/repo/beta.json",
         baseDirectory: "/repo/beta",
         assets: {},
@@ -672,6 +686,7 @@ describe("executeRunCommand integration", () => {
     const agentReport: AgentReport = {
       agentId: "alpha",
       status: "succeeded",
+      tokenUsageResult: buildUnavailableTokenUsageResult("claude-3"),
       runtimeManifestPath: "/repo/agent.json",
       baseDirectory: "/repo/agent",
       assets: {

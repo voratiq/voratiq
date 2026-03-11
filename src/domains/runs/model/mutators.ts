@@ -7,7 +7,11 @@ import {
   RUN_ABORT_WARNING,
 } from "../competition/termination-state.js";
 import { rewriteRunRecord } from "../persistence/adapter.js";
-import type { AgentInvocationRecord } from "./types.js";
+import {
+  type AgentInvocationRecord,
+  type ExtractedTokenUsage,
+  extractedTokenUsageSchema,
+} from "./types.js";
 import {
   IN_PROGRESS_AGENT_STATUSES,
   TERMINAL_AGENT_STATUSES,
@@ -187,7 +191,34 @@ function mergeAgentRecords(
     delete merged.diffStatistics;
   }
 
+  const mergedTokenUsage = mergeTokenUsage(
+    existing?.tokenUsage,
+    incoming.tokenUsage,
+  );
+  if (mergedTokenUsage) {
+    merged.tokenUsage = mergedTokenUsage;
+  } else {
+    delete merged.tokenUsage;
+  }
+
   return merged;
+}
+
+function mergeTokenUsage(
+  existing: AgentInvocationRecord["tokenUsage"],
+  incoming: AgentInvocationRecord["tokenUsage"],
+): ExtractedTokenUsage | undefined {
+  return normalizeTokenUsage(incoming) ?? normalizeTokenUsage(existing);
+}
+
+function normalizeTokenUsage(
+  tokenUsage: AgentInvocationRecord["tokenUsage"],
+): ExtractedTokenUsage | undefined {
+  if (!tokenUsage) {
+    return undefined;
+  }
+  const parsed = extractedTokenUsageSchema.safeParse(tokenUsage);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function normalizeSnapshotForTermination(

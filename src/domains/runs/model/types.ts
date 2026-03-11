@@ -19,6 +19,7 @@ import {
   runStatusSchema,
   TERMINAL_AGENT_STATUSES,
 } from "../../../status/index.js";
+import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import type { ChatArtifactFormat } from "../../../workspace/chat/types.js";
 
 export type { AgentStatus };
@@ -39,6 +40,7 @@ const CHAT_ARTIFACT_FORMATS = [
   "json",
   "jsonl",
 ] as const satisfies readonly ChatArtifactFormat[];
+export const CHAT_USAGE_PROVIDER_IDS = ["claude", "codex", "gemini"] as const;
 
 const WATCHDOG_TRIGGERS = [
   "silence",
@@ -62,6 +64,76 @@ export const watchdogMetadataSchema = z.object({
 });
 
 export type WatchdogMetadata = z.infer<typeof watchdogMetadataSchema>;
+
+export type ChatUsageProviderId = (typeof CHAT_USAGE_PROVIDER_IDS)[number];
+
+export const chatUsageProviderIdSchema = z.enum(CHAT_USAGE_PROVIDER_IDS);
+
+const billingTokenCountSchema = z.number().int().nonnegative();
+const AT_LEAST_ONE_USAGE_FIELD_MESSAGE =
+  "At least one billing-relevant usage field is required.";
+
+function withAtLeastOneUsageField<TShape extends z.ZodRawShape>(shape: TShape) {
+  return z
+    .object(shape)
+    .strict()
+    .refine(
+      (value) => Object.values(value).some((field) => field !== undefined),
+      {
+        message: AT_LEAST_ONE_USAGE_FIELD_MESSAGE,
+      },
+    );
+}
+
+export const claudeExtractedTokenUsageSchema = withAtLeastOneUsageField({
+  input_tokens: billingTokenCountSchema.optional(),
+  output_tokens: billingTokenCountSchema.optional(),
+  cache_read_input_tokens: billingTokenCountSchema.optional(),
+  cache_creation_input_tokens: billingTokenCountSchema.optional(),
+});
+
+export type ClaudeExtractedTokenUsage = z.infer<
+  typeof claudeExtractedTokenUsageSchema
+>;
+
+export const codexExtractedTokenUsageSchema = withAtLeastOneUsageField({
+  input_tokens: billingTokenCountSchema.optional(),
+  cached_input_tokens: billingTokenCountSchema.optional(),
+  output_tokens: billingTokenCountSchema.optional(),
+  reasoning_output_tokens: billingTokenCountSchema.optional(),
+  total_tokens: billingTokenCountSchema.optional(),
+});
+
+export type CodexExtractedTokenUsage = z.infer<
+  typeof codexExtractedTokenUsageSchema
+>;
+
+export const geminiExtractedTokenUsageSchema = withAtLeastOneUsageField({
+  input: billingTokenCountSchema.optional(),
+  output: billingTokenCountSchema.optional(),
+  cached: billingTokenCountSchema.optional(),
+  thoughts: billingTokenCountSchema.optional(),
+  tool: billingTokenCountSchema.optional(),
+  total: billingTokenCountSchema.optional(),
+});
+
+export type GeminiExtractedTokenUsage = z.infer<
+  typeof geminiExtractedTokenUsageSchema
+>;
+
+export const extractedTokenUsageSchemaByProvider = {
+  claude: claudeExtractedTokenUsageSchema,
+  codex: codexExtractedTokenUsageSchema,
+  gemini: geminiExtractedTokenUsageSchema,
+} as const satisfies Record<ChatUsageProviderId, z.ZodTypeAny>;
+
+export const extractedTokenUsageSchema = z.union([
+  claudeExtractedTokenUsageSchema,
+  codexExtractedTokenUsageSchema,
+  geminiExtractedTokenUsageSchema,
+]);
+
+export type ExtractedTokenUsage = z.infer<typeof extractedTokenUsageSchema>;
 
 export const agentArtifactStateSchema = z.object({
   diffAttempted: z.boolean().optional(),
@@ -101,6 +173,7 @@ export const agentInvocationRecordSchema = z
     error: z.string().optional(),
     warnings: z.array(z.string()).optional(),
     diffStatistics: z.string().optional(),
+    tokenUsage: extractedTokenUsageSchema.optional(),
     watchdog: watchdogMetadataSchema.optional(),
     failFastTriggered: z.boolean().optional(),
     failFastTarget: z.string().optional(),
@@ -222,6 +295,8 @@ export type RunRecord = z.infer<typeof runRecordSchema>;
 export type AgentReport = {
   agentId: AgentInvocationRecord["agentId"];
   status: AgentInvocationRecord["status"];
+  tokenUsage?: ExtractedTokenUsage;
+  tokenUsageResult: TokenUsageResult;
   runtimeManifestPath: string;
   baseDirectory: string;
   assets: {

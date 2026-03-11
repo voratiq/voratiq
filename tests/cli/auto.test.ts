@@ -1277,21 +1277,18 @@ describe("voratiq auto", () => {
       }),
       exitCode: 1,
       reviews: [
-        {
+        buildReviewExecution({
           agentId: "reviewer-a",
           outputPath:
             ".voratiq/reviews/sessions/review-789/reviewer-a/artifacts/review.md",
-          status: "succeeded",
-          missingArtifacts: [],
-        },
-        {
+        }),
+        buildReviewExecution({
           agentId: "reviewer-b",
           outputPath:
             ".voratiq/reviews/sessions/review-789/reviewer-b/artifacts/review.md",
           status: "failed",
-          missingArtifacts: [],
           error: "reviewer violated output contract",
-        },
+        }),
       ],
     });
 
@@ -1438,20 +1435,16 @@ describe("voratiq auto", () => {
           ".voratiq/reviews/sessions/review-123/reviewer-a/artifacts/review.md",
       }),
       reviews: [
-        {
+        buildReviewExecution({
           agentId: "reviewer-a",
           outputPath:
             ".voratiq/reviews/sessions/review-123/reviewer-a/artifacts/review.md",
-          status: "succeeded",
-          missingArtifacts: [],
-        },
-        {
+        }),
+        buildReviewExecution({
           agentId: "reviewer-b",
           outputPath:
             ".voratiq/reviews/sessions/review-123/reviewer-b/artifacts/review.md",
-          status: "succeeded",
-          missingArtifacts: [],
-        },
+        }),
       ],
     });
 
@@ -1537,20 +1530,16 @@ describe("voratiq auto", () => {
         ].join("\n"),
       }),
       reviews: [
-        {
+        buildReviewExecution({
           agentId: "reviewer-a",
           outputPath:
             ".voratiq/reviews/sessions/review-123/reviewer-a/artifacts/review.md",
-          status: "succeeded",
-          missingArtifacts: [],
-        },
-        {
+        }),
+        buildReviewExecution({
           agentId: "reviewer-b",
           outputPath:
             ".voratiq/reviews/sessions/review-123/reviewer-b/artifacts/review.md",
-          status: "succeeded",
-          missingArtifacts: [],
-        },
+        }),
       ],
     });
 
@@ -1619,20 +1608,16 @@ describe("voratiq auto", () => {
           ".voratiq/reviews/sessions/review-999/reviewer-a/artifacts/review.md",
       }),
       reviews: [
-        {
+        buildReviewExecution({
           agentId: "reviewer-a",
           outputPath:
             ".voratiq/reviews/sessions/review-999/reviewer-a/artifacts/review.md",
-          status: "succeeded",
-          missingArtifacts: [],
-        },
-        {
+        }),
+        buildReviewExecution({
           agentId: "reviewer-b",
           outputPath:
             ".voratiq/reviews/sessions/review-999/reviewer-b/artifacts/review.md",
-          status: "succeeded",
-          missingArtifacts: [],
-        },
+        }),
       ],
     });
 
@@ -1676,7 +1661,6 @@ describe("voratiq auto", () => {
     expect(output).toContain("Auto ACTION REQUIRED");
     expect(process.exitCode).toBe(1);
   });
-
   it("marks no-shared recommendation as action required when resolved_preferred_agent is missing", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
@@ -2013,18 +1997,36 @@ function buildReviewResult(
   return {
     reviewId,
     runRecord: {} as never,
-    reviews: [
-      {
-        agentId,
-        outputPath,
-        status: "succeeded" as const,
-        missingArtifacts: [],
-      },
-    ],
+    reviews: [buildReviewExecution({ agentId, outputPath })],
     agentId,
     outputPath,
     missingArtifacts: [],
     body,
+  };
+}
+
+function buildReviewExecution(
+  overrides: {
+    agentId?: string;
+    outputPath?: string;
+    status?: "succeeded" | "failed";
+    error?: string;
+  } = {},
+) {
+  return {
+    agentId: overrides.agentId ?? "reviewer",
+    outputPath:
+      overrides.outputPath ??
+      ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
+    status: overrides.status ?? ("succeeded" as const),
+    missingArtifacts: [],
+    tokenUsageResult: {
+      status: "unavailable" as const,
+      reason: "chat_not_captured" as const,
+      provider: "unknown",
+      modelId: "unknown",
+    },
+    ...(overrides.error ? { error: overrides.error } : {}),
   };
 }
 

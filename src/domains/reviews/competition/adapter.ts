@@ -44,6 +44,7 @@ import {
   rewriteReviewRecord,
 } from "../../../domains/reviews/persistence/adapter.js";
 import type { RunRecordEnhanced } from "../../../domains/runs/model/enhanced.js";
+import type { ExtractedTokenUsage } from "../../../domains/runs/model/types.js";
 import { buildPersistedExtraContextFields } from "../../../extra-context/contract.js";
 import type { ReviewProgressRenderer } from "../../../render/transcripts/review.js";
 import { emitStageProgressEvent } from "../../../render/transcripts/stage-progress.js";
@@ -55,6 +56,8 @@ import {
   relativeToRoot,
   resolvePath,
 } from "../../../utils/path.js";
+import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
+import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import {
   type AgentWorkspacePaths,
   scaffoldAgentSessionWorkspace,
@@ -70,6 +73,23 @@ import {
   VORATIQ_REVIEWS_FILE,
   VORATIQ_REVIEWS_SESSIONS_DIR,
 } from "../../../workspace/structure.js";
+
+function buildUnavailableTokenUsageResult(options: {
+  provider: string;
+  modelId: string;
+  message?: string;
+}): TokenUsageResult {
+  const { provider, modelId, message } = options;
+  return {
+    status: "unavailable",
+    reason: "chat_not_captured",
+    provider,
+    modelId,
+    message:
+      message ??
+      "Chat usage capture was not enabled or did not produce an artifact.",
+  };
+}
 
 export type ReviewCompetitionCandidate = AgentDefinition;
 
@@ -117,6 +137,8 @@ export interface ReviewCompetitionExecution {
   readonly outputPath: string;
   readonly status: "succeeded" | "failed";
   readonly missingArtifacts: readonly string[];
+  readonly tokenUsage?: ExtractedTokenUsage;
+  readonly tokenUsageResult: TokenUsageResult;
   readonly error?: string;
 }
 
@@ -152,6 +174,7 @@ export function createReviewCompetitionAdapter(
   let failure: unknown;
   const workspacesToPrune = new Set<string>();
   const worktreesToRemove = new Set<string>();
+  const tokenUsageResultByReviewerAgentId = new Map<string, TokenUsageResult>();
   let sharedInputs: BlindedReviewSessionInputs | undefined;
 
   return {
@@ -386,6 +409,22 @@ export function createReviewCompetitionAdapter(
         extraWriteProtectedPaths: sandboxPolicy.extraWriteProtectedPaths,
         extraReadProtectedPaths: sandboxPolicy.extraReadProtectedPaths,
       });
+      const tokenUsageResult = await extractProviderNativeTokenUsageForSession({
+        root,
+        domain: VORATIQ_REVIEWS_DIR,
+        sessionId: reviewId,
+        agentId: agent.id,
+        provider: agent.provider,
+        modelId: agent.model,
+        chatCaptured: result.chat?.captured === true,
+        format: result.chat?.format,
+        artifactPath: result.chat?.artifactPath,
+      });
+      tokenUsageResultByReviewerAgentId.set(agent.id, tokenUsageResult);
+      const tokenUsage =
+        tokenUsageResult.status === "available"
+          ? tokenUsageResult.tokenUsage
+          : undefined;
 
       if (result.exitCode !== 0 || result.errorMessage) {
         const detectedDetail =
@@ -444,9 +483,11 @@ export function createReviewCompetitionAdapter(
         outputPath,
         status: "succeeded",
         missingArtifacts: [...prepared.missingArtifacts],
+        tokenUsage,
+        tokenUsageResult,
       };
     },
-    onCandidateCompleted: async (prepared) => {
+    onCandidateCompleted: async (prepared, result) => {
       const completedAt = new Date().toISOString();
       await rewriteReviewRecordIfPresent({
         root,
@@ -463,6 +504,7 @@ export function createReviewCompetitionAdapter(
             status: "succeeded",
             completedAt,
             error: null,
+            tokenUsage: result.tokenUsage,
           });
         },
       });
@@ -474,6 +516,8 @@ export function createReviewCompetitionAdapter(
           reviewerAgentId: prepared.candidate.id,
           status: "succeeded",
           completedAt,
+          tokenUsage: result.tokenUsage,
+          tokenUsageResult: result.tokenUsageResult,
         },
       });
     },
@@ -481,6 +525,16 @@ export function createReviewCompetitionAdapter(
       failure = failure ?? error;
       const detail = toReviewFailureDetail(error);
       const completedAt = new Date().toISOString();
+      const tokenUsageResult =
+        tokenUsageResultByReviewerAgentId.get(prepared.candidate.id) ??
+        buildUnavailableTokenUsageResult({
+          provider: prepared.candidate.provider,
+          modelId: prepared.candidate.model,
+        });
+      const tokenUsage =
+        tokenUsageResult.status === "available"
+          ? tokenUsageResult.tokenUsage
+          : undefined;
       try {
         await rewriteReviewRecordIfPresent({
           root,
@@ -497,6 +551,7 @@ export function createReviewCompetitionAdapter(
               status: "failed",
               completedAt,
               error: detail,
+              tokenUsage,
             });
           },
         });
@@ -510,6 +565,8 @@ export function createReviewCompetitionAdapter(
           reviewerAgentId: prepared.candidate.id,
           status: "failed",
           completedAt,
+          tokenUsage,
+          tokenUsageResult,
         },
       });
       return {
@@ -517,6 +574,8 @@ export function createReviewCompetitionAdapter(
         outputPath: prepared.outputPath,
         status: "failed",
         missingArtifacts: [...prepared.missingArtifacts],
+        tokenUsage,
+        tokenUsageResult,
         error: detail,
       };
     },
@@ -593,6 +652,20 @@ export function createReviewCompetitionAdapter(
               status: reviewer.status,
               startedAt: reviewer.startedAt,
               completedAt: reviewer.completedAt,
+              tokenUsage: reviewer.tokenUsage,
+              tokenUsageResult:
+                tokenUsageResultByReviewerAgentId.get(reviewer.agentId) ??
+                (reviewer.tokenUsage
+                  ? {
+                      status: "available",
+                      provider: "unknown",
+                      modelId: "unknown",
+                      tokenUsage: reviewer.tokenUsage,
+                    }
+                  : buildUnavailableTokenUsageResult({
+                      provider: "unknown",
+                      modelId: "unknown",
+                    })),
             },
           });
         }
@@ -633,9 +706,11 @@ function mutateReviewerRecord(
     status: "succeeded" | "failed" | "aborted";
     completedAt: string;
     error: string | null;
+    tokenUsage?: ExtractedTokenUsage;
+    tokenUsageResult?: TokenUsageResult;
   },
 ): ReviewRecord {
-  const { reviewerAgentId, status, completedAt, error } = options;
+  const { reviewerAgentId, status, completedAt, error, tokenUsage } = options;
   let found = false;
   const reviewers = record.reviewers.map((reviewer) => {
     if (reviewer.agentId !== reviewerAgentId) {
@@ -647,6 +722,7 @@ function mutateReviewerRecord(
       status,
       completedAt,
       error,
+      ...(tokenUsage ? { tokenUsage } : {}),
     };
   });
   if (!found) {
