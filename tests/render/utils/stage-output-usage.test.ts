@@ -35,6 +35,12 @@ function createAgentReport(status: "succeeded" | "failed" | "aborted") {
   return {
     agentId: "runner",
     status,
+    tokenUsageResult: {
+      status: "unavailable" as const,
+      reason: "chat_not_captured" as const,
+      provider: "unknown",
+      modelId: "unknown",
+    },
     runtimeManifestPath: "runtime.json",
     baseDirectory: "base",
     assets: {},

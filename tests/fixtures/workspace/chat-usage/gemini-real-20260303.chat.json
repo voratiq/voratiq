@@ -1,0 +1,73 @@
+{
+  "provider": "gemini",
+  "collectedAt": "2026-03-03T21:47:42.000Z",
+  "transcripts": [
+    {
+      "source": "sandbox/.gemini/tmp/project-a/chats/session-a.json",
+      "payload": {
+        "sessionId": "session-a",
+        "messages": [
+          {
+            "id": "user-1",
+            "timestamp": "2026-03-03T21:47:42.000Z",
+            "type": "user",
+            "content": "Implement the task."
+          },
+          {
+            "id": "gemini-1",
+            "timestamp": "2026-03-03T21:48:00.000Z",
+            "type": "gemini",
+            "content": "Reading files.",
+            "model": "gemini-3.1-pro-preview",
+            "tokens": {
+              "input": 300000,
+              "output": 1000,
+              "cached": 250000,
+              "thoughts": 2000,
+              "tool": 0,
+              "total": 303000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "source": "sandbox/.gemini/tmp/project-b/chats/session-b.json",
+      "payload": {
+        "sessionId": "session-b",
+        "messages": [
+          {
+            "id": "gemini-2",
+            "timestamp": "2026-03-03T21:50:00.000Z",
+            "type": "gemini",
+            "content": "Updating tests.",
+            "model": "gemini-3.1-pro-preview",
+            "tokens": {
+              "input": 400000,
+              "output": 800,
+              "cached": 300000,
+              "thoughts": 2500,
+              "tool": 0,
+              "total": 403300
+            }
+          },
+          {
+            "id": "gemini-3",
+            "timestamp": "2026-03-03T21:55:00.000Z",
+            "type": "gemini",
+            "content": "Finished.",
+            "model": "gemini-3.1-pro-preview",
+            "tokens": {
+              "input": 344266,
+              "output": 631,
+              "cached": 311396,
+              "thoughts": 2089,
+              "tool": 0,
+              "total": 346986
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

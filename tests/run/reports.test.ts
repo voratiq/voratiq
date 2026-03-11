@@ -67,6 +67,12 @@ describe("report mapping helpers", () => {
       diffAttempted: true,
       diffCaptured: true,
       diffStatistics: "1 file changed",
+      tokenUsageResult: {
+        status: "unavailable",
+        reason: "chat_not_captured",
+        provider: "unknown",
+        modelId: baseAgentRecord.model,
+      },
     });
 
     expect(report.agentId).toBe(baseAgentRecord.agentId);
@@ -84,6 +90,12 @@ describe("report mapping helpers", () => {
       diffAttempted: true,
       diffCaptured: true,
       diffStatistics: "1 file changed",
+      tokenUsageResult: {
+        status: "unavailable",
+        reason: "chat_not_captured",
+        provider: "unknown",
+        modelId: baseAgentRecord.model,
+      },
     });
 
     const runRecord = createRunRecord({
@@ -109,6 +121,12 @@ describe("report mapping helpers", () => {
     const failingAgent: AgentReport = {
       agentId: "codex",
       status: "failed",
+      tokenUsageResult: {
+        status: "unavailable",
+        reason: "chat_not_captured",
+        provider: "unknown",
+        modelId: "gpt-5",
+      },
       runtimeManifestPath:
         ".voratiq/runs/sessions/bad/codex/runtime/manifest.json",
       baseDirectory: ".voratiq/runs/sessions/bad/codex",
@@ -162,6 +180,12 @@ describe("report mapping helpers", () => {
       diffAttempted: true,
       diffCaptured: true,
       diffStatistics: "1 file changed",
+      tokenUsageResult: {
+        status: "unavailable",
+        reason: "chat_not_captured",
+        provider: "unknown",
+        modelId: evalFailedRecord.model,
+      },
     });
 
     const runRecord = createRunRecord({
@@ -177,5 +201,49 @@ describe("report mapping helpers", () => {
     expect(runReport.hadEvalFailure).toBe(true);
     expect(runReport.hadAgentFailure).toBe(false);
     expect(runReport.status).toBe("succeeded");
+  });
+
+  it("exposes provider-native token usage on run reports", () => {
+    const tokenUsage = {
+      input_tokens: 210,
+      output_tokens: 65,
+      cache_read_input_tokens: 41,
+      cache_creation_input_tokens: 11,
+    } as const;
+    const usageRecord: AgentInvocationRecord = {
+      ...baseAgentRecord,
+      tokenUsage,
+    };
+
+    const agentReport = toAgentReport(runId, usageRecord, {
+      diffAttempted: true,
+      diffCaptured: true,
+      diffStatistics: "1 file changed",
+      tokenUsage: tokenUsage,
+      tokenUsageResult: {
+        status: "available",
+        provider: "unknown",
+        modelId: usageRecord.model,
+        tokenUsage,
+      },
+    });
+
+    const runRecord = createRunRecord({
+      runId,
+      baseRevisionSha: "abc123",
+      spec: { path: "specs/sample.md" },
+      createdAt: new Date(0).toISOString(),
+      agents: [usageRecord],
+      status: "succeeded",
+    });
+
+    const runReport = toRunReport(runRecord, [agentReport], false, false);
+    expect(runReport.agents[0]?.tokenUsage).toEqual(tokenUsage);
+    expect(runReport.agents[0]?.tokenUsageResult).toEqual({
+      status: "available",
+      provider: "unknown",
+      modelId: usageRecord.model,
+      tokenUsage,
+    });
   });
 });

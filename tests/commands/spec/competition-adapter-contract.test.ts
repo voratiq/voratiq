@@ -23,6 +23,15 @@ function sleep(ms: number): Promise<void> {
 
 const environment: EnvironmentConfig = {};
 
+function buildUnavailableTokenUsageResult() {
+  return {
+    status: "unavailable" as const,
+    reason: "chat_not_captured" as const,
+    provider: "unknown",
+    modelId: "unknown",
+  };
+}
+
 const subject: AdapterContractSubject<SpecCompetitionExecution> = {
   run: async ({
     candidates,
@@ -81,6 +90,7 @@ const subject: AdapterContractSubject<SpecCompetitionExecution> = {
             agentId: candidateId,
             specPath: normalizeSpecPath(candidateId),
             status: "generated",
+            tokenUsageResult: buildUnavailableTokenUsageResult(),
           };
         },
         captureExecutionFailure: captureFailures
@@ -88,6 +98,7 @@ const subject: AdapterContractSubject<SpecCompetitionExecution> = {
               agentId: prepared.candidate.id,
               specPath: normalizeSpecPath(prepared.candidate.id),
               status: "failed",
+              tokenUsageResult: buildUnavailableTokenUsageResult(),
               error: error instanceof Error ? error.message : String(error),
             })
           : undefined,

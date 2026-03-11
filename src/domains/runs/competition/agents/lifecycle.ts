@@ -18,6 +18,7 @@ import type {
 } from "../../../../domains/runs/model/types.js";
 import { toErrorMessage } from "../../../../utils/errors.js";
 import { GIT_AUTHOR_EMAIL, GIT_AUTHOR_NAME } from "../../../../utils/git.js";
+import { extractProviderNativeTokenUsageForSession } from "../../../../workspace/chat/native-usage.js";
 import { runPostProcessingAndEvaluations } from "./eval-runner.js";
 import { AgentRunContext } from "./run-context.js";
 import type { PreparedAgentExecution } from "./types.js";
@@ -144,6 +145,11 @@ export async function executeAgentLifecycle(
 
     if (processResult.chat?.captured && processResult.chat.format) {
       agentContext.markChatArtifact(processResult.chat.format);
+      await tryExtractProviderNativeTokenUsage({
+        execution,
+        artifactPath: processResult.chat.artifactPath,
+        format: processResult.chat.format,
+      });
     }
   } catch (rawError) {
     const failure =
@@ -252,4 +258,25 @@ function resolveSandboxPersona(env: Record<string, string>): {
     authorName: env["GIT_AUTHOR_NAME"] ?? GIT_AUTHOR_NAME,
     authorEmail: env["GIT_AUTHOR_EMAIL"] ?? GIT_AUTHOR_EMAIL,
   };
+}
+
+async function tryExtractProviderNativeTokenUsage(options: {
+  execution: PreparedAgentExecution;
+  artifactPath?: string;
+  format: "json" | "jsonl";
+}): Promise<void> {
+  const { execution, artifactPath, format } = options;
+  const { agent, root, runId, agentContext } = execution;
+  const extracted = await extractProviderNativeTokenUsageForSession({
+    root,
+    domain: "runs",
+    sessionId: runId,
+    agentId: agent.id,
+    provider: agent.provider,
+    modelId: agent.model,
+    chatCaptured: true,
+    format,
+    artifactPath,
+  });
+  agentContext.setTokenUsageResult(extracted);
 }

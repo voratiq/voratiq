@@ -1,0 +1,2 @@
+{"event_msg":{"type":"assistant_message","message":"hello"}}
+{"event_msg":{"type":"token_count","info":{"total_token_usage":{"input_tokens":120,"output_tokens":45,"cached_input_tokens":30,"reasoning_output_tokens":7,"total_tokens":202,"uncategorized_tokens":9},"last_token_usage":{"input_tokens":20,"output_tokens":10},"model_context_window":272000,"stream_id":"stream-envelope-b"}}}

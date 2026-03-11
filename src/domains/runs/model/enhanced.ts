@@ -13,6 +13,7 @@ import {
 import type {
   AgentEvalSnapshot,
   AgentStatus,
+  ExtractedTokenUsage,
   RunApplyStatus,
   RunAutoOutcome,
   RunRecord,
@@ -35,6 +36,7 @@ export interface AgentInvocationEnhanced {
   assets: AgentArtifactPaths;
   evals: AgentEvalEnhanced[];
   diffStatistics?: string;
+  tokenUsage?: ExtractedTokenUsage;
   error?: string;
   warnings?: string[];
 }
@@ -106,6 +108,9 @@ export function buildRunRecordEnhanced(record: RunRecord): RunRecordEnhanced {
       }
       if (Array.isArray(agent.warnings) && agent.warnings.length > 0) {
         enhancedAgent.warnings = [...agent.warnings];
+      }
+      if (agent.tokenUsage) {
+        enhancedAgent.tokenUsage = agent.tokenUsage;
       }
 
       return enhancedAgent;

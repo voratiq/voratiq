@@ -251,6 +251,10 @@ describe("shared stage progress event model", () => {
       candidate: {
         reviewerAgentId: "reviewer",
         status: "queued",
+        tokenUsage: {
+          input_tokens: 12,
+          output_tokens: 4,
+        },
       },
     });
 

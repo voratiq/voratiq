@@ -1,0 +1,50 @@
+{
+  "provider": "gemini",
+  "collectedAt": "2026-01-13T21:08:38.783Z",
+  "transcripts": [
+    {
+      "source": "sandbox/.gemini/tmp/project-a/chats/session-2026-01-13.json",
+      "payload": {
+        "sessionId": "813ed8de-80ba-40d1-9aa3-4380de9e3105",
+        "messages": [
+          {
+            "id": "user-1",
+            "timestamp": "2026-01-13T21:06:25.212Z",
+            "type": "user",
+            "content": "Implement the task."
+          },
+          {
+            "id": "gemini-1",
+            "timestamp": "2026-01-13T21:06:55.144Z",
+            "type": "gemini",
+            "content": "Searching files.",
+            "model": "gemini-2.5-pro",
+            "tokens": {
+              "input": 200000,
+              "output": 1000,
+              "cached": 150000,
+              "thoughts": 1000,
+              "tool": 0,
+              "total": 202000
+            }
+          },
+          {
+            "id": "gemini-2",
+            "timestamp": "2026-01-13T21:08:38.747Z",
+            "type": "gemini",
+            "content": "Finished.",
+            "model": "gemini-2.5-pro",
+            "tokens": {
+              "input": 386065,
+              "output": 1438,
+              "cached": 347672,
+              "thoughts": 2087,
+              "tool": 0,
+              "total": 389590
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

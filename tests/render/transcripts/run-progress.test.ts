@@ -32,6 +32,12 @@ function createAgentReport(
   return {
     agentId: "test-agent",
     status,
+    tokenUsageResult: {
+      status: "unavailable",
+      reason: "chat_not_captured",
+      provider: "unknown",
+      modelId: "unknown",
+    },
     runtimeManifestPath:
       ".voratiq/runs/sessions/run-123/test-agent/runtime.json",
     baseDirectory: ".voratiq/runs/sessions/run-123/test-agent",

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { agentIdSchema } from "../../../configs/agents/types.js";
+import { extractedTokenUsageSchema } from "../../../domains/runs/model/types.js";
 import {
   extraContextMetadataEntrySchema,
   persistedExtraContextPathSchema,
@@ -40,6 +41,7 @@ export const reductionRecordReducerSchema = z.object({
   dataPath: repoRelativeRecordPathSchema.optional(),
   startedAt: z.string().optional(),
   completedAt: z.string().optional(),
+  tokenUsage: extractedTokenUsageSchema.optional(),
   error: z.string().nullable().optional(),
 });
 

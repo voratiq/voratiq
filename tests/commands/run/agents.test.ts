@@ -23,6 +23,7 @@ import type { PreparedAgentExecution } from "../../../src/domains/runs/competiti
 import { buildRunAgentWorkspacePaths } from "../../../src/domains/runs/competition/agents/workspace.js";
 import type { AgentExecutionResult } from "../../../src/domains/runs/competition/reports.js";
 import type { AgentInvocationRecord } from "../../../src/domains/runs/model/types.js";
+import { extractProviderNativeTokenUsageForSession } from "../../../src/workspace/chat/native-usage.js";
 import { buildAgentWorkspacePaths } from "../../../src/workspace/layout.js";
 
 jest.mock("../../../src/agents/runtime/harness.js", () => ({
@@ -36,9 +37,16 @@ jest.mock(
   }),
 );
 
+jest.mock("../../../src/workspace/chat/native-usage.js", () => ({
+  extractProviderNativeTokenUsageForSession: jest.fn(),
+}));
+
 const runSandboxedAgentMock = jest.mocked(runSandboxedAgent);
 const runPostProcessingAndEvaluationsMock = jest.mocked(
   runPostProcessingAndEvaluations,
+);
+const extractProviderNativeTokenUsageForSessionMock = jest.mocked(
+  extractProviderNativeTokenUsageForSession,
 );
 
 const TEMP_DIR_PREFIX = "voratiq-agent-lifecycle-";
@@ -251,6 +259,172 @@ describe("executeAgentLifecycle integration", () => {
     expect(succeeded?.record.status).toBe("succeeded");
 
     expect(progress.onCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("extracts token usage from captured chat artifacts before success finalization", async () => {
+    const { execution } = await createPreparedExecution();
+    execution.agent.provider = "codex";
+    execution.agent.model = "codex-mini";
+
+    runSandboxedAgentMock.mockResolvedValue({
+      exitCode: 0,
+      signal: null,
+      sandboxSettings: minimalSandboxSettings(),
+      manifestEnv: {},
+      chat: {
+        captured: true,
+        format: "jsonl",
+        artifactPath: "/tmp/codex.chat.jsonl",
+      },
+    });
+    runPostProcessingAndEvaluationsMock.mockResolvedValue({
+      artifacts: {
+        summaryCaptured: false,
+        diffAttempted: false,
+        diffCaptured: false,
+      },
+      evaluations: [],
+      warnings: [],
+    });
+    extractProviderNativeTokenUsageForSessionMock.mockResolvedValue({
+      status: "available",
+      provider: "codex",
+      modelId: "codex-mini",
+      tokenUsage: {
+        input_tokens: 120,
+        cached_input_tokens: 30,
+        output_tokens: 45,
+        reasoning_output_tokens: 7,
+        total_tokens: 202,
+      },
+    });
+
+    const [result] = await runPreparedExecutionsWithLimit([execution], 1);
+
+    expect(extractProviderNativeTokenUsageForSessionMock).toHaveBeenCalledWith({
+      root: execution.root,
+      domain: "runs",
+      sessionId: execution.runId,
+      agentId: execution.agent.id,
+      provider: "codex",
+      modelId: "codex-mini",
+      chatCaptured: true,
+      format: "jsonl",
+      artifactPath: "/tmp/codex.chat.jsonl",
+    });
+    expect(result.record.tokenUsage).toEqual({
+      input_tokens: 120,
+      cached_input_tokens: 30,
+      output_tokens: 45,
+      reasoning_output_tokens: 7,
+      total_tokens: 202,
+    });
+    expect(result.report.tokenUsage).toEqual(result.record.tokenUsage);
+    expect(result.report.tokenUsageResult).toEqual({
+      status: "available",
+      provider: "codex",
+      modelId: "codex-mini",
+      tokenUsage: result.record.tokenUsage,
+    });
+  });
+
+  it("extracts token usage on failed terminal paths when chat artifacts exist", async () => {
+    const { execution } = await createPreparedExecution();
+    execution.agent.provider = "claude";
+    execution.agent.model = "claude-sonnet";
+
+    runSandboxedAgentMock.mockResolvedValue({
+      exitCode: 1,
+      signal: null,
+      errorMessage: "agent failed",
+      sandboxSettings: minimalSandboxSettings(),
+      manifestEnv: {},
+      chat: {
+        captured: true,
+        format: "jsonl",
+        artifactPath: "/tmp/claude.chat.jsonl",
+      },
+    });
+    extractProviderNativeTokenUsageForSessionMock.mockResolvedValue({
+      status: "available",
+      provider: "claude",
+      modelId: "claude-sonnet",
+      tokenUsage: {
+        input_tokens: 210,
+        output_tokens: 65,
+        cache_read_input_tokens: 41,
+        cache_creation_input_tokens: 11,
+      },
+    });
+
+    const [result] = await runPreparedExecutionsWithLimit([execution], 1);
+
+    expect(result.record.status).toBe("failed");
+    expect(runPostProcessingAndEvaluationsMock).not.toHaveBeenCalled();
+    expect(extractProviderNativeTokenUsageForSessionMock).toHaveBeenCalledWith({
+      root: execution.root,
+      domain: "runs",
+      sessionId: execution.runId,
+      agentId: execution.agent.id,
+      provider: "claude",
+      modelId: "claude-sonnet",
+      chatCaptured: true,
+      format: "jsonl",
+      artifactPath: "/tmp/claude.chat.jsonl",
+    });
+    expect(result.record.tokenUsage).toEqual({
+      input_tokens: 210,
+      output_tokens: 65,
+      cache_read_input_tokens: 41,
+      cache_creation_input_tokens: 11,
+    });
+  });
+
+  it("treats token usage extraction failures as non-fatal", async () => {
+    const { execution } = await createPreparedExecution();
+    execution.agent.provider = "gemini";
+    execution.agent.model = "gemini-2.5";
+
+    runSandboxedAgentMock.mockResolvedValue({
+      exitCode: 0,
+      signal: null,
+      sandboxSettings: minimalSandboxSettings(),
+      manifestEnv: {},
+      chat: {
+        captured: true,
+        format: "json",
+        artifactPath: "/tmp/gemini.chat.json",
+      },
+    });
+    runPostProcessingAndEvaluationsMock.mockResolvedValue({
+      artifacts: {
+        summaryCaptured: false,
+        diffAttempted: false,
+        diffCaptured: false,
+      },
+      evaluations: [],
+      warnings: [],
+    });
+    extractProviderNativeTokenUsageForSessionMock.mockResolvedValue({
+      status: "unavailable",
+      reason: "extractor_error",
+      provider: "gemini",
+      modelId: "gemini-2.5",
+      message: "Chat usage extraction failed: boom",
+    });
+
+    const [result] = await runPreparedExecutionsWithLimit([execution], 1);
+
+    expect(result.record.status).toBe("succeeded");
+    expect(result.record.tokenUsage).toBeUndefined();
+    expect(result.report.tokenUsageResult).toEqual({
+      status: "unavailable",
+      reason: "extractor_error",
+      provider: "gemini",
+      modelId: "gemini-2.5",
+      message: "Chat usage extraction failed: boom",
+    });
+    expect(runPostProcessingAndEvaluationsMock).toHaveBeenCalledTimes(1);
   });
 });
 

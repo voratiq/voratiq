@@ -123,4 +123,55 @@ describe("executeSpecCommand integration", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("persists provider-native token usage from generation results", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-spec-usage-record-"));
+    try {
+      await createWorkspace(root);
+
+      const draftPath = join(root, "draft.md");
+      await writeFile(draftPath, "# Draft Title\n\nDetails.\n", "utf8");
+
+      generateSessionIdMock.mockReturnValue("spec-usage");
+      executeCompetitionWithAdapterMock.mockResolvedValue([
+        {
+          agentId: "alpha",
+          specPath: "draft.md",
+          status: "generated",
+          tokenUsage: {
+            input_tokens: 210,
+            output_tokens: 65,
+            cache_read_input_tokens: 41,
+            cache_creation_input_tokens: 11,
+          },
+        },
+      ]);
+
+      await executeSpecCommand({
+        root,
+        specsFilePath: join(root, ".voratiq", "specs", "index.json"),
+        description: "Generate spec",
+      });
+
+      await expect(
+        readSpecRecords({
+          root,
+          specsFilePath: join(root, ".voratiq", "specs", "index.json"),
+          predicate: (record) => record.sessionId === "spec-usage",
+        }),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          sessionId: "spec-usage",
+          tokenUsage: {
+            input_tokens: 210,
+            output_tokens: 65,
+            cache_read_input_tokens: 41,
+            cache_creation_input_tokens: 11,
+          },
+        }),
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

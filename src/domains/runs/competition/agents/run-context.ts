@@ -15,18 +15,16 @@ import type {
   AgentEvalSnapshot,
   AgentInvocationRecord,
   AgentStatus,
+  ExtractedTokenUsage,
   WatchdogMetadata,
 } from "../../../../domains/runs/model/types.js";
 import { normalizeDiffStatistics } from "../../../../utils/diff.js";
+import type { TokenUsageResult } from "../../../../workspace/chat/token-usage-result.js";
 import type { ChatArtifactFormat } from "../../../../workspace/chat/types.js";
 import type { ArtifactCollectionResult } from "./artifacts.js";
 
 export class AgentRunContext {
-  public readonly state: AgentExecutionState = {
-    diffAttempted: false,
-    diffCaptured: false,
-    diffStatistics: undefined,
-  };
+  public readonly state: AgentExecutionState;
 
   public status: AgentStatus = "succeeded";
   public commitSha: string | undefined;
@@ -52,6 +50,20 @@ export class AgentRunContext {
     this.runId = params.runId;
     this.startedAt = params.startedAt;
     this.evalPlan = params.evalPlan;
+    this.state = {
+      diffAttempted: false,
+      diffCaptured: false,
+      diffStatistics: undefined,
+      tokenUsage: undefined,
+      tokenUsageResult: {
+        status: "unavailable",
+        reason: "chat_not_captured",
+        provider: params.agent.provider,
+        modelId: params.agent.model,
+        message:
+          "Chat usage capture was not enabled or did not produce an artifact.",
+      } satisfies TokenUsageResult,
+    };
     this.evalResults = buildDefaultEvalResults(this.evalPlan);
     this.artifactState = {
       diffAttempted: false,
@@ -143,6 +155,19 @@ export class AgentRunContext {
     this.failFast = info;
   }
 
+  public setTokenUsage(tokenUsage: ExtractedTokenUsage): void {
+    this.state.tokenUsage = tokenUsage;
+  }
+
+  public setTokenUsageResult(result: TokenUsageResult): void {
+    this.state.tokenUsageResult = result;
+    if (result.status === "available") {
+      this.state.tokenUsage = result.tokenUsage;
+      return;
+    }
+    this.state.tokenUsage = undefined;
+  }
+
   public finalize(): AgentExecutionResult {
     this.setCompleted();
     const record = buildAgentRecord({
@@ -156,6 +181,7 @@ export class AgentRunContext {
       evalResults: this.evalResults,
       warnings: this.evalWarnings,
       diffStatistics: this.state.diffStatistics,
+      tokenUsage: this.state.tokenUsage,
       watchdog: this.watchdogMetadata,
       failFast: this.failFast,
     });
@@ -179,6 +205,7 @@ export class AgentRunContext {
       evalResults: this.evalResults,
       warnings: this.evalWarnings,
       diffStatistics: undefined,
+      tokenUsage: this.state.tokenUsage,
       watchdog: this.watchdogMetadata,
       failFast: this.failFast,
     });
@@ -206,6 +233,7 @@ function buildAgentRecord(options: {
   evalResults: AgentEvalResult[];
   warnings: readonly string[];
   diffStatistics?: string;
+  tokenUsage?: ExtractedTokenUsage;
   watchdog?: WatchdogMetadata;
   failFast?: SandboxFailFastInfo;
 }): AgentInvocationRecord {
@@ -220,6 +248,7 @@ function buildAgentRecord(options: {
     evalResults,
     warnings,
     diffStatistics,
+    tokenUsage,
     watchdog,
     failFast,
   } = options;
@@ -242,6 +271,7 @@ function buildAgentRecord(options: {
     evals: snapshots,
     error: errorMessage,
     warnings: normalizedWarnings,
+    tokenUsage,
     watchdog,
     ...(failFast
       ? {

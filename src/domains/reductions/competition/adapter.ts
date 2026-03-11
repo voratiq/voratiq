@@ -30,6 +30,7 @@ import {
 import { readReviewRecords } from "../../../domains/reviews/persistence/adapter.js";
 import { buildRunRecordView } from "../../../domains/runs/model/enhanced.js";
 import { RunRecordNotFoundError } from "../../../domains/runs/model/errors.js";
+import type { ExtractedTokenUsage } from "../../../domains/runs/model/types.js";
 import { fetchRunsSafely } from "../../../domains/runs/persistence/adapter.js";
 import { readSpecRecords } from "../../../domains/specs/persistence/adapter.js";
 import { buildPersistedExtraContextFields } from "../../../extra-context/contract.js";
@@ -41,6 +42,8 @@ import {
   relativeToRoot,
   resolvePath,
 } from "../../../utils/path.js";
+import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
+import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import {
   type AgentWorkspacePaths,
   scaffoldAgentSessionWorkspace,
@@ -54,6 +57,23 @@ import {
   VORATIQ_REDUCTIONS_DIR,
 } from "../../../workspace/structure.js";
 
+function buildUnavailableTokenUsageResult(options: {
+  provider: string;
+  modelId: string;
+  message?: string;
+}): TokenUsageResult {
+  const { provider, modelId, message } = options;
+  return {
+    status: "unavailable",
+    reason: "chat_not_captured",
+    provider,
+    modelId,
+    message:
+      message ??
+      "Chat usage capture was not enabled or did not produce an artifact.",
+  };
+}
+
 export type ReduceCompetitionCandidate = AgentDefinition;
 
 export interface ReductionCompetitionExecution {
@@ -61,6 +81,8 @@ export interface ReductionCompetitionExecution {
   readonly outputPath: string;
   readonly dataPath: string;
   readonly status: "succeeded" | "failed";
+  readonly tokenUsage?: ExtractedTokenUsage;
+  readonly tokenUsageResult: TokenUsageResult;
   readonly error?: string;
 }
 
@@ -121,6 +143,7 @@ export function createReduceCompetitionAdapter(
 
   let failure: unknown;
   const pathsToPrune = new Set<string>();
+  const tokenUsageResultByReducerAgentId = new Map<string, TokenUsageResult>();
 
   return {
     queueCandidate: (candidate) => {
@@ -282,6 +305,22 @@ export function createReduceCompetitionAdapter(
         extraWriteProtectedPaths: sandboxPolicy.extraWriteProtectedPaths,
         extraReadProtectedPaths: sandboxPolicy.extraReadProtectedPaths,
       });
+      const tokenUsageResult = await extractProviderNativeTokenUsageForSession({
+        root,
+        domain: VORATIQ_REDUCTIONS_DIR,
+        sessionId: reductionId,
+        agentId: candidate.id,
+        provider: candidate.provider,
+        modelId: candidate.model,
+        chatCaptured: result.chat?.captured === true,
+        format: result.chat?.format,
+        artifactPath: result.chat?.artifactPath,
+      });
+      tokenUsageResultByReducerAgentId.set(candidate.id, tokenUsageResult);
+      const tokenUsage =
+        tokenUsageResult.status === "available"
+          ? tokenUsageResult.tokenUsage
+          : undefined;
 
       if (result.exitCode !== 0 || result.errorMessage) {
         const detectedDetail =
@@ -321,9 +360,11 @@ export function createReduceCompetitionAdapter(
         outputPath,
         dataPath,
         status: "succeeded",
+        tokenUsage,
+        tokenUsageResult,
       };
     },
-    onCandidateCompleted: async (prepared) => {
+    onCandidateCompleted: async (prepared, result) => {
       const completedAt = new Date().toISOString();
       await rewriteReductionRecord({
         root,
@@ -335,6 +376,7 @@ export function createReduceCompetitionAdapter(
             status: "succeeded",
             completedAt,
             error: null,
+            tokenUsage: result.tokenUsage,
           }),
       });
       emitStageProgressEvent(renderer, {
@@ -344,6 +386,8 @@ export function createReduceCompetitionAdapter(
           reducerAgentId: prepared.candidate.id,
           status: "succeeded",
           completedAt,
+          tokenUsage: result.tokenUsage,
+          tokenUsageResult: result.tokenUsageResult,
         },
       });
     },
@@ -351,6 +395,16 @@ export function createReduceCompetitionAdapter(
       failure = failure ?? error;
       const detail = toErrorMessage(error);
       const completedAt = new Date().toISOString();
+      const tokenUsageResult =
+        tokenUsageResultByReducerAgentId.get(prepared.candidate.id) ??
+        buildUnavailableTokenUsageResult({
+          provider: prepared.candidate.provider,
+          modelId: prepared.candidate.model,
+        });
+      const tokenUsage =
+        tokenUsageResult.status === "available"
+          ? tokenUsageResult.tokenUsage
+          : undefined;
       try {
         await rewriteReductionRecord({
           root,
@@ -362,6 +416,7 @@ export function createReduceCompetitionAdapter(
               status: "failed",
               completedAt,
               error: detail,
+              tokenUsage,
             }),
         });
       } catch {
@@ -374,6 +429,8 @@ export function createReduceCompetitionAdapter(
           reducerAgentId: prepared.candidate.id,
           status: "failed",
           completedAt,
+          tokenUsage,
+          tokenUsageResult,
         },
       });
       return {
@@ -381,6 +438,8 @@ export function createReduceCompetitionAdapter(
         outputPath: prepared.outputPath,
         dataPath: prepared.dataPath,
         status: "failed",
+        tokenUsage,
+        tokenUsageResult,
         error: detail,
       };
     },
@@ -433,6 +492,20 @@ export function createReduceCompetitionAdapter(
               status: reducer.status,
               startedAt: reducer.startedAt,
               completedAt: reducer.completedAt,
+              tokenUsage: reducer.tokenUsage,
+              tokenUsageResult:
+                tokenUsageResultByReducerAgentId.get(reducer.agentId) ??
+                (reducer.tokenUsage
+                  ? {
+                      status: "available",
+                      provider: "unknown",
+                      modelId: "unknown",
+                      tokenUsage: reducer.tokenUsage,
+                    }
+                  : buildUnavailableTokenUsageResult({
+                      provider: "unknown",
+                      modelId: "unknown",
+                    })),
             },
           });
         }
@@ -539,6 +612,7 @@ async function prepareSpecTargetContext(options: {
         operator: "spec",
         id: record.sessionId,
         path: normalizePathForDisplay(record.outputPath),
+        ...(record.tokenUsage ? { tokenUsage: record.tokenUsage } : {}),
       },
       artifacts: [
         {
@@ -600,6 +674,7 @@ async function prepareRunTargetContext(options: {
         status: evaluation.status,
         logPath: evaluation.logPath,
       })),
+      ...(agent.tokenUsage ? { tokenUsage: agent.tokenUsage } : {}),
     };
 
     if (agent.assets.diffPath) {
@@ -683,6 +758,7 @@ async function prepareReviewTargetContext(options: {
       status: reviewer.status,
       reviewPath: reviewRelative,
       recommendationPath: recommendationRelative,
+      ...(reviewer.tokenUsage ? { tokenUsage: reviewer.tokenUsage } : {}),
     });
   }
 
@@ -744,6 +820,7 @@ async function prepareReductionTargetContextInternal(options: {
       status: reducer.status,
       reductionPath: reductionRelative,
       reductionDataPath: dataRelative,
+      ...(reducer.tokenUsage ? { tokenUsage: reducer.tokenUsage } : {}),
     });
   }
 
@@ -831,9 +908,12 @@ function mutateReducerRecord(
     startedAt?: string;
     completedAt?: string;
     error: string | null;
+    tokenUsage?: ExtractedTokenUsage;
+    tokenUsageResult?: TokenUsageResult;
   },
 ): ReductionRecord {
-  const { reducerAgentId, status, startedAt, completedAt, error } = options;
+  const { reducerAgentId, status, startedAt, completedAt, error, tokenUsage } =
+    options;
   let found = false;
   const reducers = record.reducers.map((reducer) => {
     if (reducer.agentId !== reducerAgentId) {
@@ -846,6 +926,7 @@ function mutateReducerRecord(
       ...(startedAt ? { startedAt: reducer.startedAt ?? startedAt } : {}),
       ...(completedAt ? { completedAt } : {}),
       error,
+      ...(tokenUsage ? { tokenUsage } : {}),
     };
   });
   if (!found) {
