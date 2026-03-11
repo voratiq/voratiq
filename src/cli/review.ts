@@ -75,6 +75,7 @@ export async function runReviewCommand(
     writeOutput = writeCommandOutput,
   } = options;
   const { root, workspacePaths } = await resolveCliContext();
+
   checkPlatformSupport();
   ensureSandboxDependencies();
   const extraContextFiles = await resolveExtraContextFiles({

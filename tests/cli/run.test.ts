@@ -4,6 +4,7 @@ import {
   mkdir,
   readdir,
   readFile,
+  rm,
   writeFile,
 } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -241,6 +242,58 @@ suite("voratiq run (integration)", () => {
       } finally {
         process.chdir(originalCwd);
         process.env.PATH = originalPath;
+      }
+    },
+    RUN_INTEGRATION_TIMEOUT_MS,
+  );
+
+  it(
+    "repairs missing workspace entries without emitting a notice",
+    async () => {
+      await createWorkspace(repoRoot);
+      await writeAgentsConfig(workspace, agentScriptPath);
+
+      const specRelativePath = "specs/repair-notice.md";
+      const specPath = join(repoRoot, specRelativePath);
+      await mkdir(join(repoRoot, "specs"), { recursive: true });
+      await writeFile(specPath, "# Repair notice run spec\n", "utf8");
+
+      await rm(join(repoRoot, ".voratiq", "reductions"), {
+        recursive: true,
+        force: true,
+      });
+      await rm(join(repoRoot, ".voratiq", "reviews", "index.json"), {
+        force: true,
+      });
+      await rm(join(repoRoot, ".voratiq", "specs", "sessions"), {
+        recursive: true,
+        force: true,
+      });
+
+      const originalCwd = process.cwd();
+      process.chdir(repoRoot);
+      const infoMessages: string[] = [];
+
+      try {
+        const result = await runRunCommand({
+          specPath: specRelativePath,
+          writeOutput: (payload) => {
+            for (const alert of payload.alerts ?? []) {
+              if (alert.severity === "info") {
+                infoMessages.push(alert.message);
+              }
+            }
+          },
+        });
+
+        expect(result.report.runId).toMatch(
+          /^(run-|[0-9]{8}-[0-9]{6}-[a-z0-9]+)/u,
+        );
+        expect(infoMessages).not.toContain(
+          "Voratiq initialized missing workspace entries under .voratiq/.",
+        );
+      } finally {
+        process.chdir(originalCwd);
       }
     },
     RUN_INTEGRATION_TIMEOUT_MS,

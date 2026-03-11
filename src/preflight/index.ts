@@ -12,7 +12,10 @@ import {
   collectMissingSandboxDependencies,
   formatSandboxDependencyList,
 } from "../workspace/sandbox-requirements.js";
-import { validateWorkspace } from "../workspace/setup.js";
+import {
+  repairWorkspaceStructure,
+  validateWorkspace,
+} from "../workspace/setup.js";
 import {
   resolveWorkspacePath,
   VORATIQ_REDUCTIONS_DIR,
@@ -51,6 +54,7 @@ export interface CliContext {
   root: string;
   workspacePaths: WorkspacePaths;
   workspaceAutoInitialized?: boolean;
+  workspaceAutoRepaired?: boolean;
 }
 
 export type WorkspaceAutoInitMode = "never" | "when-missing";
@@ -70,9 +74,10 @@ export async function resolveCliContext(
 
   const workspaceDir = resolveWorkspacePath(root);
   let workspaceAutoInitialized = false;
+  let workspaceAutoRepaired = false;
 
   if (requireWorkspace) {
-    const workspaceMissing = !(await pathExists(workspaceDir));
+    let workspaceMissing = !(await pathExists(workspaceDir));
     if (workspaceAutoInitMode === "when-missing" && workspaceMissing) {
       await executeInitCommand({
         root,
@@ -82,6 +87,12 @@ export async function resolveCliContext(
         interactive: false,
       });
       workspaceAutoInitialized = true;
+      workspaceMissing = false;
+    }
+
+    if (!workspaceMissing) {
+      const repairResult = await repairWorkspaceStructure(root);
+      workspaceAutoRepaired = repairResult.repaired;
     }
 
     await validateWorkspace(root);
@@ -100,7 +111,12 @@ export async function resolveCliContext(
     specsFile: resolveWorkspacePath(root, VORATIQ_SPECS_FILE),
   };
 
-  return { root, workspacePaths, workspaceAutoInitialized };
+  return {
+    root,
+    workspacePaths,
+    workspaceAutoInitialized,
+    workspaceAutoRepaired,
+  };
 }
 
 export interface ResolvedSpecPath {

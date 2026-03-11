@@ -12,13 +12,14 @@ import {
 } from "../render/transcripts/prune.js";
 import { createConfirmationWorkflow } from "./confirmation.js";
 import { CliError, NonInteractiveShellError } from "./errors.js";
-import { writeCommandOutput } from "./output.js";
+import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface PruneCommandOptions {
   runId?: string;
   all?: boolean;
   purge?: boolean;
   yes?: boolean;
+  writeOutput?: CommandOutputWriter;
 }
 
 export interface PruneCommandResult {
@@ -36,6 +37,7 @@ export async function runPruneCommand(
   const assumeYes = Boolean(options.yes);
 
   const { root, workspacePaths } = await resolveCliContext();
+
   const confirmation = createConfirmationWorkflow({
     assumeYes,
     onUnavailable: () => {
@@ -118,6 +120,7 @@ export function createPruneCommand(): Command {
         all: wantsAll,
         purge: Boolean(options.purge),
         yes: Boolean(options.yes),
+        writeOutput: writeCommandOutput,
       });
 
       writeCommandOutput({

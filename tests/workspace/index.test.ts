@@ -1,8 +1,12 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { WorkspaceMissingEntryError } from "../../src/workspace/errors.js";
+import {
+  WorkspaceMissingEntryError,
+  WorkspaceSetupError,
+  WorkspaceWrongTypeEntryError,
+} from "../../src/workspace/errors.js";
 import {
   createWorkspace,
   validateWorkspace,
@@ -141,6 +145,38 @@ describe("workspace bootstrap", () => {
 
     await expect(validateWorkspace(repoRoot)).rejects.toBeInstanceOf(
       WorkspaceMissingEntryError,
+    );
+  });
+
+  it("fails validation when a workspace directory path is a file", async () => {
+    await createWorkspace(repoRoot);
+    const reviewsPath = resolveWorkspacePath(repoRoot, "reviews");
+    await rm(reviewsPath, { recursive: true, force: true });
+    await writeFile(reviewsPath, "");
+
+    await expect(validateWorkspace(repoRoot)).rejects.toBeInstanceOf(
+      WorkspaceWrongTypeEntryError,
+    );
+  });
+
+  it("fails validation when a workspace file path is a directory", async () => {
+    await createWorkspace(repoRoot);
+    const agentsPath = resolveWorkspacePath(repoRoot, "agents.yaml");
+    await rm(agentsPath, { force: true });
+    await mkdir(agentsPath, { recursive: true });
+
+    await expect(validateWorkspace(repoRoot)).rejects.toBeInstanceOf(
+      WorkspaceWrongTypeEntryError,
+    );
+  });
+
+  it("fails validation when an index payload is malformed", async () => {
+    await createWorkspace(repoRoot);
+    const runsPath = resolveWorkspacePath(repoRoot, "runs", "index.json");
+    await writeFile(runsPath, '{"version":2,', "utf8");
+
+    await expect(validateWorkspace(repoRoot)).rejects.toBeInstanceOf(
+      WorkspaceSetupError,
     );
   });
 });
