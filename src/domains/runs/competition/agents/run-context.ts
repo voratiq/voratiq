@@ -18,6 +18,10 @@ import type {
   ExtractedTokenUsage,
   WatchdogMetadata,
 } from "../../../../domains/runs/model/types.js";
+import {
+  buildUnavailableTokenUsageResult,
+  resolveTokenUsage,
+} from "../../../../domains/shared/token-usage.js";
 import { normalizeDiffStatistics } from "../../../../utils/diff.js";
 import type { TokenUsageResult } from "../../../../workspace/chat/token-usage-result.js";
 import type { ChatArtifactFormat } from "../../../../workspace/chat/types.js";
@@ -55,14 +59,10 @@ export class AgentRunContext {
       diffCaptured: false,
       diffStatistics: undefined,
       tokenUsage: undefined,
-      tokenUsageResult: {
-        status: "unavailable",
-        reason: "chat_not_captured",
+      tokenUsageResult: buildUnavailableTokenUsageResult({
         provider: params.agent.provider,
         modelId: params.agent.model,
-        message:
-          "Chat usage capture was not enabled or did not produce an artifact.",
-      } satisfies TokenUsageResult,
+      }),
     };
     this.evalResults = buildDefaultEvalResults(this.evalPlan);
     this.artifactState = {
@@ -155,17 +155,9 @@ export class AgentRunContext {
     this.failFast = info;
   }
 
-  public setTokenUsage(tokenUsage: ExtractedTokenUsage): void {
-    this.state.tokenUsage = tokenUsage;
-  }
-
   public setTokenUsageResult(result: TokenUsageResult): void {
     this.state.tokenUsageResult = result;
-    if (result.status === "available") {
-      this.state.tokenUsage = result.tokenUsage;
-      return;
-    }
-    this.state.tokenUsage = undefined;
+    this.state.tokenUsage = resolveTokenUsage(result);
   }
 
   public finalize(): AgentExecutionResult {

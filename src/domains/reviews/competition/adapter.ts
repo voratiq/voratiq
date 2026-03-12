@@ -50,6 +50,11 @@ import {
   buildOperationLifecycleCompleteFields,
   buildRecordLifecycleCompleteFields,
 } from "../../../domains/shared/lifecycle.js";
+import {
+  buildUnavailableTokenUsageResult,
+  reconstructTokenUsageResult,
+  resolveTokenUsage,
+} from "../../../domains/shared/token-usage.js";
 import { buildPersistedExtraContextFields } from "../../../extra-context/contract.js";
 import type { ReviewProgressRenderer } from "../../../render/transcripts/review.js";
 import { emitStageProgressEvent } from "../../../render/transcripts/stage-progress.js";
@@ -78,23 +83,6 @@ import {
   VORATIQ_REVIEWS_FILE,
   VORATIQ_REVIEWS_SESSIONS_DIR,
 } from "../../../workspace/structure.js";
-
-function buildUnavailableTokenUsageResult(options: {
-  provider: string;
-  modelId: string;
-  message?: string;
-}): TokenUsageResult {
-  const { provider, modelId, message } = options;
-  return {
-    status: "unavailable",
-    reason: "chat_not_captured",
-    provider,
-    modelId,
-    message:
-      message ??
-      "Chat usage capture was not enabled or did not produce an artifact.",
-  };
-}
 
 export type ReviewCompetitionCandidate = AgentDefinition;
 
@@ -180,6 +168,10 @@ export function createReviewCompetitionAdapter(
   const workspacesToPrune = new Set<string>();
   const worktreesToRemove = new Set<string>();
   const tokenUsageResultByReviewerAgentId = new Map<string, TokenUsageResult>();
+  const tokenUsageIdentityByReviewerAgentId = new Map<
+    string,
+    { provider: string; modelId: string }
+  >();
   let sharedInputs: BlindedReviewSessionInputs | undefined;
 
   return {
@@ -240,6 +232,10 @@ export function createReviewCompetitionAdapter(
         const prepared: PreparedReviewCompetitionCandidate[] = [];
         const reviewerAgentIds = candidates.map((candidate) => candidate.id);
         for (const candidate of candidates) {
+          tokenUsageIdentityByReviewerAgentId.set(candidate.id, {
+            provider: candidate.provider,
+            modelId: candidate.model,
+          });
           const workspacePaths = await scaffoldAgentSessionWorkspace({
             root,
             domain: VORATIQ_REVIEWS_DIR,
@@ -440,10 +436,7 @@ export function createReviewCompetitionAdapter(
         artifactPath: result.chat?.artifactPath,
       });
       tokenUsageResultByReviewerAgentId.set(agent.id, tokenUsageResult);
-      const tokenUsage =
-        tokenUsageResult.status === "available"
-          ? tokenUsageResult.tokenUsage
-          : undefined;
+      const tokenUsage = resolveTokenUsage(tokenUsageResult);
 
       if (result.exitCode !== 0 || result.errorMessage) {
         const detectedDetail =
@@ -550,10 +543,7 @@ export function createReviewCompetitionAdapter(
           provider: prepared.candidate.provider,
           modelId: prepared.candidate.model,
         });
-      const tokenUsage =
-        tokenUsageResult.status === "available"
-          ? tokenUsageResult.tokenUsage
-          : undefined;
+      const tokenUsage = resolveTokenUsage(tokenUsageResult);
       try {
         await rewriteReviewRecordIfPresent({
           root,
@@ -676,6 +666,9 @@ export function createReviewCompetitionAdapter(
 
       if (finalizedRecord) {
         for (const reviewer of finalizedRecord.reviewers) {
+          const tokenUsageIdentity = tokenUsageIdentityByReviewerAgentId.get(
+            reviewer.agentId,
+          );
           emitStageProgressEvent(renderer, {
             type: "stage.candidate",
             stage: "review",
@@ -687,17 +680,11 @@ export function createReviewCompetitionAdapter(
               tokenUsage: reviewer.tokenUsage,
               tokenUsageResult:
                 tokenUsageResultByReviewerAgentId.get(reviewer.agentId) ??
-                (reviewer.tokenUsage
-                  ? {
-                      status: "available",
-                      provider: "unknown",
-                      modelId: "unknown",
-                      tokenUsage: reviewer.tokenUsage,
-                    }
-                  : buildUnavailableTokenUsageResult({
-                      provider: "unknown",
-                      modelId: "unknown",
-                    })),
+                reconstructTokenUsageResult({
+                  tokenUsage: reviewer.tokenUsage,
+                  provider: tokenUsageIdentity?.provider,
+                  modelId: tokenUsageIdentity?.modelId,
+                }),
             },
           });
         }

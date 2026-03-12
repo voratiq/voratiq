@@ -13,6 +13,10 @@ import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-p
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import type { ExtractedTokenUsage } from "../../../domains/runs/model/types.js";
+import {
+  buildUnavailableTokenUsageResult,
+  resolveTokenUsage,
+} from "../../../domains/shared/token-usage.js";
 import { buildSpecPrompt } from "../../../domains/specs/competition/prompt.js";
 import { toErrorMessage } from "../../../utils/errors.js";
 import {
@@ -31,19 +35,6 @@ import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
 import { VORATIQ_SPECS_DIR } from "../../../workspace/structure.js";
 
 const SPEC_ARTIFACT_FILENAME = "spec.md";
-
-function buildDefaultUnavailableTokenUsageResult(
-  candidate: SpecCompetitionCandidate,
-  message = "Chat usage capture was not enabled or did not produce an artifact.",
-): TokenUsageResult {
-  return {
-    status: "unavailable",
-    reason: "chat_not_captured",
-    provider: candidate.provider,
-    modelId: candidate.model,
-    message,
-  };
-}
 
 export type SpecCompetitionCandidate = AgentDefinition;
 
@@ -136,10 +127,11 @@ export function createSpecCompetitionAdapter(
             agentId: candidate.id,
             specPath: resolveDraftSpecPath(root, workspacePaths.workspacePath),
             status: "failed",
-            tokenUsageResult: buildDefaultUnavailableTokenUsageResult(
-              candidate,
-              toErrorMessage(error),
-            ),
+            tokenUsageResult: buildUnavailableTokenUsageResult({
+              provider: candidate.provider,
+              modelId: candidate.model,
+              message: toErrorMessage(error),
+            }),
             error: toErrorMessage(error),
           });
         }
@@ -187,10 +179,7 @@ export function createSpecCompetitionAdapter(
             format: result.chat?.format,
             artifactPath: result.chat?.artifactPath,
           });
-        const tokenUsage =
-          tokenUsageResult.status === "available"
-            ? tokenUsageResult.tokenUsage
-            : undefined;
+        const tokenUsage = resolveTokenUsage(tokenUsageResult);
 
         if (result.exitCode !== 0 || result.errorMessage) {
           const detectedDetail =
@@ -237,10 +226,11 @@ export function createSpecCompetitionAdapter(
           agentId: candidate.id,
           specPath: resolveDraftSpecPath(root, workspacePaths.workspacePath),
           status: "failed",
-          tokenUsageResult: buildDefaultUnavailableTokenUsageResult(
-            candidate,
-            toErrorMessage(error),
-          ),
+          tokenUsageResult: buildUnavailableTokenUsageResult({
+            provider: candidate.provider,
+            modelId: candidate.model,
+            message: toErrorMessage(error),
+          }),
           error: toErrorMessage(error),
         };
       }

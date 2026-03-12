@@ -1,9 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
 
-import {
-  extractProviderNativeTokenUsageForSession,
-  tryExtractProviderNativeTokenUsageForSession,
-} from "../../../src/workspace/chat/native-usage.js";
+import { extractProviderNativeTokenUsageForSession } from "../../../src/workspace/chat/native-usage.js";
 import { extractChatUsageFromArtifact } from "../../../src/workspace/chat/usage-extractor.js";
 
 jest.mock("../../../src/workspace/chat/usage-extractor.js", () => ({
@@ -154,7 +151,7 @@ describe("extractProviderNativeTokenUsageForSession", () => {
     });
   });
 
-  it("returns provider-native tokenUsage only from tryExtract when available", async () => {
+  it("passes through available extraction results", async () => {
     extractChatUsageFromArtifactMock.mockResolvedValueOnce({
       status: "available",
       provider: "codex",
@@ -171,7 +168,7 @@ describe("extractProviderNativeTokenUsageForSession", () => {
     });
 
     await expect(
-      tryExtractProviderNativeTokenUsageForSession({
+      extractProviderNativeTokenUsageForSession({
         root: "/repo",
         domain: "specs",
         sessionId: "session-6",
@@ -183,11 +180,18 @@ describe("extractProviderNativeTokenUsageForSession", () => {
         artifactPath: "/tmp/chat.jsonl",
       }),
     ).resolves.toEqual({
-      input_tokens: 120,
-      cached_input_tokens: 30,
-      output_tokens: 45,
-      reasoning_output_tokens: 7,
-      total_tokens: 202,
+      status: "available",
+      provider: "codex",
+      modelId: "gpt-5",
+      artifactPath: "/tmp/chat.jsonl",
+      format: "jsonl",
+      tokenUsage: {
+        input_tokens: 120,
+        cached_input_tokens: 30,
+        output_tokens: 45,
+        reasoning_output_tokens: 7,
+        total_tokens: 202,
+      },
     });
   });
 });
