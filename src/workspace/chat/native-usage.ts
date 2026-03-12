@@ -1,7 +1,4 @@
-import type {
-  ChatUsageProviderId,
-  ExtractedTokenUsage,
-} from "../../domains/runs/model/types.js";
+import type { ChatUsageProviderId } from "../../domains/runs/model/types.js";
 import { resolvePath } from "../../utils/path.js";
 import { getAgentSessionChatArtifactPath } from "../structure.js";
 import type { TokenUsageResult } from "./token-usage-result.js";
@@ -84,21 +81,6 @@ export async function extractProviderNativeTokenUsageForSession(options: {
       }`,
     };
   }
-}
-
-export async function tryExtractProviderNativeTokenUsageForSession(options: {
-  root: string;
-  domain: string;
-  sessionId: string;
-  agentId: string;
-  provider: string;
-  modelId: string;
-  chatCaptured: boolean;
-  format?: ChatArtifactFormat;
-  artifactPath?: string;
-}): Promise<ExtractedTokenUsage | undefined> {
-  const result = await extractProviderNativeTokenUsageForSession(options);
-  return result.status === "available" ? result.tokenUsage : undefined;
 }
 
 function toChatUsageProviderId(value: string): ChatUsageProviderId | undefined {

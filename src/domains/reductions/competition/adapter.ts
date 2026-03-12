@@ -37,6 +37,11 @@ import {
   buildOperationLifecycleCompleteFields,
   buildRecordLifecycleCompleteFields,
 } from "../../../domains/shared/lifecycle.js";
+import {
+  buildUnavailableTokenUsageResult,
+  reconstructTokenUsageResult,
+  resolveTokenUsage,
+} from "../../../domains/shared/token-usage.js";
 import { readSpecRecords } from "../../../domains/specs/persistence/adapter.js";
 import { buildPersistedExtraContextFields } from "../../../extra-context/contract.js";
 import type { ReduceProgressRenderer } from "../../../render/transcripts/reduce.js";
@@ -61,23 +66,6 @@ import {
   REVIEW_RECOMMENDATION_FILENAME,
   VORATIQ_REDUCTIONS_DIR,
 } from "../../../workspace/structure.js";
-
-function buildUnavailableTokenUsageResult(options: {
-  provider: string;
-  modelId: string;
-  message?: string;
-}): TokenUsageResult {
-  const { provider, modelId, message } = options;
-  return {
-    status: "unavailable",
-    reason: "chat_not_captured",
-    provider,
-    modelId,
-    message:
-      message ??
-      "Chat usage capture was not enabled or did not produce an artifact.",
-  };
-}
 
 export type ReduceCompetitionCandidate = AgentDefinition;
 
@@ -149,6 +137,10 @@ export function createReduceCompetitionAdapter(
   let failure: unknown;
   const pathsToPrune = new Set<string>();
   const tokenUsageResultByReducerAgentId = new Map<string, TokenUsageResult>();
+  const tokenUsageIdentityByReducerAgentId = new Map<
+    string,
+    { provider: string; modelId: string }
+  >();
 
   return {
     queueCandidate: (candidate) => {
@@ -208,6 +200,10 @@ export function createReduceCompetitionAdapter(
 
       const prepared: PreparedReduceCompetitionCandidate[] = [];
       for (const candidate of candidates) {
+        tokenUsageIdentityByReducerAgentId.set(candidate.id, {
+          provider: candidate.provider,
+          modelId: candidate.model,
+        });
         const workspacePaths = await scaffoldAgentSessionWorkspace({
           root,
           domain: VORATIQ_REDUCTIONS_DIR,
@@ -333,10 +329,7 @@ export function createReduceCompetitionAdapter(
         artifactPath: result.chat?.artifactPath,
       });
       tokenUsageResultByReducerAgentId.set(candidate.id, tokenUsageResult);
-      const tokenUsage =
-        tokenUsageResult.status === "available"
-          ? tokenUsageResult.tokenUsage
-          : undefined;
+      const tokenUsage = resolveTokenUsage(tokenUsageResult);
 
       if (result.exitCode !== 0 || result.errorMessage) {
         const detectedDetail =
@@ -417,10 +410,7 @@ export function createReduceCompetitionAdapter(
           provider: prepared.candidate.provider,
           modelId: prepared.candidate.model,
         });
-      const tokenUsage =
-        tokenUsageResult.status === "available"
-          ? tokenUsageResult.tokenUsage
-          : undefined;
+      const tokenUsage = resolveTokenUsage(tokenUsageResult);
       try {
         await rewriteReductionRecord({
           root,
@@ -509,6 +499,9 @@ export function createReduceCompetitionAdapter(
 
       if (finalizedRecord) {
         for (const reducer of finalizedRecord.reducers) {
+          const tokenUsageIdentity = tokenUsageIdentityByReducerAgentId.get(
+            reducer.agentId,
+          );
           emitStageProgressEvent(renderer, {
             type: "stage.candidate",
             stage: "reduce",
@@ -520,17 +513,11 @@ export function createReduceCompetitionAdapter(
               tokenUsage: reducer.tokenUsage,
               tokenUsageResult:
                 tokenUsageResultByReducerAgentId.get(reducer.agentId) ??
-                (reducer.tokenUsage
-                  ? {
-                      status: "available",
-                      provider: "unknown",
-                      modelId: "unknown",
-                      tokenUsage: reducer.tokenUsage,
-                    }
-                  : buildUnavailableTokenUsageResult({
-                      provider: "unknown",
-                      modelId: "unknown",
-                    })),
+                reconstructTokenUsageResult({
+                  tokenUsage: reducer.tokenUsage,
+                  provider: tokenUsageIdentity?.provider,
+                  modelId: tokenUsageIdentity?.modelId,
+                }),
             },
           });
         }
