@@ -1025,6 +1025,7 @@ async function writeReviewRecord(options: {
       sessionId: reviewId,
       runId,
       createdAt: now,
+      startedAt: now,
       completedAt: now,
       status: "succeeded",
       reviewers: [
@@ -1032,6 +1033,7 @@ async function writeReviewRecord(options: {
           agentId: "reviewer",
           status: "succeeded",
           outputPath: `.voratiq/reviews/sessions/${reviewId}/reviewer/artifacts/review.md`,
+          startedAt: now,
           completedAt: now,
           error: null,
         },

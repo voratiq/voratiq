@@ -11,6 +11,7 @@ import {
   type SessionRecordWarning,
   type SessionStorePaths,
 } from "../../../persistence/session-store.js";
+import { buildRecordLifecycleCompleteFields } from "../../shared/lifecycle.js";
 import {
   type SpecIndexEntry,
   type SpecRecord,
@@ -168,8 +169,8 @@ export async function finalizeSpecRecord(options: {
     mutate: (existing) => ({
       ...existing,
       status,
+      ...buildRecordLifecycleCompleteFields({ existing, completedAt }),
       error: error ?? existing.error ?? null,
-      completedAt: completedAt ?? new Date().toISOString(),
     }),
   });
 }

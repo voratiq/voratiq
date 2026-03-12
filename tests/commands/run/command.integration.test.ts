@@ -154,6 +154,7 @@ describe("executeRunCommand integration", () => {
       spec: { path: "spec.md" },
       status: "running",
       createdAt,
+      startedAt: createdAt,
       agents: [],
       deletedAt: null,
     };
@@ -341,6 +342,7 @@ describe("executeRunCommand integration", () => {
       spec: { path: "spec.md" },
       status: "running",
       createdAt,
+      startedAt: createdAt,
       agents: [],
       deletedAt: null,
     };
@@ -505,6 +507,7 @@ describe("executeRunCommand integration", () => {
       spec: { path: "spec.md" },
       status: "running",
       createdAt,
+      startedAt: createdAt,
       agents: [],
       deletedAt: null,
     };
@@ -644,6 +647,7 @@ describe("executeRunCommand integration", () => {
       spec: { path: "spec.md" },
       status: "running",
       createdAt,
+      startedAt: createdAt,
       agents: [],
       deletedAt: null,
     };
@@ -795,6 +799,7 @@ describe("executeRunCommand integration", () => {
       spec: { path: "spec.md" },
       status: "running",
       createdAt: "2025-11-10T00:00:00.000Z",
+      startedAt: "2025-11-10T00:00:00.000Z",
       agents: [],
       deletedAt: null,
     };
@@ -859,6 +864,7 @@ describe("executeRunCommand integration", () => {
         spec: { path: "spec.md" },
         status: "running",
         createdAt: "2025-11-10T00:00:00.000Z",
+        startedAt: "2025-11-10T00:00:00.000Z",
         agents: [],
       },
       recordPersisted: false,
@@ -916,6 +922,7 @@ describe("executeRunCommand integration", () => {
         spec: { path: "spec.md" },
         status: "running",
         createdAt: "2025-11-10T00:00:00.000Z",
+        startedAt: "2025-11-10T00:00:00.000Z",
         agents: [],
         deletedAt: null,
       },

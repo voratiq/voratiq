@@ -10,6 +10,10 @@ import {
   getRunRecordSnapshot,
   rewriteRunRecord,
 } from "../../domains/runs/persistence/adapter.js";
+import {
+  buildOperationLifecycleCompleteFields,
+  buildRecordLifecycleCompleteFields,
+} from "../../domains/shared/lifecycle.js";
 import type { RunStatus } from "../../status/index.js";
 import { TERMINABLE_RUN_STATUSES } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
@@ -74,6 +78,7 @@ export async function terminateActiveRun(
     await rewriteRunRecord({
       ...context,
       mutate: (existing) => {
+        const completedAt = new Date().toISOString();
         const runInProgress =
           existing.status === "running" || existing.status === "queued";
         const runStatusNeedsUpdate =
@@ -83,7 +88,6 @@ export async function terminateActiveRun(
         let agents = existing.agents;
 
         if (status === "aborted") {
-          const abortedAt = new Date().toISOString();
           const abortWarning = RUN_ABORT_WARNING;
           agents = existing.agents.map((agent): AgentInvocationRecord => {
             if (agent.status !== "running" && agent.status !== "queued") {
@@ -110,8 +114,11 @@ export async function terminateActiveRun(
             return {
               ...agent,
               status: "aborted",
-              startedAt: agent.startedAt ?? abortedAt,
-              completedAt: abortedAt,
+              ...buildOperationLifecycleCompleteFields({
+                existing: agent,
+                startedAt: agent.startedAt ?? completedAt,
+                completedAt,
+              }),
               warnings: nextWarnings,
               artifacts: nextArtifacts,
             };
@@ -122,10 +129,22 @@ export async function terminateActiveRun(
           return existing;
         }
 
+        if (runStatusNeedsUpdate) {
+          return {
+            ...existing,
+            status,
+            ...buildRecordLifecycleCompleteFields({
+              existing,
+              startedAt: existing.startedAt ?? completedAt,
+              completedAt,
+            }),
+            deletedAt: null,
+            agents,
+          };
+        }
+
         return {
           ...existing,
-          status: runStatusNeedsUpdate ? status : existing.status,
-          deletedAt: runStatusNeedsUpdate ? null : existing.deletedAt,
           agents,
         };
       },

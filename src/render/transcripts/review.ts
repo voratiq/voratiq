@@ -1,9 +1,10 @@
 import type { ExtractedTokenUsage } from "../../domains/runs/model/types.js";
 import { getAgentStatusStyle, getRunStatusStyle } from "../../status/colors.js";
+import { TERMINAL_REVIEW_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
 import { formatAgentErrorLine } from "../utils/agents.js";
-import { formatDurationLabel } from "../utils/agents.js";
 import { formatAgentBadge } from "../utils/badges.js";
+import { formatRenderLifecycleDuration } from "../utils/duration.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import {
   buildStageFrameLines,
@@ -25,8 +26,10 @@ export interface ReviewProgressContext {
   runId: string;
   reviewId: string;
   createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
   workspacePath: string;
-  status: "running" | "succeeded" | "failed" | "aborted";
+  status: "queued" | "running" | "succeeded" | "failed" | "aborted";
 }
 
 export interface ReviewProgressReviewerRecord {
@@ -53,7 +56,10 @@ export interface ReviewProgressRenderer
   > {
   begin(context?: ReviewProgressContext): void;
   update(record: ReviewProgressReviewerRecord): void;
-  complete(status?: ReviewProgressContext["status"]): void;
+  complete(
+    status?: ReviewProgressContext["status"],
+    lifecycle?: { startedAt?: string; completedAt?: string },
+  ): void;
 }
 
 const ERASE_LINE = "\u001b[2K";
@@ -108,7 +114,7 @@ function buildReviewStageShell(options: {
   reviewId: string;
   createdAt: string;
   workspacePath: string;
-  status: "running" | "succeeded" | "failed" | "aborted";
+  status: "queued" | "running" | "succeeded" | "failed" | "aborted";
   elapsed: string;
   tableLines?: string[];
   style?: TranscriptShellStyleOptions;
@@ -192,7 +198,7 @@ export function createReviewRenderer(
           return;
         }
 
-        const nextElapsed = formatReviewElapsed(context.createdAt);
+        const nextElapsed = formatReviewElapsed(context);
         if (nextElapsed === lastElapsedLabel) {
           return;
         }
@@ -221,13 +227,20 @@ export function createReviewRenderer(
     }
   }
 
-  function formatReviewElapsed(createdAt: string): string | undefined {
-    const startedAt = Date.parse(createdAt);
-    if (Number.isNaN(startedAt)) {
-      return undefined;
-    }
-
-    return formatDurationLabel(Math.max(0, now() - startedAt));
+  function formatReviewElapsed(source: {
+    status: ReviewProgressContext["status"];
+    startedAt?: string;
+    completedAt?: string;
+  }): string | undefined {
+    return formatRenderLifecycleDuration({
+      lifecycle: {
+        status: source.status,
+        startedAt: source.startedAt,
+        completedAt: source.completedAt,
+      },
+      terminalStatuses: TERMINAL_REVIEW_STATUSES,
+      now: now(),
+    });
   }
 
   function safeParse(value?: string): number | undefined {
@@ -242,17 +255,59 @@ export function createReviewRenderer(
   }
 
   function formatDuration(record: ReviewProgressReviewerRecord): string {
-    const startedAt = safeParse(record.startedAt);
-    if (startedAt === undefined) {
+    if (record.status === "running") {
       return DASH;
     }
+    return (
+      formatRenderLifecycleDuration({
+        lifecycle: {
+          status: record.status,
+          startedAt: record.startedAt,
+          completedAt: record.completedAt,
+        },
+        terminalStatuses: TERMINAL_REVIEW_STATUSES,
+        now: now(),
+      }) ?? DASH
+    );
+  }
 
-    const completedAt = safeParse(record.completedAt);
-    if (completedAt === undefined || completedAt < startedAt) {
-      return DASH;
+  function syncContextLifecycleFromReviewerRecords(): void {
+    if (!context) {
+      return;
     }
 
-    return formatDurationLabel(completedAt - startedAt) ?? DASH;
+    let earliestStartedAt = safeParse(context.startedAt);
+    let latestCompletedAt = safeParse(context.completedAt);
+
+    for (const reviewer of reviewerRecords.values()) {
+      const startedAt = safeParse(reviewer.startedAt);
+      if (
+        startedAt !== undefined &&
+        (earliestStartedAt === undefined || startedAt < earliestStartedAt)
+      ) {
+        earliestStartedAt = startedAt;
+      }
+
+      const completedAt = safeParse(reviewer.completedAt);
+      if (
+        completedAt !== undefined &&
+        (latestCompletedAt === undefined || completedAt > latestCompletedAt)
+      ) {
+        latestCompletedAt = completedAt;
+      }
+    }
+
+    context = {
+      ...context,
+      startedAt:
+        earliestStartedAt === undefined
+          ? undefined
+          : new Date(earliestStartedAt).toISOString(),
+      completedAt:
+        latestCompletedAt === undefined
+          ? undefined
+          : new Date(latestCompletedAt).toISOString(),
+    };
   }
 
   function buildReviewerTable(style: TranscriptShellStyleOptions): string[] {
@@ -289,8 +344,10 @@ export function createReviewRenderer(
       return;
     }
 
+    syncContextLifecycleFromReviewerRecords();
+
     const style: TranscriptShellStyleOptions = { isTty: true };
-    const elapsed = formatReviewElapsed(context.createdAt);
+    const elapsed = formatReviewElapsed(context);
     lastElapsedLabel = elapsed ?? null;
 
     const shell = buildReviewStageShell({
@@ -408,9 +465,20 @@ export function createReviewRenderer(
         candidate: record,
       });
     },
-    complete(status?: ReviewProgressContext["status"]): void {
+    complete(
+      status?: ReviewProgressContext["status"],
+      lifecycle?: { startedAt?: string; completedAt?: string },
+    ): void {
       stopRefreshLoop();
       guard(() => {
+        if (context && lifecycle) {
+          context = {
+            ...context,
+            startedAt: lifecycle.startedAt ?? context.startedAt,
+            completedAt: lifecycle.completedAt ?? context.completedAt,
+          };
+        }
+
         if (status) {
           this.onProgressEvent({
             type: "stage.status",
@@ -431,7 +499,7 @@ interface ReviewTranscriptReviewerBlock {
   reviewerAgentId: string;
   outputPath: string;
   duration: string;
-  status: "running" | "succeeded" | "failed" | "aborted";
+  status: "queued" | "running" | "succeeded" | "failed" | "aborted";
   previewLines?: readonly string[];
   errorLine?: string;
 }
@@ -442,7 +510,7 @@ export function renderReviewTranscript(options: {
   createdAt: string;
   elapsed: string;
   workspacePath: string;
-  status: "running" | "succeeded" | "failed" | "aborted";
+  status: "queued" | "running" | "succeeded" | "failed" | "aborted";
   reviewers: readonly ReviewTranscriptReviewerBlock[];
   recommendedAgentId?: string;
   suppressHint?: boolean;

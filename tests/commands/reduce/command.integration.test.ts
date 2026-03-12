@@ -300,6 +300,7 @@ describe("executeReduceCommand integration", () => {
         sessionId: "reduce-123",
         target: { type: "run", id: "run-123" },
         createdAt: "2026-01-01T00:00:00.000Z",
+        startedAt: "2026-01-01T00:00:01.000Z",
         completedAt: "2026-01-01T00:00:05.000Z",
         status: "succeeded",
         reducers: [
@@ -341,7 +342,13 @@ describe("executeReduceCommand integration", () => {
       workspacePath: ".voratiq/reductions/sessions/reduce-123",
       status: "running",
     });
-    expect(renderer.complete.mock.calls[0]).toEqual(["succeeded"]);
+    expect(renderer.complete.mock.calls[0]).toEqual([
+      "succeeded",
+      {
+        startedAt: "2026-01-01T00:00:01.000Z",
+        completedAt: "2026-01-01T00:00:05.000Z",
+      },
+    ]);
   });
 
   it("fails preflight before execution when any reducer provider/auth check fails", async () => {

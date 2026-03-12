@@ -32,6 +32,11 @@ import { buildRunRecordView } from "../../../domains/runs/model/enhanced.js";
 import { RunRecordNotFoundError } from "../../../domains/runs/model/errors.js";
 import type { ExtractedTokenUsage } from "../../../domains/runs/model/types.js";
 import { fetchRunsSafely } from "../../../domains/runs/persistence/adapter.js";
+import {
+  buildLifecycleStartFields,
+  buildOperationLifecycleCompleteFields,
+  buildRecordLifecycleCompleteFields,
+} from "../../../domains/shared/lifecycle.js";
 import { readSpecRecords } from "../../../domains/specs/persistence/adapter.js";
 import { buildPersistedExtraContextFields } from "../../../extra-context/contract.js";
 import type { ReduceProgressRenderer } from "../../../render/transcripts/reduce.js";
@@ -177,10 +182,10 @@ export function createReduceCompetitionAdapter(
         sessionId: reductionId,
         target,
         createdAt,
-        status: "running",
+        status: "queued",
         reducers: candidates.map((candidate) => ({
           agentId: candidate.id,
-          status: "running",
+          status: "queued",
           outputPath: buildReductionOutputPath({
             root,
             reductionId,
@@ -255,13 +260,24 @@ export function createReduceCompetitionAdapter(
         root,
         reductionsFilePath,
         sessionId: reductionId,
-        mutate: (record) =>
-          mutateReducerRecord(record, {
+        mutate: (record) => ({
+          ...mutateReducerRecord(record, {
             reducerAgentId: prepared.candidate.id,
             status: "running",
-            startedAt: startedAt,
+            startedAt,
             error: null,
           }),
+          status: record.status === "queued" ? "running" : record.status,
+          ...buildLifecycleStartFields({
+            existingStartedAt: record.startedAt,
+            timestamp: startedAt,
+          }),
+        }),
+      });
+      emitStageProgressEvent(renderer, {
+        type: "stage.status",
+        stage: "reduce",
+        status: "running",
       });
       emitStageProgressEvent(renderer, {
         type: "stage.candidate",
@@ -445,26 +461,35 @@ export function createReduceCompetitionAdapter(
     },
     finalizeCompetition: async () => {
       const failed = failure !== undefined;
+      const completedAt = new Date().toISOString();
       await rewriteReductionRecord({
         root,
         reductionsFilePath,
         sessionId: reductionId,
         mutate: (record) => {
-          const completedAt = record.completedAt ?? new Date().toISOString();
+          const recordComplete = buildRecordLifecycleCompleteFields({
+            existing: record,
+            startedAt: record.startedAt ?? completedAt,
+            completedAt,
+          });
           const status = failed ? "failed" : "succeeded";
           return {
             ...record,
             status,
-            completedAt,
+            ...recordComplete,
             error: failed ? toErrorMessage(failure) : null,
             reducers: record.reducers.map((reducer) => {
-              if (reducer.status !== "running") {
+              if (reducer.status !== "running" && reducer.status !== "queued") {
                 return reducer;
               }
               return {
                 ...reducer,
                 status,
-                completedAt,
+                ...buildOperationLifecycleCompleteFields({
+                  existing: reducer,
+                  startedAt: reducer.startedAt ?? recordComplete.completedAt,
+                  completedAt: recordComplete.completedAt,
+                }),
                 error: failed ? toErrorMessage(failure) : null,
               };
             }),
@@ -904,7 +929,7 @@ function mutateReducerRecord(
   record: ReductionRecord,
   options: {
     reducerAgentId: string;
-    status: "running" | "succeeded" | "failed" | "aborted";
+    status: "queued" | "running" | "succeeded" | "failed" | "aborted";
     startedAt?: string;
     completedAt?: string;
     error: string | null;
@@ -920,11 +945,22 @@ function mutateReducerRecord(
       return reducer;
     }
     found = true;
+    const lifecycleFields = completedAt
+      ? buildOperationLifecycleCompleteFields({
+          existing: reducer,
+          startedAt: reducer.startedAt ?? completedAt,
+          completedAt,
+        })
+      : startedAt
+        ? buildLifecycleStartFields({
+            existingStartedAt: reducer.startedAt,
+            timestamp: startedAt,
+          })
+        : {};
     return {
       ...reducer,
       status,
-      ...(startedAt ? { startedAt: reducer.startedAt ?? startedAt } : {}),
-      ...(completedAt ? { completedAt } : {}),
+      ...lifecycleFields,
       error,
       ...(tokenUsage ? { tokenUsage } : {}),
     };

@@ -16,6 +16,8 @@ import {
   ReviewGenerationFailedError,
   ReviewPreflightError,
 } from "../../domains/reviews/competition/errors.js";
+import type { ReviewRecord } from "../../domains/reviews/model/types.js";
+import { readReviewRecords } from "../../domains/reviews/persistence/adapter.js";
 import type { RunRecordEnhanced } from "../../domains/runs/model/enhanced.js";
 import { buildRunRecordView } from "../../domains/runs/model/enhanced.js";
 import { RunRecordNotFoundError } from "../../domains/runs/model/errors.js";
@@ -201,7 +203,17 @@ export async function executeReviewCommand(
   const finalStatus = reviewResults.some((result) => result.status === "failed")
     ? "failed"
     : "succeeded";
-  renderer?.complete(finalStatus);
+
+  const persistedRecord = await readReviewSessionRecord({
+    root,
+    reviewsFilePath,
+    reviewId,
+  }).catch(() => undefined);
+
+  renderer?.complete(persistedRecord?.status ?? finalStatus, {
+    startedAt: persistedRecord?.startedAt,
+    completedAt: persistedRecord?.completedAt,
+  });
 
   return {
     reviewId,
@@ -250,4 +262,19 @@ async function assertReviewPreflight(
   if (providerIssues.length > 0) {
     throw new ReviewPreflightError(providerIssues);
   }
+}
+
+async function readReviewSessionRecord(options: {
+  root: string;
+  reviewsFilePath: string;
+  reviewId: string;
+}): Promise<ReviewRecord | undefined> {
+  const { root, reviewsFilePath, reviewId } = options;
+  const records = await readReviewRecords({
+    root,
+    reviewsFilePath,
+    limit: 1,
+    predicate: (record) => record.sessionId === reviewId,
+  });
+  return records[0];
 }

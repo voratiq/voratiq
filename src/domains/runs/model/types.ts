@@ -18,9 +18,14 @@ import {
   IN_PROGRESS_AGENT_STATUSES,
   runStatusSchema,
   TERMINAL_AGENT_STATUSES,
+  TERMINAL_RUN_STATUSES,
 } from "../../../status/index.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import type { ChatArtifactFormat } from "../../../workspace/chat/types.js";
+import {
+  validateOperationLifecycleTimestamps,
+  validateRecordLifecycleTimestamps,
+} from "../../shared/lifecycle.js";
 
 export type { AgentStatus };
 export {
@@ -53,6 +58,8 @@ const FAIL_FAST_OPERATIONS = [
   "file-read",
   "file-write",
 ] as const;
+const QUEUED_RUN_STATUSES = ["queued"] as const;
+const RUNNING_RUN_STATUSES = ["running"] as const;
 
 export const watchdogMetadataSchema = z.object({
   /** Silence timeout in milliseconds that was enforced. */
@@ -180,34 +187,26 @@ export const agentInvocationRecordSchema = z
     failFastOperation: z.enum(FAIL_FAST_OPERATIONS).optional(),
   })
   .superRefine((data, ctx) => {
-    if (IN_PROGRESS_AGENT_STATUSES.includes(data.status)) {
-      return;
-    }
+    validateOperationLifecycleTimestamps(
+      {
+        status: data.status,
+        startedAt: data.startedAt,
+        completedAt: data.completedAt,
+      },
+      ctx,
+      {
+        queued: ["queued"],
+        running: ["running"],
+        terminal: TERMINAL_AGENT_STATUSES,
+      },
+    );
 
-    if (TERMINAL_AGENT_STATUSES.includes(data.status)) {
-      if (!data.startedAt) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["startedAt"],
-          message: "startedAt is required once the agent completes",
-        });
-      }
-
-      if (!data.completedAt) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["completedAt"],
-          message: "completedAt is required once the agent completes",
-        });
-      }
-
-      if (EVAL_REQUIRED_AGENT_STATUSES.includes(data.status) && !data.evals) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["evals"],
-          message: "eval results are required once the agent completes",
-        });
-      }
+    if (EVAL_REQUIRED_AGENT_STATUSES.includes(data.status) && !data.evals) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["evals"],
+        message: "eval results are required once the agent completes",
+      });
     }
 
     if (data.failFastTriggered) {
@@ -275,20 +274,40 @@ export const autoOutcomeSchema = z.object({
 
 export type RunAutoOutcome = z.infer<typeof autoOutcomeSchema>;
 
-export const runRecordSchema = z.object({
-  runId: z.string(),
-  baseRevisionSha: z.string(),
-  rootPath: repoRelativeRecordPathSchema,
-  spec: runSpecDescriptorSchema,
-  extraContext: z.array(persistedExtraContextPathSchema).optional(),
-  extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),
-  status: runStatusSchema,
-  createdAt: z.string(),
-  agents: z.array(agentInvocationRecordSchema),
-  applyStatus: applyStatusSchema.optional(),
-  auto: autoOutcomeSchema.optional(),
-  deletedAt: z.string().nullable().optional(),
-});
+export const runRecordSchema = z
+  .object({
+    runId: z.string(),
+    baseRevisionSha: z.string(),
+    rootPath: repoRelativeRecordPathSchema,
+    spec: runSpecDescriptorSchema,
+    extraContext: z.array(persistedExtraContextPathSchema).optional(),
+    extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),
+    status: runStatusSchema,
+    createdAt: z.string(),
+    startedAt: z.string().optional(),
+    completedAt: z.string().optional(),
+    agents: z.array(agentInvocationRecordSchema),
+    applyStatus: applyStatusSchema.optional(),
+    auto: autoOutcomeSchema.optional(),
+    deletedAt: z.string().nullable().optional(),
+  })
+  .superRefine((record, ctx) => {
+    // Enforce the canonical queued/running/terminal timestamp contract.
+    validateRecordLifecycleTimestamps(
+      {
+        status: record.status,
+        createdAt: record.createdAt,
+        startedAt: record.startedAt,
+        completedAt: record.completedAt,
+      },
+      ctx,
+      {
+        queued: QUEUED_RUN_STATUSES,
+        running: RUNNING_RUN_STATUSES,
+        terminal: TERMINAL_RUN_STATUSES,
+      },
+    );
+  });
 
 export type RunRecord = z.infer<typeof runRecordSchema>;
 
@@ -321,6 +340,8 @@ export type RunReport = {
   spec: RunRecord["spec"];
   status: RunRecord["status"];
   createdAt: RunRecord["createdAt"];
+  startedAt?: RunRecord["startedAt"];
+  completedAt?: RunRecord["completedAt"];
   baseRevisionSha: RunRecord["baseRevisionSha"];
   agents: AgentReport[];
   hadAgentFailure: boolean;

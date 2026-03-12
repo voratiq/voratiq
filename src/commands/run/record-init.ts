@@ -12,6 +12,7 @@ export interface RecordInitInput {
   readonly baseRevisionSha: string;
   readonly repoDisplayPath: string;
   readonly createdAt: string;
+  readonly startedAt: string;
   readonly runRoot: string;
   readonly extraContext?: string[];
   readonly extraContextMetadata?: import("../../extra-context/contract.js").PersistedExtraContextMetadataEntry[];
@@ -31,6 +32,7 @@ export async function initializeRunRecord(
     baseRevisionSha,
     repoDisplayPath,
     createdAt,
+    startedAt,
     runRoot,
     extraContext,
     extraContextMetadata,
@@ -44,6 +46,7 @@ export async function initializeRunRecord(
     extraContext,
     extraContextMetadata,
     createdAt,
+    startedAt,
     baseRevisionSha,
     rootPath: repoDisplayPath,
     agents: [],

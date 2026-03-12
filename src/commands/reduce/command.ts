@@ -160,7 +160,10 @@ export async function executeReduceCommand(
     ]);
   }
 
-  renderer?.complete(persistedRecord.status);
+  renderer?.complete(persistedRecord.status, {
+    startedAt: persistedRecord.startedAt,
+    completedAt: persistedRecord.completedAt,
+  });
 
   return {
     reductionId,

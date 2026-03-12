@@ -17,6 +17,7 @@ import {
   flushRunRecordBuffer,
   rewriteRunRecord,
 } from "../../domains/runs/persistence/adapter.js";
+import { buildRecordLifecycleCompleteFields } from "../../domains/shared/lifecycle.js";
 import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import type { RunProgressRenderer } from "../../render/transcripts/run.js";
 import { deriveRunStatusFromAgents } from "../../status/index.js";
@@ -81,7 +82,8 @@ export async function executeRunCommand(
   });
 
   const runId = generateRunId();
-  const createdAt = new Date().toISOString();
+  const startedAt = new Date().toISOString();
+  const createdAt = startedAt;
   const repoDisplayPath = normalizePathForDisplay(relativeToRoot(root, root));
 
   const { runWorkspace } = await prepareRunWorkspace({
@@ -99,6 +101,7 @@ export async function executeRunCommand(
     baseRevisionSha: validation.baseRevisionSha,
     repoDisplayPath,
     createdAt,
+    startedAt,
     runRoot,
     ...buildPersistedExtraContextFields(extraContextFiles),
   });
@@ -130,6 +133,7 @@ export async function executeRunCommand(
       specPath: specDisplayPath,
       workspacePath: formatRunWorkspaceRelative(runId),
       createdAt,
+      startedAt,
       baseRevisionSha: validation.baseRevisionSha,
     });
   }
@@ -180,6 +184,7 @@ export async function executeRunCommand(
           ...existing,
           agents: agentRecords,
           status: derivedRunStatus,
+          ...buildRecordLifecycleCompleteFields({ existing }),
           deletedAt: null,
         };
       },
@@ -208,6 +213,7 @@ export async function executeRunCommand(
               ...existing,
               agents: agentRecords.length > 0 ? agentRecords : existing.agents,
               status: "errored",
+              ...buildRecordLifecycleCompleteFields({ existing }),
               deletedAt: null,
             };
           },

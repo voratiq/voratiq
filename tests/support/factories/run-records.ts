@@ -48,25 +48,51 @@ export function createAgentInvocationRecord(
   overrides: Partial<AgentInvocationRecord> = {},
 ): AgentInvocationRecord {
   const now = new Date("2025-10-23T17:00:00.000Z").toISOString();
+  const later = new Date("2025-10-23T17:05:00.000Z").toISOString();
 
   const agent: AgentInvocationRecord = {
     agentId: DEFAULT_AGENT_ID,
     model: DEFAULT_MODEL,
     status: "succeeded",
-    startedAt: now,
-    completedAt: new Date("2025-10-23T17:05:00.000Z").toISOString(),
-    commitSha: DEFAULT_BASE_REVISION_SHA,
-    artifacts: buildDefaultArtifacts(),
-    evals: buildDefaultEvalSnapshots(),
     error: undefined,
     ...overrides,
   };
+
+  if (agent.status === "queued") {
+    delete agent.startedAt;
+    delete agent.completedAt;
+    delete agent.commitSha;
+    delete agent.artifacts;
+    delete agent.evals;
+    return agent;
+  }
+
+  if (agent.status === "running") {
+    agent.startedAt ??= now;
+    delete agent.completedAt;
+    delete agent.commitSha;
+    delete agent.artifacts;
+    delete agent.evals;
+    return agent;
+  }
+
+  agent.startedAt ??= now;
+  agent.completedAt ??= later;
+  agent.commitSha ??= DEFAULT_BASE_REVISION_SHA;
+  agent.artifacts ??= buildDefaultArtifacts();
+  agent.evals ??= buildDefaultEvalSnapshots();
 
   return agent;
 }
 
 export function createRunRecord(overrides: Partial<RunRecord> = {}): RunRecord {
   const runId = overrides.runId ?? `run-${randomUUID()}`;
+  const createdAt =
+    overrides.createdAt ?? new Date("2025-10-23T17:00:00.000Z").toISOString();
+  const startedAt = overrides.startedAt ?? createdAt;
+  const completedAt =
+    overrides.completedAt ??
+    new Date(Date.parse(startedAt) + 5 * 60 * 1000).toISOString();
 
   const record: RunRecord = {
     runId,
@@ -74,23 +100,57 @@ export function createRunRecord(overrides: Partial<RunRecord> = {}): RunRecord {
     rootPath: ".",
     spec: { path: DEFAULT_SPEC_PATH },
     status: "succeeded",
-    createdAt: new Date("2025-10-23T17:00:00.000Z").toISOString(),
+    createdAt,
     agents: [createAgentInvocationRecord()],
     applyStatus: undefined,
     deletedAt: null,
     ...overrides,
   };
 
+  if (record.status === "queued") {
+    delete record.startedAt;
+    delete record.completedAt;
+    return record;
+  }
+
+  if (record.status === "running") {
+    record.startedAt ??= startedAt;
+    delete record.completedAt;
+    return record;
+  }
+
+  if (
+    record.status === "succeeded" ||
+    record.status === "failed" ||
+    record.status === "errored" ||
+    record.status === "aborted"
+  ) {
+    record.startedAt ??= startedAt;
+    record.completedAt ??= completedAt;
+    return record;
+  }
+
   return record;
 }
 
 export function createRunReport(overrides: Partial<RunReport> = {}): RunReport {
+  const createdAt =
+    overrides.createdAt ?? new Date("2025-10-23T17:00:00.000Z").toISOString();
+  const startedAt = overrides.startedAt ?? createdAt;
+  const defaultCompletedAt = new Date(
+    Date.parse(startedAt) + 5 * 60 * 1000,
+  ).toISOString();
+
   return {
     runId: overrides.runId ?? `run-${randomUUID()}`,
     spec: overrides.spec ?? { path: DEFAULT_SPEC_PATH },
     status: overrides.status ?? "succeeded",
-    createdAt:
-      overrides.createdAt ?? new Date("2025-10-23T17:00:00.000Z").toISOString(),
+    createdAt,
+    startedAt,
+    completedAt:
+      overrides.status === "running"
+        ? undefined
+        : (overrides.completedAt ?? defaultCompletedAt),
     baseRevisionSha: overrides.baseRevisionSha ?? DEFAULT_BASE_REVISION_SHA,
     agents: overrides.agents ?? [],
     hadAgentFailure: overrides.hadAgentFailure ?? false,

@@ -44,6 +44,8 @@ export interface AgentInvocationEnhanced {
 export interface RunRecordEnhanced {
   runId: string;
   createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
   status: RunRecord["status"];
   baseRevisionSha: string;
   rootPath: string;
@@ -120,6 +122,8 @@ export function buildRunRecordEnhanced(record: RunRecord): RunRecordEnhanced {
   const enhanced: RunRecordEnhanced = {
     runId: record.runId,
     createdAt: record.createdAt,
+    startedAt: record.startedAt,
+    completedAt: record.completedAt,
     status: record.status,
     baseRevisionSha: record.baseRevisionSha,
     rootPath: record.rootPath,

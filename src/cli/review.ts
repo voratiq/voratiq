@@ -25,8 +25,9 @@ import {
   createReviewRenderer,
   renderReviewTranscript,
 } from "../render/transcripts/review.js";
-import { formatDurationLabel } from "../render/utils/agents.js";
+import { formatRenderLifecycleDuration } from "../render/utils/duration.js";
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
+import { TERMINAL_REVIEW_STATUSES } from "../status/index.js";
 import { normalizePathForDisplay, relativeToRoot } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import {
@@ -127,6 +128,7 @@ export async function runReviewCommand(
     record.reviewers.map(async (reviewerRecord) => {
       const reviewerAgentId = reviewerRecord.agentId;
       const duration = formatReviewerDuration({
+        status: reviewerRecord.status,
         startedAt: reviewerRecord.startedAt,
         completedAt: reviewerRecord.completedAt,
       });
@@ -201,7 +203,12 @@ export async function runReviewCommand(
     runId: execution.runRecord.runId,
     reviewId: execution.reviewId,
     createdAt: record.createdAt,
-    elapsed: formatReviewElapsed(record.createdAt, record.completedAt) ?? "—",
+    elapsed:
+      formatReviewElapsed({
+        status: record.status,
+        startedAt: record.startedAt,
+        completedAt: record.completedAt,
+      }) ?? "—",
     workspacePath: normalizePathForDisplay(
       relativeToRoot(
         root,
@@ -312,45 +319,40 @@ function resolveAliasesInText(
   return resolved;
 }
 
-function safeParseTimestamp(value?: string): number | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) {
-    return undefined;
-  }
-  return parsed;
-}
-
-function formatReviewElapsed(
-  createdAt: string,
-  completedAt?: string,
-): string | undefined {
-  const start = safeParseTimestamp(createdAt);
-  if (start === undefined) {
-    return undefined;
-  }
-  const end = safeParseTimestamp(completedAt);
-  if (end === undefined || end < start) {
-    return undefined;
-  }
-  return formatDurationLabel(end - start);
+function formatReviewElapsed(options: {
+  status: ReviewRecord["status"];
+  startedAt?: string;
+  completedAt?: string;
+  now?: number;
+}): string | undefined {
+  return formatRenderLifecycleDuration({
+    lifecycle: {
+      status: options.status,
+      startedAt: options.startedAt,
+      completedAt: options.completedAt,
+    },
+    terminalStatuses: TERMINAL_REVIEW_STATUSES,
+    now: options.now,
+  });
 }
 
 function formatReviewerDuration(options: {
+  status: ReviewRecord["reviewers"][number]["status"];
   startedAt?: string;
   completedAt?: string;
+  now?: number;
 }): string {
-  const startedMs = safeParseTimestamp(options.startedAt);
-  if (startedMs === undefined) {
-    return "—";
-  }
-  const completedMs = safeParseTimestamp(options.completedAt);
-  if (completedMs === undefined || completedMs < startedMs) {
-    return "—";
-  }
-  return formatDurationLabel(completedMs - startedMs) ?? "—";
+  return (
+    formatRenderLifecycleDuration({
+      lifecycle: {
+        status: options.status,
+        startedAt: options.startedAt,
+        completedAt: options.completedAt,
+      },
+      terminalStatuses: TERMINAL_REVIEW_STATUSES,
+      now: options.now,
+    }) ?? "—"
+  );
 }
 
 interface ReviewCommandActionOptions {
