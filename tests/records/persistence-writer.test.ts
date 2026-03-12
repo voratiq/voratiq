@@ -80,6 +80,7 @@ describe("run history writer", () => {
       mutate: (record) => ({
         ...record,
         status: "failed",
+        completedAt: "2025-10-23T17:05:00.000Z",
       }),
     });
 
@@ -98,6 +99,7 @@ describe("run history writer", () => {
       mutate: (record) => ({
         ...record,
         status: "failed",
+        completedAt: "2025-10-23T17:05:00.000Z",
       }),
     });
 
@@ -146,6 +148,7 @@ describe("run history writer", () => {
       mutate: (record) => ({
         ...record,
         status: "failed",
+        completedAt: "2025-10-23T17:05:00.000Z",
       }),
     });
 

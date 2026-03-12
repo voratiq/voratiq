@@ -120,6 +120,7 @@ export async function runReduceCommand(
   const reducers = await Promise.all(
     record.reducers.map(async (reducer) => {
       const duration = formatReducerDuration({
+        status: reducer.status,
         startedAt: reducer.startedAt,
         completedAt: reducer.completedAt,
       });
@@ -175,7 +176,12 @@ export async function runReduceCommand(
   const body = renderReduceTranscript({
     reductionId: execution.reductionId,
     createdAt: record.createdAt,
-    elapsed: formatReduceElapsed(record.createdAt, record.completedAt) ?? "—",
+    elapsed:
+      formatReduceElapsed({
+        status: record.status,
+        startedAt: record.startedAt,
+        completedAt: record.completedAt,
+      }) ?? "—",
     sourceLabel: mapTargetLabel(record.target.type),
     sourcePath: sourcePathForTarget(record.target),
     workspacePath: normalizePathForDisplay(

@@ -136,6 +136,7 @@ export type ApplyStatus = (typeof APPLY_STATUS_VALUES)[number];
 export const applyStatusSchema = z.enum(APPLY_STATUS_VALUES);
 
 export const REVIEW_STATUS_VALUES = [
+  "queued",
   "running",
   "succeeded",
   "failed",
@@ -155,7 +156,13 @@ export const TERMINAL_REVIEW_STATUSES: readonly ReviewStatus[] = [
   "aborted",
 ] as const satisfies readonly ReviewStatus[];
 
+export const IN_PROGRESS_REVIEW_STATUSES: readonly ReviewStatus[] = [
+  "queued",
+  "running",
+] as const satisfies readonly ReviewStatus[];
+
 export const REDUCTION_STATUS_VALUES = [
+  "queued",
   "running",
   "succeeded",
   "failed",
@@ -173,6 +180,11 @@ export const TERMINAL_REDUCTION_STATUSES: readonly ReductionStatus[] = [
   "succeeded",
   "failed",
   "aborted",
+] as const satisfies readonly ReductionStatus[];
+
+export const IN_PROGRESS_REDUCTION_STATUSES: readonly ReductionStatus[] = [
+  "queued",
+  "running",
 ] as const satisfies readonly ReductionStatus[];
 
 export const SPEC_RECORD_STATUS_VALUES = [

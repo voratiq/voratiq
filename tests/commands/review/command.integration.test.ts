@@ -8,6 +8,7 @@ import { executeCompetitionWithAdapter } from "../../../src/competition/command-
 import { loadEnvironmentConfig } from "../../../src/configs/environment/loader.js";
 import * as reviewAdapter from "../../../src/domains/reviews/competition/adapter.js";
 import { ReviewPreflightError } from "../../../src/domains/reviews/competition/errors.js";
+import { readReviewRecords } from "../../../src/domains/reviews/persistence/adapter.js";
 import { buildRunRecordView } from "../../../src/domains/runs/model/enhanced.js";
 import { fetchRunsSafely } from "../../../src/domains/runs/persistence/adapter.js";
 
@@ -39,6 +40,10 @@ jest.mock("../../../src/agents/runtime/auth.js", () => ({
   verifyAgentProviders: jest.fn(),
 }));
 
+jest.mock("../../../src/domains/reviews/persistence/adapter.js", () => ({
+  readReviewRecords: jest.fn(),
+}));
+
 const fetchRunsSafelyMock = jest.mocked(fetchRunsSafely);
 const buildRunRecordViewMock = jest.mocked(buildRunRecordView);
 const resolveStageCompetitorsMock = jest.mocked(resolveStageCompetitors);
@@ -48,11 +53,13 @@ const executeCompetitionWithAdapterMock = jest.mocked(
 );
 const generateSessionIdMock = jest.mocked(generateSessionId);
 const verifyAgentProvidersMock = jest.mocked(verifyAgentProviders);
+const readReviewRecordsMock = jest.mocked(readReviewRecords);
 
 describe("executeReviewCommand integration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     verifyAgentProvidersMock.mockResolvedValue([]);
+    readReviewRecordsMock.mockResolvedValue([]);
   });
 
   it("routes review execution through shared competition adapter with one competitor", async () => {

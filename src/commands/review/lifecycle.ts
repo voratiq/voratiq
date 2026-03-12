@@ -3,6 +3,10 @@ import {
   flushReviewRecordBuffer,
   rewriteReviewRecord,
 } from "../../domains/reviews/persistence/adapter.js";
+import {
+  buildOperationLifecycleCompleteFields,
+  buildRecordLifecycleCompleteFields,
+} from "../../domains/shared/lifecycle.js";
 import type { ReviewStatus } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 
@@ -48,43 +52,54 @@ export async function terminateActiveReview(
       reviewsFilePath: context.reviewsFilePath,
       sessionId: context.reviewId,
       mutate: (existing) => {
-        const failedAt = new Date().toISOString();
+        const completedAt = new Date().toISOString();
         const detail =
           status === "aborted" ? REVIEW_ABORT_DETAIL : "Review failed.";
 
         const reviewers = existing.reviewers.map((reviewer) => {
-          if (reviewer.status !== "running") {
+          if (reviewer.status !== "running" && reviewer.status !== "queued") {
             return reviewer;
           }
           return {
             ...reviewer,
             status,
-            completedAt: reviewer.completedAt ?? failedAt,
+            ...buildOperationLifecycleCompleteFields({
+              existing: reviewer,
+              startedAt: reviewer.startedAt ?? completedAt,
+              completedAt,
+            }),
             error: reviewer.error ?? detail,
           };
         });
 
-        const sessionStatus =
-          existing.status === "running" ? status : existing.status;
-        const sessionCompletedAt =
-          existing.status === "running"
-            ? (existing.completedAt ?? failedAt)
-            : existing.completedAt;
+        const inProgress =
+          existing.status === "running" || existing.status === "queued";
+        const sessionStatus = inProgress ? status : existing.status;
 
-        if (
-          sessionStatus === existing.status &&
-          sessionCompletedAt === existing.completedAt &&
-          reviewers.every(
-            (reviewer, index) => reviewer === existing.reviewers[index],
-          )
-        ) {
-          return existing;
+        if (!inProgress) {
+          if (
+            reviewers.every(
+              (reviewer, index) => reviewer === existing.reviewers[index],
+            )
+          ) {
+            return existing;
+          }
+          return {
+            ...existing,
+            reviewers,
+          };
         }
+
+        const sessionComplete = buildRecordLifecycleCompleteFields({
+          existing,
+          startedAt: existing.startedAt ?? completedAt,
+          completedAt,
+        });
 
         return {
           ...existing,
           status: sessionStatus,
-          completedAt: sessionCompletedAt,
+          ...sessionComplete,
           error: existing.error ?? detail,
           reviewers,
         };

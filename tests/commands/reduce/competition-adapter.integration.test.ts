@@ -61,6 +61,7 @@ describe("reduce competition adapter integration", () => {
         record: {
           sessionId: "spec-seed",
           createdAt: "2026-01-01T00:00:00.000Z",
+          startedAt: "2026-01-01T00:00:00.000Z",
           completedAt: "2026-01-01T00:00:01.000Z",
           status: "saved",
           agentId: "seed-agent",
@@ -148,6 +149,7 @@ describe("reduce competition adapter integration", () => {
         record: {
           sessionId: "spec-seed",
           createdAt: "2026-01-01T00:00:00.000Z",
+          startedAt: "2026-01-01T00:00:00.000Z",
           completedAt: "2026-01-01T00:00:01.000Z",
           status: "saved",
           agentId: "seed-agent",
@@ -695,6 +697,7 @@ async function seedSpecTarget(
     record: {
       sessionId: "spec-seed",
       createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
       completedAt: "2026-01-01T00:00:01.000Z",
       status: "saved",
       agentId: "seed-agent",
@@ -721,6 +724,8 @@ async function seedRunTarget(root: string): Promise<void> {
       spec: { path: runSpecPath },
       status: "succeeded",
       createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:00:01.000Z",
       agents: [
         {
           agentId: "run-agent",
@@ -777,6 +782,7 @@ async function seedReviewTarget(root: string): Promise<void> {
       sessionId: "review-seed",
       runId: "run-seed",
       createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
       completedAt: "2026-01-01T00:00:01.000Z",
       status: "succeeded",
       reviewers: [
@@ -830,6 +836,7 @@ async function seedReductionTarget(root: string): Promise<void> {
       sessionId: "reduction-seed",
       target: { type: "spec", id: "spec-seed" },
       createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
       completedAt: "2026-01-01T00:00:01.000Z",
       status: "succeeded",
       reducers: [

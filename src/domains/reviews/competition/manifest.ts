@@ -1,6 +1,7 @@
 import { basename } from "node:path";
 
 import type { RunRecordEnhanced } from "../../../domains/runs/model/enhanced.js";
+import { TERMINAL_RUN_STATUSES } from "../../../status/index.js";
 import { pathExists } from "../../../utils/fs.js";
 import { resolvePath } from "../../../utils/path.js";
 
@@ -145,15 +146,10 @@ export async function buildBlindedReviewManifest(options: {
 }
 
 function resolveRunCompletedAt(run: RunRecordEnhanced): string | undefined {
-  let latest: string | undefined;
-  for (const agent of run.agents) {
-    const completedAt = agent.completedAt;
-    if (!completedAt) {
-      continue;
-    }
-    if (!latest || completedAt > latest) {
-      latest = completedAt;
-    }
+  if (TERMINAL_RUN_STATUSES.includes(run.status) && !run.completedAt) {
+    throw new Error(
+      `Run ${run.runId} is missing canonical completedAt for terminal status ${run.status}.`,
+    );
   }
-  return latest;
+  return run.completedAt;
 }

@@ -10,6 +10,8 @@ describe("shared record path validation", () => {
     const specResult = specRecordSchema.safeParse({
       sessionId: "spec-123",
       createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:01:00.000Z",
       status: "saved",
       agentId: "agent-1",
       title: "Spec",
@@ -24,6 +26,8 @@ describe("shared record path validation", () => {
       spec: { path: invalidPath },
       status: "succeeded",
       createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:01:00.000Z",
       agents: [
         {
           agentId: "agent-1",
@@ -45,12 +49,16 @@ describe("shared record path validation", () => {
       sessionId: "review-123",
       runId: "run-123",
       createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:01:00.000Z",
       status: "succeeded",
       reviewers: [
         {
           agentId: "reviewer-1",
           status: "succeeded",
           outputPath: invalidPath,
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:01:00.000Z",
         },
       ],
     });
@@ -59,6 +67,8 @@ describe("shared record path validation", () => {
       sessionId: "reduction-123",
       target: { type: "run", id: "run-123" },
       createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:01:00.000Z",
       status: "succeeded",
       reducers: [
         {
@@ -66,6 +76,8 @@ describe("shared record path validation", () => {
           status: "succeeded",
           outputPath: invalidPath,
           dataPath: invalidPath,
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:01:00.000Z",
         },
       ],
     });

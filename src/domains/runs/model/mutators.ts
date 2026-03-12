@@ -238,8 +238,12 @@ function normalizeSnapshotForTermination(
     return record;
   }
 
-  const completedAt = record.completedAt ?? new Date().toISOString();
-  const startedAt = record.startedAt ?? completedAt;
+  if (!record.startedAt || !record.completedAt) {
+    throw new Error(
+      `Terminal agent snapshot for ${record.agentId} is missing canonical lifecycle timestamps.`,
+    );
+  }
+
   const warnings = record.warnings ?? [];
   const hasAbortWarning = warnings.includes(RUN_ABORT_WARNING);
   const abortWarnings = hasAbortWarning
@@ -249,8 +253,8 @@ function normalizeSnapshotForTermination(
   return {
     ...record,
     status: "aborted",
-    startedAt,
-    completedAt,
+    startedAt: record.startedAt,
+    completedAt: record.completedAt,
     warnings: abortWarnings,
   };
 }

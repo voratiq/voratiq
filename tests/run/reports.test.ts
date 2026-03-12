@@ -110,6 +110,8 @@ describe("report mapping helpers", () => {
     const runReport = toRunReport(runRecord, [agentReport], false, false);
     expect(runReport.runId).toBe(runRecord.runId);
     expect(runReport.createdAt).toBe(runRecord.createdAt);
+    expect(runReport.startedAt).toBe(runRecord.startedAt);
+    expect(runReport.completedAt).toBe(runRecord.completedAt);
     expect(runReport.baseRevisionSha).toBe(runRecord.baseRevisionSha);
     expect(runReport.agents).toHaveLength(1);
     expect(runReport.hadAgentFailure).toBe(false);

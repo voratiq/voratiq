@@ -1,7 +1,9 @@
 import type { ExtractedTokenUsage } from "../../domains/runs/model/types.js";
 import { getAgentStatusStyle, getRunStatusStyle } from "../../status/colors.js";
+import { TERMINAL_REDUCTION_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
-import { formatAgentErrorLine, formatDurationLabel } from "../utils/agents.js";
+import { formatAgentErrorLine } from "../utils/agents.js";
+import { formatRenderLifecycleDuration } from "../utils/duration.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import {
   buildStageFrameLines,
@@ -22,10 +24,12 @@ type CliWriter = Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
 export interface ReduceProgressContext {
   reductionId: string;
   createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
   sourceLabel: "Spec" | "Run" | "Review" | "Reduce";
   sourcePath: string;
   workspacePath: string;
-  status: "running" | "succeeded" | "failed" | "aborted";
+  status: "queued" | "running" | "succeeded" | "failed" | "aborted";
 }
 
 export interface ReduceProgressReducerRecord {
@@ -52,7 +56,10 @@ export interface ReduceProgressRenderer
   > {
   begin(context?: ReduceProgressContext): void;
   update(record: ReduceProgressReducerRecord): void;
-  complete(status?: ReduceProgressContext["status"]): void;
+  complete(
+    status?: ReduceProgressContext["status"],
+    lifecycle?: { startedAt?: string; completedAt?: string },
+  ): void;
 }
 
 const ERASE_LINE = "\u001b[2K";
@@ -104,7 +111,7 @@ function formatErrorDetail(error: unknown): string {
 
 export interface ReduceTranscriptReducerBlock {
   reducerAgentId: string;
-  status: "succeeded" | "failed" | "aborted" | "running";
+  status: "queued" | "succeeded" | "failed" | "aborted" | "running";
   duration: string;
   outputPath: string;
   dataPath?: string;
@@ -119,7 +126,7 @@ export interface ReduceTranscriptOptions {
   sourceLabel: "Spec" | "Run" | "Review" | "Reduce";
   sourcePath: string;
   workspacePath: string;
-  status: "succeeded" | "failed" | "aborted" | "running";
+  status: "queued" | "succeeded" | "failed" | "aborted" | "running";
   reducers: readonly ReduceTranscriptReducerBlock[];
   nextCommandLines?: readonly string[];
   suppressHint?: boolean;
@@ -134,7 +141,7 @@ function buildReduceStageShell(options: {
   sourceLabel: string;
   sourcePath: string;
   workspacePath: string;
-  status: "succeeded" | "failed" | "aborted" | "running";
+  status: "queued" | "succeeded" | "failed" | "aborted" | "running";
   tableLines?: string[];
   style?: TranscriptShellStyleOptions;
 }): {
@@ -212,7 +219,7 @@ export function createReduceRenderer(
           stopRefreshLoop();
           return;
         }
-        const nextElapsed = formatReduceProgressElapsed(context.createdAt);
+        const nextElapsed = formatReduceProgressElapsed(context);
         if (nextElapsed === lastElapsedLabel) {
           return;
         }
@@ -240,12 +247,20 @@ export function createReduceRenderer(
     }
   }
 
-  function formatReduceProgressElapsed(createdAt: string): string | undefined {
-    const startedAt = Date.parse(createdAt);
-    if (Number.isNaN(startedAt)) {
-      return undefined;
-    }
-    return formatDurationLabel(Math.max(0, now() - startedAt));
+  function formatReduceProgressElapsed(source: {
+    status: ReduceProgressContext["status"];
+    startedAt?: string;
+    completedAt?: string;
+  }): string | undefined {
+    return formatRenderLifecycleDuration({
+      lifecycle: {
+        status: source.status,
+        startedAt: source.startedAt,
+        completedAt: source.completedAt,
+      },
+      terminalStatuses: TERMINAL_REDUCTION_STATUSES,
+      now: now(),
+    });
   }
 
   function safeParse(value?: string): number | undefined {
@@ -257,15 +272,59 @@ export function createReduceRenderer(
   }
 
   function formatDuration(record: ReduceProgressReducerRecord): string {
-    const startedAt = safeParse(record.startedAt);
-    if (startedAt === undefined) {
+    if (record.status === "running") {
       return DASH;
     }
-    const completedAt = safeParse(record.completedAt);
-    if (completedAt === undefined || completedAt < startedAt) {
-      return DASH;
+    return (
+      formatRenderLifecycleDuration({
+        lifecycle: {
+          status: record.status,
+          startedAt: record.startedAt,
+          completedAt: record.completedAt,
+        },
+        terminalStatuses: TERMINAL_REDUCTION_STATUSES,
+        now: now(),
+      }) ?? DASH
+    );
+  }
+
+  function syncContextLifecycleFromReducerRecords(): void {
+    if (!context) {
+      return;
     }
-    return formatDurationLabel(completedAt - startedAt) ?? DASH;
+
+    let earliestStartedAt = safeParse(context.startedAt);
+    let latestCompletedAt = safeParse(context.completedAt);
+
+    for (const reducer of reducerRecords.values()) {
+      const startedAt = safeParse(reducer.startedAt);
+      if (
+        startedAt !== undefined &&
+        (earliestStartedAt === undefined || startedAt < earliestStartedAt)
+      ) {
+        earliestStartedAt = startedAt;
+      }
+
+      const completedAt = safeParse(reducer.completedAt);
+      if (
+        completedAt !== undefined &&
+        (latestCompletedAt === undefined || completedAt > latestCompletedAt)
+      ) {
+        latestCompletedAt = completedAt;
+      }
+    }
+
+    context = {
+      ...context,
+      startedAt:
+        earliestStartedAt === undefined
+          ? undefined
+          : new Date(earliestStartedAt).toISOString(),
+      completedAt:
+        latestCompletedAt === undefined
+          ? undefined
+          : new Date(latestCompletedAt).toISOString(),
+    };
   }
 
   function buildReducerTable(style: TranscriptShellStyleOptions): string[] {
@@ -302,8 +361,10 @@ export function createReduceRenderer(
       return;
     }
 
+    syncContextLifecycleFromReducerRecords();
+
     const style: TranscriptShellStyleOptions = { isTty: true };
-    const elapsed = formatReduceProgressElapsed(context.createdAt);
+    const elapsed = formatReduceProgressElapsed(context);
     lastElapsedLabel = elapsed ?? null;
 
     const shell = buildReduceStageShell({
@@ -423,9 +484,20 @@ export function createReduceRenderer(
         candidate: record,
       });
     },
-    complete(status?: ReduceProgressContext["status"]): void {
+    complete(
+      status?: ReduceProgressContext["status"],
+      lifecycle?: { startedAt?: string; completedAt?: string },
+    ): void {
       stopRefreshLoop();
       guard(() => {
+        if (context && lifecycle) {
+          context = {
+            ...context,
+            startedAt: lifecycle.startedAt ?? context.startedAt,
+            completedAt: lifecycle.completedAt ?? context.completedAt,
+          };
+        }
+
         if (status) {
           this.onProgressEvent({
             type: "stage.status",
@@ -528,34 +600,37 @@ export function renderReduceTranscript(
 }
 
 export function formatReducerDuration(options: {
+  status: ReduceProgressReducerRecord["status"];
   startedAt?: string;
   completedAt?: string;
+  now?: number;
 }): string {
-  const { startedAt, completedAt } = options;
-  if (!startedAt || !completedAt) {
-    return "—";
-  }
-  const started = Date.parse(startedAt);
-  const completed = Date.parse(completedAt);
-  if (Number.isNaN(started) || Number.isNaN(completed) || completed < started) {
-    return "—";
-  }
-  return formatDurationLabel(completed - started) ?? "—";
+  return (
+    formatRenderLifecycleDuration({
+      lifecycle: {
+        status: options.status,
+        startedAt: options.startedAt,
+        completedAt: options.completedAt,
+      },
+      terminalStatuses: TERMINAL_REDUCTION_STATUSES,
+      now: options.now,
+    }) ?? "—"
+  );
 }
 
-export function formatReduceElapsed(
-  createdAt: string,
-  completedAt?: string,
-): string | undefined {
-  const started = Date.parse(createdAt);
-  if (Number.isNaN(started)) {
-    return undefined;
-  }
-
-  const finished = completedAt ? Date.parse(completedAt) : Date.now();
-  if (Number.isNaN(finished) || finished < started) {
-    return undefined;
-  }
-
-  return formatDurationLabel(finished - started);
+export function formatReduceElapsed(options: {
+  status: ReduceProgressContext["status"];
+  startedAt?: string;
+  completedAt?: string;
+  now?: number;
+}): string | undefined {
+  return formatRenderLifecycleDuration({
+    lifecycle: {
+      status: options.status,
+      startedAt: options.startedAt,
+      completedAt: options.completedAt,
+    },
+    terminalStatuses: TERMINAL_REDUCTION_STATUSES,
+    now: options.now,
+  });
 }

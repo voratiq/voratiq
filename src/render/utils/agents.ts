@@ -11,8 +11,10 @@ import {
   getAgentStatusStyle,
   getEvalStatusStyle,
 } from "../../status/colors.js";
+import { TERMINAL_AGENT_STATUSES } from "../../status/index.js";
 import { colorize } from "../../utils/colors.js";
 import { formatAgentBadge } from "./badges.js";
+import { formatRenderLifecycleDuration } from "./duration.js";
 import { renderTable } from "./table.js";
 import type { TranscriptShellStyleOptions } from "./transcript-shell.js";
 import {
@@ -282,57 +284,17 @@ export function buildAgentSectionRuntime(
 
 export function formatAgentDuration(
   agent: AgentHeaderSource,
+  options: { now?: number } = {},
 ): string | undefined {
-  const startedAt = safeParse(agent.startedAt);
-  const completedAt = safeParse(agent.completedAt);
-
-  if (
-    startedAt === undefined ||
-    completedAt === undefined ||
-    completedAt < startedAt
-  ) {
-    return undefined;
-  }
-
-  const durationMs = completedAt - startedAt;
-  return formatDurationLabel(durationMs);
-}
-
-function safeParse(timestamp: string | undefined): number | undefined {
-  if (!timestamp) {
-    return undefined;
-  }
-
-  const parsed = Date.parse(timestamp);
-  if (Number.isNaN(parsed)) {
-    return undefined;
-  }
-
-  return parsed;
-}
-
-export function formatDurationLabel(durationMs: number): string | undefined {
-  if (!Number.isFinite(durationMs) || durationMs < 0) {
-    return undefined;
-  }
-
-  const totalSeconds = Math.round(durationMs / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  const parts: string[] = [];
-  if (hours > 0) {
-    parts.push(`${hours}h`);
-  }
-  if (minutes > 0) {
-    parts.push(`${minutes}m`);
-  }
-  if (seconds > 0 || parts.length === 0) {
-    parts.push(`${seconds}s`);
-  }
-
-  return parts.join(" ");
+  return formatRenderLifecycleDuration({
+    lifecycle: {
+      status: agent.status,
+      startedAt: agent.startedAt,
+      completedAt: agent.completedAt,
+    },
+    terminalStatuses: TERMINAL_AGENT_STATUSES,
+    now: options.now,
+  });
 }
 
 function getAgentRootPath(agent: AgentSectionSource): string | undefined {

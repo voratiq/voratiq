@@ -8,6 +8,8 @@ describe("reviewRecordSchema", () => {
       sessionId: "review-123",
       runId: "run-123",
       createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.500Z",
+      completedAt: "2026-01-01T00:00:03.000Z",
       status: "succeeded",
       reviewers: [
         {

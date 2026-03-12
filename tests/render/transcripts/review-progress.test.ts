@@ -167,7 +167,7 @@ describe("review live progress renderer", () => {
       runId: "run-123",
       reviewId: "review-123",
       createdAt: "2026-01-01T00:00:00.000Z",
-      elapsed: "5s",
+      elapsed: "3s",
       workspacePath: ".voratiq/reviews/sessions/review-123",
       status: "succeeded",
       reviewers: [
@@ -187,6 +187,44 @@ describe("review live progress renderer", () => {
     const nonTtyFrame = nonTtyTranscript.split("\n\n---")[0] ?? "";
 
     expect(normalizeFrame(ttyFrame)).toBe(normalizeFrame(nonTtyFrame));
+  });
+
+  it("shows live elapsed while keeping running table duration frozen", () => {
+    let currentTime = Date.parse("2026-01-01T00:00:03.000Z");
+    const tty = new VirtualTty();
+    const renderer = createReviewRenderer({
+      stdout: tty,
+      now: () => currentTime,
+    });
+
+    renderer.begin({
+      runId: "run-123",
+      reviewId: "review-123",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      workspacePath: ".voratiq/reviews/sessions/review-123",
+      status: "running",
+    });
+    renderer.update({
+      reviewerAgentId: "reviewer-a",
+      status: "running",
+      startedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    let frame = normalizeFrame(tty.snapshot());
+    expect(frame).toContain("Elapsed    3s");
+    expect(frame).toMatch(/reviewer-a\s+RUNNING\s+—/u);
+
+    currentTime = Date.parse("2026-01-01T00:00:07.000Z");
+    renderer.update({
+      reviewerAgentId: "reviewer-a",
+      status: "running",
+      startedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    frame = normalizeFrame(tty.snapshot());
+    expect(frame).toContain("Elapsed    7s");
+    expect(frame).toMatch(/reviewer-a\s+RUNNING\s+—/u);
   });
 });
 

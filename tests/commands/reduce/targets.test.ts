@@ -36,6 +36,8 @@ describe("assertReductionTargetEligible", () => {
       const specRecord: SpecRecord = {
         sessionId: specId,
         createdAt: new Date().toISOString(),
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
         status: "saved",
         agentId: "alpha",
         title: "Spec title",
@@ -105,6 +107,8 @@ describe("assertReductionTargetEligible", () => {
         sessionId: reviewId,
         runId: "run-123",
         createdAt: new Date().toISOString(),
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
         status: "succeeded",
         reviewers: [
           {
@@ -180,6 +184,7 @@ describe("assertReductionTargetEligible", () => {
         sessionId: reductionId,
         target: { type: "run", id: "run-123" },
         createdAt: new Date().toISOString(),
+        startedAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
         status: "succeeded",
         reducers: [
@@ -242,6 +247,7 @@ describe("assertReductionTargetEligible", () => {
         sessionId: reductionId,
         target: { type: "run", id: "run-123" },
         createdAt: new Date().toISOString(),
+        startedAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
         status: "succeeded",
         reducers: [

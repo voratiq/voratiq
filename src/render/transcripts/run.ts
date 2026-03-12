@@ -3,14 +3,15 @@ import type {
   RunReport,
 } from "../../domains/runs/model/types.js";
 import { getEvalStatusStyle } from "../../status/colors.js";
+import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
 import { colorize } from "../../utils/colors.js";
 import { formatCompactDiffStatistics } from "../../utils/diff.js";
 import {
   formatAgentDuration,
   formatAgentStatusLabelWithStyle,
-  formatDurationLabel,
 } from "../utils/agents.js";
 import { formatAgentBadge } from "../utils/badges.js";
+import { formatRenderLifecycleDuration } from "../utils/duration.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import { buildRunMetadataSectionWithStyle } from "../utils/runs.js";
 import {
@@ -29,6 +30,8 @@ interface RunProgressContext {
   specPath: string;
   workspacePath: string;
   createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
   baseRevisionSha: string;
 }
 
@@ -172,8 +175,7 @@ export function createRunRenderer(
           return;
         }
 
-        const nextElapsed =
-          context.createdAt && formatRunElapsed(context.createdAt);
+        const nextElapsed = formatRunElapsed(context);
         if (nextElapsed === lastElapsedLabel) {
           return;
         }
@@ -209,6 +211,8 @@ export function createRunRenderer(
       specPath: context?.specPath ?? report.spec.path,
       workspacePath: context?.workspacePath ?? "",
       createdAt: context?.createdAt ?? report.createdAt,
+      startedAt: context?.startedAt ?? report.startedAt,
+      completedAt: context?.completedAt ?? report.completedAt,
       baseRevisionSha: context?.baseRevisionSha ?? report.baseRevisionSha,
     };
   }
@@ -220,9 +224,7 @@ export function createRunRenderer(
     metadataLines: string[];
     statusTableLines: string[];
   } {
-    const elapsedLabel = source.createdAt
-      ? (formatRunElapsed(source.createdAt) ?? undefined)
-      : undefined;
+    const elapsedLabel = formatRunElapsed(source);
     lastElapsedLabel = elapsedLabel ?? null;
 
     return {
@@ -327,22 +329,27 @@ export function createRunRenderer(
   }
 
   function formatDuration(record: AgentInvocationRecord): string {
-    const duration = formatAgentDuration(record);
+    if (record.status === "running") {
+      return DASH;
+    }
+    const duration = formatAgentDuration(record, { now: now() });
     return duration ?? DASH;
   }
 
-  function formatRunElapsed(createdAt: string): string | undefined {
-    if (!createdAt) {
-      return undefined;
-    }
-
-    const startedAt = Date.parse(createdAt);
-    if (Number.isNaN(startedAt)) {
-      return undefined;
-    }
-
-    const elapsedMs = Math.max(0, now() - startedAt);
-    return formatDurationLabel(elapsedMs);
+  function formatRunElapsed(source: {
+    status: RunReport["status"];
+    startedAt?: string;
+    completedAt?: string;
+  }): string | undefined {
+    return formatRenderLifecycleDuration({
+      lifecycle: {
+        status: source.status,
+        startedAt: source.startedAt,
+        completedAt: source.completedAt,
+      },
+      terminalStatuses: TERMINAL_RUN_STATUSES,
+      now: now(),
+    });
   }
 
   function formatEvals(
@@ -401,6 +408,8 @@ export function createRunRenderer(
     context = {
       ...context,
       status: report.status,
+      startedAt: report.startedAt ?? context.startedAt,
+      completedAt: report.completedAt ?? context.completedAt,
     };
 
     render();

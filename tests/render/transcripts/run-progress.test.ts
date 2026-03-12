@@ -272,6 +272,8 @@ describe("createRunRenderer", () => {
 
   it("shows elapsed and final eval/diff data in the non-TTY final frame", () => {
     const baseTime = new Date("2025-11-05T12:00:00.000Z").getTime();
+    const startedAt = "2025-11-05T12:00:10.000Z";
+    const completedAt = "2025-11-05T12:01:05.000Z";
     const renderer = createRunRenderer({
       now: () => baseTime + 65000,
       stdout: {
@@ -286,6 +288,7 @@ describe("createRunRenderer", () => {
       specPath: "specs/test.md",
       workspacePath: ".voratiq/runs/sessions/run-123",
       createdAt: "2025-11-05T12:00:00.000Z",
+      startedAt,
       baseRevisionSha: "abc123",
     });
 
@@ -295,6 +298,8 @@ describe("createRunRenderer", () => {
         status: "succeeded",
         spec: { path: "specs/test.md" },
         createdAt: "2025-11-05T12:00:00.000Z",
+        startedAt,
+        completedAt,
         baseRevisionSha: "abc123",
         agents: [createAgentReport("succeeded")],
       }),
@@ -302,9 +307,50 @@ describe("createRunRenderer", () => {
 
     const plain = stripAnsi(transcript);
     expect(plain).toContain("Elapsed");
-    expect(plain).toContain("1m 5s");
+    expect(plain).toContain("55s");
     expect(plain).toContain("2f +5");
     expect(plain).toContain("format");
+  });
+
+  it("shows live elapsed while keeping running table duration frozen", () => {
+    let currentTime = new Date("2025-11-05T12:00:19.000Z").getTime();
+    const tty = new VirtualTty();
+    const renderer = createRunRenderer({
+      now: () => currentTime,
+      stdout: tty,
+    });
+
+    renderer.begin({
+      runId: "run-123",
+      status: "running",
+      specPath: "specs/test.md",
+      workspacePath: ".voratiq/runs/sessions/run-123",
+      createdAt: "2025-11-05T12:00:00.000Z",
+      startedAt: "2025-11-05T12:00:00.000Z",
+      baseRevisionSha: "abc123",
+    });
+    renderer.update({
+      agentId: "test-agent",
+      model: "test-model",
+      status: "running",
+      startedAt: "2025-11-05T12:00:00.000Z",
+    });
+
+    let frame = normalizeFrame(tty.snapshot());
+    expect(frame).toContain("Elapsed        19s");
+    expect(frame).toMatch(/test-agent\s+RUNNING\s+—/u);
+
+    currentTime = new Date("2025-11-05T12:00:23.000Z").getTime();
+    renderer.update({
+      agentId: "test-agent",
+      model: "test-model",
+      status: "running",
+      startedAt: "2025-11-05T12:00:00.000Z",
+    });
+
+    frame = normalizeFrame(tty.snapshot());
+    expect(frame).toContain("Elapsed        23s");
+    expect(frame).toMatch(/test-agent\s+RUNNING\s+—/u);
   });
 
   it("disables TTY rendering on write errors and logs warning once", () => {

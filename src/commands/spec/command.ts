@@ -136,11 +136,13 @@ export async function executeSpecCommand(
   await mkdir(dirname(outputAbsolute), { recursive: true });
 
   const sessionId = generateSessionId();
-  const createdAt = new Date().toISOString();
+  const startedAt = new Date().toISOString();
+  const createdAt = startedAt;
 
   const record: SpecRecord = {
     sessionId,
     createdAt,
+    startedAt,
     status: "drafting",
     agentId: agent.id,
     title,

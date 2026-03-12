@@ -121,6 +121,8 @@ export function toRunReport(
     spec: record.spec,
     status: record.status,
     createdAt: record.createdAt,
+    startedAt: record.startedAt,
+    completedAt: record.completedAt,
     baseRevisionSha: record.baseRevisionSha,
     agents,
     hadAgentFailure: derivedAgentFailure,

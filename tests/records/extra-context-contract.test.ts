@@ -31,6 +31,7 @@ describe("persisted extra-context contract", () => {
       specRecordSchema.parse({
         sessionId: "spec-123",
         createdAt: "2026-01-01T00:00:00.000Z",
+        startedAt: "2026-01-01T00:00:01.000Z",
         status: "drafting",
         agentId: "alpha",
         title: "Spec",
@@ -48,6 +49,7 @@ describe("persisted extra-context contract", () => {
         spec: { path: "spec.md" },
         status: "running",
         createdAt: "2026-01-01T00:00:00.000Z",
+        startedAt: "2026-01-01T00:00:01.000Z",
         agents: [],
         deletedAt: null,
         ...persistedExtraContext,
@@ -60,12 +62,14 @@ describe("persisted extra-context contract", () => {
         runId: "run-123",
         createdAt: "2026-01-01T00:00:00.000Z",
         status: "running",
+        startedAt: "2026-01-01T00:00:01.000Z",
         reviewers: [
           {
             agentId: "reviewer",
             status: "running",
             outputPath:
               ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
+            startedAt: "2026-01-01T00:00:01.000Z",
           },
         ],
         ...persistedExtraContext,
@@ -78,12 +82,14 @@ describe("persisted extra-context contract", () => {
         target: { type: "spec", id: "spec-123" },
         createdAt: "2026-01-01T00:00:00.000Z",
         status: "running",
+        startedAt: "2026-01-01T00:00:01.000Z",
         reducers: [
           {
             agentId: "reducer",
             status: "running",
             outputPath:
               ".voratiq/reductions/sessions/reduce-123/reducer/artifacts/reduction.md",
+            startedAt: "2026-01-01T00:00:01.000Z",
           },
         ],
         ...persistedExtraContext,
@@ -106,6 +112,7 @@ describe("persisted extra-context contract", () => {
       specRecordSchema.parse({
         sessionId: "spec-123",
         createdAt: "2026-01-01T00:00:00.000Z",
+        startedAt: "2026-01-01T00:00:01.000Z",
         status: "drafting",
         agentId: "alpha",
         title: "Spec",
@@ -123,6 +130,7 @@ describe("persisted extra-context contract", () => {
         spec: { path: "spec.md" },
         status: "running",
         createdAt: "2026-01-01T00:00:00.000Z",
+        startedAt: "2026-01-01T00:00:01.000Z",
         agents: [],
         deletedAt: null,
         ...invalidMetadata,
@@ -135,12 +143,14 @@ describe("persisted extra-context contract", () => {
         runId: "run-123",
         createdAt: "2026-01-01T00:00:00.000Z",
         status: "running",
+        startedAt: "2026-01-01T00:00:01.000Z",
         reviewers: [
           {
             agentId: "reviewer",
             status: "running",
             outputPath:
               ".voratiq/reviews/sessions/review-123/reviewer/artifacts/review.md",
+            startedAt: "2026-01-01T00:00:01.000Z",
           },
         ],
         ...invalidMetadata,
@@ -153,12 +163,14 @@ describe("persisted extra-context contract", () => {
         target: { type: "spec", id: "spec-123" },
         createdAt: "2026-01-01T00:00:00.000Z",
         status: "running",
+        startedAt: "2026-01-01T00:00:01.000Z",
         reducers: [
           {
             agentId: "reducer",
             status: "running",
             outputPath:
               ".voratiq/reductions/sessions/reduce-123/reducer/artifacts/reduction.md",
+            startedAt: "2026-01-01T00:00:01.000Z",
           },
         ],
         ...invalidMetadata,

@@ -45,6 +45,11 @@ import {
 } from "../../../domains/reviews/persistence/adapter.js";
 import type { RunRecordEnhanced } from "../../../domains/runs/model/enhanced.js";
 import type { ExtractedTokenUsage } from "../../../domains/runs/model/types.js";
+import {
+  buildLifecycleStartFields,
+  buildOperationLifecycleCompleteFields,
+  buildRecordLifecycleCompleteFields,
+} from "../../../domains/shared/lifecycle.js";
 import { buildPersistedExtraContextFields } from "../../../extra-context/contract.js";
 import type { ReviewProgressRenderer } from "../../../render/transcripts/review.js";
 import { emitStageProgressEvent } from "../../../render/transcripts/stage-progress.js";
@@ -210,10 +215,10 @@ export function createReviewCompetitionAdapter(
           sessionId: reviewId,
           runId: run.runId,
           createdAt,
-          status: "running",
+          status: "queued",
           reviewers: candidates.map((candidate) => ({
             agentId: candidate.id,
-            status: "running",
+            status: "queued",
             outputPath: buildReviewOutputPath({
               root,
               reviewId,
@@ -354,6 +359,11 @@ export function createReviewCompetitionAdapter(
 
           return {
             ...record,
+            status: record.status === "queued" ? "running" : record.status,
+            ...buildLifecycleStartFields({
+              existingStartedAt: record.startedAt,
+              timestamp: startedAt,
+            }),
             reviewers: record.reviewers.map((reviewer) => {
               if (reviewer.agentId !== prepared.candidate.id) {
                 return reviewer;
@@ -361,11 +371,20 @@ export function createReviewCompetitionAdapter(
               return {
                 ...reviewer,
                 status: "running",
-                startedAt: reviewer.startedAt ?? startedAt,
+                ...buildLifecycleStartFields({
+                  existingStartedAt: reviewer.startedAt,
+                  timestamp: startedAt,
+                }),
               };
             }),
           };
         },
+      });
+
+      emitStageProgressEvent(renderer, {
+        type: "stage.status",
+        stage: "review",
+        status: "running",
       });
 
       emitStageProgressEvent(renderer, {
@@ -583,6 +602,7 @@ export function createReviewCompetitionAdapter(
       const failed = failure !== undefined;
       const failureDetail = toReviewFailureDetail(failure);
       let finalizedRecord: ReviewRecord | undefined;
+      const completedAt = new Date().toISOString();
 
       try {
         finalizedRecord = await rewriteReviewRecord({
@@ -590,7 +610,11 @@ export function createReviewCompetitionAdapter(
           reviewsFilePath,
           sessionId: reviewId,
           mutate: (record) => {
-            const completedAt = record.completedAt ?? new Date().toISOString();
+            const recordComplete = buildRecordLifecycleCompleteFields({
+              existing: record,
+              startedAt: record.startedAt ?? completedAt,
+              completedAt,
+            });
             const runningReviewerStatus = resolveRunningReviewerStatus({
               recordStatus: record.status,
               failed,
@@ -598,28 +622,36 @@ export function createReviewCompetitionAdapter(
 
             const reviewers = record.reviewers.map(
               (reviewer): ReviewRecord["reviewers"][number] => {
-                if (reviewer.status !== "running") {
+                if (
+                  reviewer.status !== "running" &&
+                  reviewer.status !== "queued"
+                ) {
                   return reviewer;
                 }
+                const opComplete = buildOperationLifecycleCompleteFields({
+                  existing: reviewer,
+                  startedAt: reviewer.startedAt ?? recordComplete.completedAt,
+                  completedAt: recordComplete.completedAt,
+                });
                 if (runningReviewerStatus === "succeeded") {
                   return {
                     ...reviewer,
                     status: runningReviewerStatus,
-                    completedAt,
+                    ...opComplete,
                     error: null,
                   };
                 }
                 return {
                   ...reviewer,
                   status: runningReviewerStatus,
-                  completedAt,
+                  ...opComplete,
                   error: reviewer.error ?? record.error ?? failureDetail,
                 };
               },
             );
 
             const status =
-              record.status === "running"
+              record.status === "running" || record.status === "queued"
                 ? failed
                   ? "failed"
                   : "succeeded"
@@ -632,7 +664,7 @@ export function createReviewCompetitionAdapter(
             return {
               ...record,
               status,
-              completedAt,
+              ...recordComplete,
               error,
               reviewers,
             };
@@ -720,7 +752,11 @@ function mutateReviewerRecord(
     return {
       ...reviewer,
       status,
-      completedAt,
+      ...buildOperationLifecycleCompleteFields({
+        existing: reviewer,
+        startedAt: reviewer.startedAt ?? completedAt,
+        completedAt,
+      }),
       error,
       ...(tokenUsage ? { tokenUsage } : {}),
     };

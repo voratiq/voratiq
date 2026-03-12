@@ -7,6 +7,8 @@ const baseRunRecord = {
   spec: { path: "specs/sample.md" },
   status: "succeeded",
   createdAt: "2025-01-01T00:00:00.000Z",
+  startedAt: "2025-01-01T00:00:00.500Z",
+  completedAt: "2025-01-01T00:05:00.000Z",
   agents: [
     {
       agentId: "agent-1",

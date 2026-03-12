@@ -25,6 +25,7 @@ describe("initializeRunRecord", () => {
         baseRevisionSha: "abc123",
         repoDisplayPath: ".",
         createdAt: "2026-01-01T00:00:00.000Z",
+        startedAt: "2026-01-01T00:00:00.000Z",
         runRoot,
         extraContext: ["../context/carry-forward.md"],
         extraContextMetadata: [

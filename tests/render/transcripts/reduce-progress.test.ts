@@ -175,7 +175,7 @@ describe("reduce live progress renderer", () => {
     const nonTtyTranscript = renderReduceTranscript({
       reductionId: "reduce-123",
       createdAt: "2026-01-01T00:00:00.000Z",
-      elapsed: "5s",
+      elapsed: "3s",
       sourceLabel: "Run",
       sourcePath: ".voratiq/runs/sessions/run-123",
       workspacePath: ".voratiq/reductions/sessions/reduce-123",
@@ -197,5 +197,44 @@ describe("reduce live progress renderer", () => {
     const nonTtyFrame = nonTtyTranscript.split("\n\n---")[0] ?? "";
 
     expect(normalizeFrame(ttyFrame)).toBe(normalizeFrame(nonTtyFrame));
+  });
+
+  it("shows live elapsed while keeping running table duration frozen", () => {
+    let currentTime = Date.parse("2026-01-01T00:00:03.000Z");
+    const tty = new VirtualTty();
+    const renderer = createReduceRenderer({
+      stdout: tty,
+      now: () => currentTime,
+    });
+
+    renderer.begin({
+      reductionId: "reduce-123",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      sourceLabel: "Run",
+      sourcePath: ".voratiq/runs/sessions/run-123",
+      workspacePath: ".voratiq/reductions/sessions/reduce-123",
+      status: "running",
+    });
+    renderer.update({
+      reducerAgentId: "reducer-a",
+      status: "running",
+      startedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    let frame = normalizeFrame(tty.snapshot());
+    expect(frame).toContain("Elapsed    3s");
+    expect(frame).toMatch(/reducer-a\s+RUNNING\s+—/u);
+
+    currentTime = Date.parse("2026-01-01T00:00:07.000Z");
+    renderer.update({
+      reducerAgentId: "reducer-a",
+      status: "running",
+      startedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    frame = normalizeFrame(tty.snapshot());
+    expect(frame).toContain("Elapsed    7s");
+    expect(frame).toMatch(/reducer-a\s+RUNNING\s+—/u);
   });
 });

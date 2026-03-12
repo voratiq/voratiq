@@ -2,7 +2,7 @@ import type { AutoTerminalStatus } from "../../domains/runs/model/types.js";
 import { getRunStatusStyle } from "../../status/colors.js";
 import type { RunStatus } from "../../status/index.js";
 import { colorize } from "../../utils/colors.js";
-import { formatDurationLabel } from "../utils/agents.js";
+import { formatDurationLabel } from "../utils/duration.js";
 import { renderTranscript } from "../utils/transcript.js";
 
 export type AutoPhaseStatus = "succeeded" | "failed" | "skipped";
