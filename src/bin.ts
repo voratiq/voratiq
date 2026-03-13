@@ -183,7 +183,7 @@ export async function runCli(
     .helpCommand(false);
 
   // Start update check (non-blocking)
-  const { startUpdateCheck } = await import("./update-check/mvp.js");
+  const { startUpdateCheck } = await import("./update-check/checker.js");
   const { resolveUpdateStatePath } = await import(
     "./update-check/state-path.js"
   );
