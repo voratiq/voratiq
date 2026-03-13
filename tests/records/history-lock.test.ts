@@ -5,9 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 
-import { RunHistoryLockTimeoutError } from "../../src/domains/runs/model/errors.js";
 import { HISTORY_LOCK_STALE_GRACE_MS } from "../../src/domains/runs/persistence/adapter.js";
-import { acquireHistoryLock as acquireRunHistoryLock } from "../../src/domains/runs/persistence/history-lock.js";
 import { SessionHistoryLockTimeoutError } from "../../src/persistence/errors.js";
 import {
   createHistoryLockMetadata,
@@ -103,18 +101,9 @@ describe("history locks", () => {
     await expect(access(lockPath)).rejects.toBeDefined();
   });
 
-  it("keeps the historical run-owned timeout contract for direct run imports", async () => {
+  it("times out with the shared session lock contract", async () => {
     const lockPath = join(tempDir, "history.lock");
     const release = await acquireHistoryLock(lockPath);
-
-    await expect(
-      acquireRunHistoryLock(lockPath, {
-        timeoutMs: 20,
-        minDelayMs: 5,
-        maxDelayMs: 5,
-        staleAfterMs: HISTORY_LOCK_STALE_GRACE_MS * 10,
-      }),
-    ).rejects.toBeInstanceOf(RunHistoryLockTimeoutError);
 
     await expect(
       acquireHistoryLock(lockPath, {
