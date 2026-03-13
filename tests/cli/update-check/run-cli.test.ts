@@ -12,8 +12,8 @@ import {
 import { runCli } from "../../../src/bin.js";
 import type { ConfirmationInteractor } from "../../../src/render/interactions/confirmation.js";
 import * as confirmation from "../../../src/render/interactions/confirmation.js";
-import type { UpdateHandle } from "../../../src/update-check/mvp.js";
-import * as updateCheck from "../../../src/update-check/mvp.js";
+import type { UpdateHandle } from "../../../src/update-check/checker.js";
+import * as updateCheck from "../../../src/update-check/checker.js";
 import * as updateStatePath from "../../../src/update-check/state-path.js";
 
 jest.mock("node:child_process", () => ({
@@ -24,7 +24,7 @@ jest.mock("../../../src/utils/version.js", () => ({
   getVoratiqVersion: jest.fn(() => "0.4.2"),
 }));
 
-jest.mock("../../../src/update-check/mvp.js", () => ({
+jest.mock("../../../src/update-check/checker.js", () => ({
   startUpdateCheck: jest.fn(),
 }));
 

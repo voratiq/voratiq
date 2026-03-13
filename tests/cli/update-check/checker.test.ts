@@ -12,7 +12,7 @@ import {
   readCache,
   startUpdateCheck,
   writeCache,
-} from "../../../src/update-check/mvp.js";
+} from "../../../src/update-check/checker.js";
 
 jest.mock("node:fs", () => fs);
 
