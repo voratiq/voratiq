@@ -55,7 +55,7 @@ function buildValidWorkspaceTree(
     [`${root}/.voratiq/environment.yaml`]: "\n",
     [`${root}/.voratiq/sandbox.yaml`]: "providers: {}\n",
     [`${root}/.voratiq/orchestration.yaml`]:
-      "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    review:\n      agents: []\n",
+      "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    review:\n      agents: []\n    reduce:\n      agents: []\n",
   };
 }
 
@@ -106,7 +106,7 @@ describe("CLI Context", () => {
       );
       await fs.promises.writeFile(
         `${root}/.voratiq/orchestration.yaml`,
-        "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    review:\n      agents: []\n",
+        "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    review:\n      agents: []\n    reduce:\n      agents: []\n",
       );
 
       return {

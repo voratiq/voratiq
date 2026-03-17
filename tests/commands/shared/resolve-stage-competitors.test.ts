@@ -55,6 +55,8 @@ describe("resolveStageCompetitors", () => {
         "      agents: []",
         "    review:",
         "      agents: []",
+        "    reduce:",
+        "      agents: []",
         "",
       ]);
 
@@ -100,6 +102,9 @@ describe("resolveStageCompetitors", () => {
         "    review:",
         "      agents:",
         "        - id: alpha",
+        "    reduce:",
+        "      agents:",
+        "        - id: alpha",
         "  quality:",
         "    spec:",
         "      agents: []",
@@ -111,6 +116,9 @@ describe("resolveStageCompetitors", () => {
         "    review:",
         "      agents:",
         "        - id: alpha",
+        "    reduce:",
+        "      agents:",
+        "        - id: beta",
         "",
       ]);
 
@@ -143,6 +151,9 @@ describe("resolveStageCompetitors", () => {
         "    review:",
         "      agents:",
         "        - id: alpha",
+        "    reduce:",
+        "      agents:",
+        "        - id: alpha",
         "  quality:",
         "    spec:",
         "      agents: []",
@@ -152,6 +163,9 @@ describe("resolveStageCompetitors", () => {
         "    review:",
         "      agents:",
         "        - id: alpha",
+        "    reduce:",
+        "      agents:",
+        "        - id: gamma",
         "",
       ]);
 
@@ -182,6 +196,9 @@ describe("resolveStageCompetitors", () => {
         "    review:",
         "      agents:",
         "        - id: alpha",
+        "    reduce:",
+        "      agents:",
+        "        - id: alpha",
         "  quality:",
         "    spec:",
         "      agents: []",
@@ -191,6 +208,9 @@ describe("resolveStageCompetitors", () => {
         "    review:",
         "      agents:",
         "        - id: alpha",
+        "    reduce:",
+        "      agents:",
+        "        - id: beta",
         "",
       ]);
 
@@ -224,6 +244,9 @@ describe("resolveStageCompetitors", () => {
         "    review:",
         "      agents:",
         "        - id: alpha",
+        "    reduce:",
+        "      agents:",
+        "        - id: alpha",
         "  quality:",
         "    spec:",
         "      agents: []",
@@ -233,6 +256,9 @@ describe("resolveStageCompetitors", () => {
         "    review:",
         "      agents:",
         "        - id: alpha",
+        "    reduce:",
+        "      agents:",
+        "        - id: beta",
         "",
       ]);
 
@@ -259,6 +285,38 @@ describe("resolveStageCompetitors", () => {
       expect(hinted.hintLines).toEqual([
         "Review `--profile` and update `orchestration.yaml` if needed.",
       ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves reduce through the shared stage resolver path", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-shared-reduce-"));
+    try {
+      await writeOrchestrationFixture(root, [
+        "profiles:",
+        "  default:",
+        "    spec:",
+        "      agents: []",
+        "    run:",
+        "      agents: []",
+        "    review:",
+        "      agents: []",
+        "    reduce:",
+        "      agents:",
+        "        - id: gamma",
+        "        - id: alpha",
+        "",
+      ]);
+
+      const resolution = resolveStageCompetitors({
+        root,
+        stageId: "reduce",
+        includeDefinitions: false,
+      });
+
+      expect(resolution.source).toBe("orchestration");
+      expect(resolution.agentIds).toEqual(["gamma", "alpha"]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

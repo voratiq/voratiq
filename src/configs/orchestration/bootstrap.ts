@@ -5,7 +5,12 @@ import {
 } from "../agents/defaults.js";
 import type { AgentConfigEntry, AgentsConfig } from "../agents/types.js";
 
-const ORCHESTRATION_BOOTSTRAP_STAGE_IDS = ["spec", "run", "review"] as const;
+const ORCHESTRATION_BOOTSTRAP_STAGE_IDS = [
+  "spec",
+  "run",
+  "review",
+  "reduce",
+] as const;
 
 export function collectEnabledAgentIdsForBootstrap(
   agents: readonly Pick<AgentConfigEntry, "id" | "enabled">[],

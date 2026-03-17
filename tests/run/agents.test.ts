@@ -466,16 +466,19 @@ async function writeOrchestrationConfig(
     runAgentIds?: readonly string[];
     reviewAgentIds?: readonly string[];
     specAgentIds?: readonly string[];
+    reduceAgentIds?: readonly string[];
   } = {},
 ): Promise<void> {
   const runAgentIds = options.runAgentIds ?? [];
   const reviewAgentIds = options.reviewAgentIds ?? [];
   const specAgentIds = options.specAgentIds ?? [];
+  const reduceAgentIds = options.reduceAgentIds ?? [];
 
   const lines = ["profiles:", "  default:"];
   appendOrchestrationStage(lines, "spec", specAgentIds);
   appendOrchestrationStage(lines, "run", runAgentIds);
   appendOrchestrationStage(lines, "review", reviewAgentIds);
+  appendOrchestrationStage(lines, "reduce", reduceAgentIds);
   lines.push("");
 
   await writeFile(
@@ -487,7 +490,7 @@ async function writeOrchestrationConfig(
 
 function appendOrchestrationStage(
   lines: string[],
-  stageId: "run" | "review" | "spec",
+  stageId: "run" | "review" | "spec" | "reduce",
   agentIds: readonly string[],
 ): void {
   lines.push(`    ${stageId}:`);
