@@ -73,6 +73,9 @@ profiles:
     spec:
       agents:
         - id: gemini
+    reduce:
+      agents:
+        - id: codex
 `;
     const agentsYaml = `
 agents:
@@ -106,6 +109,9 @@ agents:
     expect(
       config.profiles.default.spec.agents.map((agent) => agent.id),
     ).toEqual(["gemini"]);
+    expect(
+      config.profiles.default.reduce.agents.map((agent) => agent.id),
+    ).toEqual(["codex"]);
   });
 
   test("treats missing enabled in agents.yaml as enabled during cross-validation", () => {
@@ -119,6 +125,9 @@ profiles:
       agents:
         - id: codex
     spec:
+      agents:
+        - id: codex
+    reduce:
       agents:
         - id: codex
 `;
@@ -155,6 +164,8 @@ profiles:
         - id: codex
     spec:
       agents: []
+    reduce:
+      agents: []
 `;
     const agentsYaml = `
 agents:
@@ -179,6 +190,7 @@ agents:
       config.profiles.default.review.agents.map((agent) => agent.id),
     ).toEqual(["codex"]);
     expect(config.profiles.default.spec.agents).toEqual([]);
+    expect(config.profiles.default.reduce.agents).toEqual([]);
   });
 
   test("fails when legacy version key is present at top level", () => {
@@ -192,6 +204,8 @@ profiles:
       agents:
         - id: codex
     spec:
+      agents: []
+    reduce:
       agents: []
 `;
     const agentsYaml = `
@@ -232,6 +246,9 @@ profiles:
     spec:
       agents:
         - id: codex
+    reduce:
+      agents:
+        - id: codex
 unexpected: true
 `;
     const agentsYaml = `
@@ -270,6 +287,9 @@ profiles:
     spec:
       agents:
         - id: codex
+    reduce:
+      agents:
+        - id: codex
   quality:
     run:
       agents:
@@ -280,6 +300,9 @@ profiles:
     spec:
       agents:
         - id: codex
+    reduce:
+      agents:
+        - id: codex
   cost-optimized:
     run:
       agents:
@@ -288,6 +311,9 @@ profiles:
       agents:
         - id: codex
     spec:
+      agents:
+        - id: codex
+    reduce:
       agents:
         - id: codex
 `;
@@ -332,6 +358,9 @@ profiles:
     spec:
       agents:
         - id: codex
+    reduce:
+      agents:
+        - id: codex
   Quality_Profile:
     run:
       agents:
@@ -340,6 +369,9 @@ profiles:
       agents:
         - id: codex
     spec:
+      agents:
+        - id: codex
+    reduce:
       agents:
         - id: codex
 `;
@@ -381,6 +413,9 @@ profiles:
     spec:
       agents:
         - id: codex
+    reduce:
+      agents:
+        - id: codex
   ${profileName}:
     run:
       agents:
@@ -389,6 +424,9 @@ profiles:
       agents:
         - id: codex
     spec:
+      agents:
+        - id: codex
+    reduce:
       agents:
         - id: codex
 `;
@@ -429,6 +467,9 @@ profiles:
     spec:
       agents:
         - id: codex
+    reduce:
+      agents:
+        - id: codex
 `;
     const agentsYaml = `
 agents:
@@ -464,6 +505,9 @@ profiles:
       agents:
         - id: codex
     spec:
+      agents:
+        - id: codex
+    reduce:
       agents:
         - id: codex
     deploy:
@@ -502,6 +546,9 @@ profiles:
     review:
       agents:
         - id: codex
+    reduce:
+      agents:
+        - id: codex
 `;
     const agentsYaml = `
 agents:
@@ -536,6 +583,9 @@ profiles:
     spec:
       agents:
         - id: codex
+    reduce:
+      agents:
+        - id: codex
 `;
     const agentsYaml = `
 agents:
@@ -560,6 +610,43 @@ agents:
     expect(load).toThrow(/profiles\.default\.review/u);
   });
 
+  test("fails when profiles.default.reduce is missing", () => {
+    const orchestrationYaml = `
+profiles:
+  default:
+    run:
+      agents:
+        - id: codex
+    review:
+      agents:
+        - id: codex
+    spec:
+      agents:
+        - id: codex
+`;
+    const agentsYaml = `
+agents:
+  - id: codex
+    provider: codex
+    model: gpt-5
+    enabled: true
+    binary: /usr/local/bin/codex
+`;
+
+    const load = () =>
+      loadOrchestrationConfig({
+        root: ROOT,
+        filePath: ORCHESTRATION_FILE,
+        readFile: createReadFile({
+          [ORCHESTRATION_FILE]: orchestrationYaml,
+          [AGENTS_FILE]: agentsYaml,
+        }),
+      });
+
+    expect(load).toThrow(OrchestrationSchemaValidationError);
+    expect(load).toThrow(/profiles\.default\.reduce/u);
+  });
+
   test("fails on malformed stage agent definitions", () => {
     const orchestrationYaml = `
 profiles:
@@ -571,6 +658,9 @@ profiles:
       agents:
         - id: codex
     spec:
+      agents:
+        - id: codex
+    reduce:
       agents:
         - id: codex
 `;
@@ -610,6 +700,9 @@ profiles:
     spec:
       agents:
         - id: codex
+    reduce:
+      agents:
+        - id: codex
 `;
     const agentsYaml = `
 agents:
@@ -645,6 +738,9 @@ profiles:
       agents:
         - id: ghost
     spec:
+      agents:
+        - id: codex
+    reduce:
       agents:
         - id: codex
 `;
@@ -686,6 +782,9 @@ profiles:
     spec:
       agents:
         - id: codex
+    reduce:
+      agents:
+        - id: codex
 `;
     const agentsYaml = `
 agents:
@@ -725,6 +824,9 @@ profiles:
     spec:
       agents:
         - id: codex
+    reduce:
+      agents:
+        - id: codex
 `;
     const agentsYaml = `
 agents:
@@ -751,6 +853,48 @@ agents:
     expect(message).not.toContain("profiles.default.run.agents[0].id");
   });
 
+  test("fails when reduce references an unknown agent id through shared stage validation", () => {
+    const orchestrationYaml = `
+profiles:
+  default:
+    run:
+      agents:
+        - id: codex
+    review:
+      agents:
+        - id: codex
+    spec:
+      agents:
+        - id: codex
+    reduce:
+      agents:
+        - id: ghost
+`;
+    const agentsYaml = `
+agents:
+  - id: codex
+    provider: codex
+    model: gpt-5
+    enabled: true
+    binary: /usr/local/bin/codex
+`;
+
+    const load = () =>
+      loadOrchestrationConfig({
+        root: ROOT,
+        filePath: ORCHESTRATION_FILE,
+        readFile: createReadFile({
+          [ORCHESTRATION_FILE]: orchestrationYaml,
+          [AGENTS_FILE]: agentsYaml,
+        }),
+      });
+
+    expect(load).toThrow(OrchestrationSchemaValidationError);
+    expect(load).toThrow(/Agent `ghost` is not defined in `agents\.yaml`/u);
+    const message = getThrownMessage(load);
+    expect(message).not.toContain("profiles.default.reduce.agents[0].id");
+  });
+
   test("fails when agents.yaml is missing during cross-validation", () => {
     const orchestrationYaml = `
 profiles:
@@ -762,6 +906,9 @@ profiles:
       agents:
         - id: codex
     spec:
+      agents:
+        - id: codex
+    reduce:
       agents:
         - id: codex
 `;

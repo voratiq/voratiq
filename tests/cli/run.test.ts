@@ -1114,12 +1114,14 @@ async function writeOrchestrationConfig(
     runAgentIds?: readonly string[];
     reviewAgentIds?: readonly string[];
     specAgentIds?: readonly string[];
+    reduceAgentIds?: readonly string[];
     profiles?: Record<
       string,
       {
         runAgentIds?: readonly string[];
         reviewAgentIds?: readonly string[];
         specAgentIds?: readonly string[];
+        reduceAgentIds?: readonly string[];
       }
     >;
   } = {},
@@ -1131,6 +1133,7 @@ async function writeOrchestrationConfig(
         runAgentIds: options.runAgentIds ?? [],
         reviewAgentIds: options.reviewAgentIds ?? [],
         specAgentIds: options.specAgentIds ?? [],
+        reduceAgentIds: options.reduceAgentIds ?? [],
       },
     } satisfies Record<
       string,
@@ -1138,6 +1141,7 @@ async function writeOrchestrationConfig(
         runAgentIds?: readonly string[];
         reviewAgentIds?: readonly string[];
         specAgentIds?: readonly string[];
+        reduceAgentIds?: readonly string[];
       }
     >);
 
@@ -1151,6 +1155,11 @@ async function writeOrchestrationConfig(
       "review",
       profileStages.reviewAgentIds ?? [],
     );
+    appendOrchestrationStage(
+      lines,
+      "reduce",
+      profileStages.reduceAgentIds ?? [],
+    );
   }
   lines.push("");
 
@@ -1163,7 +1172,7 @@ async function writeOrchestrationConfig(
 
 function appendOrchestrationStage(
   lines: string[],
-  stageId: "run" | "review" | "spec",
+  stageId: "run" | "review" | "spec" | "reduce",
   agentIds: readonly string[],
 ): void {
   lines.push(`    ${stageId}:`);

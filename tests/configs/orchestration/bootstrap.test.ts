@@ -8,7 +8,7 @@ import {
 } from "../../../src/configs/orchestration/bootstrap.js";
 
 describe("orchestration bootstrap generator", () => {
-  test("seeds spec/review empty and seeds run from preset stage agents", () => {
+  test("seeds spec/review/reduce empty and seeds run from preset stage agents", () => {
     const config: AgentsConfig = {
       agents: [
         {
@@ -59,11 +59,14 @@ describe("orchestration bootstrap generator", () => {
         "    review:",
         "      agents: []",
         "",
+        "    reduce:",
+        "      agents: []",
+        "",
       ].join("\n"),
     );
   });
 
-  test("manual preset seeds empty run/review/spec", () => {
+  test("manual preset seeds empty run/review/spec/reduce", () => {
     const config: AgentsConfig = {
       agents: [
         {
@@ -90,6 +93,9 @@ describe("orchestration bootstrap generator", () => {
         "      agents: []",
         "",
         "    review:",
+        "      agents: []",
+        "",
+        "    reduce:",
         "      agents: []",
         "",
       ].join("\n"),

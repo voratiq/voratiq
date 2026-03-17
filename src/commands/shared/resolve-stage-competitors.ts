@@ -21,7 +21,7 @@ import {
 
 export interface ResolveStageCompetitorsInput {
   root: string;
-  stageId: OperatorCompetitorStageId;
+  stageId: OrchestrationStageId;
   cliAgentIds?: readonly string[];
   cliOverrideFlag?: string;
   profileName?: string;
@@ -37,7 +37,6 @@ export interface CompetitionPlan {
 }
 
 export type StageCompetitorResolution = CompetitionPlan;
-export type OperatorCompetitorStageId = OrchestrationStageId | "reduce";
 
 const ORCHESTRATION_CONFIG_DISPLAY_PATH = VORATIQ_ORCHESTRATION_FILE;
 const DEFAULT_PROFILE_NAME = "default";
@@ -135,7 +134,7 @@ function normalizeAgentIds(agentIds: readonly string[] | undefined): string[] {
 }
 
 function assertNoDuplicateCliAgentIds(
-  stageId: OperatorCompetitorStageId,
+  stageId: OrchestrationStageId,
   cliAgentIds: readonly string[],
   cliOverrideFlag: string,
 ): void {
@@ -191,7 +190,7 @@ function validateResolvedAgentIds(options: {
 }
 
 function assertResolvedAgentCount(options: {
-  stageId: OperatorCompetitorStageId;
+  stageId: OrchestrationStageId;
   agentIds: readonly string[];
   selectedProfileName: string;
   enforceSingleCompetitor: boolean;
@@ -232,30 +231,28 @@ function assertResolvedAgentCount(options: {
 
 function getProfileAgentIds(
   profile: OrchestrationProfile | undefined,
-  stageId: OperatorCompetitorStageId,
+  stageId: OrchestrationStageId,
 ): string[] {
   if (!profile) {
     return [];
   }
-  if (stageId === "reduce") {
-    return profile.reduce?.agents.map((agent) => agent.id) ?? [];
-  }
+
   return profile[stageId].agents.map((agent) => agent.id);
 }
 
 function profileAgentPath(
   profileName: string,
-  stageId: OperatorCompetitorStageId,
+  stageId: OrchestrationStageId,
 ): string {
   return `profiles.${profileName}.${stageId}.agents`;
 }
 
-function stageNoun(stageId: OperatorCompetitorStageId): string {
+function stageNoun(stageId: OrchestrationStageId): string {
   return stageId === "reduce" ? "reduce" : `stage \`${stageId}\``;
 }
 
 function duplicateAgentHeadline(
-  stageId: OperatorCompetitorStageId,
+  stageId: OrchestrationStageId,
   cliOverrideFlag: string,
 ): string {
   return stageId === "reduce"
@@ -263,13 +260,13 @@ function duplicateAgentHeadline(
     : `Duplicate \`${cliOverrideFlag}\` values for stage \`${stageId}\`.`;
 }
 
-function missingAgentsHeadline(stageId: OperatorCompetitorStageId): string {
+function missingAgentsHeadline(stageId: OrchestrationStageId): string {
   return stageId === "reduce"
     ? "No reducer agents configured."
     : `No agents configured for stage \`${stageId}\`.`;
 }
 
-function multipleAgentsHeadline(stageId: OperatorCompetitorStageId): string {
+function multipleAgentsHeadline(stageId: OrchestrationStageId): string {
   return stageId === "reduce"
     ? "Multiple agents configured for reduce."
     : `Multiple agents configured for stage \`${stageId}\`.`;

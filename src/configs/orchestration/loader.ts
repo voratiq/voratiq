@@ -91,12 +91,6 @@ function validateStageAgentReferences(
         assertAgentEnabled(stageAgent.id, agentsById);
       }
     }
-    const reduction = profile.reduce;
-    if (reduction) {
-      for (const stageAgent of reduction.agents) {
-        assertAgentEnabled(stageAgent.id, agentsById);
-      }
-    }
   }
 }
 

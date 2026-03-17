@@ -2,7 +2,12 @@ import { z } from "zod";
 
 import { agentIdSchema } from "../agents/types.js";
 
-export const ORCHESTRATION_STAGE_IDS = ["run", "review", "spec"] as const;
+export const ORCHESTRATION_STAGE_IDS = [
+  "run",
+  "review",
+  "spec",
+  "reduce",
+] as const;
 export type OrchestrationStageId = (typeof ORCHESTRATION_STAGE_IDS)[number];
 
 export const orchestrationStageAgentSchema = z
@@ -37,13 +42,17 @@ export const orchestrationStageSchema = z
 
 export type OrchestrationStageConfig = z.infer<typeof orchestrationStageSchema>;
 
+const orchestrationProfileShape = {} as Record<
+  OrchestrationStageId,
+  typeof orchestrationStageSchema
+>;
+
+for (const stageId of ORCHESTRATION_STAGE_IDS) {
+  orchestrationProfileShape[stageId] = orchestrationStageSchema;
+}
+
 export const orchestrationProfileSchema = z
-  .object({
-    run: orchestrationStageSchema,
-    review: orchestrationStageSchema,
-    spec: orchestrationStageSchema,
-    reduce: orchestrationStageSchema.optional(),
-  })
+  .object(orchestrationProfileShape)
   .strict();
 
 export type OrchestrationProfile = z.infer<typeof orchestrationProfileSchema>;
