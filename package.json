@@ -1,7 +1,7 @@
 {
   "name": "voratiq",
   "version": "0.1.0-beta.15",
-  "description": "Run coding agents against each other. Merge the winner.",
+  "description": "Agent ensembles to design, generate, and select the best code for every task.",
   "keywords": [
     "ai",
     "cli",
