@@ -117,7 +117,8 @@ describe("voratiq auto", () => {
       .mockReturnValue(new Date(fixedTimestamp).getTime());
 
     runSpecCommandMock.mockResolvedValue({
-      outputPath: ".voratiq/specs/generated.md",
+      generatedSpecPaths: [".voratiq/specs/generated.md"],
+      specPath: ".voratiq/specs/generated.md",
       body: "Spec saved: .voratiq/specs/generated.md",
     });
     runRunCommandMock.mockResolvedValue({
@@ -192,7 +193,8 @@ describe("voratiq auto", () => {
       .mockReturnValue(new Date(fixedTimestamp).getTime());
 
     runSpecCommandMock.mockResolvedValue({
-      outputPath: ".voratiq/specs/generated.md",
+      generatedSpecPaths: [".voratiq/specs/generated.md"],
+      specPath: ".voratiq/specs/generated.md",
       body: "Spec saved: .voratiq/specs/generated.md",
     });
     runRunCommandMock.mockResolvedValue({
@@ -425,7 +427,8 @@ describe("voratiq auto", () => {
         alerts: [{ severity: "info", message: "Generating specification…" }],
       });
       return Promise.resolve({
-        outputPath: ".voratiq/specs/generated.md",
+        generatedSpecPaths: [".voratiq/specs/generated.md"],
+        specPath: ".voratiq/specs/generated.md",
         body: [
           "Spec saved: .voratiq/specs/generated.md",
           "",
@@ -539,7 +542,8 @@ describe("voratiq auto", () => {
       });
 
     runSpecCommandMock.mockResolvedValue({
-      outputPath: ".voratiq/specs/generated.md",
+      generatedSpecPaths: [".voratiq/specs/generated.md"],
+      specPath: ".voratiq/specs/generated.md",
       body: "Spec saved: .voratiq/specs/generated.md",
     });
     runRunCommandMock.mockResolvedValue({
@@ -669,7 +673,7 @@ describe("voratiq auto", () => {
       });
 
     runSpecCommandMock.mockResolvedValue({
-      outputPath: ".voratiq/specs/generated.md",
+      generatedSpecPaths: [".voratiq/specs/generated.md"],
       specPath: ".voratiq/specs/generated.md",
       body: "Spec saved: .voratiq/specs/generated.md",
     });

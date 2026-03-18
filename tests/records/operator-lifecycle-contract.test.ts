@@ -58,11 +58,14 @@ describe("unified operator lifecycle contract", () => {
     const specMissingStartedAt = specRecordSchema.safeParse({
       sessionId: "spec-legacy",
       createdAt: QUEUED_AT,
-      status: "drafting",
-      agentId: "spec-agent",
-      title: "Title",
-      slug: "title",
-      outputPath: ".voratiq/specs/title.md",
+      status: "running",
+      description: "Title",
+      agents: [
+        {
+          agentId: "spec-agent",
+          status: "running",
+        },
+      ],
     });
     expect(specMissingStartedAt.success).toBe(false);
     expect(
@@ -190,11 +193,15 @@ describe("unified operator lifecycle contract", () => {
         sessionId: "spec-r",
         createdAt: QUEUED_AT,
         startedAt: STARTED_AT,
-        status: "drafting",
-        agentId: "spec-agent",
-        title: "Title",
-        slug: "title",
-        outputPath: ".voratiq/specs/title.md",
+        status: "running",
+        description: "Title",
+        agents: [
+          {
+            agentId: "spec-agent",
+            status: "running",
+            startedAt: STARTED_AT,
+          },
+        ],
       }),
       runRecordSchema.parse({
         runId: "run-r",
@@ -250,11 +257,18 @@ describe("unified operator lifecycle contract", () => {
         createdAt: QUEUED_AT,
         startedAt: STARTED_AT,
         completedAt: COMPLETED_AT,
-        status: "saved",
-        agentId: "spec-agent",
-        title: "Title",
-        slug: "title",
-        outputPath: ".voratiq/specs/title.md",
+        status: "succeeded",
+        description: "Title",
+        agents: [
+          {
+            agentId: "spec-agent",
+            status: "succeeded",
+            startedAt: STARTED_AT,
+            completedAt: COMPLETED_AT,
+            outputPath: ".voratiq/specs/title.md",
+            dataPath: ".voratiq/specs/title.json",
+          },
+        ],
       }),
       runRecordSchema.parse({
         runId: "run-t",

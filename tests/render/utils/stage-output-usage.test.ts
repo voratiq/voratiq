@@ -126,7 +126,6 @@ describe("stage output adapters", () => {
     expect(renderStageFinalFrameMock).toHaveBeenCalledTimes(1);
     expect(renderStageFinalFrameMock).toHaveBeenCalledWith({
       metadataLines: ["Spec saved: .voratiq/specs/test.md"],
-      hint: undefined,
     });
   });
 });

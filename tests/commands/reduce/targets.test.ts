@@ -38,11 +38,18 @@ describe("assertReductionTargetEligible", () => {
         createdAt: new Date().toISOString(),
         startedAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
-        status: "saved",
-        agentId: "alpha",
-        title: "Spec title",
-        slug: "spec-title",
-        outputPath: "specs/spec-title.md",
+        status: "succeeded",
+        description: "Spec title",
+        agents: [
+          {
+            agentId: "alpha",
+            status: "succeeded",
+            startedAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+            outputPath: "specs/spec-title.md",
+            dataPath: "specs/spec-title.json",
+          },
+        ],
       };
 
       await appendSpecRecord({
@@ -60,7 +67,7 @@ describe("assertReductionTargetEligible", () => {
           reductionsFilePath: workspace.reductionsFilePath,
           target: { type: "spec", id: specId },
         }),
-      ).rejects.toThrow(/missing its output file/i);
+      ).rejects.toThrow(/missing artifact files/i);
     } finally {
       await workspace.cleanup();
     }

@@ -26,7 +26,7 @@ export interface AutoSpecStageInput {
 
 export interface AutoSpecStageResult {
   body: string;
-  outputPath?: string;
+  generatedSpecPaths?: readonly string[];
   specPath?: string;
 }
 
@@ -607,17 +607,20 @@ function resolveSpecPathForAuto(result: AutoSpecStageResult): string {
     return specPathCandidate;
   }
 
-  const outputPathCandidate =
-    typeof result.outputPath === "string" && result.outputPath.trim().length > 0
-      ? result.outputPath.trim()
-      : undefined;
-  if (outputPathCandidate) {
-    return outputPathCandidate;
+  if ((result.generatedSpecPaths?.length ?? 0) > 1) {
+    throw new HintedError(
+      "Spec stage generated multiple drafts and did not select one.",
+      {
+        hintLines: [
+          "Review the generated spec artifacts manually before continuing.",
+        ],
+      },
+    );
   }
 
   throw new HintedError("Spec stage did not return a spec path.", {
     hintLines: [
-      "Re-run the spec stage and check for `Spec saved:` in the output.",
+      "Re-run the spec stage and check for generated artifacts in the output.",
     ],
   });
 }

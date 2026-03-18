@@ -1,17 +1,20 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
-
 import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
 import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
-import type { AgentDefinition } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
-import type { ExtractedTokenUsage } from "../../domains/runs/model/types.js";
+import {
+  buildLifecycleStartFields,
+  buildOperationLifecycleCompleteFields,
+} from "../../domains/shared/lifecycle.js";
 import {
   createSpecCompetitionAdapter,
   type SpecCompetitionExecution,
 } from "../../domains/specs/competition/adapter.js";
-import type { SpecRecord } from "../../domains/specs/model/types.js";
+import {
+  deriveSpecStatusFromAgents,
+  type SpecAgentEntry,
+  type SpecRecord,
+} from "../../domains/specs/model/types.js";
 import {
   appendSpecRecord,
   finalizeSpecRecord,
@@ -19,48 +22,31 @@ import {
   rewriteSpecRecord,
 } from "../../domains/specs/persistence/adapter.js";
 import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
+import type { SpecProgressRenderer } from "../../render/transcripts/spec.js";
 import { toErrorMessage } from "../../utils/errors.js";
-import { pathExists } from "../../utils/fs.js";
-import {
-  assertPathWithinRoot,
-  normalizePathForDisplay,
-  relativeToRoot,
-  resolvePath,
-} from "../../utils/path.js";
-import { slugify } from "../../utils/slug.js";
-import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
-import { getSpecsDirectoryPath } from "../../workspace/structure.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
-import {
-  SpecAgentNotFoundError,
-  SpecGenerationFailedError,
-  SpecOutputExistsError,
-  SpecOutputPathError,
-} from "./errors.js";
+import { SpecAgentNotFoundError, SpecGenerationFailedError } from "./errors.js";
 
 export interface ExecuteSpecCommandInput {
   root: string;
   specsFilePath: string;
   description: string;
-  agentId?: string;
+  agentIds?: readonly string[];
   profileName?: string;
   maxParallel?: number;
   title?: string;
-  outputPath?: string;
   extraContextFiles?: readonly ResolvedExtraContextFile[];
   onStatus?: (message: string) => void;
+  renderer?: SpecProgressRenderer;
 }
 
 export interface ExecuteSpecCommandResult {
   sessionId: string;
-  slug: string;
-  outputPath: string;
+  status: string;
   record: SpecRecord;
-  tokenUsage?: ExtractedTokenUsage;
-  tokenUsageResult: TokenUsageResult;
-  exitCode?: number;
+  agents: readonly SpecAgentEntry[];
 }
 
 export async function executeSpecCommand(
@@ -70,38 +56,39 @@ export async function executeSpecCommand(
     root,
     specsFilePath,
     description,
-    agentId,
+    agentIds: cliAgentIds,
     profileName,
     maxParallel: requestedMaxParallel,
     title: providedTitle,
-    outputPath: customOutputPath,
     extraContextFiles = [],
     onStatus,
+    renderer,
   } = input;
 
-  let agent: AgentDefinition;
+  let competitors;
   try {
+    const normalizedCliIds =
+      cliAgentIds && cliAgentIds.length > 0 ? [...cliAgentIds] : undefined;
     const resolution = resolveStageCompetitors({
       root,
       stageId: "spec",
-      cliAgentIds: agentId ? [agentId] : undefined,
+      cliAgentIds: normalizedCliIds,
       profileName,
-      enforceSingleCompetitor: true,
     });
-    const resolvedAgent = resolution.competitors[0];
-    if (!resolvedAgent) {
+    competitors = resolution.competitors;
+    if (competitors.length === 0) {
       throw new SpecGenerationFailedError(["Spec agent resolution failed."]);
     }
-    agent = resolvedAgent;
   } catch (error) {
     if (error instanceof AgentNotFoundError) {
       throw new SpecAgentNotFoundError(error.agentId);
     }
     throw error;
   }
+
   const environment = loadEnvironmentConfig({ root });
   const effectiveMaxParallel = resolveEffectiveMaxParallel({
-    competitorCount: 1,
+    competitorCount: competitors.length,
     requestedMaxParallel,
   });
 
@@ -109,45 +96,23 @@ export async function executeSpecCommand(
     providedTitle && providedTitle.trim().length > 0
       ? providedTitle.trim()
       : undefined;
-  let title = deriveTitle(providedTitle, description);
-  let slug = slugify(title, "spec");
-
-  const specsRoot = resolvePath(root, getSpecsDirectoryPath());
-  const defaultOutputAbsolute = resolvePath(
-    root,
-    getSpecsDirectoryPath(),
-    `${slug}.md`,
-  );
-
-  let outputAbsolute = resolveOutputPath({
-    root,
-    specsRoot,
-    customOutputPath,
-    defaultPath: defaultOutputAbsolute,
-  });
-
-  if (customOutputPath && (await pathExists(outputAbsolute))) {
-    const display = normalizePathForDisplay(
-      relativeToRoot(root, outputAbsolute),
-    );
-    throw new SpecOutputExistsError(display);
-  }
-
-  await mkdir(dirname(outputAbsolute), { recursive: true });
 
   const sessionId = generateSessionId();
   const startedAt = new Date().toISOString();
   const createdAt = startedAt;
 
+  const initialAgents: SpecAgentEntry[] = competitors.map((agent) => ({
+    agentId: agent.id,
+    status: "queued" as const,
+  }));
+
   const record: SpecRecord = {
     sessionId,
     createdAt,
     startedAt,
-    status: "drafting",
-    agentId: agent.id,
-    title,
-    slug,
-    outputPath: normalizePathForDisplay(relativeToRoot(root, outputAbsolute)),
+    status: "running",
+    description,
+    agents: initialAgents,
     ...buildPersistedExtraContextFields(extraContextFiles),
   };
 
@@ -156,319 +121,316 @@ export async function executeSpecCommand(
     specsFilePath,
     record,
   });
+  let currentAgents: SpecAgentEntry[] = [...initialAgents];
 
-  let latestRecord = record;
   onStatus?.("Generating specification…");
-  let generationResult: SpecCompetitionExecution;
+  renderer?.begin({
+    sessionId,
+    createdAt,
+    startedAt,
+    workspacePath: `.voratiq/specs/sessions/${sessionId}`,
+    status: "running",
+  });
+
+  let executionResults: SpecCompetitionExecution[];
 
   try {
-    const generationResults = await executeCompetitionWithAdapter({
-      candidates: [agent],
+    const baseAdapter = createSpecCompetitionAdapter({
+      root,
+      sessionId,
+      description,
+      specTitle,
+      environment,
+      extraContextFiles,
+    });
+    executionResults = await executeCompetitionWithAdapter({
+      candidates: [...competitors],
       maxParallel: effectiveMaxParallel,
-      adapter: createSpecCompetitionAdapter({
-        root,
-        sessionId,
-        description,
-        specTitle,
-        environment,
-        extraContextFiles,
-      }),
+      adapter: {
+        ...baseAdapter,
+        onPreparationFailure: async (result) => {
+          currentAgents = await persistSpecAgentFailure({
+            root,
+            specsFilePath,
+            sessionId,
+            agentId: result.agentId,
+            tokenUsage: result.tokenUsage,
+            error: result.error ?? null,
+          });
+          const failedAgent = currentAgents.find(
+            (agent) => agent.agentId === result.agentId,
+          );
+          renderer?.update({
+            agentId: result.agentId,
+            status: "failed",
+            startedAt: failedAgent?.startedAt,
+            completedAt: failedAgent?.completedAt,
+            tokenUsage: result.tokenUsage,
+            tokenUsageResult: result.tokenUsageResult,
+          });
+        },
+        onCandidateRunning: async (prepared, index) => {
+          await baseAdapter.onCandidateRunning?.(prepared, index);
+          currentAgents = await persistSpecAgentRunning({
+            root,
+            specsFilePath,
+            sessionId,
+            agentId: prepared.candidate.id,
+          });
+          const runningAgent = currentAgents.find(
+            (agent) => agent.agentId === prepared.candidate.id,
+          );
+          renderer?.update({
+            agentId: prepared.candidate.id,
+            status: "running",
+            startedAt: runningAgent?.startedAt,
+          });
+        },
+        onCandidateCompleted: async (_prepared, result) => {
+          currentAgents = await persistSpecAgentCompletion({
+            root,
+            specsFilePath,
+            sessionId,
+            result,
+          });
+          const completedAgent = currentAgents.find(
+            (agent) => agent.agentId === result.agentId,
+          );
+          renderer?.update({
+            agentId: result.agentId,
+            status: completedAgent?.status ?? result.status,
+            startedAt: completedAgent?.startedAt,
+            completedAt: completedAgent?.completedAt,
+            tokenUsage: result.tokenUsage,
+            tokenUsageResult: result.tokenUsageResult,
+          });
+        },
+      },
     });
-
-    const selectedResult = generationResults[0];
-    if (!selectedResult) {
-      const detail = `Specification session ${sessionId} did not produce any result.`;
-      latestRecord = await finalizeSpecRecord({
-        root,
-        specsFilePath,
-        sessionId,
-        status: "failed",
-        error: detail,
-      });
-      await flushSpecRecordBuffer({ specsFilePath, sessionId });
-      throw new SpecGenerationFailedError([detail]);
-    }
-
-    generationResult = selectedResult;
   } catch (error) {
-    if (error instanceof SpecGenerationFailedError) {
-      throw error;
-    }
-
     const detail = toErrorMessage(error);
-    latestRecord = await finalizeSpecRecord({
+    await finalizeSpecRecord({
       root,
       specsFilePath,
       sessionId,
       status: "failed",
       error: detail,
     });
+    renderer?.complete("failed");
     await flushSpecRecordBuffer({ specsFilePath, sessionId });
     throw new SpecGenerationFailedError([detail]);
   }
 
-  if (generationResult.status === "failed") {
-    if (generationResult.tokenUsage) {
-      latestRecord = await rewriteSpecRecord({
-        root,
-        specsFilePath,
-        sessionId,
-        mutate: (existing) => ({
-          ...existing,
-          tokenUsage: generationResult.tokenUsage,
-        }),
-      });
-    }
-    latestRecord = await finalizeSpecRecord({
-      root,
-      specsFilePath,
-      sessionId,
-      status: "failed",
-      error: generationResult.error ?? null,
-    });
-    await flushSpecRecordBuffer({ specsFilePath, sessionId });
-    throw new SpecGenerationFailedError(
-      generationResult.error ? [generationResult.error] : [],
-    );
-  }
+  const agentEntries = currentAgents.some(
+    (agent) => agent.status === "succeeded" || agent.status === "failed",
+  )
+    ? currentAgents
+    : mapExecutionResultsToSpecAgents(executionResults, startedAt);
 
-  if (generationResult.tokenUsage) {
-    latestRecord = await rewriteSpecRecord({
-      root,
-      specsFilePath,
-      sessionId,
-      mutate: (existing) => ({
-        ...existing,
-        tokenUsage: generationResult.tokenUsage,
-      }),
-    });
-  }
+  // Derive session status from agent outcomes.
+  const sessionStatus = deriveSpecStatusFromAgents(
+    agentEntries.map((a) => a.status),
+  );
 
-  let generatedSpecContent: string;
-  try {
-    generatedSpecContent = await readFile(
-      resolvePath(root, generationResult.specPath),
-      "utf8",
-    );
-  } catch (error) {
-    const detail = toErrorMessage(error);
-    latestRecord = await finalizeSpecRecord({
-      root,
-      specsFilePath,
-      sessionId,
-      status: "failed",
-      error: detail,
-    });
-    await flushSpecRecordBuffer({ specsFilePath, sessionId });
-    throw new SpecGenerationFailedError([detail]);
-  }
-
-  const parsedTitle = deriveTitleFromDraft(generatedSpecContent, description);
-  if (parsedTitle !== title) {
-    title = parsedTitle;
-  }
-
-  latestRecord = await rewriteSpecRecord({
+  const latestRecord = await finalizeSpecRecord({
     root,
     specsFilePath,
     sessionId,
-    mutate: (existing) => ({
-      ...existing,
-      title,
-    }),
+    status: sessionStatus,
+    agents: agentEntries,
+    error:
+      sessionStatus === "failed" ? collectAgentErrors(agentEntries) : undefined,
   });
-
-  await rewriteSpecRecord({
-    root,
-    specsFilePath,
-    sessionId,
-    mutate: (existing) => ({
-      ...existing,
-      status: "saving",
-    }),
-  });
-
-  const handleSaveError = async (error: unknown) => {
-    const detail = toErrorMessage(error);
-    latestRecord = await finalizeSpecRecord({
-      root,
-      specsFilePath,
-      sessionId,
-      status: "failed",
-      error: detail,
-    });
-    await flushSpecRecordBuffer({ specsFilePath, sessionId });
-    throw new SpecGenerationFailedError([detail]);
-  };
-
-  try {
-    if (!customOutputPath) {
-      const desiredSlug = slugify(title, "spec");
-      const desiredOutputAbsolute = resolveOutputPath({
-        root,
-        specsRoot,
-        customOutputPath,
-        defaultPath: resolvePath(
-          root,
-          getSpecsDirectoryPath(),
-          `${desiredSlug}.md`,
-        ),
-      });
-      if (desiredOutputAbsolute !== outputAbsolute) {
-        outputAbsolute = await findUniqueOutputPath(desiredOutputAbsolute);
-      } else if (await pathExists(outputAbsolute)) {
-        outputAbsolute = await findUniqueOutputPath(outputAbsolute);
-      }
-      slug = desiredSlug;
-    } else {
-      slug = slugify(title, "spec");
-    }
-
-    if (
-      latestRecord.slug !== slug ||
-      latestRecord.outputPath !==
-        normalizePathForDisplay(relativeToRoot(root, outputAbsolute))
-    ) {
-      latestRecord = await rewriteSpecRecord({
-        root,
-        specsFilePath,
-        sessionId,
-        mutate: (existing) => ({
-          ...existing,
-          slug,
-          outputPath: normalizePathForDisplay(
-            relativeToRoot(root, outputAbsolute),
-          ),
-        }),
-      });
-    }
-
-    await mkdir(dirname(outputAbsolute), { recursive: true });
-    await writeFile(outputAbsolute, generatedSpecContent, "utf8");
-    latestRecord = await finalizeSpecRecord({
-      root,
-      specsFilePath,
-      sessionId,
-      status: "saved",
-    });
-  } catch (error) {
-    await handleSaveError(error);
-  }
 
   await flushSpecRecordBuffer({ specsFilePath, sessionId });
+  renderer?.complete(latestRecord.status, {
+    startedAt: latestRecord.startedAt,
+    completedAt: latestRecord.completedAt,
+  });
+
+  if (sessionStatus === "failed") {
+    const errorDetails = agentEntries
+      .filter((a) => a.error)
+      .map((a) => `${a.agentId}: ${a.error}`);
+    throw new SpecGenerationFailedError(
+      errorDetails.length > 0
+        ? errorDetails
+        : ["All agents failed to generate a specification."],
+    );
+  }
 
   return {
     sessionId,
-    slug,
-    outputPath: latestRecord.outputPath,
+    status: latestRecord.status,
     record: latestRecord,
-    tokenUsage: latestRecord.tokenUsage,
-    tokenUsageResult: generationResult.tokenUsageResult,
+    agents: latestRecord.agents,
   };
 }
 
-function deriveTitle(
-  provided: string | undefined,
-  description: string,
-): string {
-  if (provided && provided.trim().length > 0) {
-    return provided.trim();
-  }
-
-  const firstLine = description.trim().split("\n")[0] ?? "";
-  const truncated = firstLine.slice(0, 80).trim();
-  return truncated.length > 0 ? truncated : "Untitled Spec";
+function collectAgentErrors(agents: readonly SpecAgentEntry[]): string | null {
+  const errors = agents
+    .filter((a) => a.error)
+    .map((a) => `${a.agentId}: ${a.error}`);
+  return errors.length > 0 ? errors.join("; ") : null;
 }
 
-function deriveTitleFromDraft(draft: string, description: string): string {
-  const fromDraft = extractTitleFromDraft(draft);
-  if (fromDraft) {
-    return fromDraft;
-  }
-  return deriveTitle(undefined, description);
-}
-
-function extractTitleFromDraft(draft: string): string | undefined {
-  const lines = draft.split(/\r?\n/);
-  let inCodeBlock = false;
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("```")) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) {
-      continue;
-    }
-    const match = /^\s*#\s+(.+?)\s*$/.exec(line);
-    if (!match) {
-      continue;
-    }
-    const sanitized = sanitizeSpecTitle(match[1] ?? "");
-    if (sanitized.length > 0) {
-      return sanitized;
-    }
-  }
-  return undefined;
-}
-
-function sanitizeSpecTitle(value: string): string {
-  const withoutHashSuffix = value.replace(/\s+#+\s*$/g, "");
-  const withoutLinks = withoutHashSuffix.replace(
-    /\[([^\]]+)\]\([^)]+\)/g,
-    "$1",
-  );
-  const normalized = withoutLinks
-    .replace(/[`*_~]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (normalized.length === 0) {
-    return "";
-  }
-  return normalized.slice(0, 80).trim();
-}
-
-function resolveOutputPath(options: {
+async function persistSpecAgentRunning(options: {
   root: string;
-  specsRoot: string;
-  customOutputPath?: string;
-  defaultPath: string;
-}): string {
-  const { root, specsRoot, customOutputPath, defaultPath } = options;
-
-  if (!customOutputPath) {
-    return defaultPath;
-  }
-
-  const absolute = customOutputPath.startsWith("/")
-    ? customOutputPath
-    : resolvePath(root, customOutputPath);
-
-  try {
-    return assertPathWithinRoot(specsRoot, absolute, {
-      message: `Output path must be inside ${relativeToRoot(root, specsRoot)}.`,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new SpecOutputPathError(message);
-  }
+  specsFilePath: string;
+  sessionId: string;
+  agentId: string;
+}): Promise<SpecAgentEntry[]> {
+  const { root, specsFilePath, sessionId, agentId } = options;
+  const timestamp = new Date().toISOString();
+  const updated = await rewriteSpecRecord({
+    root,
+    specsFilePath,
+    sessionId,
+    mutate: (record) => ({
+      ...record,
+      agents: record.agents.map((agent) =>
+        agent.agentId === agentId
+          ? {
+              ...agent,
+              status: "running",
+              ...buildLifecycleStartFields({
+                existingStartedAt: agent.startedAt,
+                timestamp,
+              }),
+              completedAt: undefined,
+              error: null,
+            }
+          : agent,
+      ),
+    }),
+  });
+  return [...updated.agents];
 }
 
-async function findUniqueOutputPath(desiredPath: string): Promise<string> {
-  if (!(await pathExists(desiredPath))) {
-    return desiredPath;
-  }
+async function persistSpecAgentCompletion(options: {
+  root: string;
+  specsFilePath: string;
+  sessionId: string;
+  result: SpecCompetitionExecution;
+}): Promise<SpecAgentEntry[]> {
+  const { root, specsFilePath, sessionId, result } = options;
+  const completedAt = new Date().toISOString();
+  const updated = await rewriteSpecRecord({
+    root,
+    specsFilePath,
+    sessionId,
+    mutate: (record) => ({
+      ...record,
+      agents: record.agents.map((agent) => {
+        if (agent.agentId !== result.agentId) {
+          return agent;
+        }
+        const startedAt = buildLifecycleStartFields({
+          existingStartedAt: agent.startedAt,
+          timestamp: completedAt,
+        }).startedAt;
+        const completeFields = buildOperationLifecycleCompleteFields({
+          existing: {
+            startedAt,
+            completedAt: agent.completedAt,
+          },
+          completedAt,
+        });
+        if (result.status === "succeeded") {
+          return {
+            ...agent,
+            status: "succeeded",
+            ...completeFields,
+            outputPath: result.outputPath,
+            dataPath: result.dataPath,
+            tokenUsage: result.tokenUsage,
+            error: null,
+          };
+        }
+        return {
+          ...agent,
+          status: "failed",
+          ...completeFields,
+          tokenUsage: result.tokenUsage,
+          error: result.error ?? null,
+        };
+      }),
+    }),
+  });
+  return [...updated.agents];
+}
 
-  const dir = dirname(desiredPath);
-  const ext = ".md";
-  const base = desiredPath.slice(dir.length + 1, -ext.length);
+async function persistSpecAgentFailure(options: {
+  root: string;
+  specsFilePath: string;
+  sessionId: string;
+  agentId: string;
+  tokenUsage?: SpecCompetitionExecution["tokenUsage"];
+  error?: string | null;
+}): Promise<SpecAgentEntry[]> {
+  const { root, specsFilePath, sessionId, agentId, tokenUsage, error } =
+    options;
+  const completedAt = new Date().toISOString();
+  const updated = await rewriteSpecRecord({
+    root,
+    specsFilePath,
+    sessionId,
+    mutate: (record) => ({
+      ...record,
+      agents: record.agents.map((agent) => {
+        if (agent.agentId !== agentId) {
+          return agent;
+        }
+        const startedAt = buildLifecycleStartFields({
+          existingStartedAt: agent.startedAt,
+          timestamp: completedAt,
+        }).startedAt;
+        const completeFields = buildOperationLifecycleCompleteFields({
+          existing: {
+            startedAt,
+            completedAt: agent.completedAt,
+          },
+          completedAt,
+        });
+        return {
+          ...agent,
+          status: "failed",
+          ...completeFields,
+          ...(tokenUsage ? { tokenUsage } : {}),
+          error: error ?? null,
+        };
+      }),
+    }),
+  });
+  return [...updated.agents];
+}
 
-  let suffix = 2;
-  while (true) {
-    const candidate = resolvePath(dir, `${base}-${suffix}${ext}`);
-    if (!(await pathExists(candidate))) {
-      return candidate;
+function mapExecutionResultsToSpecAgents(
+  executionResults: readonly SpecCompetitionExecution[],
+  startedAt: string,
+): SpecAgentEntry[] {
+  return executionResults.map((result): SpecAgentEntry => {
+    const completedAt = new Date().toISOString();
+    const base: Pick<SpecAgentEntry, "agentId" | "startedAt" | "completedAt"> =
+      {
+        agentId: result.agentId,
+        startedAt,
+        completedAt,
+      };
+    if (result.status === "succeeded") {
+      return {
+        ...base,
+        status: "succeeded",
+        outputPath: result.outputPath,
+        dataPath: result.dataPath,
+        tokenUsage: result.tokenUsage,
+      };
     }
-    suffix += 1;
-  }
+    return {
+      ...base,
+      status: "failed",
+      tokenUsage: result.tokenUsage,
+      error: result.error ?? null,
+    };
+  });
 }

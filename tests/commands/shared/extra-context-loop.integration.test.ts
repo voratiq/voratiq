@@ -48,10 +48,27 @@ describe("end-to-end extra-context reuse loop", () => {
 
       const seedSpecId = "spec-seed";
       const seedSpecPath = ".voratiq/specs/seed.md";
+      const seedSpecDataPath = ".voratiq/specs/seed.json";
       await mkdir(join(root, ".voratiq", "specs"), { recursive: true });
       await writeFile(
         join(root, ".voratiq", "specs", "seed.md"),
         "# Seed\n",
+        "utf8",
+      );
+      await writeFile(
+        join(root, ".voratiq", "specs", "seed.json"),
+        JSON.stringify(
+          {
+            title: "Seed",
+            objective: "Carry the seed forward.",
+            scope: ["Use the seed draft as the baseline."],
+            acceptanceCriteria: ["Use the seed."],
+            constraints: ["Preserve the seed intent."],
+            exitSignal: "The seed draft is reusable downstream.",
+          },
+          null,
+          2,
+        ),
         "utf8",
       );
       await appendSpecRecord({
@@ -62,11 +79,18 @@ describe("end-to-end extra-context reuse loop", () => {
           createdAt: "2026-01-01T00:00:00.000Z",
           startedAt: "2026-01-01T00:00:00.000Z",
           completedAt: "2026-01-01T00:00:01.000Z",
-          status: "saved",
-          agentId: "alpha",
-          title: "Seed",
-          slug: "seed",
-          outputPath: seedSpecPath,
+          status: "succeeded",
+          description: "Seed",
+          agents: [
+            {
+              agentId: "alpha",
+              status: "succeeded",
+              startedAt: "2026-01-01T00:00:00.000Z",
+              completedAt: "2026-01-01T00:00:01.000Z",
+              outputPath: seedSpecPath,
+              dataPath: seedSpecDataPath,
+            },
+          ],
           error: null,
         },
       });
@@ -169,6 +193,22 @@ describe("end-to-end extra-context reuse loop", () => {
             `# Spec from reduction\n\nDirective: ${directive}\n`,
             "utf8",
           );
+          await writeFile(
+            join(input.paths.workspacePath, "spec.json"),
+            JSON.stringify(
+              {
+                title: "Spec from reduction",
+                objective: directive,
+                scope: ["Carry the reduction directive into the next draft."],
+                acceptanceCriteria: [directive],
+                constraints: ["Use the reduction output as context."],
+                exitSignal: "The new draft reflects the reduction directive.",
+              },
+              null,
+              2,
+            ),
+            "utf8",
+          );
 
           return {
             exitCode: 0,
@@ -210,17 +250,29 @@ describe("end-to-end extra-context reuse loop", () => {
         root,
         specsFilePath: join(root, ".voratiq", "specs", "index.json"),
         description: "Generate a new spec using prior reduction",
-        agentId: "alpha",
+        agentIds: ["alpha"],
         extraContextFiles,
       });
 
-      const outputAbsolute = join(root, ...specResult.outputPath.split("/"));
+      if (!specResult.agents[0]?.outputPath) {
+        throw new Error("Expected generated spec artifact path");
+      }
+      const outputAbsolute = join(
+        root,
+        ...specResult.agents[0].outputPath.split("/"),
+      );
       const specContent = await readFile(outputAbsolute, "utf8");
       expect(sawExtraContextPromptSection).toBe(true);
       expect(sawReductionContextReference).toBe(true);
       expect(specContent).toContain(
         "Directive: Use the seed spec as baseline.",
       );
+      await expect(
+        readFile(
+          join(root, ...(specResult.agents[0].dataPath ?? "").split("/")),
+          "utf8",
+        ),
+      ).resolves.toContain('"title": "Spec from reduction"');
     } finally {
       await rm(root, { recursive: true, force: true });
     }

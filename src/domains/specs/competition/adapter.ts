@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { detectAgentProcessFailureDetail } from "../../../agents/runtime/failures.js";
 import { runSandboxedAgent } from "../../../agents/runtime/harness.js";
 import type {
@@ -18,11 +21,11 @@ import {
   resolveTokenUsage,
 } from "../../../domains/shared/token-usage.js";
 import { buildSpecPrompt } from "../../../domains/specs/competition/prompt.js";
+import { parseSpecData } from "../../../domains/specs/model/output.js";
 import { toErrorMessage } from "../../../utils/errors.js";
 import {
   normalizePathForDisplay,
   relativeToRoot,
-  resolvePath,
 } from "../../../utils/path.js";
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
@@ -34,7 +37,8 @@ import {
 import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
 import { VORATIQ_SPECS_DIR } from "../../../workspace/structure.js";
 
-const SPEC_ARTIFACT_FILENAME = "spec.md";
+const SPEC_MARKDOWN_FILENAME = "spec.md";
+const SPEC_DATA_FILENAME = "spec.json";
 
 export type SpecCompetitionCandidate = AgentDefinition;
 
@@ -46,8 +50,9 @@ export interface PreparedSpecCompetitionCandidate {
 
 export interface SpecCompetitionExecution {
   readonly agentId: string;
-  readonly specPath: string;
-  readonly status: "generated" | "failed";
+  readonly outputPath?: string;
+  readonly dataPath?: string;
+  readonly status: "succeeded" | "failed";
   readonly tokenUsage?: ExtractedTokenUsage;
   readonly tokenUsageResult: TokenUsageResult;
   readonly error?: string;
@@ -81,6 +86,7 @@ export function createSpecCompetitionAdapter(
   const workspacesToPrune = new Set<string>();
 
   return {
+    failurePolicy: "continue",
     prepareCandidates: async (
       candidates,
     ): Promise<
@@ -111,7 +117,8 @@ export function createSpecCompetitionAdapter(
           const prompt = buildSpecPrompt({
             description,
             title: specTitle,
-            outputPath: SPEC_ARTIFACT_FILENAME,
+            markdownOutputPath: SPEC_MARKDOWN_FILENAME,
+            dataOutputPath: SPEC_DATA_FILENAME,
             repoRootPath: root,
             workspacePath: workspacePaths.workspacePath,
             extraContextFiles,
@@ -125,7 +132,6 @@ export function createSpecCompetitionAdapter(
         } catch (error) {
           failures.push({
             agentId: candidate.id,
-            specPath: resolveDraftSpecPath(root, workspacePaths.workspacePath),
             status: "failed",
             tokenUsageResult: buildUnavailableTokenUsageResult({
               provider: candidate.provider,
@@ -196,7 +202,6 @@ export function createSpecCompetitionAdapter(
             `Agent exited with code ${result.exitCode ?? "unknown"}`;
           return {
             agentId: candidate.id,
-            specPath: resolveDraftSpecPath(root, workspacePaths.workspacePath),
             status: "failed",
             tokenUsage,
             tokenUsageResult,
@@ -204,27 +209,47 @@ export function createSpecCompetitionAdapter(
           };
         }
 
-        const promoteResult = await promoteWorkspaceFile({
+        const stagedMarkdownPath = join(
+          workspacePaths.workspacePath,
+          SPEC_MARKDOWN_FILENAME,
+        );
+        const stagedDataPath = join(
+          workspacePaths.workspacePath,
+          SPEC_DATA_FILENAME,
+        );
+        await readFile(stagedMarkdownPath, "utf8");
+        parseSpecData(await readFile(stagedDataPath, "utf8"));
+
+        const markdownPromoteResult = await promoteWorkspaceFile({
           workspacePath: workspacePaths.workspacePath,
           artifactsPath: workspacePaths.artifactsPath,
-          stagedRelativePath: SPEC_ARTIFACT_FILENAME,
-          artifactRelativePath: SPEC_ARTIFACT_FILENAME,
+          stagedRelativePath: SPEC_MARKDOWN_FILENAME,
+          artifactRelativePath: SPEC_MARKDOWN_FILENAME,
+          deleteStaged: true,
+        });
+        const dataPromoteResult = await promoteWorkspaceFile({
+          workspacePath: workspacePaths.workspacePath,
+          artifactsPath: workspacePaths.artifactsPath,
+          stagedRelativePath: SPEC_DATA_FILENAME,
+          artifactRelativePath: SPEC_DATA_FILENAME,
           deleteStaged: true,
         });
 
         return {
           agentId: candidate.id,
-          specPath: normalizePathForDisplay(
-            relativeToRoot(root, promoteResult.artifactPath),
+          outputPath: normalizePathForDisplay(
+            relativeToRoot(root, markdownPromoteResult.artifactPath),
           ),
-          status: "generated",
+          dataPath: normalizePathForDisplay(
+            relativeToRoot(root, dataPromoteResult.artifactPath),
+          ),
+          status: "succeeded",
           tokenUsage,
           tokenUsageResult,
         };
       } catch (error) {
         return {
           agentId: candidate.id,
-          specPath: resolveDraftSpecPath(root, workspacePaths.workspacePath),
           status: "failed",
           tokenUsageResult: buildUnavailableTokenUsageResult({
             provider: candidate.provider,
@@ -242,12 +267,6 @@ export function createSpecCompetitionAdapter(
     },
     sortResults: compareSpecExecutionsByAgentId,
   };
-}
-
-function resolveDraftSpecPath(root: string, workspacePath: string): string {
-  return normalizePathForDisplay(
-    relativeToRoot(root, resolvePath(workspacePath, SPEC_ARTIFACT_FILENAME)),
-  );
 }
 
 function compareSpecExecutionsByAgentId(

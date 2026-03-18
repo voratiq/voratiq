@@ -610,29 +610,51 @@ async function prepareSpecTargetContext(options: {
     throw new Error(`Spec session \`${target.id}\` not found.`);
   }
 
+  const generatedAgents = record.agents.filter(
+    (agent): agent is typeof agent & { outputPath: string; dataPath: string } =>
+      agent.status === "succeeded" &&
+      typeof agent.outputPath === "string" &&
+      typeof agent.dataPath === "string",
+  );
+  if (generatedAgents.length === 0) {
+    throw new Error(
+      `Spec session \`${target.id}\` has no generated artifacts.`,
+    );
+  }
+  const stagedFiles: StagedTargetFile[] = [];
+  const artifacts: Array<Record<string, unknown>> = [];
+  for (const agent of generatedAgents) {
+    const markdownRelative = `inputs/specs/${agent.agentId}/spec.md`;
+    const dataRelative = `inputs/specs/${agent.agentId}/spec.json`;
+    stagedFiles.push({
+      sourceAbsolutePath: resolvePath(root, agent.outputPath),
+      stagedRelativePath: markdownRelative,
+    });
+    stagedFiles.push({
+      sourceAbsolutePath: resolvePath(root, agent.dataPath),
+      stagedRelativePath: dataRelative,
+    });
+    artifacts.push({
+      artifactId: `spec:${agent.agentId}`,
+      kind: "spec",
+      agentId: agent.agentId,
+      markdownPath: markdownRelative,
+      dataPath: dataRelative,
+      ...(agent.tokenUsage ? { tokenUsage: agent.tokenUsage } : {}),
+    });
+  }
+
   return {
     target,
-    displayPath: normalizePathForDisplay(record.outputPath),
-    stagedFiles: [
-      {
-        sourceAbsolutePath: resolvePath(root, record.outputPath),
-        stagedRelativePath: "inputs/spec.md",
-      },
-    ],
+    displayPath: `.voratiq/specs/sessions/${record.sessionId}`,
+    stagedFiles,
     manifest: {
       target: {
         operator: "spec",
         id: record.sessionId,
-        path: normalizePathForDisplay(record.outputPath),
-        ...(record.tokenUsage ? { tokenUsage: record.tokenUsage } : {}),
+        path: `.voratiq/specs/sessions/${record.sessionId}`,
       },
-      artifacts: [
-        {
-          artifactId: "spec-output",
-          kind: "spec",
-          path: "inputs/spec.md",
-        },
-      ],
+      artifacts,
     },
   };
 }

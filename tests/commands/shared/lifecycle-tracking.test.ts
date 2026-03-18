@@ -401,12 +401,12 @@ describe("cross-operator parity: lifecycle execution duration", () => {
   it("uses `now - startedAt` for running statuses across operators", () => {
     const specRunning = resolveLifecycleExecutionDurationMs(
       {
-        status: "drafting",
+        status: "running",
         startedAt: STARTED_AT,
       },
       {
         statusGroups: {
-          running: ["drafting", "saving"],
+          running: ["running"],
           terminal: TERMINAL_SPEC_STATUSES,
         },
         now: RUNNING_NOW_MS,
@@ -462,13 +462,13 @@ describe("cross-operator parity: lifecycle execution duration", () => {
   it("uses `completedAt - startedAt` for terminal statuses across operators", () => {
     const specTerminal = resolveLifecycleExecutionDurationMs(
       {
-        status: "saved",
+        status: "succeeded",
         startedAt: STARTED_AT,
         completedAt: COMPLETED_AT,
       },
       {
         statusGroups: {
-          running: ["drafting", "saving"],
+          running: ["running"],
           terminal: TERMINAL_SPEC_STATUSES,
         },
       },
@@ -562,12 +562,12 @@ describe("cross-operator parity: lifecycle execution duration", () => {
     );
     const invalidTimestamp = resolveLifecycleExecutionDurationMs(
       {
-        status: "drafting",
+        status: "running",
         startedAt: "not-a-timestamp",
       },
       {
         statusGroups: {
-          running: ["drafting", "saving"],
+          running: ["running"],
           terminal: TERMINAL_SPEC_STATUSES,
         },
         now: RUNNING_NOW_MS,

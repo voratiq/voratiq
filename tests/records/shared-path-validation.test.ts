@@ -12,11 +12,18 @@ describe("shared record path validation", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
       startedAt: "2026-01-01T00:00:00.000Z",
       completedAt: "2026-01-01T00:01:00.000Z",
-      status: "saved",
-      agentId: "agent-1",
-      title: "Spec",
-      slug: "spec",
-      outputPath: invalidPath,
+      status: "succeeded",
+      description: "Spec",
+      agents: [
+        {
+          agentId: "agent-1",
+          status: "succeeded",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:01:00.000Z",
+          outputPath: invalidPath,
+          dataPath: invalidPath,
+        },
+      ],
     });
 
     const runResult = runRecordSchema.safeParse({
@@ -90,7 +97,9 @@ describe("shared record path validation", () => {
     expect(reviewResult.success).toBe(false);
     expect(reductionResult.success).toBe(false);
 
-    expect(specResult.error?.issues[0]?.message).toBe(expectedMessage);
+    const specIssueMessages =
+      specResult.error?.issues.map((i) => i.message) ?? [];
+    expect(specIssueMessages).toContain(expectedMessage);
     expect(runResult.error?.issues[0]?.message).toBe(expectedMessage);
     expect(runResult.error?.issues[1]?.message).toBe(expectedMessage);
     expect(reviewResult.error?.issues[0]?.message).toBe(expectedMessage);

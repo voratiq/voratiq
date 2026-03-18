@@ -188,9 +188,8 @@ export const IN_PROGRESS_REDUCTION_STATUSES: readonly ReductionStatus[] = [
 ] as const satisfies readonly ReductionStatus[];
 
 export const SPEC_RECORD_STATUS_VALUES = [
-  "drafting",
-  "saving",
-  "saved",
+  "running",
+  "succeeded",
   "aborted",
   "failed",
 ] as const;
@@ -203,7 +202,26 @@ export const specRecordStatusSchema = z.enum(SPEC_RECORD_STATUS_VALUES);
  * Spec record statuses that indicate the spec session has finished.
  */
 export const TERMINAL_SPEC_STATUSES: readonly SpecRecordStatus[] = [
-  "saved",
+  "succeeded",
   "aborted",
   "failed",
 ] as const satisfies readonly SpecRecordStatus[];
+
+export const SPEC_AGENT_STATUS_VALUES = [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+] as const;
+
+export type SpecAgentStatus = (typeof SPEC_AGENT_STATUS_VALUES)[number];
+
+export const specAgentStatusSchema = z.enum(SPEC_AGENT_STATUS_VALUES);
+
+/**
+ * Spec agent statuses that indicate the agent has finished execution.
+ */
+export const TERMINAL_SPEC_AGENT_STATUSES: readonly SpecAgentStatus[] = [
+  "succeeded",
+  "failed",
+] as const satisfies readonly SpecAgentStatus[];

@@ -55,6 +55,22 @@ describe("reduce competition adapter integration", () => {
         "# Seed\n\nBody\n",
         "utf8",
       );
+      await writeFile(
+        join(root, ".voratiq", "specs", "seed.json"),
+        JSON.stringify(
+          {
+            title: "Seed",
+            objective: "Keep the seed intent intact.",
+            scope: ["Retain the seeded spec content."],
+            acceptanceCriteria: ["Keep the seed spec."],
+            constraints: ["Do not drop the seed context."],
+            exitSignal: "The seeded draft is ready for reduction.",
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
       await appendSpecRecord({
         root,
         specsFilePath: join(root, ".voratiq", "specs", "index.json"),
@@ -63,11 +79,18 @@ describe("reduce competition adapter integration", () => {
           createdAt: "2026-01-01T00:00:00.000Z",
           startedAt: "2026-01-01T00:00:00.000Z",
           completedAt: "2026-01-01T00:00:01.000Z",
-          status: "saved",
-          agentId: "seed-agent",
-          title: "Seed",
-          slug: "seed",
-          outputPath: ".voratiq/specs/seed.md",
+          status: "succeeded",
+          description: "Seed",
+          agents: [
+            {
+              agentId: "seed-agent",
+              status: "succeeded",
+              startedAt: "2026-01-01T00:00:00.000Z",
+              completedAt: "2026-01-01T00:00:01.000Z",
+              outputPath: ".voratiq/specs/seed.md",
+              dataPath: ".voratiq/specs/seed.json",
+            },
+          ],
           error: null,
         },
       });
@@ -143,6 +166,22 @@ describe("reduce competition adapter integration", () => {
         "# Seed\n\nBody\n",
         "utf8",
       );
+      await writeFile(
+        join(root, ".voratiq", "specs", "seed.json"),
+        JSON.stringify(
+          {
+            title: "Seed",
+            objective: "Keep the seed intent intact.",
+            scope: ["Retain the seeded spec content."],
+            acceptanceCriteria: ["Keep the seed spec."],
+            constraints: ["Do not drop the seed context."],
+            exitSignal: "The seeded draft is ready for reduction.",
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
       await appendSpecRecord({
         root,
         specsFilePath: join(root, ".voratiq", "specs", "index.json"),
@@ -151,11 +190,18 @@ describe("reduce competition adapter integration", () => {
           createdAt: "2026-01-01T00:00:00.000Z",
           startedAt: "2026-01-01T00:00:00.000Z",
           completedAt: "2026-01-01T00:00:01.000Z",
-          status: "saved",
-          agentId: "seed-agent",
-          title: "Seed",
-          slug: "seed",
-          outputPath: ".voratiq/specs/seed.md",
+          status: "succeeded",
+          description: "Seed",
+          agents: [
+            {
+              agentId: "seed-agent",
+              status: "succeeded",
+              startedAt: "2026-01-01T00:00:00.000Z",
+              completedAt: "2026-01-01T00:00:01.000Z",
+              outputPath: ".voratiq/specs/seed.md",
+              dataPath: ".voratiq/specs/seed.json",
+            },
+          ],
           error: null,
         },
       });
@@ -404,8 +450,15 @@ describe("reduce competition adapter integration", () => {
         expect.objectContaining({
           target: expect.objectContaining({
             operator: "spec",
-            tokenUsage: seededTargetTokenUsage,
+            id: "spec-seed",
           }),
+          artifacts: expect.arrayContaining([
+            expect.objectContaining({
+              artifactId: "spec:seed-agent",
+              kind: "spec",
+              tokenUsage: seededTargetTokenUsage,
+            }),
+          ]),
         }),
       );
       expect(onProgressEvent).toHaveBeenCalledWith(
@@ -691,6 +744,22 @@ async function seedSpecTarget(
     "# Seed\n\nBody\n",
     "utf8",
   );
+  await writeFile(
+    join(root, ".voratiq", "specs", "seed.json"),
+    JSON.stringify(
+      {
+        title: "Seed",
+        objective: "Keep the seed intent intact.",
+        scope: ["Retain the seeded spec content."],
+        acceptanceCriteria: ["Keep the seed spec."],
+        constraints: ["Do not drop the seed context."],
+        exitSignal: "The seeded draft is ready for reduction.",
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
   await appendSpecRecord({
     root,
     specsFilePath: join(root, ".voratiq", "specs", "index.json"),
@@ -699,12 +768,19 @@ async function seedSpecTarget(
       createdAt: "2026-01-01T00:00:00.000Z",
       startedAt: "2026-01-01T00:00:00.000Z",
       completedAt: "2026-01-01T00:00:01.000Z",
-      status: "saved",
-      agentId: "seed-agent",
-      title: "Seed",
-      slug: "seed",
-      outputPath: ".voratiq/specs/seed.md",
-      ...(tokenUsage ? { tokenUsage } : {}),
+      status: "succeeded",
+      description: "Seed",
+      agents: [
+        {
+          agentId: "seed-agent",
+          status: "succeeded",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:00:01.000Z",
+          outputPath: ".voratiq/specs/seed.md",
+          dataPath: ".voratiq/specs/seed.json",
+          ...(tokenUsage ? { tokenUsage } : {}),
+        },
+      ],
       error: null,
     },
   });

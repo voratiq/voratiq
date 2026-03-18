@@ -88,15 +88,15 @@ const subject: AdapterContractSubject<SpecCompetitionExecution> = {
 
           return {
             agentId: candidateId,
-            specPath: normalizeSpecPath(candidateId),
-            status: "generated",
+            outputPath: normalizeSpecPath(candidateId),
+            dataPath: normalizeSpecDataPath(candidateId),
+            status: "succeeded",
             tokenUsageResult: buildUnavailableTokenUsageResult(),
           };
         },
         captureExecutionFailure: captureFailures
           ? ({ prepared, error }) => ({
               agentId: prepared.candidate.id,
-              specPath: normalizeSpecPath(prepared.candidate.id),
               status: "failed",
               tokenUsageResult: buildUnavailableTokenUsageResult(),
               error: error instanceof Error ? error.message : String(error),
@@ -154,4 +154,8 @@ function toWorkspacePaths(id: string): AgentWorkspacePaths {
 
 function normalizeSpecPath(id: string): string {
   return `.voratiq/specs/sessions/spec-session/${id}/artifacts/spec.md`;
+}
+
+function normalizeSpecDataPath(id: string): string {
+  return `.voratiq/specs/sessions/spec-session/${id}/artifacts/spec.json`;
 }
