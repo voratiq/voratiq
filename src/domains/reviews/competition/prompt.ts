@@ -5,6 +5,7 @@ import {
 import {
   appendConstraints,
   appendOutputRequirements,
+  buildWorkspaceArtifactRequirements,
 } from "../../../competition/shared/prompt-helpers.js";
 
 export interface BuildReviewPromptOptions {
@@ -105,6 +106,7 @@ export function buildReviewPrompt(
     "- Docs-heavy diffs: do not add new product/behavior claims; focus on what changed and whether it matches the spec.",
     "",
     "Output contract (must follow exactly):",
+    "- Produce two artifacts: the full review and the machine-readable recommendation.",
     "- Include all sections below in the same order.",
     "- `## Ranking` must appear before `## Recommendation`.",
     "- Candidate assessments must be listed in lexicographic candidate-id order.",
@@ -156,13 +158,7 @@ export function buildReviewPrompt(
     "<one line per recommendation, e.g. `voratiq apply --run <run-id> --agent <candidate-id>`>",
     "",
     "## Recommendation Artifact (JSON)",
-    "In addition to the markdown recommendation above, write `recommendation.json` with this exact shape:",
-    `{"preferred_agent":"<candidate-id>","ranking":["<candidate-id>","<candidate-id>"],"rationale":"<summary>","next_actions":["<action>"]}`,
-    "- `preferred_agent` must be exactly one candidate id and must match ranking #1",
-    "- `ranking` must include every candidate id exactly once, in the same order as `## Ranking`",
-    "- Do not include a `version` field",
-    "- `rationale` must be a string",
-    "- `next_actions` must be an array of action strings",
+    "The machine-readable recommendation must match the same selection described in `## Recommendation`.",
   ];
 
   const leakageCheckPrompt = `${lines.join("\n")}\n`;
@@ -172,10 +168,30 @@ export function buildReviewPrompt(
     writeAccess: workspacePath,
   });
   appendExtraContextPromptSection(lines, extraContextFiles);
-  appendOutputRequirements(lines, [
-    `- Save the full review to \`${outputPath}\` in the workspace root.`,
-    "- Save the machine-readable recommendation to `recommendation.json` in the workspace root.",
-  ]);
+  appendOutputRequirements(
+    lines,
+    buildWorkspaceArtifactRequirements([
+      {
+        instruction: "Save the full review",
+        path: outputPath,
+      },
+      {
+        instruction: "Save the machine-readable recommendation",
+        path: "recommendation.json",
+        schema: {
+          leadIn: "with this shape",
+          content: [
+            '`{"preferred_agent":"<candidate-id>","ranking":["<candidate-id>","<candidate-id>"],"rationale":"<summary>","next_actions":["<action>"]}`',
+            "- `preferred_agent` must be exactly one candidate id and must match ranking #1.",
+            "- `ranking` must include every candidate id exactly once, in the same order as `## Ranking`.",
+            "- Do not include a `version` field.",
+            "- `rationale` must be a string.",
+            "- `next_actions` must be an array of action strings.",
+          ],
+        },
+      },
+    ]),
+  );
 
   return {
     prompt: `${lines.join("\n")}\n`,

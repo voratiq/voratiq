@@ -4,6 +4,15 @@ export interface AppendConstraintsOptions {
   writeAccess?: string;
 }
 
+export interface WorkspaceArtifactRequirement {
+  instruction: string;
+  path: string;
+  schema?: {
+    content: string | readonly string[];
+    leadIn: string;
+  };
+}
+
 export function appendConstraints(
   lines: string[],
   options: AppendConstraintsOptions = {},
@@ -39,4 +48,27 @@ export function appendOutputRequirements(
     ...(extra ?? []),
     "- Do not write files outside the workspace.",
   );
+}
+
+export function buildWorkspaceArtifactRequirements(
+  requirements: readonly WorkspaceArtifactRequirement[],
+  extra: readonly string[] = [],
+): string[] {
+  const lines = requirements.flatMap((requirement) => {
+    const instructionLine = `- ${requirement.instruction} to \`${requirement.path}\` in the workspace root${
+      requirement.schema ? `, ${requirement.schema.leadIn}:` : "."
+    }`;
+
+    if (!requirement.schema) {
+      return [instructionLine];
+    }
+
+    const schemaLines = Array.isArray(requirement.schema.content)
+      ? requirement.schema.content
+      : [requirement.schema.content];
+
+    return [instructionLine, ...schemaLines.map((line) => `  ${line}`)];
+  });
+
+  return [...lines, ...extra];
 }

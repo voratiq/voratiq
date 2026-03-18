@@ -3,6 +3,31 @@ import { describe, expect, it } from "@jest/globals";
 import { buildReducePrompt } from "../../../src/domains/reductions/competition/prompt.js";
 
 describe("buildReducePrompt", () => {
+  it("includes markdown and reduction artifact requirements", () => {
+    const prompt = buildReducePrompt({
+      targetOperator: "run",
+      targetId: "run-1",
+      artifactInfoPath: "artifact-information.json",
+      repoRootPath:
+        "/repo/.voratiq/reductions/sessions/reduce-1/alpha/workspace",
+      workspacePath:
+        "/repo/.voratiq/reductions/sessions/reduce-1/alpha/workspace",
+    });
+
+    expect(prompt).toContain(
+      "Save the full reduction to `reduction.md` in the workspace root.",
+    );
+    expect(prompt).toContain(
+      "Save the machine-readable reduction to `reduction.json` in the workspace root, with this shape:",
+    );
+    expect(prompt).toContain(
+      '{"summary":"<summary>","directives":["<directive>"],"risks":["<risk>"]}',
+    );
+    expect(prompt).toContain(
+      "The machine-readable reduction must match the same synthesis described in `## Synthesis`.",
+    );
+  });
+
   it("lists staged extra-context files when provided", () => {
     const prompt = buildReducePrompt({
       targetOperator: "run",

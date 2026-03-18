@@ -5,6 +5,7 @@ import {
 import {
   appendConstraints,
   appendOutputRequirements,
+  buildWorkspaceArtifactRequirements,
 } from "../../../competition/shared/prompt-helpers.js";
 
 export interface BuildSpecPromptOptions {
@@ -67,12 +68,36 @@ export function buildSpecPrompt(options: BuildSpecPromptOptions): string {
     writeAccess: workspacePath,
   });
   appendExtraContextPromptSection(lines, extraContextFiles);
-  appendOutputRequirements(lines, [
-    `- Save the spec as markdown to \`${markdownOutputPath}\` in the workspace root.`,
-    `- Save the same spec as JSON to \`${dataOutputPath}\` in the workspace root, with this shape:`,
-    "  `{ title: string, objective: string, scope: string[], acceptanceCriteria: string[], constraints: string[], exitSignal: string, outOfScope?: string[] }`",
-    "- Both files must describe the same spec.",
-  ]);
+  appendOutputRequirements(
+    lines,
+    buildWorkspaceArtifactRequirements(
+      [
+        {
+          instruction: "Save the spec as markdown",
+          path: markdownOutputPath,
+        },
+        {
+          instruction: "Save the same spec as JSON",
+          path: dataOutputPath,
+          schema: {
+            leadIn: "with this shape",
+            content: [
+              "`{`",
+              "`  title: string,`",
+              "`  objective: string,`",
+              "`  scope: string[],`",
+              "`  acceptanceCriteria: string[],`",
+              "`  constraints: string[],`",
+              "`  exitSignal: string,`",
+              "`  outOfScope?: string[],`",
+              "`}`",
+            ],
+          },
+        },
+      ],
+      ["- Both files must describe the same spec."],
+    ),
+  );
 
   return `${lines.join("\n")}\n`;
 }
