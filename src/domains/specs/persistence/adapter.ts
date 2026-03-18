@@ -13,6 +13,7 @@ import {
 } from "../../../persistence/session-store.js";
 import { buildRecordLifecycleCompleteFields } from "../../shared/lifecycle.js";
 import {
+  type SpecAgentEntry,
   type SpecIndexEntry,
   type SpecRecord,
   specRecordSchema,
@@ -157,10 +158,11 @@ export async function finalizeSpecRecord(options: {
   specsFilePath: string;
   sessionId: string;
   status: SpecRecordStatus;
+  agents?: readonly SpecAgentEntry[];
   error?: string | null;
   completedAt?: string;
 }): Promise<SpecRecord> {
-  const { root, specsFilePath, sessionId, status, error, completedAt } =
+  const { root, specsFilePath, sessionId, status, agents, error, completedAt } =
     options;
   return await rewriteSpecRecord({
     root,
@@ -170,6 +172,7 @@ export async function finalizeSpecRecord(options: {
       ...existing,
       status,
       ...buildRecordLifecycleCompleteFields({ existing, completedAt }),
+      ...(agents ? { agents: [...agents] } : {}),
       error: error ?? existing.error ?? null,
     }),
   });

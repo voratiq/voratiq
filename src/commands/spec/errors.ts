@@ -22,24 +22,6 @@ export class SpecAgentNotFoundError extends SpecError {
   }
 }
 
-export class SpecOutputExistsError extends SpecError {
-  constructor(outputPath: string) {
-    super(
-      `Output file already exists: \`${outputPath}\`.`,
-      [],
-      ["Use a different `--output` path or remove the existing file."],
-    );
-    this.name = "SpecOutputExistsError";
-  }
-}
-
-export class SpecOutputPathError extends SpecError {
-  constructor(message: string) {
-    super(message, [], ["Use a path inside `specs/` or omit `--output`."]);
-    this.name = "SpecOutputPathError";
-  }
-}
-
 export class SpecGenerationFailedError extends SpecError {
   constructor(detailLines: readonly string[] = []) {
     super("Specification generation failed.", detailLines, [

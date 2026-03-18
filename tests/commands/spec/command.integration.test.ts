@@ -73,8 +73,10 @@ describe("executeSpecCommand integration", () => {
       executeCompetitionWithAdapterMock.mockResolvedValue([
         {
           agentId: "alpha",
-          specPath: "draft.md",
-          status: "generated",
+          outputPath: "draft.md",
+          dataPath: "draft.json",
+          status: "succeeded",
+          tokenUsageResult: { status: "unavailable" },
         },
       ]);
 
@@ -136,14 +138,16 @@ describe("executeSpecCommand integration", () => {
       executeCompetitionWithAdapterMock.mockResolvedValue([
         {
           agentId: "alpha",
-          specPath: "draft.md",
-          status: "generated",
+          outputPath: "draft.md",
+          dataPath: "draft.json",
+          status: "succeeded",
           tokenUsage: {
             input_tokens: 210,
             output_tokens: 65,
             cache_read_input_tokens: 41,
             cache_creation_input_tokens: 11,
           },
+          tokenUsageResult: { status: "unavailable" },
         },
       ]);
 
@@ -153,23 +157,20 @@ describe("executeSpecCommand integration", () => {
         description: "Generate spec",
       });
 
-      await expect(
-        readSpecRecords({
-          root,
-          specsFilePath: join(root, ".voratiq", "specs", "index.json"),
-          predicate: (record) => record.sessionId === "spec-usage",
-        }),
-      ).resolves.toEqual([
-        expect.objectContaining({
-          sessionId: "spec-usage",
-          tokenUsage: {
-            input_tokens: 210,
-            output_tokens: 65,
-            cache_read_input_tokens: 41,
-            cache_creation_input_tokens: 11,
-          },
-        }),
-      ]);
+      const records = await readSpecRecords({
+        root,
+        specsFilePath: join(root, ".voratiq", "specs", "index.json"),
+        predicate: (record) => record.sessionId === "spec-usage",
+      });
+
+      expect(records).toHaveLength(1);
+      expect(records[0]?.sessionId).toBe("spec-usage");
+      expect(records[0]?.agents[0]?.tokenUsage).toEqual({
+        input_tokens: 210,
+        output_tokens: 65,
+        cache_read_input_tokens: 41,
+        cache_creation_input_tokens: 11,
+      });
     } finally {
       await rm(root, { recursive: true, force: true });
     }

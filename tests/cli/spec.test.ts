@@ -9,6 +9,7 @@ import { CliError } from "../../src/cli/errors.js";
 import { createSpecCommand, runSpecCommand } from "../../src/cli/spec.js";
 import { executeCompetitionWithAdapter } from "../../src/competition/command-adapter.js";
 import { readAgentsConfig } from "../../src/configs/agents/loader.js";
+import { readSpecRecords } from "../../src/domains/specs/persistence/adapter.js";
 import * as preflight from "../../src/preflight/index.js";
 import { renderCliError } from "../../src/render/utils/errors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
@@ -76,7 +77,7 @@ describe("voratiq spec command options", () => {
     expect((received as { description?: string }).description).toBe(
       "Generate a spec",
     );
-    expect((received as { agent?: string }).agent).toBeUndefined();
+    expect((received as { agent?: string[] }).agent).toEqual([]);
   });
 
   it("parses --agent when provided", async () => {
@@ -99,7 +100,7 @@ describe("voratiq spec command options", () => {
       "reviewer",
     ]);
 
-    expect((received as { agent?: string }).agent).toBe("reviewer");
+    expect((received as { agent?: string[] }).agent).toEqual(["reviewer"]);
   });
 
   it("parses --profile when provided", async () => {
@@ -217,8 +218,25 @@ describe("voratiq spec (CLI)", () => {
     runSandboxedAgentMock.mockReset();
     runSandboxedAgentMock.mockImplementation(async (options) => {
       const draftPath = join(options.paths.workspacePath, "spec.md");
+      const dataPath = join(options.paths.workspacePath, "spec.json");
       await mkdir(dirname(draftPath), { recursive: true });
       await writeFile(draftPath, "# Payment Flow\n\nDetails.\n", "utf8");
+      await writeFile(
+        dataPath,
+        JSON.stringify(
+          {
+            title: "Payment Flow",
+            objective: "Define the payment flow outcome clearly.",
+            scope: ["Describe the payment flow draft."],
+            acceptanceCriteria: ["Capture the payment flow."],
+            constraints: ["Keep the draft concise and repo-grounded."],
+            exitSignal: "The payment flow spec is ready to feed run.",
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
       return {
         exitCode: 0,
         sandboxSettings: {
@@ -260,7 +278,7 @@ describe("voratiq spec (CLI)", () => {
     try {
       const result = await runSpecCommand({
         description: "Write a spec",
-        agent: "gpt-5-3-codex",
+        agentIds: ["gpt-5-3-codex"],
         writeOutput: (payload) => {
           for (const alert of payload.alerts ?? []) {
             if (alert.severity === "info") {
@@ -270,7 +288,8 @@ describe("voratiq spec (CLI)", () => {
         },
       });
 
-      expect(result.outputPath).toBe(".voratiq/specs/payment-flow.md");
+      expect(result.specPath).toBeDefined();
+      expect(result.generatedSpecPaths).toHaveLength(1);
       expect(
         infoMessages.filter(
           (message) => message === "Voratiq initialized (.voratiq/).",
@@ -305,17 +324,12 @@ describe("voratiq spec (CLI)", () => {
     try {
       const result = await runSpecCommand({
         description: "Write a spec",
-        agent: "claude-haiku-4-5-20251001",
+        agentIds: ["claude-haiku-4-5-20251001"],
       });
-      expect(result).toMatchObject({
-        outputPath: ".voratiq/specs/payment-flow.md",
-      });
-      expect(result.body).toContain(
-        "Spec saved: .voratiq/specs/payment-flow.md",
-      );
-      expect(result.body).toContain(
-        "Next:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
-      );
+      expect(result.specPath).toBeDefined();
+      expect(result.generatedSpecPaths).toHaveLength(1);
+      expect(result.body).toContain("SUCCEEDED");
+      expect(result.body).toContain("claude-haiku-4-5-20251001");
     } finally {
       if (originalDescriptor) {
         Object.defineProperty(process.stdin, "isTTY", originalDescriptor);
@@ -332,9 +346,8 @@ describe("voratiq spec (CLI)", () => {
       description: "Write a spec",
     });
 
-    expect(result).toMatchObject({
-      outputPath: ".voratiq/specs/payment-flow.md",
-    });
+    expect(result.specPath).toBeDefined();
+    expect(result.generatedSpecPaths).toHaveLength(1);
     expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
       expect.objectContaining({
         maxParallel: 1,
@@ -382,9 +395,8 @@ describe("voratiq spec (CLI)", () => {
       profile: "quality",
     });
 
-    expect(result).toMatchObject({
-      outputPath: ".voratiq/specs/payment-flow.md",
-    });
+    expect(result.specPath).toBeDefined();
+    expect(result.generatedSpecPaths).toHaveLength(1);
     expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
       expect.objectContaining({
         maxParallel: 1,
@@ -427,13 +439,12 @@ describe("voratiq spec (CLI)", () => {
 
     const result = await runSpecCommand({
       description: "Write a spec",
-      agent: "claude-haiku-4-5-20251001",
+      agentIds: ["claude-haiku-4-5-20251001"],
       profile: "quality",
     });
 
-    expect(result).toMatchObject({
-      outputPath: ".voratiq/specs/payment-flow.md",
-    });
+    expect(result.specPath).toBeDefined();
+    expect(result.generatedSpecPaths).toHaveLength(1);
     expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
       expect.objectContaining({
         maxParallel: 1,
@@ -468,12 +479,12 @@ describe("voratiq spec (CLI)", () => {
       "Checked `profiles.default.spec.agents` in `orchestration.yaml`.",
     );
     expect(rendered).toContain(
-      "Configure exactly one agent under `profiles.default.spec.agents` in `orchestration.yaml`.",
+      "Configure at least one agent under `profiles.default.spec.agents` in `orchestration.yaml`.",
     );
     expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
   });
 
-  it("fails without --agent when orchestration spec agents contain multiple ids", async () => {
+  it("runs all agents when orchestration spec agents contain multiple ids", async () => {
     await workspace.writeAgentsConfig([
       {
         id: "claude-haiku-4-5-20251001",
@@ -494,30 +505,117 @@ describe("voratiq spec (CLI)", () => {
       specAgentIds: ["claude-haiku-4-5-20251001", "codex-reviewer"],
     });
 
-    let captured: unknown;
-    await expect(
-      runSpecCommand({
-        description: "Write a spec",
-      }).catch((error) => {
-        captured = error;
-        throw error;
-      }),
-    ).rejects.toBeDefined();
+    const result = await runSpecCommand({
+      description: "Write a spec",
+    });
 
-    const rendered = renderCliError(captured as CliError).replace(
-      ANSI_PATTERN,
-      "",
+    expect(result.specPath).toBeUndefined();
+    expect(result.generatedSpecPaths).toHaveLength(2);
+    const firstCall = executeCompetitionWithAdapterMock.mock.calls[0]?.[0] as
+      | { maxParallel: number; candidates: ReadonlyArray<{ id: string }> }
+      | undefined;
+    expect(firstCall?.maxParallel).toBe(2);
+    expect(firstCall?.candidates.map((candidate) => candidate.id)).toEqual(
+      expect.arrayContaining(["claude-haiku-4-5-20251001", "codex-reviewer"]),
     );
-    expect(rendered).toContain(
-      "Error: Multiple agents configured for stage `spec`.",
+  });
+
+  it("persists distinct per-agent lifecycle timestamps during multi-agent generation", async () => {
+    await workspace.writeAgentsConfig([
+      {
+        id: "claude-haiku-4-5-20251001",
+        model: "claude-haiku-4-5-20251001",
+        binary: workspace.srtStubPath,
+        provider: "claude",
+        enabled: true,
+      },
+      {
+        id: "codex-reviewer",
+        model: "gpt-5-2-codex",
+        binary: workspace.srtStubPath,
+        provider: "codex",
+        enabled: true,
+      },
+    ]);
+
+    let invocationCount = 0;
+
+    runSandboxedAgentMock.mockImplementation(async (options) => {
+      invocationCount += 1;
+      await new Promise((resolve) => {
+        setTimeout(resolve, invocationCount * 15);
+      });
+
+      await writeFile(
+        join(options.paths.workspacePath, "spec.md"),
+        `# ${options.agent.id}\n\nDetails.\n`,
+        "utf8",
+      );
+      await writeFile(
+        join(options.paths.workspacePath, "spec.json"),
+        JSON.stringify(
+          {
+            title: options.agent.id,
+            objective: "Define the draft outcome clearly.",
+            scope: ["Capture the candidate draft."],
+            acceptanceCriteria: ["Capture the draft."],
+            constraints: ["Keep the draft concise."],
+            exitSignal: "The draft is ready for downstream use.",
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+
+      return {
+        exitCode: 0,
+        sandboxSettings: {
+          network: {
+            allowedDomains: [],
+            deniedDomains: [],
+          },
+          filesystem: {
+            denyRead: [],
+            allowWrite: [],
+            denyWrite: [],
+          },
+        },
+        manifestEnv: {},
+      };
+    });
+
+    const result = await runSpecCommand({
+      description: "Write a spec",
+      agentIds: ["claude-haiku-4-5-20251001", "codex-reviewer"],
+      maxParallel: 1,
+    });
+
+    expect(result.sessionId).toBeDefined();
+    const finalRecord = (
+      await readSpecRecords({
+        root: repoRoot,
+        specsFilePath: join(repoRoot, ".voratiq", "specs", "index.json"),
+        limit: 1,
+        predicate: (entry) => entry.sessionId === result.sessionId,
+      })
+    )[0];
+    expect(finalRecord?.agents).toHaveLength(2);
+    const [firstAgent, secondAgent] = finalRecord?.agents ?? [];
+    expect(firstAgent?.agentId).toBe("claude-haiku-4-5-20251001");
+    expect(firstAgent?.status).toBe("succeeded");
+    expect(typeof firstAgent?.startedAt).toBe("string");
+    expect(typeof firstAgent?.completedAt).toBe("string");
+    expect(secondAgent?.agentId).toBe("codex-reviewer");
+    expect(secondAgent?.status).toBe("succeeded");
+    expect(typeof secondAgent?.startedAt).toBe("string");
+    expect(typeof secondAgent?.completedAt).toBe("string");
+    expect(Date.parse(firstAgent?.startedAt ?? "")).toBeLessThan(
+      Date.parse(secondAgent?.startedAt ?? ""),
     );
-    expect(rendered).toContain(
-      "This command supports one agent for stage `spec`.",
+    expect(Date.parse(firstAgent?.completedAt ?? "")).toBeLessThanOrEqual(
+      Date.parse(secondAgent?.startedAt ?? ""),
     );
-    expect(rendered).toContain(
-      "Configure exactly one agent under `profiles.default.spec.agents` in `orchestration.yaml`.",
-    );
-    expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
   });
 
   it("records failed sessions with finalized error metadata", async () => {
@@ -541,7 +639,7 @@ describe("voratiq spec (CLI)", () => {
     await expect(
       runSpecCommand({
         description: "Design a payment flow",
-        agent: "claude-haiku-4-5-20251001",
+        agentIds: ["claude-haiku-4-5-20251001"],
         title: "Payment Flow",
       }),
     ).rejects.toBeDefined();
@@ -566,12 +664,13 @@ describe("voratiq spec (CLI)", () => {
     const record = JSON.parse(await readFile(recordPath, "utf8")) as {
       status: string;
       error: string | null;
-      outputPath: string;
+      agents: Array<{ agentId: string; status: string; error?: string | null }>;
       completedAt?: string;
     };
     expect(record.status).toBe("failed");
     expect(record.error).toContain("agent crashed");
-    expect(record.outputPath).toBe(".voratiq/specs/payment-flow.md");
+    expect(record.agents[0]?.agentId).toBe("claude-haiku-4-5-20251001");
+    expect(record.agents[0]?.status).toBe("failed");
     expect(record.completedAt).toEqual(expect.any(String));
 
     const workspacePath = join(
@@ -610,7 +709,7 @@ describe("voratiq spec (CLI)", () => {
     await expect(
       runSpecCommand({
         description: "Write a spec",
-        agent: "claude-haiku-4-5-20251001",
+        agentIds: ["claude-haiku-4-5-20251001"],
       }).catch((error) => {
         captured = error;
         throw error;
@@ -630,7 +729,7 @@ describe("voratiq spec (CLI)", () => {
     await expect(
       runSpecCommand({
         description: "Do something",
-        agent: "missing",
+        agentIds: ["missing"],
       }).catch((error) => {
         captured = error;
         throw error;
@@ -650,73 +749,20 @@ describe("voratiq spec (CLI)", () => {
     );
   });
 
-  it("rejects output paths outside .voratiq/specs", async () => {
-    await expect(
-      runSpecCommand({
-        description: "Spec with bad path",
-        agent: "claude-haiku-4-5-20251001",
-        output: "../escape.md",
-      }),
-    ).rejects.toThrow(".voratiq/specs");
-  });
-
-  it("aborts when the target output already exists", async () => {
-    const existingPath = join(repoRoot, ".voratiq", "specs", "custom.md");
-    await mkdir(dirname(existingPath), { recursive: true });
-    await writeFile(existingPath, "existing", "utf8");
-
-    await expect(
-      runSpecCommand({
-        description: "Design a payment flow",
-        agent: "claude-haiku-4-5-20251001",
-        title: "Payment Flow",
-        output: ".voratiq/specs/custom.md",
-      }),
-    ).rejects.toThrow("Output file already exists:");
-  });
-
-  it("surfaces write failures when saving the final spec", async () => {
-    const oversizedFilename = `${"x".repeat(300)}.md`;
-
-    let captured: unknown;
-    await expect(
-      runSpecCommand({
-        description: "Design a payment flow",
-        agent: "claude-haiku-4-5-20251001",
-        title: "Payment Flow",
-        output: `.voratiq/specs/${oversizedFilename}`,
-      }).catch((error) => {
-        captured = error;
-        throw error;
-      }),
-    ).rejects.toBeDefined();
-
-    const rendered = renderCliError(captured as CliError).replace(
-      ANSI_PATTERN,
-      "",
-    );
-    expect(rendered).toContain("Error: Specification generation failed.");
-    expect(rendered).toMatch(
-      /name too long|enametoolong|permission denied|eacces|eperm/i,
-    );
-  });
-
-  it("promotes spec artifacts, updates records, and writes canonical output", async () => {
+  it("promotes spec artifacts and updates session records", async () => {
     const title = "Payment Flow";
 
     const result = await runSpecCommand({
       description: "Design a payment flow",
-      agent: "claude-haiku-4-5-20251001",
+      agentIds: ["claude-haiku-4-5-20251001"],
       title,
     });
     expect(runSandboxedAgentMock).toHaveBeenCalledTimes(1);
     expect(runSandboxedAgentMock.mock.calls[0]?.[0]?.sandboxStageId).toBe(
       "spec",
     );
-    expect(result.body).toContain("Spec saved: .voratiq/specs/payment-flow.md");
-    expect(result.body).toContain(
-      "Next:\n  voratiq run --spec .voratiq/specs/payment-flow.md",
-    );
+    expect(result.body).toContain("SUCCEEDED");
+    expect(result.body).toContain("claude-haiku-4-5-20251001");
 
     expect(executeCompetitionWithAdapterMock).toHaveBeenCalledTimes(1);
     expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
@@ -735,7 +781,7 @@ describe("voratiq spec (CLI)", () => {
     const latest = indexPayload.sessions.at(-1);
     expect(latest).toBeDefined();
     const sessionId = latest?.sessionId ?? "";
-    expect(latest?.status).toBe("saved");
+    expect(latest?.status).toBe("succeeded");
 
     const recordPath = join(
       repoRoot,
@@ -746,16 +792,23 @@ describe("voratiq spec (CLI)", () => {
       "record.json",
     );
     const record = JSON.parse(await readFile(recordPath, "utf8")) as {
-      slug: string;
-      outputPath: string;
-      iterations?: unknown;
-      agentId: string;
+      status: string;
+      description: string;
+      agents: Array<{
+        agentId: string;
+        status: string;
+        outputPath?: string;
+        dataPath?: string;
+      }>;
     };
 
-    expect(record.slug).toBe("payment-flow");
-    expect(record.outputPath).toBe(".voratiq/specs/payment-flow.md");
-    expect(record.agentId).toBe("claude-haiku-4-5-20251001");
-    expect(record.iterations).toBeUndefined();
+    expect(record.status).toBe("succeeded");
+    expect(record.description).toBe("Design a payment flow");
+    expect(record.agents).toHaveLength(1);
+    expect(record.agents[0]?.agentId).toBe("claude-haiku-4-5-20251001");
+    expect(record.agents[0]?.status).toBe("succeeded");
+    expect(record.agents[0]?.outputPath).toBeDefined();
+    expect(record.agents[0]?.dataPath).toBeDefined();
 
     const artifactPath = join(
       repoRoot,
@@ -767,19 +820,25 @@ describe("voratiq spec (CLI)", () => {
       "artifacts",
       "spec.md",
     );
-    const canonicalPath = join(
-      repoRoot,
-      ".voratiq",
-      "specs",
-      "payment-flow.md",
-    );
 
     await expect(readFile(artifactPath, "utf8")).resolves.toContain(
       "# Payment Flow",
     );
-    await expect(readFile(canonicalPath, "utf8")).resolves.toContain(
-      "# Payment Flow",
-    );
+    await expect(
+      readFile(
+        join(
+          repoRoot,
+          ".voratiq",
+          "specs",
+          "sessions",
+          sessionId,
+          "claude-haiku-4-5-20251001",
+          "artifacts",
+          "spec.json",
+        ),
+        "utf8",
+      ),
+    ).resolves.toContain('"title": "Payment Flow"');
 
     const workspacePath = join(
       repoRoot,
@@ -795,10 +854,10 @@ describe("voratiq spec (CLI)", () => {
     });
   });
 
-  it("clamps spec max-parallel to the single-agent guard", async () => {
+  it("clamps spec max-parallel to competitor count", async () => {
     await runSpecCommand({
       description: "Design a payment flow",
-      agent: "claude-haiku-4-5-20251001",
+      agentIds: ["claude-haiku-4-5-20251001"],
       maxParallel: 8,
     });
 

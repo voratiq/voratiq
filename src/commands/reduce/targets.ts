@@ -86,20 +86,43 @@ async function assertSpecTargetEligible(
     );
   }
 
-  if (record.status !== "saved") {
+  if (record.status !== "succeeded") {
     throw new CliError(
-      `Spec session \`${target.id}\` did not complete.`,
+      `Spec session \`${target.id}\` did not succeed.`,
       [`Status: \`${record.status}\`.`],
       ["Re-run `voratiq spec` to generate a complete spec artifact."],
     );
   }
 
-  const outputAbsolute = resolvePath(root, record.outputPath);
-  if (!(await pathExists(outputAbsolute))) {
+  const generatedAgents = record.agents.filter(
+    (agent) =>
+      agent.status === "succeeded" && agent.outputPath && agent.dataPath,
+  );
+  if (generatedAgents.length === 0) {
     throw new CliError(
-      `Spec session \`${target.id}\` is missing its output file.`,
-      [`Expected: \`${normalizePathForDisplay(record.outputPath)}\`.`],
-      ["Re-run `voratiq spec` to regenerate the spec artifact."],
+      `Spec session \`${target.id}\` has no complete generated artifacts.`,
+      [],
+      ["Re-run `voratiq spec` to regenerate the spec artifacts."],
+    );
+  }
+
+  const missing: string[] = [];
+  for (const agent of generatedAgents) {
+    if (!agent.outputPath || !agent.dataPath) continue;
+    const markdownAbsolute = resolvePath(root, agent.outputPath);
+    if (!(await pathExists(markdownAbsolute))) {
+      missing.push(normalizePathForDisplay(agent.outputPath));
+    }
+    const dataAbsolute = resolvePath(root, agent.dataPath);
+    if (!(await pathExists(dataAbsolute))) {
+      missing.push(normalizePathForDisplay(agent.dataPath));
+    }
+  }
+  if (missing.length > 0) {
+    throw new CliError(
+      `Spec session \`${target.id}\` is missing artifact files.`,
+      missing.map((path) => `Missing: \`${path}\`.`),
+      ["Re-run `voratiq spec` to regenerate the spec artifacts."],
     );
   }
 }

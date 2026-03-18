@@ -8,10 +8,7 @@ export type StageProgressStatus =
   | "errored"
   | "aborted"
   | "skipped"
-  | "pruned"
-  | "drafting"
-  | "saving"
-  | "saved";
+  | "pruned";
 
 export interface StageProgressBeginEvent<TContext extends object> {
   type: "stage.begin";

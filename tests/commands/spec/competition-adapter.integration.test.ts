@@ -49,6 +49,22 @@ describe("spec competition adapter native token usage integration", () => {
         "# Spec\n",
         "utf8",
       );
+      await writeFile(
+        join(input.paths.workspacePath, "spec.json"),
+        JSON.stringify(
+          {
+            title: "Spec",
+            objective: "Define the spec outcome.",
+            scope: ["Describe the requested work."],
+            acceptanceCriteria: ["Do the thing."],
+            constraints: ["Stay within repo context."],
+            exitSignal: "The spec is ready to execute.",
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
       return {
         exitCode: 0,
         signal: null,
@@ -101,7 +117,7 @@ describe("spec competition adapter native token usage integration", () => {
     expect(results).toEqual([
       expect.objectContaining({
         agentId: "spec-agent",
-        status: "generated",
+        status: "succeeded",
         tokenUsage: {
           input_tokens: 120,
           cached_input_tokens: 30,
@@ -140,6 +156,22 @@ describe("spec competition adapter native token usage integration", () => {
       await writeFile(
         join(input.paths.workspacePath, "spec.md"),
         "# Spec\n",
+        "utf8",
+      );
+      await writeFile(
+        join(input.paths.workspacePath, "spec.json"),
+        JSON.stringify(
+          {
+            title: "Spec",
+            objective: "Define the spec outcome.",
+            scope: ["Describe the requested work."],
+            acceptanceCriteria: ["Do the thing."],
+            constraints: ["Stay within repo context."],
+            exitSignal: "The spec is ready to execute.",
+          },
+          null,
+          2,
+        ),
         "utf8",
       );
       return {
@@ -189,7 +221,7 @@ describe("spec competition adapter native token usage integration", () => {
     expect(results).toEqual([
       expect.objectContaining({
         agentId: "spec-agent",
-        status: "generated",
+        status: "succeeded",
         tokenUsageResult: {
           status: "unavailable",
           reason: "extractor_error",

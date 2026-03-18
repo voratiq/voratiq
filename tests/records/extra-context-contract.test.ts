@@ -32,11 +32,15 @@ describe("persisted extra-context contract", () => {
         sessionId: "spec-123",
         createdAt: "2026-01-01T00:00:00.000Z",
         startedAt: "2026-01-01T00:00:01.000Z",
-        status: "drafting",
-        agentId: "alpha",
-        title: "Spec",
-        slug: "spec",
-        outputPath: ".voratiq/specs/spec.md",
+        status: "running",
+        description: "Spec",
+        agents: [
+          {
+            agentId: "alpha",
+            status: "running",
+            startedAt: "2026-01-01T00:00:01.000Z",
+          },
+        ],
         ...persistedExtraContext,
       }),
     ).not.toThrow();
@@ -113,11 +117,15 @@ describe("persisted extra-context contract", () => {
         sessionId: "spec-123",
         createdAt: "2026-01-01T00:00:00.000Z",
         startedAt: "2026-01-01T00:00:01.000Z",
-        status: "drafting",
-        agentId: "alpha",
-        title: "Spec",
-        slug: "spec",
-        outputPath: ".voratiq/specs/spec.md",
+        status: "running",
+        description: "Spec",
+        agents: [
+          {
+            agentId: "alpha",
+            status: "running",
+            startedAt: "2026-01-01T00:00:01.000Z",
+          },
+        ],
         ...invalidMetadata,
       }),
     ).toThrow(/context/u);
