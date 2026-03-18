@@ -167,6 +167,11 @@ const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     extraArgs: ["--config", "model_reasoning_effort=xhigh"],
   },
   {
+    id: "gpt-5-4-mini",
+    provider: "codex",
+    model: "gpt-5.4-mini",
+  },
+  {
     id: "gpt-5-4",
     provider: "codex",
     model: "gpt-5.4",
