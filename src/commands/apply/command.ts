@@ -4,6 +4,7 @@ import { readReviewRecords } from "../../domains/reviews/persistence/adapter.js"
 import { buildRunRecordEnhanced } from "../../domains/runs/model/enhanced.js";
 import type { RunApplyStatus } from "../../domains/runs/model/types.js";
 import { rewriteRunRecord } from "../../domains/runs/persistence/adapter.js";
+import { deriveSelectorSelectionDecision } from "../../policy/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { ensureFileExists } from "../../utils/fs.js";
 import {
@@ -191,10 +192,6 @@ async function resolveApplyAgentSelector(options: {
 }): Promise<string> {
   const { root, runId, selector, canonicalAgentIds, reviewsFilePath } = options;
 
-  if (canonicalAgentIds.includes(selector)) {
-    return selector;
-  }
-
   const effectiveReviewsPath =
     reviewsFilePath ?? `${root}/.voratiq/reviews/index.json`;
 
@@ -204,51 +201,55 @@ async function resolveApplyAgentSelector(options: {
     predicate: (record) => record.runId === runId,
   }).catch(() => []);
 
-  const matches: Array<{ reviewId: string; agentId: string }> = [];
-  const aliases = new Set<string>();
+  const selectorDecision = deriveSelectorSelectionDecision({
+    selector,
+    canonicalAgentIds,
+    sources: reviewRecords
+      .map((record) => {
+        const aliasMap = record.blinded?.aliasMap;
+        if (!aliasMap) {
+          return undefined;
+        }
 
-  for (const record of reviewRecords) {
-    const aliasMap = record.blinded?.aliasMap;
-    if (!aliasMap) {
-      continue;
-    }
+        return {
+          sourceId: record.sessionId,
+          aliasMap,
+        };
+      })
+      .filter(
+        (
+          source,
+        ): source is { sourceId: string; aliasMap: Record<string, string> } =>
+          source !== undefined,
+      ),
+  });
 
-    for (const alias of Object.keys(aliasMap)) {
-      aliases.add(alias);
-    }
-
-    const resolved = aliasMap[selector];
-    if (resolved) {
-      matches.push({ reviewId: record.sessionId, agentId: resolved });
-    }
+  if (selectorDecision.state === "resolvable") {
+    return selectorDecision.selectedCanonicalAgentId;
   }
 
-  const uniqueResolved = Array.from(
-    new Set(matches.map((match) => match.agentId)),
+  const ambiguousReason = selectorDecision.unresolvedReasons.find(
+    (reason) => reason.code === "selector_ambiguous",
   );
-  if (uniqueResolved.length === 1) {
-    return uniqueResolved[0] ?? selector;
-  }
-
-  if (uniqueResolved.length === 0) {
-    throw new ApplyAgentSelectorUnresolvedError({
+  if (ambiguousReason) {
+    throw new ApplyAgentSelectorAmbiguousError({
       runId,
       selector,
-      canonicalAgentIds,
-      aliases: Array.from(aliases).sort(),
+      matches: ambiguousReason.resolutions.map((resolution) => ({
+        reviewId: resolution.sourceId,
+        agentId: resolution.selectedCanonicalAgentId,
+      })),
     });
   }
 
-  const byKey = new Map<string, { reviewId: string; agentId: string }>();
-  for (const match of matches) {
-    byKey.set(`${match.reviewId}:${match.agentId}`, match);
-  }
-  throw new ApplyAgentSelectorAmbiguousError({
+  const unresolvedReason = selectorDecision.unresolvedReasons.find(
+    (reason) => reason.code === "selector_unresolved",
+  );
+  throw new ApplyAgentSelectorUnresolvedError({
     runId,
     selector,
-    matches: Array.from(byKey.values()).sort((a, b) =>
-      a.reviewId.localeCompare(b.reviewId),
-    ),
+    canonicalAgentIds,
+    aliases: unresolvedReason?.availableAliases ?? [],
   });
 }
 

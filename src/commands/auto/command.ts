@@ -2,6 +2,11 @@ import type {
   AutoApplyStatus,
   AutoTerminalStatus,
 } from "../../domains/runs/model/types.js";
+import {
+  deriveReviewSelectionDecision,
+  type ReviewSelectionInput,
+  type UnresolvedSelectionDecision,
+} from "../../policy/index.js";
 import { mapRunStatusToExitCode, type RunStatus } from "../../status/index.js";
 import { HintedError, toErrorMessage } from "../../utils/errors.js";
 
@@ -76,6 +81,7 @@ export interface AutoReviewStageInput {
 }
 
 export interface AutoReviewStageResult {
+  reviewId?: string;
   body: string;
   stderr?: string;
   exitCode?: number;
@@ -94,15 +100,6 @@ export interface AutoApplyStageResult {
   exitCode?: number;
 }
 
-export interface AutoRecommendationLoadResult {
-  recommendationPath: string;
-  preferredAgent?: string;
-}
-
-export interface ReviewerRecommendation extends AutoRecommendationLoadResult {
-  reviewerAgentId: string;
-}
-
 export type AutoCommandEvent =
   | {
       kind: "body";
@@ -117,7 +114,7 @@ export type AutoCommandEvent =
   | {
       kind: "action_required";
       detail: string;
-      warningMessage: string;
+      message: string;
       separateWithDivider: boolean;
     };
 
@@ -168,12 +165,11 @@ export interface AutoCommandDependencies {
     input: AutoReviewStageInput,
   ) => Promise<AutoReviewStageResult>;
   runApplyStage: (input: AutoApplyStageInput) => Promise<AutoApplyStageResult>;
-  loadRecommendation: (input: {
-    reviewOutputPath: string;
-  }) => Promise<AutoRecommendationLoadResult>;
-  loadReviewerRecommendations: (input: {
+  loadReviewSelectionInput: (input: {
+    reviewId: string;
     reviews: readonly AutoReviewStageReview[];
-  }) => Promise<ReviewerRecommendation[]>;
+    availableAgents: readonly string[];
+  }) => Promise<ReviewSelectionInput>;
 }
 
 export async function executeAutoCommand(
@@ -190,8 +186,12 @@ export async function executeAutoCommand(
   const now = dependencies.now ?? Date.now.bind(Date);
   const overallStart = now();
   const events: AutoCommandEvent[] = [];
+  let bodyOutputEmitted = false;
   const recordEvent = (event: AutoCommandEvent): void => {
     events.push(event);
+    if (event.kind === "body") {
+      bodyOutputEmitted = true;
+    }
     dependencies.onEvent?.(event);
   };
 
@@ -216,18 +216,17 @@ export async function executeAutoCommand(
 
   let reviewStartedAt: number | undefined;
   let reviewStatus: "succeeded" | "failed" | "skipped" = "skipped";
+  let reviewId: string | undefined;
   let reviewOutputPath: string | undefined;
   let reviewDetail: string | undefined;
-  let reviewResultCount = 0;
   let reviewResults: readonly AutoReviewStageReview[] | undefined;
-  let reviewTranscriptEmitted = false;
 
   let applyStartedAt: number | undefined;
   let applyStatus: AutoApplyStatus = "skipped";
   let applyAgentId: string | undefined;
   let applyDetail: string | undefined;
 
-  const markActionRequired = (detail: string, warningMessage: string): void => {
+  const markActionRequired = (detail: string, message: string): void => {
     actionRequired = true;
     actionRequiredDetail = detail;
     applyStatus = "skipped";
@@ -235,8 +234,8 @@ export async function executeAutoCommand(
     recordEvent({
       kind: "action_required",
       detail,
-      warningMessage,
-      separateWithDivider: reviewTranscriptEmitted,
+      message,
+      separateWithDivider: bodyOutputEmitted,
     });
   };
 
@@ -252,9 +251,19 @@ export async function executeAutoCommand(
         suppressHint: true,
       });
       specStatus = "succeeded";
-      specPath = resolveSpecPathForAuto(specResult);
-      resolvedSpecPath = specPath;
       recordEvent({ kind: "body", body: specResult.body });
+      const unresolvedSpecSelection =
+        describeUnresolvedSpecSelection(specResult);
+      if (unresolvedSpecSelection) {
+        specDetail = unresolvedSpecSelection.detail;
+        markActionRequired(
+          unresolvedSpecSelection.detail,
+          unresolvedSpecSelection.message,
+        );
+      } else {
+        specPath = resolveSpecPathForAuto(specResult);
+        resolvedSpecPath = specPath;
+      }
     } catch (error) {
       specStatus = "failed";
       specDetail = toHeadline(error);
@@ -351,8 +360,8 @@ export async function executeAutoCommand(
         });
 
         reviewStatus = "succeeded";
+        reviewId = reviewResult.reviewId;
         reviewOutputPath = reviewResult.outputPath;
-        reviewResultCount = reviewResult.reviews?.length ?? 1;
         reviewResults = reviewResult.reviews;
         if (reviewResult.exitCode === 1) {
           reviewStatus = "failed";
@@ -366,7 +375,6 @@ export async function executeAutoCommand(
           stderr: reviewResult.stderr,
           exitCode: reviewResult.exitCode,
         });
-        reviewTranscriptEmitted = true;
       } catch (error) {
         reviewStatus = "failed";
         reviewDetail = toHeadline(error);
@@ -380,78 +388,19 @@ export async function executeAutoCommand(
     options.apply &&
     runId &&
     reviewStatus === "succeeded" &&
-    reviewOutputPath &&
     (!hasDescription || runStatus === "succeeded")
   ) {
     applyStartedAt = now();
     try {
-      let recommendationPath: string | undefined;
-      let preferredAgent: string | undefined;
-
-      if (reviewResultCount <= 1) {
-        const recommendationResult = await dependencies.loadRecommendation({
-          reviewOutputPath,
+      if (!reviewId) {
+        throw new HintedError("Review stage did not return a review id.", {
+          hintLines: [
+            "Re-run `voratiq review` to regenerate review artifacts.",
+          ],
         });
-        recommendationPath = recommendationResult.recommendationPath;
-        preferredAgent = recommendationResult.preferredAgent;
-        if (!preferredAgent) {
-          markActionRequired(
-            "No resolvable recommendation was produced; manual review required.",
-            "No resolvable recommendation was produced. Review results and apply manually.",
-          );
-        }
-      } else if (reviewResults && reviewResults.length > 0) {
-        const reviewerRecommendations =
-          await dependencies.loadReviewerRecommendations({
-            reviews: reviewResults,
-          });
-        if (reviewerRecommendations.length === 0) {
-          markActionRequired(
-            "No shared reviewer recommendation could be resolved; manual review required.",
-            "No shared recommendation was resolved. Review results and apply manually.",
-          );
-        } else {
-          const resolvedPreferredAgents = reviewerRecommendations
-            .map(
-              (recommendation) => recommendation.preferredAgent?.trim() ?? "",
-            )
-            .filter((agent): agent is string => agent.length > 0);
+      }
 
-          if (
-            resolvedPreferredAgents.length !== reviewerRecommendations.length
-          ) {
-            markActionRequired(
-              "No shared reviewer recommendation could be resolved; manual review required.",
-              "No shared recommendation was resolved. Review results and apply manually.",
-            );
-          } else {
-            const distinctPreferredAgents = new Set(resolvedPreferredAgents);
-
-            if (distinctPreferredAgents.size === 1) {
-              const unanimousPreferredAgent =
-                [...distinctPreferredAgents][0] ?? "";
-              const firstRecommendation = reviewerRecommendations[0];
-              if (!firstRecommendation) {
-                throw new HintedError(
-                  "Failed to resolve reviewer recommendation.",
-                  {
-                    hintLines: [
-                      "Re-run `voratiq review` to regenerate review artifacts.",
-                    ],
-                  },
-                );
-              }
-              recommendationPath = firstRecommendation.recommendationPath;
-              preferredAgent = unanimousPreferredAgent;
-            } else {
-              markActionRequired(
-                "Reviewers disagreed on preferred candidate; manual review required.",
-                "Reviewers disagreed. Review results and apply manually.",
-              );
-            }
-          }
-        }
-      } else {
+      if (!reviewResults || reviewResults.length === 0) {
         throw new HintedError("Failed to resolve reviewer recommendations.", {
           hintLines: [
             "Re-run `voratiq review` to regenerate review artifacts.",
@@ -459,21 +408,32 @@ export async function executeAutoCommand(
         });
       }
 
-      if (preferredAgent && recommendationPath) {
-        const recommendedAgentId = resolveRecommendedAgent({
-          recommendationPath,
-          preferredAgent,
-          availableAgents: runAgentIds,
-        });
+      const reviewSelectionInput = await dependencies.loadReviewSelectionInput({
+        reviewId,
+        reviews: reviewResults,
+        availableAgents: runAgentIds,
+      });
+      const reviewSelectionDecision =
+        deriveReviewSelectionDecision(reviewSelectionInput);
 
+      if (reviewSelectionDecision.state === "unresolved") {
+        const actionRequiredMessage = describeUnresolvedAutoApplyDecision({
+          input: reviewSelectionInput,
+          decision: reviewSelectionDecision,
+        });
+        markActionRequired(
+          actionRequiredMessage.detail,
+          actionRequiredMessage.message,
+        );
+      } else {
         const applyResult = await dependencies.runApplyStage({
           runId,
-          agentId: recommendedAgentId,
+          agentId: reviewSelectionDecision.selectedCanonicalAgentId,
           commit: options.commit ?? false,
         });
 
         applyStatus = "succeeded";
-        applyAgentId = recommendedAgentId;
+        applyAgentId = reviewSelectionDecision.selectedCanonicalAgentId;
 
         recordEvent({
           kind: "body",
@@ -625,39 +585,60 @@ function resolveSpecPathForAuto(result: AutoSpecStageResult): string {
   });
 }
 
-function resolveRecommendedAgent(options: {
-  recommendationPath: string;
-  preferredAgent: string;
-  availableAgents: readonly string[];
-}): string {
-  const { recommendationPath, preferredAgent, availableAgents } = options;
-
-  const normalizedPreferredAgent = preferredAgent.trim();
-  if (normalizedPreferredAgent.length === 0) {
-    throw new HintedError(`No preferred agent in \`${recommendationPath}\`.`, {
-      hintLines: ["Re-run `voratiq review` to regenerate the recommendation."],
-    });
+function describeUnresolvedSpecSelection(
+  result: AutoSpecStageResult,
+): { detail: string; message: string } | undefined {
+  if ((result.generatedSpecPaths?.length ?? 0) > 1) {
+    return {
+      detail: "Multiple specs generated; manual selection required.",
+      message: "Multiple specs generated; manual selection required.",
+    };
   }
 
-  const availableSet = new Set(availableAgents);
-  if (!availableSet.has(normalizedPreferredAgent)) {
-    const availableDisplay = availableAgents
-      .map((agentId) => `\`${agentId}\``)
-      .join(", ");
-    throw new HintedError("Recommendation did not match any run agent.", {
-      detailLines: [
-        `Preferred agent: \`${normalizedPreferredAgent}\`.`,
-        ...(availableDisplay.length > 0
-          ? [`Available agents: ${availableDisplay}.`]
-          : []),
-      ],
-      hintLines: [
-        "Use an agent id present in the run report or review output.",
-      ],
-    });
+  return undefined;
+}
+
+function describeUnresolvedAutoApplyDecision(options: {
+  input: ReviewSelectionInput;
+  decision: UnresolvedSelectionDecision;
+}): {
+  detail: string;
+  message: string;
+} {
+  const { input, decision } = options;
+
+  if (
+    decision.unresolvedReasons.some(
+      (reason) => reason.code === "reviewer_disagreement",
+    )
+  ) {
+    return {
+      detail:
+        "Reviewers disagreed on preferred candidate; manual review required.",
+      message:
+        "Reviewers disagreed on preferred candidate; manual review required.",
+    };
   }
 
-  return normalizedPreferredAgent;
+  const successfulReviewerCount = input.reviewers.filter(
+    (reviewer) => reviewer.status === "succeeded",
+  ).length;
+
+  if (successfulReviewerCount > 1) {
+    return {
+      detail:
+        "No shared reviewer recommendation could be resolved; manual review required.",
+      message:
+        "No shared reviewer recommendation could be resolved; manual review required.",
+    };
+  }
+
+  return {
+    detail:
+      "No resolvable recommendation was produced; manual review required.",
+    message:
+      "No resolvable recommendation was produced; manual review required.",
+  };
 }
 
 function resolveAutoTerminalStatus(options: {
