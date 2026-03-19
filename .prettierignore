@@ -1,4 +1,3 @@
+**/.*/
+coverage/
 dist/
-.internal/
-.voratiq/
-.mypy_cache/
