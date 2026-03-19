@@ -60,12 +60,16 @@ describe("buildSpecPrompt", () => {
       workspacePath: "/repo/.voratiq/specs/sessions/123/workspace",
     });
 
-    expect(prompt).toContain("Save the spec as markdown to `spec.md`");
-    expect(prompt).toContain("Save the same spec as JSON to `spec.json`");
-    expect(prompt).toContain("objective: string");
-    expect(prompt).toContain("scope: string[]");
-    expect(prompt).toContain("constraints: string[]");
-    expect(prompt).toContain("exitSignal: string");
+    expect(prompt).toContain(
+      "Save the spec as markdown to `spec.md` in the workspace root.",
+    );
+    expect(prompt).toContain(
+      "Save the same spec as JSON to `spec.json` in the workspace root, with this shape:",
+    );
+    expect(prompt).toContain("`  objective: string,`");
+    expect(prompt).toContain("`  scope: string[],`");
+    expect(prompt).toContain("`  constraints: string[],`");
+    expect(prompt).toContain("`  exitSignal: string,`");
     expect(prompt).toContain("Both files must describe the same spec.");
   });
 

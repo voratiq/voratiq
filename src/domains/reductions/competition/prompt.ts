@@ -5,6 +5,7 @@ import {
 import {
   appendConstraints,
   appendOutputRequirements,
+  buildWorkspaceArtifactRequirements,
 } from "../../../competition/shared/prompt-helpers.js";
 
 export interface BuildReducePromptOptions {
@@ -54,6 +55,8 @@ export function buildReducePrompt(options: BuildReducePromptOptions): string {
     "- Prefer the smallest useful reduction that preserves durable guidance.",
     "",
     "Output contract (must follow exactly):",
+    "- Produce two artifacts: the full reduction and the machine-readable reduction.",
+    "- The machine-readable artifact must contain only the final synthesized carry-forward result.",
     "",
     "## reduction.md",
     "Write markdown with this shape:",
@@ -80,7 +83,7 @@ export function buildReducePrompt(options: BuildReducePromptOptions): string {
     "- <risk>",
     "",
     "## reduction.json",
-    "Write JSON with this exact shape:",
+    "The machine-readable reduction must match the same synthesis described in `## Synthesis`.",
     `{"summary":"<summary>","directives":["<directive>"],"risks":["<risk>"]}`,
     "- `reduction.json` must contain only the final synthesized carry-forward result, not per-source assessments.",
     "- Keep `summary`, `directives`, and `risks` concise and reusable.",
@@ -94,10 +97,30 @@ export function buildReducePrompt(options: BuildReducePromptOptions): string {
     writeAccess: workspacePath,
   });
   appendExtraContextPromptSection(lines, extraContextFiles);
-  appendOutputRequirements(lines, [
-    "- Save the full reduction to `reduction.md` in the workspace root.",
-    "- Save the machine-readable reduction to `reduction.json` in the workspace root.",
-  ]);
+  appendOutputRequirements(
+    lines,
+    buildWorkspaceArtifactRequirements([
+      {
+        instruction: "Save the full reduction",
+        path: "reduction.md",
+      },
+      {
+        instruction: "Save the machine-readable reduction",
+        path: "reduction.json",
+        schema: {
+          leadIn: "with this shape",
+          content: [
+            '`{"summary":"<summary>","directives":["<directive>"],"risks":["<risk>"]}`',
+            "- `reduction.json` must contain only the final synthesized carry-forward result, not per-source assessments.",
+            "- Keep `summary`, `directives`, and `risks` concise and reusable.",
+            "- Include only the strongest durable guidance; do not restate every source artifact.",
+            "- Prefer 3-6 directives and 2-5 risks unless the evidence is unusually sparse.",
+            "- Merge overlapping findings instead of listing near-duplicates.",
+          ],
+        },
+      },
+    ]),
+  );
 
   return `${lines.join("\n")}\n`;
 }
