@@ -32,7 +32,7 @@ export function renderAutoSummaryTranscript(input: AutoSummaryInput): string {
   const totalDuration = formatDurationLabel(input.totalDurationMs) ?? "—";
   const statusLabel =
     input.status === "action_required"
-      ? "ACTION REQUIRED"
+      ? "ACTION_REQUIRED"
       : input.status === "succeeded"
         ? "SUCCEEDED"
         : "FAILED";

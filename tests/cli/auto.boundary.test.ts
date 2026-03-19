@@ -85,8 +85,7 @@ describe("runAutoCommand boundary", () => {
     expect(typeof dependencies?.runRunStage).toBe("function");
     expect(typeof dependencies?.runReviewStage).toBe("function");
     expect(typeof dependencies?.runApplyStage).toBe("function");
-    expect(typeof dependencies?.loadRecommendation).toBe("function");
-    expect(typeof dependencies?.loadReviewerRecommendations).toBe("function");
+    expect(typeof dependencies?.loadReviewSelectionInput).toBe("function");
     expect(jest.mocked(runCli.runRunCommand)).not.toHaveBeenCalled();
     expect(jest.mocked(specCli.runSpecCommand)).not.toHaveBeenCalled();
     expect(jest.mocked(reviewCli.runReviewCommand)).not.toHaveBeenCalled();

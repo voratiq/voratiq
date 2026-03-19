@@ -1586,16 +1586,16 @@ describe("voratiq auto", () => {
     expect(output).toContain("voratiq apply --run run-123 --agent <agent-id>");
     expect((output.match(/To apply a solution:/gu) ?? []).length).toBe(1);
     expect(output).toContain(
-      "---\n\nWarning: Reviewers disagreed. Review results and apply manually.",
+      "---\n\nAction required: Reviewers disagreed on preferred candidate; manual review required.",
     );
     expect(output).toContain(
-      "Warning: Reviewers disagreed. Review results and apply manually.",
+      "Action required: Reviewers disagreed on preferred candidate; manual review required.",
     );
-    expect(output).toContain("Auto ACTION REQUIRED");
+    expect(output).toContain("Auto ACTION_REQUIRED");
     expect(process.exitCode).toBe(1);
   });
 
-  it("marks no-shared multi-reviewer recommendation as action required", async () => {
+  it("marks multi-reviewer disagreement as action required even without resolved_preferred_agent on every reviewer", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")
@@ -1660,12 +1660,48 @@ describe("voratiq auto", () => {
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     const output = stripAnsi(stdout.join(""));
     expect(output).toContain(
-      "Warning: No shared recommendation was resolved. Review results and apply manually.",
+      "Action required: Reviewers disagreed on preferred candidate; manual review required.",
     );
-    expect(output).toContain("Auto ACTION REQUIRED");
+    expect(output).toContain("Auto ACTION_REQUIRED");
     expect(process.exitCode).toBe(1);
   });
-  it("marks no-shared recommendation as action required when resolved_preferred_agent is missing", async () => {
+
+  it("marks multi-draft spec generation as action required", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runSpecCommandMock.mockResolvedValue({
+      generatedSpecPaths: [
+        ".voratiq/specs/sessions/spec-123/alpha/artifacts/spec.md",
+        ".voratiq/specs/sessions/spec-123/beta/artifacts/spec.md",
+      ],
+      body: "SPEC BODY",
+    });
+
+    const result = await runAutoCommand({
+      description: "Draft a migration plan",
+      apply: true,
+    });
+
+    expect(result.auto.status).toBe("action_required");
+    expect(result.apply.status).toBe("skipped");
+    expect(result.exitCode).toBe(1);
+    expect(runRunCommandMock).not.toHaveBeenCalled();
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain("SPEC BODY");
+    expect(output).toContain(
+      "Action required: Multiple specs generated; manual selection required.",
+    );
+    expect(output).toContain("Auto ACTION_REQUIRED");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("auto-applies when preferred_agent already matches a canonical run agent id", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")
@@ -1676,6 +1712,10 @@ describe("voratiq auto", () => {
 
     runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
     runReviewCommandMock.mockResolvedValue(buildReviewResult());
+    runApplyCommandMock.mockResolvedValue({
+      result: {} as never,
+      body: "APPLY BODY",
+    });
 
     await withTempRepo(async (repoRoot) => {
       await writeRecommendationArtifact(
@@ -1694,17 +1734,21 @@ describe("voratiq auto", () => {
         apply: true,
       });
 
-      expect(result.auto.status).toBe("action_required");
-      expect(result.apply.status).toBe("skipped");
-      expect(result.exitCode).toBe(1);
+      expect(result.auto.status).toBe("succeeded");
+      expect(result.apply.status).toBe("succeeded");
+      expect(result.exitCode).toBe(0);
     });
 
-    expect(runApplyCommandMock).not.toHaveBeenCalled();
-    expect(stripAnsi(stdout.join(""))).toContain(
-      "Warning: No resolvable recommendation was produced. Review results and apply manually.",
+    expect(runApplyCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-123",
+        agentId: "agent-good",
+        commit: false,
+      }),
     );
-    expect(stripAnsi(stdout.join(""))).toContain("Auto ACTION REQUIRED");
-    expect(process.exitCode).toBe(1);
+    expect(stripAnsi(stdout.join(""))).toContain("APPLY BODY");
+    expect(stripAnsi(stdout.join(""))).toContain("Auto SUCCEEDED");
+    expect(process.exitCode).toBe(0);
   });
 
   it("marks aliased-only recommendation as action required when no resolved candidate is available", async () => {
@@ -1743,9 +1787,9 @@ describe("voratiq auto", () => {
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     expect(stripAnsi(stdout.join(""))).toContain(
-      "Warning: No resolvable recommendation was produced. Review results and apply manually.",
+      "Action required: No resolvable recommendation was produced; manual review required.",
     );
-    expect(stripAnsi(stdout.join(""))).toContain("Auto ACTION REQUIRED");
+    expect(stripAnsi(stdout.join(""))).toContain("Auto ACTION_REQUIRED");
     expect(process.exitCode).toBe(1);
   });
 

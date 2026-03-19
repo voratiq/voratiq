@@ -8,16 +8,15 @@ import {
   type AutoReviewStageReview,
   executeAutoCommand,
 } from "../commands/auto/command.js";
-import {
-  readReviewRecommendation,
-  type ReviewRecommendation,
-} from "../domains/reviews/competition/recommendation.js";
+import { readReviewRecommendation } from "../domains/reviews/competition/recommendation.js";
+import { readReviewRecords } from "../domains/reviews/persistence/adapter.js";
 import type {
   AutoApplyStatus,
   AutoTerminalStatus,
   RunAutoOutcome,
 } from "../domains/runs/model/types.js";
 import { rewriteRunRecord } from "../domains/runs/persistence/adapter.js";
+import { type ReviewSelectionInput } from "../policy/index.js";
 import { resolveCliContext } from "../preflight/index.js";
 import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
 import { renderCliError } from "../render/utils/errors.js";
@@ -81,23 +80,16 @@ function collectReviewAgentOption(value: string, previous: string[]): string[] {
 
 async function loadAutoRecommendation(options: {
   reviewOutputPath: string;
+  resolutionRoot: string;
 }): Promise<{
-  recommendationPath: string;
-  preferredAgent?: string;
+  preferredCandidateId: string;
+  resolvedPreferredCandidateId?: string;
 }> {
   const recommendationPath = normalizePathForDisplay(
     join(dirname(options.reviewOutputPath), REVIEW_RECOMMENDATION_FILENAME),
   );
-  let resolutionRoot = process.cwd();
-  try {
-    const { root } = await resolveCliContext();
-    resolutionRoot = root;
-  } catch {
-    // Unit tests and non-repo contexts may not resolve CLI root.
-    // Fall back to cwd for compatibility.
-  }
   const recommendationAbsolutePath =
-    resolveDisplayPath(resolutionRoot, recommendationPath) ??
+    resolveDisplayPath(options.resolutionRoot, recommendationPath) ??
     recommendationPath;
 
   try {
@@ -105,8 +97,9 @@ async function loadAutoRecommendation(options: {
       recommendationAbsolutePath,
     );
     return {
-      recommendationPath,
-      preferredAgent: resolvePreferredAgentForAuto({ recommendation }),
+      preferredCandidateId: recommendation.preferred_agent,
+      resolvedPreferredCandidateId:
+        recommendation.resolved_preferred_agent?.trim() || undefined,
     };
   } catch (error) {
     throw new CliError(
@@ -117,42 +110,75 @@ async function loadAutoRecommendation(options: {
   }
 }
 
-async function loadReviewerRecommendationsForAuto(options: {
+async function loadReviewSelectionInputForAuto(options: {
+  reviewId: string;
   reviews: readonly AutoReviewStageReview[];
-}): Promise<
-  Array<{
-    reviewerAgentId: string;
-    recommendationPath: string;
-    preferredAgent?: string;
-  }>
-> {
-  const successfulReviews = options.reviews.filter(
-    (review): review is AutoReviewStageReview & { status: "succeeded" } =>
-      review.status === "succeeded",
-  );
+  availableAgents: readonly string[];
+}): Promise<ReviewSelectionInput> {
+  let resolutionRoot = process.cwd();
+  let reviewsFilePath: string | undefined;
+  try {
+    const { root, workspacePaths } = await resolveCliContext();
+    resolutionRoot = root;
+    reviewsFilePath = workspacePaths.reviewsFile;
+  } catch {
+    // Unit tests and non-repo contexts may not resolve CLI root.
+    // Fall back to cwd for compatibility.
+  }
 
-  return Promise.all(
-    successfulReviews.map(async (review) => {
+  const persistedRecord = reviewsFilePath
+    ? (
+        await readReviewRecords({
+          root: resolutionRoot,
+          reviewsFilePath,
+          limit: 1,
+          predicate: (record) => record.sessionId === options.reviewId,
+        }).catch(() => [])
+      )[0]
+    : undefined;
+
+  const reviewerArtifacts = persistedRecord
+    ? persistedRecord.reviewers.map((reviewer) => ({
+        reviewerAgentId: reviewer.agentId,
+        status: reviewer.status === "succeeded" ? "succeeded" : "failed",
+        outputPath: reviewer.outputPath,
+      }))
+    : options.reviews.map((review) => ({
+        reviewerAgentId: review.agentId,
+        status: review.status,
+        outputPath: review.outputPath,
+      }));
+
+  const reviewers = await Promise.all(
+    reviewerArtifacts.map(async (review) => {
+      if (review.status !== "succeeded") {
+        return {
+          reviewerAgentId: review.reviewerAgentId,
+          status: "failed" as const,
+        };
+      }
+
       const recommendation = await loadAutoRecommendation({
         reviewOutputPath: review.outputPath,
+        resolutionRoot,
       });
       return {
-        reviewerAgentId: review.agentId,
-        recommendationPath: recommendation.recommendationPath,
-        preferredAgent: recommendation.preferredAgent,
+        reviewerAgentId: review.reviewerAgentId,
+        status: "succeeded" as const,
+        preferredCandidateId: recommendation.preferredCandidateId,
+        resolvedPreferredCandidateId:
+          recommendation.resolvedPreferredCandidateId,
       };
     }),
   );
-}
 
-function resolvePreferredAgentForAuto(options: {
-  recommendation: ReviewRecommendation;
-}): string | undefined {
-  const resolvedPreferredAgent =
-    options.recommendation.resolved_preferred_agent?.trim();
-  return resolvedPreferredAgent && resolvedPreferredAgent.length > 0
-    ? resolvedPreferredAgent
-    : undefined;
+  return {
+    canonicalAgentIds: [...options.availableAgents],
+    ...(persistedRecord?.blinded?.aliasMap
+      ? { aliasMap: persistedRecord.blinded.aliasMap }
+      : {}),
+    reviewers,
+  };
 }
 
 function replayAutoCommandEvent(event: AutoCommandEvent): void {
@@ -171,9 +197,9 @@ function replayAutoCommandEvent(event: AutoCommandEvent): void {
   }
 
   const warningBody = formatAlertMessage(
-    "Warning",
+    "Action required",
     "yellow",
-    event.warningMessage,
+    event.message,
   );
   writeCommandOutput({
     body: event.separateWithDivider ? `---\n\n${warningBody}` : warningBody,
@@ -262,8 +288,7 @@ export async function runAutoCommand(
           agentId: input.agentId,
           commit: input.commit,
         }),
-      loadRecommendation: loadAutoRecommendation,
-      loadReviewerRecommendations: loadReviewerRecommendationsForAuto,
+      loadReviewSelectionInput: loadReviewSelectionInputForAuto,
     };
 
     const execution = await executeAutoCommand(options, dependencies);

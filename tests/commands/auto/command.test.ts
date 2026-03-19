@@ -6,8 +6,8 @@ import {
   type AutoReviewStageResult,
   type AutoRunStageResult,
   executeAutoCommand,
-  type ReviewerRecommendation,
 } from "../../../src/commands/auto/command.js";
+import type { ReviewSelectionInput } from "../../../src/policy/index.js";
 
 function createDependencies(
   overrides: Partial<AutoCommandDependencies> = {},
@@ -24,11 +24,8 @@ function createDependencies(
   const runApplyStage: jest.MockedFunction<
     AutoCommandDependencies["runApplyStage"]
   > = jest.fn();
-  const loadRecommendation: jest.MockedFunction<
-    AutoCommandDependencies["loadRecommendation"]
-  > = jest.fn();
-  const loadReviewerRecommendations: jest.MockedFunction<
-    AutoCommandDependencies["loadReviewerRecommendations"]
+  const loadReviewSelectionInput: jest.MockedFunction<
+    AutoCommandDependencies["loadReviewSelectionInput"]
   > = jest.fn();
 
   return {
@@ -36,8 +33,7 @@ function createDependencies(
     runRunStage,
     runReviewStage,
     runApplyStage,
-    loadRecommendation,
-    loadReviewerRecommendations,
+    loadReviewSelectionInput,
     ...overrides,
   };
 }
@@ -63,6 +59,7 @@ function createReviewStageResult(
   overrides: Partial<AutoReviewStageResult> = {},
 ): AutoReviewStageResult {
   return {
+    reviewId: "review-1",
     body: "review body",
     outputPath: "reviews/review.md",
     reviews: [
@@ -91,17 +88,68 @@ function createApplyStageResult(
   };
 }
 
-function createReviewerRecommendations(
+function createReviewSelectionInput(
   preferredAgents: readonly string[],
-): ReviewerRecommendation[] {
-  return preferredAgents.map((preferredAgent, index) => ({
-    reviewerAgentId: `reviewer-${String.fromCharCode(97 + index)}`,
-    recommendationPath: `reviews/reviewer-${String.fromCharCode(97 + index)}/recommendation.json`,
-    preferredAgent,
-  }));
+): ReviewSelectionInput {
+  return preferredAgents
+    .map((preferredAgent, index) => ({
+      reviewerAgentId: `reviewer-${String.fromCharCode(97 + index)}`,
+      status: "succeeded" as const,
+      preferredCandidateId: preferredAgent,
+      resolvedPreferredCandidateId: preferredAgent,
+    }))
+    .reduce<ReviewSelectionInput>(
+      (input, reviewer) => ({
+        ...input,
+        reviewers: [...input.reviewers, reviewer],
+      }),
+      {
+        canonicalAgentIds: ["alpha", "beta"],
+        reviewers: [],
+      },
+    );
 }
 
 describe("executeAutoCommand", () => {
+  it("returns action required when spec generation produces multiple drafts", async () => {
+    const runRunStage = jest.fn<AutoCommandDependencies["runRunStage"]>();
+    const dependencies = createDependencies({
+      now: () => 0,
+      runSpecStage: jest
+        .fn<AutoCommandDependencies["runSpecStage"]>()
+        .mockResolvedValue({
+          body: "spec body",
+          generatedSpecPaths: ["specs/a.md", "specs/b.md"],
+        }),
+      runRunStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        description: "Define the task",
+        apply: true,
+      },
+      dependencies,
+    );
+
+    expect(runRunStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("action_required");
+    expect(result.auto.detail).toBe(
+      "Multiple specs generated; manual selection required.",
+    );
+    expect(result.apply.status).toBe("skipped");
+    expect(result.summary.spec.detail).toBe(
+      "Multiple specs generated; manual selection required.",
+    );
+    expect(result.events).toContainEqual(
+      expect.objectContaining({
+        kind: "action_required",
+        detail: "Multiple specs generated; manual selection required.",
+        message: "Multiple specs generated; manual selection required.",
+      }),
+    );
+  });
+
   it("auto-applies from unanimous reviewer recommendations in the application layer", async () => {
     const onEvent = jest.fn();
     const runApplyStage = jest
@@ -117,11 +165,9 @@ describe("executeAutoCommand", () => {
         .fn<AutoCommandDependencies["runReviewStage"]>()
         .mockResolvedValue(createReviewStageResult()),
       runApplyStage,
-      loadRecommendation:
-        jest.fn<AutoCommandDependencies["loadRecommendation"]>(),
-      loadReviewerRecommendations: jest
-        .fn<AutoCommandDependencies["loadReviewerRecommendations"]>()
-        .mockResolvedValue(createReviewerRecommendations(["beta", "beta"])),
+      loadReviewSelectionInput: jest
+        .fn<AutoCommandDependencies["loadReviewSelectionInput"]>()
+        .mockResolvedValue(createReviewSelectionInput(["beta", "beta"])),
     });
 
     const result = await executeAutoCommand(
@@ -172,11 +218,9 @@ describe("executeAutoCommand", () => {
         .fn<AutoCommandDependencies["runReviewStage"]>()
         .mockResolvedValue(createReviewStageResult()),
       runApplyStage,
-      loadRecommendation:
-        jest.fn<AutoCommandDependencies["loadRecommendation"]>(),
-      loadReviewerRecommendations: jest
-        .fn<AutoCommandDependencies["loadReviewerRecommendations"]>()
-        .mockResolvedValue(createReviewerRecommendations(["alpha", "beta"])),
+      loadReviewSelectionInput: jest
+        .fn<AutoCommandDependencies["loadReviewSelectionInput"]>()
+        .mockResolvedValue(createReviewSelectionInput(["alpha", "beta"])),
     });
 
     const result = await executeAutoCommand(
@@ -197,6 +241,8 @@ describe("executeAutoCommand", () => {
       expect.objectContaining({
         kind: "action_required",
         detail:
+          "Reviewers disagreed on preferred candidate; manual review required.",
+        message:
           "Reviewers disagreed on preferred candidate; manual review required.",
       }),
     );

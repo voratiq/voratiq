@@ -192,7 +192,7 @@ export async function executeReviewCommand(
     ]);
   }
 
-  const selectedResult = reviewResults[0];
+  const selectedResult = selectLegacyReviewCommandResult(reviewResults);
   if (!selectedResult) {
     renderer?.complete("failed");
     throw new ReviewGenerationFailedError([
@@ -223,6 +223,21 @@ export async function executeReviewCommand(
     outputPath: selectedResult.outputPath,
     missingArtifacts: [...selectedResult.missingArtifacts],
   };
+}
+
+function selectLegacyReviewCommandResult(
+  reviewResults: readonly ReviewCompetitionExecution[],
+): ReviewCompetitionExecution | undefined {
+  let firstResult: ReviewCompetitionExecution | undefined;
+
+  for (const result of reviewResults) {
+    firstResult ??= result;
+    if (reviewResults.length === 1 || result.status === "succeeded") {
+      return result;
+    }
+  }
+
+  return firstResult;
 }
 
 function resolveReviewAgents(options: {
