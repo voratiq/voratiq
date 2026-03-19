@@ -77,6 +77,7 @@ const cliProject = createProject("cli", buildTestRegex(["cli"]), {
 const config = {
   watchman: false,
   passWithNoTests: false,
+  coverageDirectory: "<rootDir>/coverage",
   collectCoverageFrom: ["<rootDir>/src/**/*.ts"],
   coverageThreshold: {
     global: {

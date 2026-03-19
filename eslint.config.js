@@ -9,13 +9,14 @@ const tsRecommended = tseslint.configs["recommended-type-checked"];
 const jestRecommended =
   eslintPluginJest.configs["flat/recommended"] ??
   eslintPluginJest.configs.recommended;
+const repoIgnores = ["**/.*/**", "coverage/**", "dist/**", "node_modules/**"];
 
 /**
  * @param {{ files: string[]; project: string; includeJest: boolean }} options
  */
 const createTsConfig = ({ files, project, includeJest }) => ({
   files,
-  ignores: ["dist/**", "node_modules/**", ".voratiq/**", ".internal/**"],
+  ignores: repoIgnores,
   languageOptions: {
     parser: tsParser,
     parserOptions: {
@@ -52,7 +53,7 @@ const createTsConfig = ({ files, project, includeJest }) => ({
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", ".voratiq/**", ".internal/**"],
+    ignores: repoIgnores,
   },
   createTsConfig({
     files: ["src/**/*.ts"],
@@ -66,7 +67,7 @@ export default [
   }),
   {
     files: ["**/*.js", "**/*.cjs", "**/*.mjs"],
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: repoIgnores,
     languageOptions: {
       globals: {
         ...globals.nodeBuiltin,
