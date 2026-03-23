@@ -4,8 +4,6 @@ import {
   createVerifyRenderer,
   renderVerifyTranscript,
 } from "../../../src/render/transcripts/verify.js";
-import { colorize } from "../../../src/utils/colors.js";
-
 const ESC = String.fromCharCode(0x1b);
 const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
 const CONTROL_SEQUENCE = new RegExp(String.raw`^\x1b\[(\d+)([A-Za-z])`);
@@ -240,7 +238,7 @@ describe("verify live progress renderer", () => {
     expect(frame).toMatch(/programmatic\s+—\s+RUNNING\s+—/u);
   });
 
-  it("colors the programmatic verifier label in TTY summaries", () => {
+  it("renders the programmatic verifier label as plain text in TTY summaries", () => {
     const transcript = renderVerifyTranscript({
       verificationId: "verify-123",
       createdAt: "2026-01-01T00:00:00.000Z",
@@ -262,7 +260,7 @@ describe("verify live progress renderer", () => {
       includeSummarySection: true,
     });
 
-    expect(transcript).toContain(colorize("programmatic", "green"));
+    expect(transcript).toContain("programmatic");
     expect(transcript).toContain("Target     Run run-123");
   });
 });

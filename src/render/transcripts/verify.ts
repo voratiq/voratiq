@@ -1,7 +1,6 @@
 import type { ExtractedTokenUsage } from "../../domains/runs/model/types.js";
 import { getRunStatusStyle } from "../../status/colors.js";
 import { TERMINAL_VERIFICATION_STATUSES } from "../../status/index.js";
-import { colorize } from "../../utils/colors.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
 import { formatRenderLifecycleDuration } from "../utils/duration.js";
 import { formatRunTimestamp } from "../utils/records.js";
@@ -210,12 +209,9 @@ function formatVerifierLabel(
   status: VerifyProgressMethodRecord["status"],
   style: TranscriptShellStyleOptions,
 ): string {
-  const resolvedStyle = resolveTranscriptShellStyle(style);
-  if (!resolvedStyle.isTty || verifierLabel !== "programmatic") {
-    return verifierLabel;
-  }
-
-  return colorize(verifierLabel, getRunStatusStyle(status).cli);
+  void status;
+  void style;
+  return verifierLabel;
 }
 
 export function createVerifyRenderer(
