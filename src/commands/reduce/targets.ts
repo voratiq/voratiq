@@ -9,12 +9,13 @@ import {
 import { readReductionRecords } from "../../domains/reductions/persistence/adapter.js";
 import { buildRunRecordView } from "../../domains/runs/model/enhanced.js";
 import { RunRecordNotFoundError } from "../../domains/runs/model/errors.js";
+import type { RunRecord } from "../../domains/runs/model/types.js";
 import { fetchRunsSafely } from "../../domains/runs/persistence/adapter.js";
 import { TERMINAL_SPEC_STATUSES } from "../../domains/specs/model/types.js";
 import { readSpecRecords } from "../../domains/specs/persistence/adapter.js";
 import { TERMINAL_VERIFICATION_STATUSES } from "../../domains/verifications/model/types.js";
 import { readVerificationRecords } from "../../domains/verifications/persistence/adapter.js";
-import { type RunStatus, TERMINAL_RUN_STATUSES } from "../../status/index.js";
+import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
 import { pathExists } from "../../utils/fs.js";
 import {
   normalizePathForDisplay,
@@ -146,15 +147,7 @@ async function assertRunTargetEligible(
     throw new RunNotFoundCliError(target.id);
   }
 
-  if (record.deletedAt) {
-    throw new CliError(
-      `Run \`${target.id}\` has been pruned.`,
-      [],
-      ["Re-run `voratiq run` to regenerate artifacts."],
-    );
-  }
-
-  if (!TERMINAL_RUN_STATUSES.includes(record.status)) {
+  if (!isRunStatusCompleteForReduction(record.status)) {
     throw new CliError(
       `Run \`${target.id}\` is not complete.`,
       [`Status: \`${record.status}\`.`],
@@ -183,8 +176,20 @@ async function assertRunTargetEligible(
   }
 }
 
-function assertRunArtifactsPresent(status: RunStatus, runId: string): void {
-  if (status === "succeeded" || status === "failed" || status === "errored") {
+function isRunStatusCompleteForReduction(status: RunRecord["status"]): boolean {
+  return status === "pruned" || TERMINAL_RUN_STATUSES.includes(status);
+}
+
+function assertRunArtifactsPresent(
+  status: RunRecord["status"],
+  runId: string,
+): void {
+  if (
+    status === "succeeded" ||
+    status === "failed" ||
+    status === "errored" ||
+    status === "pruned"
+  ) {
     return;
   }
 

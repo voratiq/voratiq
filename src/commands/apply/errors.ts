@@ -11,17 +11,6 @@ export class ApplyError extends CliError {
   }
 }
 
-export class ApplyRunDeletedError extends ApplyError {
-  constructor(public readonly runId: string) {
-    super(
-      `Run \`${runId}\` has been deleted.`,
-      [],
-      ["Re-run the spec to regenerate artifacts."],
-    );
-    this.name = "ApplyRunDeletedError";
-  }
-}
-
 export class ApplyRunMetadataCorruptedError extends ApplyError {
   constructor(detail: string) {
     super(

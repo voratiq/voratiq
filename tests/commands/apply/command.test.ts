@@ -692,6 +692,60 @@ describe("executeApplyCommand", () => {
     }
   });
 
+  it("applies retained artifacts for a pruned run", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-pruned-"));
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const { filePath, baseRevisionSha, diffContent, diffStatistics } =
+        await createDiffFixture({
+          repoRoot,
+          original: "console.log('hello');\n",
+          updated: "console.log('hello pruned apply');\n",
+        });
+
+      const runId = "run-pruned-apply";
+      const agentId = "claude";
+      const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
+
+      await writeRunRecord({
+        repoRoot,
+        runId,
+        agentId,
+        baseRevisionSha,
+        diffContent,
+        diffStatistics,
+      });
+
+      await rewriteRunRecord({
+        root: repoRoot,
+        runsFilePath,
+        runId,
+        mutate: (existing) => ({
+          ...existing,
+          status: "pruned",
+          deletedAt: new Date().toISOString(),
+        }),
+      });
+
+      const result = await executeApplyCommand({
+        root: repoRoot,
+        runsFilePath,
+        runId,
+        agentId,
+        ignoreBaseMismatch: false,
+      });
+
+      await expect(readFile(filePath, "utf8")).resolves.toBe(
+        "console.log('hello pruned apply');\n",
+      );
+      expect(result.status).toBe("pruned");
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it("creates a git commit when requested", async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-commit-"));
     try {
