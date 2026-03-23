@@ -83,9 +83,25 @@ export function buildForbiddenVerificationIdentityTokens(options: {
   allowed?: readonly string[];
 }): string[] {
   const { resolvedTarget, allowed = [] } = options;
-  const allowedTokens = new Set(
-    allowed.map((token) => token.toLowerCase().trim()).filter(Boolean),
-  );
+
+  // Collect all candidate identity tokens first so we can detect overlap
+  // with verifier self-identity tokens.
+  const candidateTokens = new Set<string>();
+  for (const candidate of resolvedTarget.competitiveCandidates) {
+    for (const token of candidate.forbiddenIdentityTokens) {
+      const normalized = token.toLowerCase().trim();
+      if (normalized) {
+        candidateTokens.add(normalized);
+      }
+    }
+  }
+
+  // Only allowlist verifier self-identity tokens that do NOT overlap with
+  // candidate identity tokens. Overlapping tokens must stay forbidden so
+  // that a shared identity between verifier and candidate is still detected
+  // as a leakage vector.
+  const allowedTokens = overlapSafeAllowlist(allowed, candidateTokens);
+
   const tokens = new Set<string>();
 
   for (const candidate of resolvedTarget.competitiveCandidates) {
@@ -99,6 +115,22 @@ export function buildForbiddenVerificationIdentityTokens(options: {
   }
 
   return Array.from(tokens);
+}
+
+/**
+ * Build an overlap-safe allowlist: verifier self-identity tokens are only
+ * permitted when they are not also candidate-identity tokens under
+ * verification.
+ */
+export function overlapSafeAllowlist(
+  allowed: readonly string[],
+  candidateTokens: ReadonlySet<string>,
+): Set<string> {
+  return new Set(
+    allowed
+      .map((token) => token.toLowerCase().trim())
+      .filter((token) => token !== "" && !candidateTokens.has(token)),
+  );
 }
 
 export function assertNoVerificationIdentityLeak(options: {
