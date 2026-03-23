@@ -1,5 +1,6 @@
 import { executeCompetitionWithAdapter } from "../../../competition/command-adapter.js";
 import type { ResolvedExtraContextFile } from "../../../competition/shared/extra-context.js";
+import type { TeardownController } from "../../../competition/shared/teardown.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import type { VerificationConfig } from "../../../configs/verification/types.js";
@@ -11,10 +12,7 @@ import {
   type VerifyCompetitionCandidate,
 } from "./adapter.js";
 import { loadRubricTemplate } from "./prompt.js";
-import {
-  cleanupSharedVerificationInputs,
-  prepareSharedVerificationInputs,
-} from "./shared-layout.js";
+import { prepareSharedVerificationInputs } from "./shared-layout.js";
 import type { ResolvedVerificationTarget } from "./target.js";
 
 export async function executeAndPersistRubricMethods(options: {
@@ -27,6 +25,7 @@ export async function executeAndPersistRubricMethods(options: {
   environment: EnvironmentConfig;
   extraContextFiles: readonly ResolvedExtraContextFile[];
   maxParallel: number;
+  teardown: TeardownController;
   mutators: VerificationRecordMutators;
   renderer?: VerifyProgressRenderer;
 }): Promise<VerificationRecord["methods"]> {
@@ -40,6 +39,7 @@ export async function executeAndPersistRubricMethods(options: {
     environment,
     extraContextFiles,
     maxParallel,
+    teardown,
     mutators,
     renderer,
   } = options;
@@ -62,60 +62,66 @@ export async function executeAndPersistRubricMethods(options: {
     aliasMap,
   });
 
-  try {
-    const loadedTemplates = await Promise.all(
-      rubricTemplates.map(async (rubric) => ({
-        rubric,
-        template: await loadRubricTemplate({
-          root,
-          template: rubric.template,
-        }),
-      })),
-    );
-
-    const candidates: VerifyCompetitionCandidate[] = loadedTemplates.flatMap(
-      ({ template }) =>
-        verifierAgents.map((agent) => ({
-          agent,
-          template,
-        })),
-    );
-
-    const executions = await executeCompetitionWithAdapter({
-      candidates,
-      maxParallel,
-      adapter: createVerifyCompetitionAdapter({
-        root,
-        verificationId,
-        resolvedTarget,
-        aliasMap,
-        environment,
-        extraContextFiles,
-        sharedInputs,
-        mutators,
-        renderer,
-      }),
-    });
-
-    return executions.map((execution) => ({
-      method: "rubric",
-      template: execution.template,
-      verifierId: execution.verifierId,
-      scope:
-        resolvedTarget.target.kind === "run"
-          ? { kind: "run" }
-          : { kind: "target" },
-      status: execution.status,
-      artifactPath: execution.artifactPath,
-      startedAt: execution.startedAt,
-      completedAt: execution.completedAt,
-      tokenUsage: execution.tokenUsage,
-      ...(execution.status === "failed" ? { error: execution.error } : {}),
-    }));
-  } finally {
-    await cleanupSharedVerificationInputs({
+  for (const worktreePath of sharedInputs.worktreesToRemove) {
+    teardown.addWorktree({
       root,
-      sharedInputs,
+      worktreePath,
+      label: "detached reference worktree",
     });
   }
+  teardown.addPath(
+    sharedInputs.sharedRootAbsolute,
+    "shared verification inputs",
+  );
+
+  const loadedTemplates = await Promise.all(
+    rubricTemplates.map(async (rubric) => ({
+      rubric,
+      template: await loadRubricTemplate({
+        root,
+        template: rubric.template,
+      }),
+    })),
+  );
+
+  const candidates: VerifyCompetitionCandidate[] = loadedTemplates.flatMap(
+    ({ template }) =>
+      verifierAgents.map((agent) => ({
+        agent,
+        template,
+      })),
+  );
+
+  const executions = await executeCompetitionWithAdapter({
+    candidates,
+    maxParallel,
+    adapter: createVerifyCompetitionAdapter({
+      root,
+      verificationId,
+      resolvedTarget,
+      aliasMap,
+      environment,
+      extraContextFiles,
+      sharedInputs,
+      teardown,
+      mutators,
+      renderer,
+    }),
+  });
+
+  return executions.map((execution) => ({
+    method: "rubric",
+    template: execution.template,
+    verifierId: execution.verifierId,
+    scope:
+      resolvedTarget.target.kind === "run"
+        ? { kind: "run" }
+        : { kind: "target" },
+    status: execution.status,
+    artifactPath: execution.artifactPath,
+    startedAt: execution.startedAt,
+    completedAt: execution.completedAt,
+    tokenUsage: execution.tokenUsage,
+    ...(execution.status === "failed" ? { error: execution.error } : {}),
+  }));
 }

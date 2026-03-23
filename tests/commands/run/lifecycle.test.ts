@@ -15,9 +15,11 @@ import type { StagedAuthContext } from "../../../src/agents/runtime/auth.js";
 import * as sandboxRegistry from "../../../src/agents/runtime/registry.js";
 import {
   clearActiveRun,
+  finalizeActiveRun,
   registerActiveRun,
   terminateActiveRun,
 } from "../../../src/commands/run/lifecycle.js";
+import { createTeardownController } from "../../../src/competition/shared/teardown.js";
 import type { RunRecord } from "../../../src/domains/runs/model/types.js";
 import {
   disposeRunRecordBuffer,
@@ -165,10 +167,19 @@ describe("terminateActiveRun", () => {
   });
 
   it("tears down staged sandboxes when the run aborts", async () => {
+    const teardown = createTeardownController(`run \`${RUN_ID}\``);
+    teardown.addAction({
+      key: `run-auth:${RUN_ID}`,
+      label: "session auth",
+      cleanup: async () => {
+        await sandboxRegistry.teardownSessionAuth(RUN_ID);
+      },
+    });
     registerActiveRun({
       root: "/repo",
       runsFilePath: "/repo/.voratiq/runs/index.json",
       runId: RUN_ID,
+      teardown,
       agents: [],
     });
 
@@ -298,11 +309,21 @@ describe("terminateActiveRun", () => {
 
   it("ignores not-found results and logs capture errors without blocking abort", async () => {
     const order: string[] = [];
+    const teardown = createTeardownController(`run \`${RUN_ID}\``);
+    teardown.addAction({
+      key: "teardown-order",
+      label: "teardown order",
+      cleanup: () => {
+        order.push("teardown");
+        return Promise.resolve();
+      },
+    });
     const agentRoot = "/repo/.voratiq/runs/sessions/run-123/agents/alpha";
     registerActiveRun({
       root: "/repo",
       runsFilePath: "/repo/.voratiq/runs/index.json",
       runId: RUN_ID,
+      teardown,
       agents: [
         {
           agentId: "alpha",
@@ -356,30 +377,32 @@ describe("terminateActiveRun", () => {
       Promise.resolve(mutate(existingRecord)),
     );
 
-    const originalTeardown = sandboxRegistry.teardownSessionAuth;
-    const teardownSpy = jest
-      .spyOn(sandboxRegistry, "teardownSessionAuth")
-      .mockImplementation(async (runId) => {
-        order.push("teardown");
-        return originalTeardown(runId);
-      });
-
     await terminateActiveRun("aborted");
 
     expect(order).toContain("capture-claude");
     expect(order).toContain("capture-gpt");
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(teardownSpy).toHaveBeenCalled();
+    expect(order).toContain("teardown");
 
     warnSpy.mockRestore();
-    teardownSpy.mockRestore();
   });
 
   it("captures chat logs before tearing down sandboxes", async () => {
+    const callOrder: string[] = [];
+    const teardown = createTeardownController(`run \`${RUN_ID}\``);
+    teardown.addAction({
+      key: "capture-before-teardown",
+      label: "capture before teardown",
+      cleanup: () => {
+        callOrder.push("teardown");
+        return Promise.resolve();
+      },
+    });
     registerActiveRun({
       root: "/repo",
       runsFilePath: "/repo/.voratiq/runs/index.json",
       runId: RUN_ID,
+      teardown,
       agents: [
         {
           agentId: "alpha",
@@ -409,40 +432,34 @@ describe("terminateActiveRun", () => {
       Promise.resolve(mutate(existingRecord)),
     );
 
-    const callOrder: string[] = [];
     preserveProviderChatTranscriptsMock.mockImplementation(() => {
       callOrder.push("capture");
       return Promise.resolve({ status: "already-exists", format: "jsonl" });
     });
 
-    const originalTeardown = sandboxRegistry.teardownSessionAuth;
-    const teardownSpy = jest
-      .spyOn(sandboxRegistry, "teardownSessionAuth")
-      .mockImplementation(async (runId) => {
-        callOrder.push("teardown");
-        return originalTeardown(runId);
-      });
-
     await terminateActiveRun("aborted");
 
     expect(callOrder).toEqual(["capture", "teardown"]);
-
-    teardownSpy.mockRestore();
   });
 
   it("logs and surfaces rewrite failures while still tearing down sandboxes", async () => {
+    const teardown = createTeardownController(`run \`${RUN_ID}\``);
+    const teardownSpy = jest.fn(() => Promise.resolve());
+    teardown.addAction({
+      key: "rewrite-failure-teardown",
+      label: "rewrite failure teardown",
+      cleanup: teardownSpy,
+    });
     registerActiveRun({
       root: "/repo",
       runsFilePath: "/repo/.voratiq/runs/index.json",
       runId: RUN_ID,
+      teardown,
       agents: [],
     });
 
     rewriteRunRecordMock.mockRejectedValue(new Error("rewrite failed"));
 
-    const teardownSpy = jest
-      .spyOn(sandboxRegistry, "teardownSessionAuth")
-      .mockResolvedValue();
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
     await expect(terminateActiveRun("aborted")).rejects.toThrow(
@@ -452,10 +469,9 @@ describe("terminateActiveRun", () => {
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining("Failed to finalize run run-123"),
     );
-    expect(teardownSpy).toHaveBeenCalledWith(RUN_ID);
+    expect(teardownSpy).toHaveBeenCalledTimes(1);
 
     errorSpy.mockRestore();
-    teardownSpy.mockRestore();
   });
 
   it("logs and surfaces disposal failures after finalizing run history", async () => {
@@ -493,5 +509,75 @@ describe("terminateActiveRun", () => {
     );
 
     errorSpy.mockRestore();
+  });
+
+  it("prunes run context, runtime, and sandbox while retaining workspace and artifacts on finalization", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-run-finalize-"));
+    tempRoots.push(root);
+    const agentRoot = join(
+      root,
+      ".voratiq",
+      "runs",
+      "sessions",
+      RUN_ID,
+      "alpha",
+    );
+    const workspacePath = join(agentRoot, "workspace");
+    const artifactsPath = join(agentRoot, "artifacts");
+    const contextPath = join(agentRoot, "context");
+    const runtimePath = join(agentRoot, "runtime");
+    const sandboxPath = join(agentRoot, "sandbox");
+
+    await mkdir(workspacePath, { recursive: true });
+    await mkdir(artifactsPath, { recursive: true });
+    await mkdir(contextPath, { recursive: true });
+    await mkdir(runtimePath, { recursive: true });
+    await mkdir(sandboxPath, { recursive: true });
+
+    const teardown = createTeardownController(`run \`${RUN_ID}\``);
+    teardown.addPath(contextPath, "alpha context");
+    teardown.addPath(runtimePath, "alpha runtime");
+    teardown.addPath(sandboxPath, "alpha sandbox");
+
+    registerActiveRun({
+      root,
+      runsFilePath: join(root, ".voratiq", "runs", "index.json"),
+      runId: RUN_ID,
+      teardown,
+      agents: [],
+    });
+
+    await finalizeActiveRun(RUN_ID);
+
+    await expect(pathExists(workspacePath)).resolves.toBe(true);
+    await expect(pathExists(artifactsPath)).resolves.toBe(true);
+    await expect(pathExists(contextPath)).resolves.toBe(false);
+    await expect(pathExists(runtimePath)).resolves.toBe(false);
+    await expect(pathExists(sandboxPath)).resolves.toBe(false);
+  });
+
+  it("reports teardown diagnostics without failing successful finalization", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const teardown = createTeardownController(`run \`${RUN_ID}\``);
+    teardown.addAction({
+      key: "broken-cleanup",
+      label: "broken cleanup",
+      cleanup: () => Promise.reject(new Error("boom")),
+    });
+
+    registerActiveRun({
+      root: "/repo",
+      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runId: RUN_ID,
+      teardown,
+      agents: [],
+    });
+
+    await expect(finalizeActiveRun(RUN_ID)).resolves.toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to teardown run `run-123`"),
+    );
+
+    warnSpy.mockRestore();
   });
 });

@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { detectAgentProcessFailureDetail } from "../../../agents/runtime/failures.js";
 import { runSandboxedAgent } from "../../../agents/runtime/harness.js";
+import { teardownSessionAuth } from "../../../agents/runtime/registry.js";
 import type {
   CompetitionCommandAdapter,
   CompetitionPreparationResult,
@@ -11,8 +12,11 @@ import {
   type ResolvedExtraContextFile,
   stageExtraContextFiles,
 } from "../../../competition/shared/extra-context.js";
-import { pruneWorkspace } from "../../../competition/shared/prune.js";
 import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
+import {
+  createTeardownController,
+  runTeardown,
+} from "../../../competition/shared/teardown.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import type { ExtractedTokenUsage } from "../../../domains/runs/model/types.js";
@@ -83,7 +87,14 @@ export function createSpecCompetitionAdapter(
     extraContextFiles = [],
   } = input;
 
-  const workspacesToPrune = new Set<string>();
+  const teardown = createTeardownController(`spec \`${sessionId}\``);
+  teardown.addAction({
+    key: `spec-auth:${sessionId}`,
+    label: "session auth",
+    cleanup: async () => {
+      await teardownSessionAuth(sessionId);
+    },
+  });
 
   return {
     failurePolicy: "continue",
@@ -105,7 +116,11 @@ export function createSpecCompetitionAdapter(
           sessionId,
           agentId: candidate.id,
         });
-        workspacesToPrune.add(workspacePaths.workspacePath);
+        registerScratchWorkspaceTeardown(
+          teardown,
+          workspacePaths,
+          candidate.id,
+        );
 
         try {
           await scaffoldAgentWorkspace(workspacePaths);
@@ -171,6 +186,7 @@ export function createSpecCompetitionAdapter(
             stderrPath: workspacePaths.stderrPath,
           },
           captureChat: true,
+          teardownAuthOnExit: false,
           ...composeStageSandboxPolicy(),
         });
         const tokenUsageResult =
@@ -261,12 +277,21 @@ export function createSpecCompetitionAdapter(
       }
     },
     finalizeCompetition: async () => {
-      for (const workspacePath of workspacesToPrune) {
-        await pruneWorkspace(workspacePath);
-      }
+      await runTeardown(teardown);
     },
     sortResults: compareSpecExecutionsByAgentId,
   };
+}
+
+function registerScratchWorkspaceTeardown(
+  teardown: ReturnType<typeof createTeardownController>,
+  workspacePaths: AgentWorkspacePaths,
+  agentId: string,
+): void {
+  teardown.addPath(workspacePaths.workspacePath, `${agentId} workspace`);
+  teardown.addPath(workspacePaths.contextPath, `${agentId} context`);
+  teardown.addPath(workspacePaths.runtimePath, `${agentId} runtime`);
+  teardown.addPath(workspacePaths.sandboxPath, `${agentId} sandbox`);
 }
 
 function compareSpecExecutionsByAgentId(

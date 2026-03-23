@@ -8,7 +8,7 @@ import {
   realpath,
   writeFile,
 } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative } from "node:path";
+import { join, relative } from "node:path";
 
 import { runRunCommand } from "../../src/cli/run.js";
 import { loadAgentCatalog } from "../../src/configs/agents/loader.js";
@@ -55,7 +55,7 @@ interface AgentTestScenario {
 
 interface AgentTestContext {
   scenario: AgentTestScenario;
-  manifest: AgentManifestSnapshot;
+  executionSnapshot: AgentExecutionSnapshot;
   runReport: RunReport;
   agentReport: AgentReport;
   agentEnhanced: AgentInvocationEnhanced;
@@ -111,45 +111,49 @@ suite("agent integrations", () => {
       specSlug: "agents",
       specHeading: "Agent Integration",
       specBody: "Ensure vendor agent artifacts are captured.",
-      assertScenario: async ({ manifest, runReport, scenario }) => {
-        expect(manifest.argv).toEqual([
+      assertScenario: async ({ executionSnapshot, runReport, scenario }) => {
+        expect(executionSnapshot.argv.slice(0, 5)).toEqual([
           "--model",
           "claude-model",
           "--output-format",
           "json",
           "--dangerously-skip-permissions",
-          "-p",
         ]);
+        expect(executionSnapshot.argv).toContain("-p");
         const expectedSandboxPrefix = `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox`;
-        expect(manifest.env.CLAUDE_CONFIG_DIR).toContain(expectedSandboxPrefix);
-        expect(manifest.env.CLAUDE_CONFIG_DIR).toBe(
-          join(manifest.env.HOME, ".claude"),
+        expect(executionSnapshot.env.CLAUDE_CONFIG_DIR).toContain(
+          expectedSandboxPrefix,
         );
-        expect(manifest.env.XDG_CONFIG_HOME).toContain(
+        expect(executionSnapshot.env.CLAUDE_CONFIG_DIR).toBe(
+          join(executionSnapshot.env.HOME, ".claude"),
+        );
+        expect(executionSnapshot.env.XDG_CONFIG_HOME).toContain(
           `${expectedSandboxPrefix}/.config`,
         );
-        expect(manifest.env.XDG_CACHE_HOME).toContain(
+        expect(executionSnapshot.env.XDG_CACHE_HOME).toContain(
           `${expectedSandboxPrefix}/.cache`,
         );
-        expect(manifest.env.XDG_DATA_HOME).toContain(
+        expect(executionSnapshot.env.XDG_DATA_HOME).toContain(
           `${expectedSandboxPrefix}/.local/share`,
         );
-        expect(manifest.env.XDG_STATE_HOME).toContain(
+        expect(executionSnapshot.env.XDG_STATE_HOME).toContain(
           `${expectedSandboxPrefix}/.local/state`,
         );
-        expect(manifest.env.CLAUDE_CODE_DEBUG_LOGS_DIR).toContain(
+        expect(executionSnapshot.env.CLAUDE_CODE_DEBUG_LOGS_DIR).toContain(
           `${expectedSandboxPrefix}/logs/debug/claude.log`,
         );
-        expect(manifest.env.TMPDIR).toContain(`${expectedSandboxPrefix}/tmp`);
-        expect(manifest.env.TEMP).toBe(manifest.env.TMPDIR);
-        expect(manifest.env.TMP).toBe(manifest.env.TMPDIR);
-        expect(manifest.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBe(
-          "true",
+        expect(executionSnapshot.env.TMPDIR).toContain(
+          `${expectedSandboxPrefix}/tmp`,
         );
-        expect(manifest.env.DISABLE_AUTOUPDATER).toBe("true");
-        expect(manifest.env.DISABLE_ERROR_REPORTING).toBe("true");
-        expect(manifest.env.CLAUDE_CODE_ENABLE_TELEMETRY).toBe("0");
-        const stagedSandbox = manifest.env.CLAUDE_CONFIG_DIR;
+        expect(executionSnapshot.env.TEMP).toBe(executionSnapshot.env.TMPDIR);
+        expect(executionSnapshot.env.TMP).toBe(executionSnapshot.env.TMPDIR);
+        expect(
+          executionSnapshot.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC,
+        ).toBe("true");
+        expect(executionSnapshot.env.DISABLE_AUTOUPDATER).toBe("true");
+        expect(executionSnapshot.env.DISABLE_ERROR_REPORTING).toBe("true");
+        expect(executionSnapshot.env.CLAUDE_CODE_ENABLE_TELEMETRY).toBe("0");
+        const stagedSandbox = executionSnapshot.env.CLAUDE_CONFIG_DIR;
         await expect(pathExists(stagedSandbox)).resolves.toBe(false);
         await expect(access(stagedSandbox)).rejects.toThrow();
         const claudeSecretPath = join(
@@ -168,23 +172,20 @@ suite("agent integrations", () => {
       specHeading: "Codex Integration",
       specBody: "Ensure codex credentials are staged.",
       extraArgs: ["--config", "model_reasoning_effort=high"],
-      assertScenario: async ({ manifest, runReport, scenario }) => {
-        expect(manifest.env.CODEX_HOME).toContain(
+      assertScenario: async ({ executionSnapshot, runReport, scenario }) => {
+        expect(executionSnapshot.env.CODEX_HOME).toContain(
           `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox/.codex`,
         );
-        expect(manifest.env.HOME).toContain(
+        expect(executionSnapshot.env.HOME).toContain(
           `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox`,
         );
-        expect(manifest.env.TMPDIR).toContain(
+        expect(executionSnapshot.env.TMPDIR).toContain(
           `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox/tmp`,
         );
-        expect(manifest.env.TEMP).toBe(manifest.env.TMPDIR);
-        expect(manifest.env.TMP).toBe(manifest.env.TMPDIR);
-        expect(manifest.argv.slice(-2)).toEqual([
-          "--config",
-          "model_reasoning_effort=high",
-        ]);
-        const stagedSandbox = manifest.env.CODEX_HOME;
+        expect(executionSnapshot.env.TEMP).toBe(executionSnapshot.env.TMPDIR);
+        expect(executionSnapshot.env.TMP).toBe(executionSnapshot.env.TMPDIR);
+        expect(executionSnapshot.argv).toContain("model_reasoning_effort=high");
+        const stagedSandbox = executionSnapshot.env.CODEX_HOME;
         await expect(pathExists(stagedSandbox)).resolves.toBe(false);
         await expect(access(stagedSandbox)).rejects.toThrow();
         const codexSecretPath = join(
@@ -202,17 +203,22 @@ suite("agent integrations", () => {
       specSlug: "gemini",
       specHeading: "Gemini Integration",
       specBody: "Ensure gemini credentials use sandbox.",
-      assertScenario: async ({ manifest, runReport, repoRoot, scenario }) => {
-        const homeEnv = manifest.env.HOME;
+      assertScenario: async ({
+        executionSnapshot,
+        runReport,
+        repoRoot,
+        scenario,
+      }) => {
+        const homeEnv = executionSnapshot.env.HOME;
         expect(homeEnv).toContain(
           `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox`,
         );
-        expect(manifest.env.TMPDIR).toContain(
+        expect(executionSnapshot.env.TMPDIR).toContain(
           `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox/tmp`,
         );
-        expect(manifest.env.TEMP).toBe(manifest.env.TMPDIR);
-        expect(manifest.env.TMP).toBe(manifest.env.TMPDIR);
-        expect(manifest.env.GEMINI_HOME).toBeUndefined();
+        expect(executionSnapshot.env.TEMP).toBe(executionSnapshot.env.TMPDIR);
+        expect(executionSnapshot.env.TMP).toBe(executionSnapshot.env.TMPDIR);
+        expect(executionSnapshot.env.GEMINI_HOME).toBeUndefined();
 
         const stagedGeminiDir = join(
           repoRoot,
@@ -306,35 +312,21 @@ suite("agent integrations", () => {
     );
     expect(agentEnhanced).toBeDefined();
 
-    const manifest = await loadAgentManifest(agentEnhanced!, repoRoot);
-    expect(manifest.binary).toBe(agentScriptPath);
-    const manifestDirPath = dirname(
-      join(repoRoot, agentEnhanced!.runtimeManifestPath),
-    );
-    const promptPath = isAbsolute(manifest.promptPath)
-      ? manifest.promptPath
-      : join(manifestDirPath, manifest.promptPath);
-    const expectedPromptPrefix = join(
-      repoRoot,
-      ".voratiq",
-      "runs",
-      "sessions",
-      runReport.runId,
-    );
-    expect(
-      normalizePathForCompare(promptPath).startsWith(
-        normalizePathForCompare(expectedPromptPrefix),
-      ),
-    ).toBe(true);
-    await expect(access(promptPath)).rejects.toThrow();
     const expectedWorkspacePath = join(
       repoRoot,
       agentEnhanced!.baseDirectory,
       "workspace",
     );
+    const executionSnapshot = await loadExecutionSnapshot(
+      expectedWorkspacePath,
+    );
+    expect(executionSnapshot.binary).toBe(agentScriptPath);
     const resolvedWorkspacePath = await realpath(expectedWorkspacePath);
-    const manifestWorkspacePath = await realpath(manifest.workspace);
-    expect(manifestWorkspacePath).toBe(resolvedWorkspacePath);
+    const snapshotWorkspacePath = await realpath(executionSnapshot.workspace);
+    expect(snapshotWorkspacePath).toBe(resolvedWorkspacePath);
+    await expect(
+      access(join(repoRoot, agentEnhanced!.runtimeManifestPath)),
+    ).rejects.toThrow();
 
     const summaryPath = agentEnhanced!.assets.summaryPath;
     expect(typeof summaryPath).toBe("string");
@@ -346,7 +338,7 @@ suite("agent integrations", () => {
 
     return {
       scenario,
-      manifest,
+      executionSnapshot,
       runReport,
       agentReport,
       agentEnhanced: agentEnhanced!,
@@ -377,41 +369,40 @@ suite("agent integrations", () => {
     );
   }
 
-  async function loadAgentManifest(
-    agent: AgentInvocationEnhanced,
-    root: string,
-  ): Promise<AgentManifestSnapshot> {
-    const manifestRaw = await readFile(
-      join(root, agent.runtimeManifestPath),
+  async function loadExecutionSnapshot(
+    workspacePath: string,
+  ): Promise<AgentExecutionSnapshot> {
+    const snapshotRaw = await readFile(
+      join(workspacePath, "execution-snapshot.json"),
       "utf8",
     );
-    const manifestUnknown = JSON.parse(manifestRaw) as unknown;
-    if (!isAgentManifest(manifestUnknown)) {
-      throw new Error("Unexpected agent manifest structure");
+    const snapshotUnknown = JSON.parse(snapshotRaw) as unknown;
+    if (!isAgentExecutionSnapshot(snapshotUnknown)) {
+      throw new Error("Unexpected agent execution snapshot structure");
     }
-    return manifestUnknown;
+    return snapshotUnknown;
   }
 });
 
-interface AgentManifestSnapshot {
+interface AgentExecutionSnapshot {
   binary: string;
   argv: string[];
-  promptPath: string;
   workspace: string;
   env: Record<string, string>;
 }
 
-function isAgentManifest(value: unknown): value is AgentManifestSnapshot {
+function isAgentExecutionSnapshot(
+  value: unknown,
+): value is AgentExecutionSnapshot {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
   const record = value as Record<string, unknown>;
-  const { binary, argv, promptPath, workspace, env } = record;
+  const { binary, argv, workspace, env } = record;
   if (
     typeof binary !== "string" ||
     !Array.isArray(argv) ||
     argv.some((item) => typeof item !== "string") ||
-    typeof promptPath !== "string" ||
     typeof workspace !== "string" ||
     !env ||
     typeof env !== "object" ||
@@ -423,13 +414,6 @@ function isAgentManifest(value: unknown): value is AgentManifestSnapshot {
   return Object.values(envRecord).every(
     (valueItem) => typeof valueItem === "string",
   );
-}
-
-function normalizePathForCompare(path: string): string {
-  const normalized = path.replaceAll("\\", "/");
-  return normalized.startsWith("/private/")
-    ? normalized.slice("/private".length)
-    : normalized;
 }
 
 async function expectNoRegularSecrets(secretPath: string): Promise<void> {
@@ -451,6 +435,18 @@ const workspace = process.cwd();
 const content = 'gemini agent summary';
 fs.writeFileSync(path.join(workspace, '.summary.txt'), content, 'utf8');
 fs.writeFileSync(path.join(workspace, 'artifact.txt'), content, 'utf8');
+fs.writeFileSync(
+  path.join(workspace, 'execution-snapshot.json'),
+  JSON.stringify({
+    binary: process.argv[1],
+    argv: process.argv.slice(2),
+    workspace,
+    env: Object.fromEntries(
+      Object.entries(process.env).filter(([, value]) => typeof value === 'string'),
+    ),
+  }),
+  'utf8',
+);
 console.log('stdout from gemini fixture');
 console.error('stderr from gemini fixture');
 `;

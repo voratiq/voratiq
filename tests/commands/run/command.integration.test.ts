@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import { teardownSessionAuth } from "../../../src/agents/runtime/registry.js";
 import { executeRunCommand } from "../../../src/commands/run/command.js";
 import {
-  clearActiveRun,
+  finalizeActiveRun,
   registerActiveRun,
 } from "../../../src/commands/run/lifecycle.js";
 import { initializeRunRecord } from "../../../src/commands/run/record-init.js";
@@ -62,7 +61,7 @@ jest.mock("../../../src/domains/runs/competition/reports.js", () => ({
 
 jest.mock("../../../src/commands/run/lifecycle.js", () => ({
   registerActiveRun: jest.fn(),
-  clearActiveRun: jest.fn(),
+  finalizeActiveRun: jest.fn(),
 }));
 
 jest.mock("../../../src/commands/shared/resolve-stage-competitors.js", () => ({
@@ -73,10 +72,6 @@ jest.mock("../../../src/domains/runs/model/id.js", () => ({
   generateRunId: jest.fn(),
 }));
 
-jest.mock("../../../src/agents/runtime/registry.js", () => ({
-  teardownSessionAuth: jest.fn(),
-}));
-
 const validateAndPrepareMock = jest.mocked(validateAndPrepare);
 const prepareRunWorkspaceMock = jest.mocked(prepareRunWorkspace);
 const initializeRunRecordMock = jest.mocked(initializeRunRecord);
@@ -85,10 +80,9 @@ const executeAgentsMock = jest.mocked(executeAgents);
 const rewriteRunRecordMock = jest.mocked(rewriteRunRecord);
 const toRunReportMock = jest.mocked(toRunReport);
 const registerActiveRunMock = jest.mocked(registerActiveRun);
-const clearActiveRunMock = jest.mocked(clearActiveRun);
+const finalizeActiveRunMock = jest.mocked(finalizeActiveRun);
 const resolveStageCompetitorsMock = jest.mocked(resolveStageCompetitors);
 const generateRunIdMock = jest.mocked(generateRunId);
-const teardownSessionAuthMock = jest.mocked(teardownSessionAuth);
 
 function buildUnavailableTokenUsageResult(modelId = "unknown") {
   return {
@@ -102,7 +96,7 @@ function buildUnavailableTokenUsageResult(modelId = "unknown") {
 describe("executeRunCommand integration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    teardownSessionAuthMock.mockResolvedValue(undefined);
+    finalizeActiveRunMock.mockResolvedValue(undefined);
     resolveStageCompetitorsMock.mockReturnValue({
       source: "orchestration",
       agentIds: ["alpha"],
@@ -242,18 +236,20 @@ describe("executeRunCommand integration", () => {
       resolvedAgentIds: ["alpha"],
       maxParallel: undefined,
     });
-    expect(registerActiveRunMock).toHaveBeenCalledWith({
-      root: "/repo",
-      runsFilePath: "/repo/runs.json",
-      runId: "run-xyz",
-      agents: [
-        {
-          agentId: "alpha",
-          providerId: "claude",
-          agentRoot: "/repo/.voratiq/runs/sessions/run-xyz/alpha",
-        },
-      ],
-    });
+    expect(registerActiveRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        root: "/repo",
+        runsFilePath: "/repo/runs.json",
+        runId: "run-xyz",
+        agents: [
+          {
+            agentId: "alpha",
+            providerId: "claude",
+            agentRoot: "/repo/.voratiq/runs/sessions/run-xyz/alpha",
+          },
+        ],
+      }),
+    );
     expect(executeAgentsMock).toHaveBeenCalledWith(
       expect.objectContaining({
         runId: "run-xyz",
@@ -262,7 +258,7 @@ describe("executeRunCommand integration", () => {
       }),
     );
     expect(rewriteRunRecordMock).toHaveBeenCalled();
-    expect(clearActiveRunMock).toHaveBeenCalledWith("run-xyz");
+    expect(finalizeActiveRunMock).toHaveBeenCalledWith("run-xyz");
     expect(report).toEqual(runReport);
   });
 
@@ -790,7 +786,7 @@ describe("executeRunCommand integration", () => {
     expect(toRunReportMock).not.toHaveBeenCalled();
   });
 
-  it("tears down run auth exactly once when execution throws", async () => {
+  it("finalizes run teardown exactly once when execution throws", async () => {
     generateRunIdMock.mockReturnValue("run-fail");
     validateAndPrepareMock.mockResolvedValue({
       specContent: "Implement feature",
@@ -841,8 +837,8 @@ describe("executeRunCommand integration", () => {
       }),
     ).rejects.toThrow("post-processing failed");
 
-    expect(teardownSessionAuthMock).toHaveBeenCalledTimes(1);
-    expect(teardownSessionAuthMock).toHaveBeenCalledWith("run-fail");
+    expect(finalizeActiveRunMock).toHaveBeenCalledTimes(1);
+    expect(finalizeActiveRunMock).toHaveBeenCalledWith("run-fail");
   });
 
   it("passes staged extra-context references through to agent execution", async () => {

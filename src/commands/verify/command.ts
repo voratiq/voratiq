@@ -1,4 +1,5 @@
 import { teardownSessionAuth } from "../../agents/runtime/registry.js";
+import { createTeardownController } from "../../competition/shared/teardown.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import { loadVerificationConfig } from "../../configs/verification/loader.js";
 import { buildBlindedAliasMap } from "../../domains/verifications/competition/blinding.js";
@@ -31,7 +32,7 @@ import {
   resolveVerificationAgents,
 } from "./agents.js";
 import {
-  clearActiveVerification,
+  finalizeActiveVerification,
   registerActiveVerification,
 } from "./lifecycle.js";
 import { resolveVerifyRubricMaxParallel } from "./max-parallel.js";
@@ -136,10 +137,20 @@ export async function executeVerifyCommand(
     status: "running",
   });
 
+  const teardown = createTeardownController(`verify \`${verificationId}\``);
+  teardown.addAction({
+    key: `verify-auth:${verificationId}`,
+    label: "session auth",
+    cleanup: async () => {
+      await teardownSessionAuth(verificationId);
+    },
+  });
+
   registerActiveVerification({
     root,
     verificationsFilePath,
     verificationId,
+    teardown,
   });
   const mutators = createVerificationRecordMutators({
     root,
@@ -169,6 +180,7 @@ export async function executeVerifyCommand(
         environment,
         extraContextFiles,
         maxParallel: rubricMaxParallel,
+        teardown,
         mutators,
         renderer,
       }),
@@ -229,8 +241,7 @@ export async function executeVerifyCommand(
 
     throw error;
   } finally {
-    clearActiveVerification(verificationId);
-    await teardownSessionAuth(verificationId).catch(() => {});
+    await finalizeActiveVerification(verificationId);
   }
 }
 

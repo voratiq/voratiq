@@ -254,6 +254,10 @@ export async function prepareSharedVerificationInputs(options: {
         worktreePath: referenceRepoAbsolute,
       }).catch(() => {});
     }
+    await rm(sharedRootAbsolute, {
+      recursive: true,
+      force: true,
+    }).catch(() => {});
     throw error;
   }
 }

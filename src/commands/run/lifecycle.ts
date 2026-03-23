@@ -1,4 +1,5 @@
-import { teardownSessionAuth } from "../../agents/runtime/registry.js";
+import type { TeardownController } from "../../competition/shared/teardown.js";
+import { runTeardown } from "../../competition/shared/teardown.js";
 import {
   getActiveTerminationStatus,
   RUN_ABORT_WARNING,
@@ -24,6 +25,7 @@ interface ActiveRunContext {
   root: string;
   runsFilePath: string;
   runId: string;
+  teardown?: TeardownController;
   agents?: readonly ActiveRunAgentContext[];
 }
 
@@ -176,7 +178,7 @@ export async function terminateActiveRun(
   }
 
   try {
-    await teardownSessionAuth(context.runId);
+    await finalizeRegisteredRunTeardown(context);
   } finally {
     terminationInFlight = false;
     setActiveTerminationStatus(context.runId, undefined);
@@ -185,6 +187,20 @@ export async function terminateActiveRun(
 
   if (persistenceError) {
     throw persistenceError;
+  }
+}
+
+export async function finalizeActiveRun(runId: string): Promise<void> {
+  if (!activeRun || activeRun.runId !== runId) {
+    clearActiveRun(runId);
+    return;
+  }
+
+  const context = activeRun;
+  try {
+    await finalizeRegisteredRunTeardown(context);
+  } finally {
+    clearActiveRun(runId);
   }
 }
 
@@ -259,4 +275,10 @@ async function captureChatArtifactsBeforeAbort(
       );
     }
   }
+}
+
+async function finalizeRegisteredRunTeardown(
+  context: ActiveRunContext,
+): Promise<void> {
+  await runTeardown(context.teardown);
 }
