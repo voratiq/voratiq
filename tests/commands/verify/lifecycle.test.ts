@@ -1,3 +1,7 @@
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import {
   afterEach,
   beforeEach,
@@ -10,10 +14,12 @@ import {
 import { teardownSessionAuth } from "../../../src/agents/runtime/registry.js";
 import {
   clearActiveVerification,
+  finalizeActiveVerification,
   registerActiveVerification,
   terminateActiveVerification,
   VERIFY_ABORT_DETAIL,
 } from "../../../src/commands/verify/lifecycle.js";
+import { createTeardownController } from "../../../src/competition/shared/teardown.js";
 import { writeVerificationArtifact } from "../../../src/domains/verifications/competition/artifacts.js";
 import type { VerificationRecord } from "../../../src/domains/verifications/model/types.js";
 import {
@@ -21,6 +27,7 @@ import {
   readVerificationRecords,
   rewriteVerificationRecord,
 } from "../../../src/domains/verifications/persistence/adapter.js";
+import { pathExists } from "../../../src/utils/fs.js";
 
 jest.mock("../../../src/domains/verifications/persistence/adapter.js", () => ({
   readVerificationRecords: jest.fn(),
@@ -49,6 +56,7 @@ const teardownSessionAuthMock = jest.mocked(teardownSessionAuth);
 
 describe("verify lifecycle", () => {
   const VERIFICATION_ID = "verify-123";
+  const tempRoots: string[] = [];
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -59,13 +67,27 @@ describe("verify lifecycle", () => {
 
   afterEach(() => {
     clearActiveVerification(VERIFICATION_ID);
+    return Promise.all(
+      tempRoots
+        .splice(0)
+        .map((root) => rm(root, { recursive: true, force: true })),
+    ).then(() => undefined);
   });
 
   it("marks running methods as aborted, persists fallback artifacts, and finalizes the verification record", async () => {
+    const teardown = createTeardownController(`verify \`${VERIFICATION_ID}\``);
+    teardown.addAction({
+      key: `verify-auth:${VERIFICATION_ID}`,
+      label: "session auth",
+      cleanup: async () => {
+        await teardownSessionAuth(VERIFICATION_ID);
+      },
+    });
     registerActiveVerification({
       root: "/repo",
       verificationsFilePath: "/repo/.voratiq/verifications/index.json",
       verificationId: VERIFICATION_ID,
+      teardown,
     });
 
     const existingRecord: VerificationRecord = {
@@ -171,5 +193,87 @@ describe("verify lifecycle", () => {
     expect(rewriteVerificationRecordMock).not.toHaveBeenCalled();
     expect(flushVerificationRecordBufferMock).not.toHaveBeenCalled();
     expect(teardownSessionAuthMock).not.toHaveBeenCalled();
+  });
+
+  it("prunes verify scratch state while retaining artifacts on finalization", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-verify-finalize-"));
+    tempRoots.push(root);
+
+    const agentRoot = join(
+      root,
+      ".voratiq",
+      "verifications",
+      "sessions",
+      VERIFICATION_ID,
+      "verifier",
+      "run-review",
+    );
+    const workspacePath = join(agentRoot, "workspace");
+    const artifactsPath = join(agentRoot, "artifacts");
+    const contextPath = join(agentRoot, "context");
+    const runtimePath = join(agentRoot, "runtime");
+    const sandboxPath = join(agentRoot, "sandbox");
+    const sharedRoot = join(root, ".shared");
+
+    await mkdir(workspacePath, { recursive: true });
+    await mkdir(artifactsPath, { recursive: true });
+    await mkdir(contextPath, { recursive: true });
+    await mkdir(runtimePath, { recursive: true });
+    await mkdir(sandboxPath, { recursive: true });
+    await mkdir(sharedRoot, { recursive: true });
+
+    const teardown = createTeardownController(`verify \`${VERIFICATION_ID}\``);
+    teardown.addPath(workspacePath, "verifier workspace");
+    teardown.addPath(contextPath, "verifier context");
+    teardown.addPath(runtimePath, "verifier runtime");
+    teardown.addPath(sandboxPath, "verifier sandbox");
+    teardown.addPath(sharedRoot, "shared verification inputs");
+
+    registerActiveVerification({
+      root,
+      verificationsFilePath: join(
+        root,
+        ".voratiq",
+        "verifications",
+        "index.json",
+      ),
+      verificationId: VERIFICATION_ID,
+      teardown,
+    });
+
+    await finalizeActiveVerification(VERIFICATION_ID);
+
+    await expect(pathExists(workspacePath)).resolves.toBe(false);
+    await expect(pathExists(contextPath)).resolves.toBe(false);
+    await expect(pathExists(runtimePath)).resolves.toBe(false);
+    await expect(pathExists(sandboxPath)).resolves.toBe(false);
+    await expect(pathExists(sharedRoot)).resolves.toBe(false);
+    await expect(pathExists(artifactsPath)).resolves.toBe(true);
+  });
+
+  it("reports teardown diagnostics without failing verification finalization", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const teardown = createTeardownController(`verify \`${VERIFICATION_ID}\``);
+    teardown.addAction({
+      key: "broken-cleanup",
+      label: "broken cleanup",
+      cleanup: () => Promise.reject(new Error("boom")),
+    });
+
+    registerActiveVerification({
+      root: "/repo",
+      verificationsFilePath: "/repo/.voratiq/verifications/index.json",
+      verificationId: VERIFICATION_ID,
+      teardown,
+    });
+
+    await expect(
+      finalizeActiveVerification(VERIFICATION_ID),
+    ).resolves.toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to teardown verify `verify-123`"),
+    );
+
+    warnSpy.mockRestore();
   });
 });

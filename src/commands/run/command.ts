@@ -1,5 +1,6 @@
 import { teardownSessionAuth } from "../../agents/runtime/registry.js";
 import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
+import { createTeardownController } from "../../competition/shared/teardown.js";
 import { executeAgents } from "../../domains/runs/competition/agent-execution.js";
 import {
   RunCommandError,
@@ -24,12 +25,13 @@ import { deriveRunStatusFromAgents } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
 import {
+  type AgentWorkspacePaths,
   buildAgentWorkspacePaths,
   formatRunWorkspaceRelative,
 } from "../../workspace/layout.js";
 import { prepareRunWorkspace } from "../../workspace/run.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
-import { clearActiveRun, registerActiveRun } from "./lifecycle.js";
+import { finalizeActiveRun, registerActiveRun } from "./lifecycle.js";
 import { initializeRunRecord } from "./record-init.js";
 import { validateAndPrepare } from "./validation.js";
 
@@ -106,12 +108,22 @@ export async function executeRunCommand(
     ...buildPersistedExtraContextFields(extraContextFiles),
   });
 
+  const teardown = createTeardownController(`run \`${runId}\``);
+  teardown.addAction({
+    key: `run-auth:${runId}`,
+    label: "session auth",
+    cleanup: async () => {
+      await teardownSessionAuth(runId);
+    },
+  });
+
   const agentAbortContexts = validation.agents.map((agent) => {
     const workspacePaths = buildAgentWorkspacePaths({
       root,
       runId,
       agentId: agent.id,
     });
+    registerRunWorkspaceTeardown(teardown, workspacePaths, agent.id);
     return {
       agentId: agent.id,
       providerId: agent.provider,
@@ -123,6 +135,7 @@ export async function executeRunCommand(
     root,
     runsFilePath,
     runId,
+    teardown,
     agents: agentAbortContexts,
   });
 
@@ -148,7 +161,6 @@ export async function executeRunCommand(
   let agentRecords: AgentInvocationRecord[] = [];
 
   let executionError: unknown;
-  let cleanupError: unknown;
   let runReport: RunReport | undefined;
 
   try {
@@ -221,24 +233,7 @@ export async function executeRunCommand(
       }
     }
   } finally {
-    try {
-      await teardownSessionAuth(runId);
-    } catch (error) {
-      cleanupError = error;
-    } finally {
-      clearActiveRun(runId);
-    }
-  }
-
-  if (cleanupError) {
-    if (executionError) {
-      throw new RunProcessStreamError(
-        `Run \`${runId}\` failed and cleanup also failed: ${toErrorMessage(cleanupError)}`,
-      );
-    }
-    throw new RunProcessStreamError(
-      `Run \`${runId}\` cleanup failed: ${toErrorMessage(cleanupError)}`,
-    );
+    await finalizeActiveRun(runId);
   }
 
   if (executionError) {
@@ -260,4 +255,14 @@ export async function executeRunCommand(
   });
 
   return runReport;
+}
+
+function registerRunWorkspaceTeardown(
+  teardown: ReturnType<typeof createTeardownController>,
+  workspacePaths: AgentWorkspacePaths,
+  agentId: string,
+): void {
+  teardown.addPath(workspacePaths.contextPath, `${agentId} context`);
+  teardown.addPath(workspacePaths.runtimePath, `${agentId} runtime`);
+  teardown.addPath(workspacePaths.sandboxPath, `${agentId} sandbox`);
 }

@@ -118,15 +118,7 @@ async function resolveRunVerifyTarget(
     throw new RunNotFoundCliError(target.sessionId);
   }
 
-  if (record.deletedAt) {
-    throw new CliError(
-      `Run \`${target.sessionId}\` has been pruned.`,
-      [],
-      ["Re-run `voratiq run` to regenerate artifacts before verification."],
-    );
-  }
-
-  if (!TERMINAL_RUN_STATUSES.includes(record.status)) {
+  if (!isRunStatusCompleteForVerification(record.status)) {
     throw new CliError(
       `Run \`${target.sessionId}\` is not complete.`,
       [`Status: \`${record.status}\`.`],
@@ -162,6 +154,12 @@ async function resolveRunVerifyTarget(
     },
     runRecord: record,
   };
+}
+
+function isRunStatusCompleteForVerification(
+  status: RunRecord["status"],
+): boolean {
+  return status === "pruned" || TERMINAL_RUN_STATUSES.includes(status);
 }
 
 async function resolveReductionVerifyTarget(

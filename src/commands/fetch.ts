@@ -7,7 +7,7 @@ export interface FetchRunsCLIOptions {
   root: string;
   runsFilePath: string;
   runId: string;
-  onDeleted: (runRecord: RunRecord) => Error;
+  onDeleted?: (runRecord: RunRecord) => Error;
 }
 
 export async function fetchRunSafely(
@@ -32,7 +32,7 @@ export async function fetchRunSafely(
     throw new RunNotFoundCliError(runId);
   }
 
-  if (runRecord.deletedAt) {
+  if (runRecord.deletedAt && onDeleted) {
     throw onDeleted(runRecord);
   }
 

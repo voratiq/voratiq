@@ -1,4 +1,5 @@
-import { teardownSessionAuth } from "../../agents/runtime/registry.js";
+import type { TeardownController } from "../../competition/shared/teardown.js";
+import { runTeardown } from "../../competition/shared/teardown.js";
 import {
   buildOperationLifecycleCompleteFields,
   buildRecordLifecycleCompleteFields,
@@ -26,6 +27,7 @@ interface ActiveVerificationContext {
   root: string;
   verificationsFilePath: string;
   verificationId: string;
+  teardown?: TeardownController;
 }
 
 let activeVerification: ActiveVerificationContext | undefined;
@@ -140,7 +142,7 @@ export async function terminateActiveVerification(
     );
   } finally {
     try {
-      await teardownSessionAuth(context.verificationId);
+      await finalizeRegisteredVerificationTeardown(context);
     } finally {
       terminationInFlight = false;
       activeVerification = undefined;
@@ -149,6 +151,25 @@ export async function terminateActiveVerification(
 
   if (persistenceError) {
     throw persistenceError;
+  }
+}
+
+export async function finalizeActiveVerification(
+  verificationId: string,
+): Promise<void> {
+  if (
+    !activeVerification ||
+    activeVerification.verificationId !== verificationId
+  ) {
+    clearActiveVerification(verificationId);
+    return;
+  }
+
+  const context = activeVerification;
+  try {
+    await finalizeRegisteredVerificationTeardown(context);
+  } finally {
+    clearActiveVerification(verificationId);
   }
 }
 
@@ -267,6 +288,12 @@ async function materializeTerminalVerificationArtifacts(options: {
       },
     });
   }
+}
+
+async function finalizeRegisteredVerificationTeardown(
+  context: ActiveVerificationContext,
+): Promise<void> {
+  await runTeardown(context.teardown);
 }
 
 function buildVerificationMethodArtifactPath(options: {

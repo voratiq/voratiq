@@ -30,7 +30,6 @@ import {
   ApplyBaseMismatchError,
   ApplyGitCommitError,
   ApplyPatchApplicationError,
-  ApplyRunDeletedError,
   ApplyVerificationPolicyLoadError,
 } from "./errors.js";
 import type { ApplyResult } from "./types.js";
@@ -62,7 +61,6 @@ export async function executeApplyCommand(
     root,
     runsFilePath,
     runId,
-    onDeleted: (record) => new ApplyRunDeletedError(record.runId),
   });
   const enhanced = buildRunRecordEnhanced(runRecord);
 

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe } from "@jest/globals";
 
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
+import { createTeardownController } from "../../../src/competition/shared/teardown.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
 import {
   createVerifyCompetitionAdapter,
@@ -63,6 +64,7 @@ const subject: AdapterContractSubject<VerifyCompetitionExecution> = {
     const root = await mkdtemp(join(tmpdir(), "voratiq-verify-adapter-"));
     try {
       const verifyCandidates = candidates.map((id) => toVerifyCandidate(id));
+      const teardown = createTeardownController("verify `verify-id`");
       const adapter = createVerifyCompetitionAdapter({
         root,
         verificationId: "verify-id",
@@ -70,6 +72,7 @@ const subject: AdapterContractSubject<VerifyCompetitionExecution> = {
         environment,
         extraContextFiles: [],
         sharedInputs,
+        teardown,
         mutators: createMutators(events),
       });
 

@@ -11,8 +11,8 @@ import {
   type ResolvedExtraContextFile,
   stageExtraContextFiles,
 } from "../../../competition/shared/extra-context.js";
-import { pruneWorkspace } from "../../../competition/shared/prune.js";
 import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
+import type { TeardownController } from "../../../competition/shared/teardown.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import {
@@ -97,6 +97,7 @@ export interface CreateVerifyCompetitionAdapterInput {
   readonly environment: EnvironmentConfig;
   readonly extraContextFiles: readonly ResolvedExtraContextFile[];
   readonly sharedInputs: SharedVerificationInputs;
+  readonly teardown: TeardownController;
   readonly mutators: VerificationRecordMutators;
   readonly renderer?: VerifyProgressRenderer;
 }
@@ -116,11 +117,11 @@ export function createVerifyCompetitionAdapter(
     environment,
     extraContextFiles,
     sharedInputs,
+    teardown,
     mutators,
     renderer,
   } = input;
 
-  const scratchRoots = new Map<string, AgentWorkspacePaths>();
   const startedAtByExecutionKey = new Map<string, string>();
   const tokenUsageResultByExecutionKey = new Map<string, TokenUsageResult>();
 
@@ -144,7 +145,12 @@ export function createVerifyCompetitionAdapter(
           verifierId: candidate.agent.id,
           template: candidate.template.template,
         });
-        scratchRoots.set(workspacePaths.agentRoot, workspacePaths);
+        registerScratchWorkspaceTeardown(
+          teardown,
+          workspacePaths,
+          candidate.agent.id,
+          candidate.template.template,
+        );
         return { candidate, workspacePaths };
       }),
       failures: [],
@@ -528,14 +534,6 @@ export function createVerifyCompetitionAdapter(
         tokenUsageResult,
       };
     },
-    finalizeCompetition: async () => {
-      for (const workspacePaths of scratchRoots.values()) {
-        await pruneWorkspace(workspacePaths.workspacePath);
-        await pruneWorkspace(workspacePaths.contextPath);
-        await pruneWorkspace(workspacePaths.runtimePath);
-        await pruneWorkspace(workspacePaths.sandboxPath);
-      }
-    },
     sortResults: compareVerificationsByTemplateThenVerifierId,
   };
 }
@@ -593,4 +591,17 @@ function compareVerificationsByTemplateThenVerifierId(
     left.template.localeCompare(right.template) ||
     left.verifierId.localeCompare(right.verifierId)
   );
+}
+
+function registerScratchWorkspaceTeardown(
+  teardown: TeardownController,
+  workspacePaths: AgentWorkspacePaths,
+  verifierId: string,
+  template: string,
+): void {
+  const labelPrefix = `${verifierId}/${template}`;
+  teardown.addPath(workspacePaths.workspacePath, `${labelPrefix} workspace`);
+  teardown.addPath(workspacePaths.contextPath, `${labelPrefix} context`);
+  teardown.addPath(workspacePaths.runtimePath, `${labelPrefix} runtime`);
+  teardown.addPath(workspacePaths.sandboxPath, `${labelPrefix} sandbox`);
 }

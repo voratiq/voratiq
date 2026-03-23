@@ -180,22 +180,49 @@ export async function prepareSharedVerificationInputs(options: {
             agentId: candidateId,
           });
 
-          const diffPath = await copyIfExists(
-            resolve(runPaths.artifactsPath, "diff.patch"),
-            resolve(dir, "diff.patch"),
+          const runAgentRecord = resolvedTarget.runRecord.agents.find(
+            (agent) => agent.agentId === candidateId,
           );
-          const stdoutPath = await copyIfExists(
-            resolve(runPaths.artifactsPath, "stdout.log"),
-            resolve(dir, "stdout.log"),
-          );
-          const stderrPath = await copyIfExists(
-            resolve(runPaths.artifactsPath, "stderr.log"),
-            resolve(dir, "stderr.log"),
-          );
-          const summaryPath = await copyIfExists(
-            resolve(runPaths.artifactsPath, "summary.txt"),
-            resolve(dir, "summary.txt"),
-          );
+          const diffExpected = runAgentRecord?.artifacts?.diffCaptured ?? false;
+          const summaryExpected =
+            runAgentRecord?.artifacts?.summaryCaptured ?? false;
+          const stdoutExpected =
+            runAgentRecord?.artifacts?.stdoutCaptured ?? true;
+          const stderrExpected =
+            runAgentRecord?.artifacts?.stderrCaptured ?? true;
+
+          const diffPath = await copyArtifactForRunCandidate({
+            sourceAbsolute: resolve(runPaths.artifactsPath, "diff.patch"),
+            destinationAbsolute: resolve(dir, "diff.patch"),
+            expected: diffExpected,
+            runId: resolvedTarget.target.sessionId,
+            candidateId,
+            label: "diff.patch",
+          });
+          const stdoutPath = await copyArtifactForRunCandidate({
+            sourceAbsolute: resolve(runPaths.artifactsPath, "stdout.log"),
+            destinationAbsolute: resolve(dir, "stdout.log"),
+            expected: stdoutExpected,
+            runId: resolvedTarget.target.sessionId,
+            candidateId,
+            label: "stdout.log",
+          });
+          const stderrPath = await copyArtifactForRunCandidate({
+            sourceAbsolute: resolve(runPaths.artifactsPath, "stderr.log"),
+            destinationAbsolute: resolve(dir, "stderr.log"),
+            expected: stderrExpected,
+            runId: resolvedTarget.target.sessionId,
+            candidateId,
+            label: "stderr.log",
+          });
+          const summaryPath = await copyArtifactForRunCandidate({
+            sourceAbsolute: resolve(runPaths.artifactsPath, "summary.txt"),
+            destinationAbsolute: resolve(dir, "summary.txt"),
+            expected: summaryExpected,
+            runId: resolvedTarget.target.sessionId,
+            candidateId,
+            label: "summary.txt",
+          });
 
           return {
             alias,
@@ -254,6 +281,10 @@ export async function prepareSharedVerificationInputs(options: {
         worktreePath: referenceRepoAbsolute,
       }).catch(() => {});
     }
+    await rm(sharedRootAbsolute, {
+      recursive: true,
+      force: true,
+    }).catch(() => {});
     throw error;
   }
 }
@@ -448,4 +479,30 @@ async function copyIfExists(
   }
   await copyFile(sourceAbsolute, destinationAbsolute);
   return destinationAbsolute;
+}
+
+async function copyArtifactForRunCandidate(options: {
+  sourceAbsolute: string;
+  destinationAbsolute: string;
+  expected: boolean;
+  runId: string;
+  candidateId: string;
+  label: string;
+}): Promise<string | undefined> {
+  const {
+    sourceAbsolute,
+    destinationAbsolute,
+    expected,
+    runId,
+    candidateId,
+    label,
+  } = options;
+  const copied = await copyIfExists(sourceAbsolute, destinationAbsolute);
+  if (copied || !expected) {
+    return copied;
+  }
+
+  throw new Error(
+    `Run \`${runId}\` candidate \`${candidateId}\` is missing required verification artifact \`${label}\` (${sourceAbsolute}).`,
+  );
 }
