@@ -401,6 +401,7 @@ describe("executeReduceCommand integration", () => {
         "- reducer-b: missing provider",
       ]),
     );
+    expect(preflight.hintLines).toEqual([]);
     expect(generateSessionIdMock).not.toHaveBeenCalled();
     expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
   });

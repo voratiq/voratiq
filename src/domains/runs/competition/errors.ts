@@ -133,12 +133,15 @@ export class RunPreflightError extends RunCommandError {
   public readonly kind = "workspace-setup" as const;
   public readonly issues: readonly PreflightIssue[];
 
-  constructor(issues: readonly PreflightIssue[]) {
+  constructor(
+    issues: readonly PreflightIssue[],
+    hintLines: readonly string[] = [PREFLIGHT_HINT],
+  ) {
     super("Preflight failed. Aborting run.", {
       detailLines: formatPreflightIssueLines(issues, {
         unlabeledAgentIds: RUN_PREFLIGHT_UNLABELED_AGENT_IDS,
       }),
-      hintLines: [PREFLIGHT_HINT],
+      hintLines,
     });
     this.issues = Array.from(issues);
     this.name = "RunPreflightError";

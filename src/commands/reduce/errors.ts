@@ -11,7 +11,7 @@ export class ReduceError extends CliError {
   constructor(
     headline: string,
     detailLines: readonly string[] = [],
-    hintLines: readonly string[] = [],
+    hintLines?: readonly string[],
   ) {
     super(headline, detailLines, hintLines);
     this.name = "ReduceError";
@@ -32,11 +32,14 @@ export class ReduceAgentNotFoundError extends ReduceError {
 export class ReducePreflightError extends ReduceError {
   public readonly issues: readonly ReducePreflightIssue[];
 
-  constructor(issues: readonly ReducePreflightIssue[]) {
+  constructor(
+    issues: readonly ReducePreflightIssue[],
+    hintLines: readonly string[] = [PREFLIGHT_HINT],
+  ) {
     super(
       "Preflight failed. Aborting reduction.",
       formatPreflightIssueLines(issues),
-      [PREFLIGHT_HINT],
+      hintLines,
     );
     this.issues = Array.from(issues);
     this.name = "ReducePreflightError";
