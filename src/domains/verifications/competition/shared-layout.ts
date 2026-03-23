@@ -17,6 +17,32 @@ import { VORATIQ_VERIFICATIONS_SESSIONS_DIR } from "../../../workspace/structure
 import { aliasForCandidate } from "./blinding.js";
 import type { ResolvedVerificationTarget } from "./target.js";
 
+const BLINDED_VERIFY_SPEC_ARTIFACT_ALLOWLIST = [
+  {
+    sourcePathKey: "outputPath",
+    stagedFilename: "spec.md",
+    required: true,
+  },
+  {
+    sourcePathKey: "dataPath",
+    stagedFilename: "spec.json",
+    required: false,
+  },
+] as const;
+
+const BLINDED_VERIFY_RUN_ARTIFACT_ALLOWLIST = [
+  {
+    sourceFilename: "diff.patch",
+    stagedFilename: "diff.patch",
+    requiredArtifactStateKey: "diffCaptured",
+  },
+  {
+    sourceFilename: "summary.txt",
+    stagedFilename: "summary.txt",
+    requiredArtifactStateKey: undefined,
+  },
+] as const;
+
 export type SharedVerificationInputs =
   | {
       kind: "spec";
@@ -26,6 +52,7 @@ export type SharedVerificationInputs =
       worktreesToRemove: readonly string[];
       candidates: readonly {
         alias: string;
+        hasSpecData: boolean;
       }[];
     }
   | {
@@ -37,8 +64,6 @@ export type SharedVerificationInputs =
       candidates: readonly {
         alias: string;
         hasDiff: boolean;
-        hasStdout: boolean;
-        hasStderr: boolean;
         hasSummary: boolean;
       }[];
     }
@@ -61,6 +86,7 @@ export type StagedVerificationInputs =
       candidates: readonly {
         alias: string;
         specPath: string;
+        specDataPath?: string;
       }[];
     }
   | {
@@ -70,8 +96,6 @@ export type StagedVerificationInputs =
       candidates: readonly {
         alias: string;
         diffPath?: string;
-        stdoutPath?: string;
-        stderrPath?: string;
         summaryPath?: string;
       }[];
     }
@@ -139,12 +163,29 @@ export async function prepareSharedVerificationInputs(options: {
             const dir = resolve(draftsDir, alias);
             await mkdir(dir, { recursive: true });
 
-            await copyFile(
-              resolve(root, agent.outputPath ?? ""),
-              resolve(dir, "spec.md"),
+            const copiedArtifacts = await Promise.all(
+              BLINDED_VERIFY_SPEC_ARTIFACT_ALLOWLIST.map((artifact) =>
+                copyRetainedVerificationArtifact({
+                  root,
+                  sourceRelativePath: agent[artifact.sourcePathKey],
+                  destinationAbsolute: resolve(dir, artifact.stagedFilename),
+                  ownerLabel: `Spec \`${resolvedTarget.target.sessionId}\` candidate \`${agent.agentId}\``,
+                  artifactLabel: artifact.stagedFilename,
+                  required: artifact.required,
+                }),
+              ),
             );
 
-            return { alias };
+            if (!copiedArtifacts[0]) {
+              throw new Error(
+                `Spec \`${resolvedTarget.target.sessionId}\` candidate \`${agent.agentId}\` is missing required verification artifact \`spec.md\`.`,
+              );
+            }
+
+            return {
+              alias,
+              hasSpecData: copiedArtifacts[1] !== undefined,
+            };
           }),
       );
 
@@ -183,53 +224,30 @@ export async function prepareSharedVerificationInputs(options: {
           const runAgentRecord = resolvedTarget.runRecord.agents.find(
             (agent) => agent.agentId === candidateId,
           );
-          const diffExpected = runAgentRecord?.artifacts?.diffCaptured ?? false;
-          const summaryExpected =
-            runAgentRecord?.artifacts?.summaryCaptured ?? false;
-          const stdoutExpected =
-            runAgentRecord?.artifacts?.stdoutCaptured ?? true;
-          const stderrExpected =
-            runAgentRecord?.artifacts?.stderrCaptured ?? true;
-
-          const diffPath = await copyArtifactForRunCandidate({
-            sourceAbsolute: resolve(runPaths.artifactsPath, "diff.patch"),
-            destinationAbsolute: resolve(dir, "diff.patch"),
-            expected: diffExpected,
-            runId: resolvedTarget.target.sessionId,
-            candidateId,
-            label: "diff.patch",
-          });
-          const stdoutPath = await copyArtifactForRunCandidate({
-            sourceAbsolute: resolve(runPaths.artifactsPath, "stdout.log"),
-            destinationAbsolute: resolve(dir, "stdout.log"),
-            expected: stdoutExpected,
-            runId: resolvedTarget.target.sessionId,
-            candidateId,
-            label: "stdout.log",
-          });
-          const stderrPath = await copyArtifactForRunCandidate({
-            sourceAbsolute: resolve(runPaths.artifactsPath, "stderr.log"),
-            destinationAbsolute: resolve(dir, "stderr.log"),
-            expected: stderrExpected,
-            runId: resolvedTarget.target.sessionId,
-            candidateId,
-            label: "stderr.log",
-          });
-          const summaryPath = await copyArtifactForRunCandidate({
-            sourceAbsolute: resolve(runPaths.artifactsPath, "summary.txt"),
-            destinationAbsolute: resolve(dir, "summary.txt"),
-            expected: summaryExpected,
-            runId: resolvedTarget.target.sessionId,
-            candidateId,
-            label: "summary.txt",
-          });
+          const copiedArtifacts = await Promise.all(
+            BLINDED_VERIFY_RUN_ARTIFACT_ALLOWLIST.map((artifact) =>
+              copyArtifactForRunCandidate({
+                sourceAbsolute: resolve(
+                  runPaths.artifactsPath,
+                  artifact.sourceFilename,
+                ),
+                destinationAbsolute: resolve(dir, artifact.stagedFilename),
+                required: artifact.requiredArtifactStateKey
+                  ? (runAgentRecord?.artifacts?.[
+                      artifact.requiredArtifactStateKey
+                    ] ?? false)
+                  : false,
+                runId: resolvedTarget.target.sessionId,
+                candidateId,
+                label: artifact.stagedFilename,
+              }),
+            ),
+          );
 
           return {
             alias,
-            hasDiff: diffPath !== undefined,
-            hasStdout: stdoutPath !== undefined,
-            hasStderr: stderrPath !== undefined,
-            hasSummary: summaryPath !== undefined,
+            hasDiff: copiedArtifacts[0] !== undefined,
+            hasSummary: copiedArtifacts[1] !== undefined,
           };
         }),
       );
@@ -257,10 +275,14 @@ export async function prepareSharedVerificationInputs(options: {
           const dir = resolve(candidatesDir, alias);
           await mkdir(dir, { recursive: true });
 
-          await copyFile(
-            resolve(root, reducer.outputPath),
-            resolve(dir, "reduction.md"),
-          );
+          await copyRetainedVerificationArtifact({
+            root,
+            sourceRelativePath: reducer.outputPath,
+            destinationAbsolute: resolve(dir, "reduction.md"),
+            ownerLabel: `Reduction \`${resolvedTarget.target.sessionId}\` candidate \`${reducer.agentId}\``,
+            artifactLabel: "reduction.md",
+            required: true,
+          });
 
           return { alias };
         }),
@@ -324,6 +346,14 @@ export function buildStagedVerificationInputs(options: {
           workspacePaths.workspacePath,
           resolve(inputsRoot, "drafts", candidate.alias, "spec.md"),
         ),
+        ...(candidate.hasSpecData
+          ? {
+              specDataPath: toWorkspaceRelative(
+                workspacePaths.workspacePath,
+                resolve(inputsRoot, "drafts", candidate.alias, "spec.json"),
+              ),
+            }
+          : {}),
       })),
     };
   }
@@ -347,32 +377,6 @@ export function buildStagedVerificationInputs(options: {
                   "candidates",
                   candidate.alias,
                   "diff.patch",
-                ),
-              ),
-            }
-          : {}),
-        ...(candidate.hasStdout
-          ? {
-              stdoutPath: toWorkspaceRelative(
-                workspacePaths.workspacePath,
-                resolve(
-                  inputsRoot,
-                  "candidates",
-                  candidate.alias,
-                  "stdout.log",
-                ),
-              ),
-            }
-          : {}),
-        ...(candidate.hasStderr
-          ? {
-              stderrPath: toWorkspaceRelative(
-                workspacePaths.workspacePath,
-                resolve(
-                  inputsRoot,
-                  "candidates",
-                  candidate.alias,
-                  "stderr.log",
                 ),
               ),
             }
@@ -481,10 +485,46 @@ async function copyIfExists(
   return destinationAbsolute;
 }
 
+async function copyRetainedVerificationArtifact(options: {
+  root: string;
+  sourceRelativePath?: string;
+  destinationAbsolute: string;
+  ownerLabel: string;
+  artifactLabel: string;
+  required: boolean;
+}): Promise<string | undefined> {
+  const {
+    root,
+    sourceRelativePath,
+    destinationAbsolute,
+    ownerLabel,
+    artifactLabel,
+    required,
+  } = options;
+  if (!sourceRelativePath) {
+    if (!required) {
+      return undefined;
+    }
+    throw new Error(
+      `${ownerLabel} is missing required verification artifact \`${artifactLabel}\`.`,
+    );
+  }
+
+  const sourceAbsolute = resolve(root, sourceRelativePath);
+  const copied = await copyIfExists(sourceAbsolute, destinationAbsolute);
+  if (copied || !required) {
+    return copied;
+  }
+
+  throw new Error(
+    `${ownerLabel} is missing required verification artifact \`${artifactLabel}\` (${sourceAbsolute}).`,
+  );
+}
+
 async function copyArtifactForRunCandidate(options: {
   sourceAbsolute: string;
   destinationAbsolute: string;
-  expected: boolean;
+  required: boolean;
   runId: string;
   candidateId: string;
   label: string;
@@ -492,13 +532,13 @@ async function copyArtifactForRunCandidate(options: {
   const {
     sourceAbsolute,
     destinationAbsolute,
-    expected,
+    required,
     runId,
     candidateId,
     label,
   } = options;
   const copied = await copyIfExists(sourceAbsolute, destinationAbsolute);
-  if (copied || !expected) {
+  if (copied || !required) {
     return copied;
   }
 
