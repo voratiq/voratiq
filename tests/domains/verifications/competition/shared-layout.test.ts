@@ -524,11 +524,7 @@ describe("prepareSharedVerificationInputs", () => {
         "stderr\n",
         "utf8",
       );
-      await writeFile(
-        join(reducerArtifactsDir, "chat.jsonl"),
-        "{}\n",
-        "utf8",
-      );
+      await writeFile(join(reducerArtifactsDir, "chat.jsonl"), "{}\n", "utf8");
 
       const result = await prepareSharedVerificationInputs({
         root,
@@ -576,17 +572,32 @@ describe("prepareSharedVerificationInputs", () => {
       ).resolves.toBe(true);
       await expect(
         pathExists(
-          join(result.sharedInputsAbsolute, "candidates", agentId, "stdout.log"),
+          join(
+            result.sharedInputsAbsolute,
+            "candidates",
+            agentId,
+            "stdout.log",
+          ),
         ),
       ).resolves.toBe(false);
       await expect(
         pathExists(
-          join(result.sharedInputsAbsolute, "candidates", agentId, "stderr.log"),
+          join(
+            result.sharedInputsAbsolute,
+            "candidates",
+            agentId,
+            "stderr.log",
+          ),
         ),
       ).resolves.toBe(false);
       await expect(
         pathExists(
-          join(result.sharedInputsAbsolute, "candidates", agentId, "chat.jsonl"),
+          join(
+            result.sharedInputsAbsolute,
+            "candidates",
+            agentId,
+            "chat.jsonl",
+          ),
         ),
       ).resolves.toBe(false);
     } finally {

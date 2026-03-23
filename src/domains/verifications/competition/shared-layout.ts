@@ -233,8 +233,9 @@ export async function prepareSharedVerificationInputs(options: {
                 ),
                 destinationAbsolute: resolve(dir, artifact.stagedFilename),
                 required: artifact.requiredArtifactStateKey
-                  ? (runAgentRecord?.artifacts?.[artifact.requiredArtifactStateKey] ??
-                    false)
+                  ? (runAgentRecord?.artifacts?.[
+                      artifact.requiredArtifactStateKey
+                    ] ?? false)
                   : false,
                 runId: resolvedTarget.target.sessionId,
                 candidateId,

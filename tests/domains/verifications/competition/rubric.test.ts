@@ -20,12 +20,14 @@ import {
   createRunRecord,
 } from "../../../support/factories/run-records.js";
 
-const runSandboxedAgentMock = jest.fn<
-  typeof import("../../../../src/agents/runtime/harness.js").runSandboxedAgent
->();
-const extractProviderNativeTokenUsageForSessionMock = jest.fn<
-  typeof import("../../../../src/workspace/chat/native-usage.js").extractProviderNativeTokenUsageForSession
->();
+const runSandboxedAgentMock =
+  jest.fn<
+    typeof import("../../../../src/agents/runtime/harness.js").runSandboxedAgent
+  >();
+const extractProviderNativeTokenUsageForSessionMock =
+  jest.fn<
+    typeof import("../../../../src/workspace/chat/native-usage.js").extractProviderNativeTokenUsageForSession
+  >();
 
 jest.mock("../../../../src/agents/runtime/harness.js", () => ({
   runSandboxedAgent: (...args: Parameters<typeof runSandboxedAgentMock>) =>
@@ -39,9 +41,7 @@ jest.mock("../../../../src/utils/git.js", () => ({
 
 jest.mock("../../../../src/workspace/chat/native-usage.js", () => ({
   extractProviderNativeTokenUsageForSession: (
-    ...args: Parameters<
-      typeof extractProviderNativeTokenUsageForSessionMock
-    >
+    ...args: Parameters<typeof extractProviderNativeTokenUsageForSessionMock>
   ) => extractProviderNativeTokenUsageForSessionMock(...args),
 }));
 
@@ -95,7 +95,10 @@ describe("executeAndPersistRubricMethods", () => {
       );
       await mkdir(templateDir, { recursive: true });
       await writeFile(join(templateDir, "prompt.md"), "Evaluate outcomes.\n");
-      await writeFile(join(templateDir, "rubric.md"), "Prefer the best diff.\n");
+      await writeFile(
+        join(templateDir, "rubric.md"),
+        "Prefer the best diff.\n",
+      );
       await writeFile(
         join(templateDir, "schema.yaml"),
         "type: object\n",
@@ -139,9 +142,9 @@ describe("executeAndPersistRubricMethods", () => {
             blindedAlias,
           );
 
-          await expect(pathExists(join(candidateInputsDir, "diff.patch"))).resolves.toBe(
-            true,
-          );
+          await expect(
+            pathExists(join(candidateInputsDir, "diff.patch")),
+          ).resolves.toBe(true);
           await expect(
             pathExists(join(candidateInputsDir, "summary.txt")),
           ).resolves.toBe(true);
