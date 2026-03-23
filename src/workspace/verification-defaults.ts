@@ -364,7 +364,7 @@ Expected working style:
 
 Judgment discipline:
 
-- make claims only when you can point to evidence from diffs, logs, or files
+- make claims only when you can point to evidence from candidate diffs or staged files
 - if you cannot verify something, say so explicitly
 - distinguish cleanup issues from correctness or apply-risk issues
 - focus on whether the candidate actually solved the asked task, not whether it merely looks plausible
@@ -454,7 +454,7 @@ Evidence here means direct artifact evidence for the candidate itself:
 
 - diffs
 - changed files
-- logs
+- summaries when present
 - cited files and line ranges
 
 ## Candidate posture

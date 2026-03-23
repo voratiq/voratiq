@@ -118,6 +118,7 @@ describe("prepareSharedVerificationInputs", () => {
       await writeFile(join(artifactsDir, "diff.patch"), "diff --git\n", "utf8");
       await writeFile(join(artifactsDir, "stdout.log"), "stdout\n", "utf8");
       await writeFile(join(artifactsDir, "stderr.log"), "stderr\n", "utf8");
+      await writeFile(join(artifactsDir, "chat.jsonl"), "{}\n", "utf8");
       await writeFile(join(artifactsDir, "summary.txt"), "summary\n", "utf8");
 
       const result = await prepareSharedVerificationInputs({
@@ -164,9 +165,137 @@ describe("prepareSharedVerificationInputs", () => {
         {
           alias: agentId,
           hasDiff: true,
-          hasStdout: true,
-          hasStderr: true,
           hasSummary: true,
+        },
+      ]);
+      await expect(
+        pathExists(
+          join(
+            result.sharedInputsAbsolute,
+            "candidates",
+            agentId,
+            "diff.patch",
+          ),
+        ),
+      ).resolves.toBe(true);
+      await expect(
+        pathExists(
+          join(
+            result.sharedInputsAbsolute,
+            "candidates",
+            agentId,
+            "summary.txt",
+          ),
+        ),
+      ).resolves.toBe(true);
+      await expect(
+        pathExists(
+          join(
+            result.sharedInputsAbsolute,
+            "candidates",
+            agentId,
+            "stdout.log",
+          ),
+        ),
+      ).resolves.toBe(false);
+      await expect(
+        pathExists(
+          join(
+            result.sharedInputsAbsolute,
+            "candidates",
+            agentId,
+            "stderr.log",
+          ),
+        ),
+      ).resolves.toBe(false);
+      await expect(
+        pathExists(
+          join(
+            result.sharedInputsAbsolute,
+            "candidates",
+            agentId,
+            "chat.jsonl",
+          ),
+        ),
+      ).resolves.toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("treats summary.txt as optional even when metadata says it was captured", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "voratiq-verify-shared-run-optional-summary-"),
+    );
+    const verificationId = "verify-run-optional-summary";
+    const runId = "run-optional-summary";
+    const agentId = "agent-1";
+    const specPath = "specs/run-optional-summary.md";
+
+    try {
+      await writeFile(
+        join(root, ".git"),
+        "gitdir: ./.git/worktrees/test\n",
+        "utf8",
+      );
+      await mkdir(join(root, "specs"), { recursive: true });
+      await writeFile(join(root, specPath), "# spec\n", "utf8");
+
+      const artifactsDir = join(
+        root,
+        ".voratiq",
+        "runs",
+        "sessions",
+        runId,
+        agentId,
+        "artifacts",
+      );
+      await mkdir(artifactsDir, { recursive: true });
+      await writeFile(join(artifactsDir, "diff.patch"), "diff --git\n", "utf8");
+
+      const result = await prepareSharedVerificationInputs({
+        root,
+        verificationId,
+        resolvedTarget: {
+          baseRevisionSha: "base-sha",
+          competitiveCandidates: [
+            {
+              canonicalId: agentId,
+              forbiddenIdentityTokens: [agentId],
+            },
+          ],
+          target: {
+            kind: "run",
+            sessionId: runId,
+            candidateIds: [agentId],
+          },
+          runRecord: createRunRecord({
+            runId,
+            status: "pruned",
+            deletedAt: new Date().toISOString(),
+            spec: { path: specPath },
+            agents: [
+              createAgentInvocationRecord({
+                agentId,
+                artifacts: {
+                  diffCaptured: true,
+                  summaryCaptured: true,
+                },
+              }),
+            ],
+          }),
+        } as ResolvedVerificationTarget,
+      });
+
+      expect(result.kind).toBe("run");
+      if (result.kind !== "run") {
+        throw new Error("expected run shared inputs");
+      }
+      expect(result.candidates).toEqual([
+        {
+          alias: agentId,
+          hasDiff: true,
+          hasSummary: false,
         },
       ]);
     } finally {
@@ -245,6 +374,221 @@ describe("prepareSharedVerificationInputs", () => {
       ).rejects.toThrow(
         /missing required verification artifact `diff.patch`/iu,
       );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("stages spec deliverables and excludes raw execution artifacts", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-verify-shared-spec-"));
+    const verificationId = "verify-spec-artifacts";
+    const agentId = "agent-spec";
+    const specArtifactsDir = join(
+      root,
+      ".voratiq",
+      "specs",
+      "sessions",
+      "spec-123",
+      agentId,
+      "artifacts",
+    );
+
+    try {
+      await writeFile(
+        join(root, ".git"),
+        "gitdir: ./.git/worktrees/test\n",
+        "utf8",
+      );
+      await mkdir(specArtifactsDir, { recursive: true });
+      await writeFile(join(specArtifactsDir, "spec.md"), "# spec\n", "utf8");
+      await writeFile(
+        join(specArtifactsDir, "spec.json"),
+        '{"title":"Spec"}\n',
+        "utf8",
+      );
+      await writeFile(join(specArtifactsDir, "stdout.log"), "stdout\n", "utf8");
+      await writeFile(join(specArtifactsDir, "stderr.log"), "stderr\n", "utf8");
+      await writeFile(join(specArtifactsDir, "chat.jsonl"), "{}\n", "utf8");
+
+      const result = await prepareSharedVerificationInputs({
+        root,
+        verificationId,
+        resolvedTarget: {
+          baseRevisionSha: "base-sha",
+          competitiveCandidates: [
+            {
+              canonicalId: agentId,
+              forbiddenIdentityTokens: [agentId],
+            },
+          ],
+          target: { kind: "spec", sessionId: "spec-123" },
+          specRecord: {
+            sessionId: "spec-123",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            startedAt: "2026-01-01T00:00:00.000Z",
+            completedAt: "2026-01-01T00:01:00.000Z",
+            description: "Draft a spec",
+            status: "succeeded",
+            baseRevisionSha: "base-sha",
+            agents: [
+              {
+                agentId,
+                status: "succeeded",
+                startedAt: "2026-01-01T00:00:00.000Z",
+                completedAt: "2026-01-01T00:01:00.000Z",
+                outputPath:
+                  ".voratiq/specs/sessions/spec-123/agent-spec/artifacts/spec.md",
+                dataPath:
+                  ".voratiq/specs/sessions/spec-123/agent-spec/artifacts/spec.json",
+              },
+            ],
+          },
+        } as ResolvedVerificationTarget,
+      });
+
+      expect(result.kind).toBe("spec");
+      if (result.kind !== "spec") {
+        throw new Error("expected spec shared inputs");
+      }
+      expect(result.candidates).toEqual([
+        {
+          alias: agentId,
+          hasSpecData: true,
+        },
+      ]);
+      await expect(
+        pathExists(
+          join(result.sharedInputsAbsolute, "drafts", agentId, "spec.md"),
+        ),
+      ).resolves.toBe(true);
+      await expect(
+        pathExists(
+          join(result.sharedInputsAbsolute, "drafts", agentId, "spec.json"),
+        ),
+      ).resolves.toBe(true);
+      await expect(
+        pathExists(
+          join(result.sharedInputsAbsolute, "drafts", agentId, "stdout.log"),
+        ),
+      ).resolves.toBe(false);
+      await expect(
+        pathExists(
+          join(result.sharedInputsAbsolute, "drafts", agentId, "stderr.log"),
+        ),
+      ).resolves.toBe(false);
+      await expect(
+        pathExists(
+          join(result.sharedInputsAbsolute, "drafts", agentId, "chat.jsonl"),
+        ),
+      ).resolves.toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("stages reduction deliverables and excludes raw execution artifacts", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "voratiq-verify-shared-reduction-"),
+    );
+    const verificationId = "verify-reduction-artifacts";
+    const agentId = "reducer-a";
+    const reducerArtifactsDir = join(
+      root,
+      ".voratiq",
+      "reductions",
+      "sessions",
+      "reduce-123",
+      agentId,
+      "artifacts",
+    );
+
+    try {
+      await writeFile(
+        join(root, ".git"),
+        "gitdir: ./.git/worktrees/test\n",
+        "utf8",
+      );
+      await mkdir(reducerArtifactsDir, { recursive: true });
+      await writeFile(
+        join(reducerArtifactsDir, "reduction.md"),
+        "# reduction\n",
+        "utf8",
+      );
+      await writeFile(
+        join(reducerArtifactsDir, "stdout.log"),
+        "stdout\n",
+        "utf8",
+      );
+      await writeFile(
+        join(reducerArtifactsDir, "stderr.log"),
+        "stderr\n",
+        "utf8",
+      );
+      await writeFile(
+        join(reducerArtifactsDir, "chat.jsonl"),
+        "{}\n",
+        "utf8",
+      );
+
+      const result = await prepareSharedVerificationInputs({
+        root,
+        verificationId,
+        resolvedTarget: {
+          baseRevisionSha: "base-sha",
+          competitiveCandidates: [
+            {
+              canonicalId: agentId,
+              forbiddenIdentityTokens: [agentId],
+            },
+          ],
+          target: { kind: "reduce", sessionId: "reduce-123" },
+          reductionRecord: {
+            sessionId: "reduce-123",
+            target: { type: "run", id: "run-123" },
+            createdAt: "2026-01-01T00:00:00.000Z",
+            startedAt: "2026-01-01T00:00:00.000Z",
+            completedAt: "2026-01-01T00:01:00.000Z",
+            status: "succeeded",
+            reducers: [
+              {
+                agentId,
+                status: "succeeded",
+                outputPath:
+                  ".voratiq/reductions/sessions/reduce-123/reducer-a/artifacts/reduction.md",
+                startedAt: "2026-01-01T00:00:00.000Z",
+                completedAt: "2026-01-01T00:01:00.000Z",
+              },
+            ],
+          },
+        } as ResolvedVerificationTarget,
+      });
+
+      expect(result.kind).toBe("reduce");
+      await expect(
+        pathExists(
+          join(
+            result.sharedInputsAbsolute,
+            "candidates",
+            agentId,
+            "reduction.md",
+          ),
+        ),
+      ).resolves.toBe(true);
+      await expect(
+        pathExists(
+          join(result.sharedInputsAbsolute, "candidates", agentId, "stdout.log"),
+        ),
+      ).resolves.toBe(false);
+      await expect(
+        pathExists(
+          join(result.sharedInputsAbsolute, "candidates", agentId, "stderr.log"),
+        ),
+      ).resolves.toBe(false);
+      await expect(
+        pathExists(
+          join(result.sharedInputsAbsolute, "candidates", agentId, "chat.jsonl"),
+        ),
+      ).resolves.toBe(false);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

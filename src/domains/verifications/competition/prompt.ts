@@ -58,9 +58,13 @@ export function buildRubricPrompt(options: {
       `- Base repository snapshot (read-only): \`${staged.referenceRepoPath}/\``,
       `- Original description: \`${staged.descriptionPath}\``,
       "- Drafts:",
-      ...staged.candidates.map(
-        (candidate) => `  - ${candidate.alias}: \`${candidate.specPath}\``,
-      ),
+      ...staged.candidates.map((candidate) => {
+        const parts = [`spec: \`${candidate.specPath}\``];
+        if (candidate.specDataPath) {
+          parts.push(`metadata: \`${candidate.specDataPath}\``);
+        }
+        return `  - ${candidate.alias} (${parts.join(", ")})`;
+      }),
     );
   } else if (staged.kind === "run") {
     lines.push(
@@ -72,12 +76,6 @@ export function buildRubricPrompt(options: {
         if (candidate.diffPath) parts.push(`diff: \`${candidate.diffPath}\``);
         if (candidate.summaryPath) {
           parts.push(`summary: \`${candidate.summaryPath}\``);
-        }
-        if (candidate.stdoutPath) {
-          parts.push(`stdout: \`${candidate.stdoutPath}\``);
-        }
-        if (candidate.stderrPath) {
-          parts.push(`stderr: \`${candidate.stderrPath}\``);
         }
         const suffix = parts.length > 0 ? ` (${parts.join(", ")})` : "";
         return `  - ${candidate.alias}${suffix}`;
