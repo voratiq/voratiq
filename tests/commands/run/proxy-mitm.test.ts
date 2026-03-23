@@ -99,8 +99,6 @@ async function setupSandboxRun(options: { sandboxConfig: string }): Promise<{
       sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
       runtimePath: workspacePaths.runtimePath,
       artifactsPath: workspacePaths.artifactsPath,
-      extraWriteProtectedPaths: [workspacePaths.evalsDirPath],
-      extraReadProtectedPaths: [workspacePaths.evalsDirPath],
     });
 
     setupComplete = true;

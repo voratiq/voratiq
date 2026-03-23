@@ -72,13 +72,13 @@ async function flushPendingHistory(): Promise<void> {
     );
   }
   try {
-    const { flushAllReviewRecordBuffers } = await import(
-      "./domains/reviews/persistence/adapter.js"
+    const { flushAllVerificationRecordBuffers } = await import(
+      "./domains/verifications/persistence/adapter.js"
     );
-    await flushAllReviewRecordBuffers();
+    await flushAllVerificationRecordBuffers();
   } catch (error) {
     console.warn(
-      `[voratiq] Failed to flush review history buffers: ${(error as Error).message}`,
+      `[voratiq] Failed to flush verification history buffers: ${(error as Error).message}`,
     );
   }
   try {
@@ -122,22 +122,22 @@ async function terminateActiveRunSafe(
   }
 }
 
-async function terminateActiveReviewSafe(
+async function terminateActiveVerificationSafe(
   status: "failed" | "aborted",
   context: string,
 ): Promise<Error | null> {
   try {
-    const { terminateActiveReview } = await import(
-      "./commands/review/lifecycle.js"
+    const { terminateActiveVerification } = await import(
+      "./commands/verify/lifecycle.js"
     );
-    await terminateActiveReview(status);
+    await terminateActiveVerification(status);
     return null;
   } catch (error) {
     const { toErrorMessage } = await import("./utils/errors.js");
     const normalizedError =
       error instanceof Error ? error : new Error(toErrorMessage(error));
     console.error(
-      `[voratiq] Failed to teardown review after ${context}: ${toErrorMessage(error)}`,
+      `[voratiq] Failed to teardown verification after ${context}: ${toErrorMessage(error)}`,
     );
     return normalizedError;
   }
@@ -148,14 +148,23 @@ async function terminateActiveSessionsSafe(
   context: string,
 ): Promise<Error | null> {
   const runError = await terminateActiveRunSafe(status, context);
-  const reviewError = await terminateActiveReviewSafe(status, context);
-  if (runError && reviewError) {
+  const verificationError = await terminateActiveVerificationSafe(
+    status,
+    context,
+  );
+
+  const errors = [runError, verificationError].filter(
+    (error): error is Error => error instanceof Error,
+  );
+
+  if (errors.length > 1) {
     return new AggregateError(
-      [runError, reviewError],
-      `Failed to teardown run and review after ${context}`,
+      errors,
+      `Failed to teardown active sessions after ${context}`,
     );
   }
-  return runError ?? reviewError ?? null;
+
+  return errors[0] ?? null;
 }
 
 export async function runCli(
@@ -321,7 +330,7 @@ async function registerCommands(
         "init",
         "spec",
         "run",
-        "review",
+        "verify",
         "reduce",
         "apply",
         "list",
@@ -337,8 +346,8 @@ async function registerCommands(
     program.addCommand((await import("./cli/init.js")).createInitCommand());
     program.addCommand((await import("./cli/spec.js")).createSpecCommand());
     program.addCommand((await import("./cli/run.js")).createRunCommand());
-    program.addCommand((await import("./cli/review.js")).createReviewCommand());
     program.addCommand((await import("./cli/reduce.js")).createReduceCommand());
+    program.addCommand((await import("./cli/verify.js")).createVerifyCommand());
     program.addCommand((await import("./cli/apply.js")).createApplyCommand());
     program.addCommand((await import("./cli/list.js")).createListCommand());
     program.addCommand((await import("./cli/prune.js")).createPruneCommand());
@@ -358,14 +367,14 @@ async function registerCommands(
     case "run":
       program.addCommand((await import("./cli/run.js")).createRunCommand());
       break;
-    case "review":
-      program.addCommand(
-        (await import("./cli/review.js")).createReviewCommand(),
-      );
-      break;
     case "reduce":
       program.addCommand(
         (await import("./cli/reduce.js")).createReduceCommand(),
+      );
+      break;
+    case "verify":
+      program.addCommand(
+        (await import("./cli/verify.js")).createVerifyCommand(),
       );
       break;
     case "auto":

@@ -6,12 +6,10 @@ import { isFileSystemError } from "../../../utils/fs.js";
 import {
   type AgentArtifactPaths,
   buildAgentArtifactPaths,
-  buildAgentEvalViews,
   getAgentDirectoryPath,
   getAgentManifestPath,
 } from "../../../workspace/structure.js";
 import type {
-  AgentEvalSnapshot,
   AgentStatus,
   ExtractedTokenUsage,
   RunApplyStatus,
@@ -19,10 +17,6 @@ import type {
   RunRecord,
   RunSpecDescriptor,
 } from "./types.js";
-
-export type AgentEvalEnhanced = AgentEvalSnapshot & {
-  logPath?: string;
-};
 
 export interface AgentInvocationEnhanced {
   agentId: string;
@@ -34,7 +28,6 @@ export interface AgentInvocationEnhanced {
   runtimeManifestPath: string;
   baseDirectory: string;
   assets: AgentArtifactPaths;
-  evals: AgentEvalEnhanced[];
   diffStatistics?: string;
   tokenUsage?: ExtractedTokenUsage;
   error?: string;
@@ -76,12 +69,6 @@ export function buildRunRecordEnhanced(record: RunRecord): RunRecordEnhanced {
         artifacts: agent.artifacts,
       });
 
-      const evals: AgentEvalEnhanced[] = buildAgentEvalViews({
-        runId: record.runId,
-        agentId: agent.agentId,
-        evals: agent.evals,
-      });
-
       const enhancedAgent: AgentInvocationEnhanced = {
         agentId: agent.agentId,
         model: agent.model,
@@ -89,7 +76,6 @@ export function buildRunRecordEnhanced(record: RunRecord): RunRecordEnhanced {
         runtimeManifestPath,
         baseDirectory,
         assets,
-        evals,
       };
       const normalizedDiff = normalizeDiffStatistics(agent.diffStatistics);
       if (normalizedDiff) {

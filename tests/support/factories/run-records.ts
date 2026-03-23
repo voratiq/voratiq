@@ -6,7 +6,6 @@ import {
 } from "../../../src/domains/runs/model/enhanced.js";
 import type {
   AgentArtifactState,
-  AgentEvalSnapshot,
   AgentInvocationRecord,
   RunRecord,
   RunReport,
@@ -16,23 +15,6 @@ const DEFAULT_AGENT_ID = "agent-1";
 const DEFAULT_MODEL = "model-v1";
 const DEFAULT_SPEC_PATH = "specs/sample.md";
 const DEFAULT_BASE_REVISION_SHA = "1234567890abcdef1234567890abcdef12345678";
-
-const EVAL_SLUGS: AgentEvalSnapshot["slug"][] = [
-  "format",
-  "lint",
-  "typecheck",
-  "tests",
-];
-
-function buildDefaultEvalSnapshots(): AgentEvalSnapshot[] {
-  return EVAL_SLUGS.map((slug) => ({
-    slug,
-    status: "succeeded",
-    exitCode: 0,
-    command: `npm run ${slug}`,
-    hasLog: true,
-  }));
-}
 
 function buildDefaultArtifacts(): AgentArtifactState {
   return {
@@ -63,7 +45,6 @@ export function createAgentInvocationRecord(
     delete agent.completedAt;
     delete agent.commitSha;
     delete agent.artifacts;
-    delete agent.evals;
     return agent;
   }
 
@@ -72,7 +53,6 @@ export function createAgentInvocationRecord(
     delete agent.completedAt;
     delete agent.commitSha;
     delete agent.artifacts;
-    delete agent.evals;
     return agent;
   }
 
@@ -80,7 +60,6 @@ export function createAgentInvocationRecord(
   agent.completedAt ??= later;
   agent.commitSha ??= DEFAULT_BASE_REVISION_SHA;
   agent.artifacts ??= buildDefaultArtifacts();
-  agent.evals ??= buildDefaultEvalSnapshots();
 
   return agent;
 }
@@ -154,7 +133,6 @@ export function createRunReport(overrides: Partial<RunReport> = {}): RunReport {
     baseRevisionSha: overrides.baseRevisionSha ?? DEFAULT_BASE_REVISION_SHA,
     agents: overrides.agents ?? [],
     hadAgentFailure: overrides.hadAgentFailure ?? false,
-    hadEvalFailure: overrides.hadEvalFailure ?? false,
   };
 }
 

@@ -15,13 +15,12 @@ import {
   resolveWorkspacePath,
   VORATIQ_AGENTS_FILE,
   VORATIQ_ENVIRONMENT_FILE,
-  VORATIQ_EVALS_FILE,
   VORATIQ_HISTORY_LOCK_FILENAME,
   VORATIQ_ORCHESTRATION_FILE,
-  VORATIQ_REVIEWS_DIR,
   VORATIQ_RUNS_DIR,
   VORATIQ_RUNS_FILE,
   VORATIQ_SANDBOX_FILE,
+  VORATIQ_VERIFICATIONS_DIR,
 } from "../../../src/workspace/structure.js";
 import { clearSandboxConfigurationCache } from "../../support/hooks/sandbox-loader.js";
 
@@ -33,7 +32,7 @@ describe("sandbox", () => {
     const runtimePath = "/run/agent/runtime";
     const sandboxSettingsPath = `${runtimePath}/sandbox.json`;
     const artifactsPath = "/run/agent/artifacts";
-    const evalsPath = "/run/agent/evals";
+    const protectedPath = "/run/agent/protected";
     beforeEach(() => {
       clearSandboxConfigurationCache();
     });
@@ -57,7 +56,6 @@ describe("sandbox", () => {
       return [
         join(root, ".git"),
         resolveWorkspacePath(root, VORATIQ_AGENTS_FILE),
-        resolveWorkspacePath(root, VORATIQ_EVALS_FILE),
         resolveWorkspacePath(root, VORATIQ_ENVIRONMENT_FILE),
         resolveWorkspacePath(root, VORATIQ_ORCHESTRATION_FILE),
         resolveWorkspacePath(root, VORATIQ_SANDBOX_FILE),
@@ -67,7 +65,7 @@ describe("sandbox", () => {
           VORATIQ_RUNS_DIR,
           VORATIQ_HISTORY_LOCK_FILENAME,
         ),
-        resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR),
+        resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_DIR),
       ];
     }
 
@@ -83,8 +81,8 @@ describe("sandbox", () => {
           sandboxSettingsPath,
           runtimePath,
           artifactsPath,
-          extraWriteProtectedPaths: [evalsPath],
-          extraReadProtectedPaths: [evalsPath],
+          extraWriteProtectedPaths: [protectedPath],
+          extraReadProtectedPaths: [protectedPath],
         });
 
         expect(settings.network).toEqual({
@@ -98,10 +96,10 @@ describe("sandbox", () => {
         });
         const baseline = expectedRunBaselinePaths(root);
         expect(settings.filesystem.denyRead).toEqual(
-          expect.arrayContaining([...baseline, artifactsPath, evalsPath]),
+          expect.arrayContaining([...baseline, artifactsPath, protectedPath]),
         );
         expect(settings.filesystem.denyWrite).toEqual(
-          expect.arrayContaining([...baseline, artifactsPath, evalsPath]),
+          expect.arrayContaining([...baseline, artifactsPath, protectedPath]),
         );
         expect(settings.filesystem.denyRead).toEqual(
           settings.filesystem.denyWrite,
@@ -129,8 +127,8 @@ describe("sandbox", () => {
             sandboxSettingsPath,
             runtimePath,
             artifactsPath,
-            extraWriteProtectedPaths: [evalsPath],
-            extraReadProtectedPaths: [evalsPath],
+            extraWriteProtectedPaths: [protectedPath],
+            extraReadProtectedPaths: [protectedPath],
           }),
         ).toThrow(/Invalid `sandbox\.yaml`/u);
       } finally {
@@ -151,8 +149,8 @@ describe("sandbox", () => {
           sandboxSettingsPath,
           runtimePath,
           artifactsPath,
-          extraWriteProtectedPaths: [evalsPath],
-          extraReadProtectedPaths: [evalsPath],
+          extraWriteProtectedPaths: [protectedPath],
+          extraReadProtectedPaths: [protectedPath],
         });
 
         expect(settings.network.allowedDomains).toEqual([
@@ -180,8 +178,8 @@ describe("sandbox", () => {
           sandboxSettingsPath,
           runtimePath,
           artifactsPath,
-          extraWriteProtectedPaths: [evalsPath],
-          extraReadProtectedPaths: [evalsPath],
+          extraWriteProtectedPaths: [protectedPath],
+          extraReadProtectedPaths: [protectedPath],
         });
 
         expect(settings.network.allowUnixSockets).toEqual([
@@ -209,8 +207,8 @@ describe("sandbox", () => {
           sandboxSettingsPath,
           runtimePath,
           artifactsPath,
-          extraWriteProtectedPaths: [evalsPath],
-          extraReadProtectedPaths: [evalsPath],
+          extraWriteProtectedPaths: [protectedPath],
+          extraReadProtectedPaths: [protectedPath],
         });
 
         expect(settings.network.allowedDomains).toEqual([
@@ -229,7 +227,7 @@ describe("sandbox", () => {
             ...baseline,
             join(workspacePath, "sandbox-secrets"),
             artifactsPath,
-            evalsPath,
+            protectedPath,
           ]),
         );
         expect(settings.filesystem.denyWrite).toEqual(
@@ -237,7 +235,7 @@ describe("sandbox", () => {
             ...baseline,
             "/tmp/cache/sensitive",
             artifactsPath,
-            evalsPath,
+            protectedPath,
           ]),
         );
         expect(settings.filesystem.denyWrite).not.toContain(runtimePath);
@@ -265,13 +263,13 @@ describe("sandbox", () => {
           sandboxSettingsPath,
           runtimePath,
           artifactsPath,
-          extraWriteProtectedPaths: [evalsPath],
-          extraReadProtectedPaths: [evalsPath],
+          extraWriteProtectedPaths: [protectedPath],
+          extraReadProtectedPaths: [protectedPath],
         });
 
         const baseline = expectedRunBaselinePaths(root);
         expect(settings.filesystem.denyWrite).toEqual(
-          expect.arrayContaining([...baseline, artifactsPath, evalsPath]),
+          expect.arrayContaining([...baseline, artifactsPath, protectedPath]),
         );
         expect(settings.filesystem.denyWrite).not.toContain(runtimePath);
         expect(settings.filesystem.denyWrite).not.toContain(

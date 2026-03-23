@@ -1,6 +1,5 @@
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
-import type { EvalDefinition } from "../../../configs/evals/types.js";
 import type { AgentExecutionResult } from "../../../domains/runs/competition/reports.js";
 import { prepareAgentForExecution } from "./agents/preparation.js";
 import type {
@@ -15,7 +14,6 @@ export async function prepareAgents(options: {
   root: string;
   specContent: string;
   extraContextFiles: readonly import("../../../competition/shared/extra-context.js").ResolvedExtraContextFile[];
-  evalPlan: readonly EvalDefinition[];
   environment: EnvironmentConfig;
 }): Promise<AgentPreparationResult> {
   const {
@@ -25,7 +23,6 @@ export async function prepareAgents(options: {
     root,
     specContent,
     extraContextFiles,
-    evalPlan,
     environment,
   } = options;
 
@@ -40,7 +37,6 @@ export async function prepareAgents(options: {
       root,
       specContent,
       extraContextFiles,
-      evalPlan,
       environment,
     });
     if (preparation.status === "ready") {

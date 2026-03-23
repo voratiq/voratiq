@@ -336,12 +336,6 @@ suite("voratiq run (integration)", () => {
         expect(agent.status).toBe("succeeded");
         expect(agent.diffAttempted).toBe(true);
         expect(agent.diffCaptured).toBe(true);
-        expect(agent.evals).toHaveLength(4);
-        expect(
-          agent.evals.every((evaluation) =>
-            ["succeeded", "skipped"].includes(evaluation.status),
-          ),
-        ).toBe(true);
         expect(agent.baseDirectory).toBe(
           `.voratiq/runs/sessions/${runReport.runId}/${agent.agentId}`,
         );
@@ -1152,7 +1146,7 @@ async function writeOrchestrationConfig(
     appendOrchestrationStage(lines, "run", profileStages.runAgentIds ?? []);
     appendOrchestrationStage(
       lines,
-      "review",
+      "verify",
       profileStages.reviewAgentIds ?? [],
     );
     appendOrchestrationStage(
@@ -1172,7 +1166,7 @@ async function writeOrchestrationConfig(
 
 function appendOrchestrationStage(
   lines: string[],
-  stageId: "run" | "review" | "spec" | "reduce",
+  stageId: "run" | "verify" | "spec" | "reduce",
   agentIds: readonly string[],
 ): void {
   lines.push(`    ${stageId}:`);

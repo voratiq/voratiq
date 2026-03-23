@@ -3,7 +3,6 @@ import { describe } from "@jest/globals";
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
-import type { EvalDefinition } from "../../../src/configs/evals/types.js";
 import { createRunCompetitionAdapter } from "../../../src/domains/runs/competition/adapter.js";
 import type { PreparedAgentExecution } from "../../../src/domains/runs/competition/agents/types.js";
 import type { AgentExecutionResult } from "../../../src/domains/runs/competition/reports.js";
@@ -43,7 +42,6 @@ const subject: AdapterContractSubject<AgentExecutionResult> = {
         runId: "run-id",
         root: "/repo",
         specContent: "spec",
-        evalPlan: [] satisfies readonly EvalDefinition[],
         mutators,
         environment,
       },
@@ -148,7 +146,6 @@ function toPreparedExecution(agent: AgentDefinition): PreparedAgentExecution {
     root: "/repo",
     runId: "run-id",
     prompt: "spec",
-    evalPlan: [],
     environment,
   };
 }
@@ -172,7 +169,6 @@ function buildExecutionResult(
       runtimeManifestPath: `runs/run-id/agents/${agentId}/runtime-manifest.json`,
       baseDirectory: `runs/run-id/agents/${agentId}`,
       assets: {},
-      evals: [],
       startedAt: "2026-01-01T00:00:00.000Z",
       completedAt: "2026-01-01T00:00:01.000Z",
       diffAttempted: false,
@@ -192,7 +188,6 @@ function buildAgentRecord(
   status: "running" | "succeeded" | "failed";
   startedAt?: string;
   completedAt?: string;
-  evals?: [];
   error?: string;
 } {
   if (status === "running") {
@@ -210,7 +205,6 @@ function buildAgentRecord(
     status,
     startedAt: "2026-01-01T00:00:00.000Z",
     completedAt: "2026-01-01T00:00:01.000Z",
-    evals: [],
     ...(reason ? { error: reason } : {}),
   };
 }

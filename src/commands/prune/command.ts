@@ -31,7 +31,6 @@ import {
 import {
   buildAgentArtifactPaths,
   getAgentDirectoryPath,
-  getAgentEvalsDirectoryPath,
   getAgentWorkspaceDirectoryPath,
   getRunDirectoryPath,
   resolveWorkspacePath,
@@ -332,16 +331,6 @@ function buildArtifactTargets(options: {
     register(artifactPaths.diffPath, "file");
     register(artifactPaths.summaryPath, "file");
     register(artifactPaths.chatPath, "file");
-
-    const hasEvalLogs = (agent.evals ?? []).some(
-      (evaluation) => evaluation.hasLog,
-    );
-    if (hasEvalLogs) {
-      register(
-        getAgentEvalsDirectoryPath(runRecord.runId, agent.agentId),
-        "directory",
-      );
-    }
   }
 
   return Array.from(entries.values()).sort((a, b) =>

@@ -12,37 +12,6 @@ import {
 } from "../support/factories/run-records.js";
 
 describe("report mapping helpers", () => {
-  const baseEvalResults = [
-    {
-      slug: "format" as const,
-      status: "succeeded" as const,
-      exitCode: 0,
-      command: "npm run format:check",
-      hasLog: true,
-    },
-    {
-      slug: "lint" as const,
-      status: "succeeded" as const,
-      exitCode: 0,
-      command: "npm run lint",
-      hasLog: true,
-    },
-    {
-      slug: "typecheck" as const,
-      status: "succeeded" as const,
-      exitCode: 0,
-      command: "npx tsc --noEmit",
-      hasLog: true,
-    },
-    {
-      slug: "tests" as const,
-      status: "succeeded" as const,
-      exitCode: 0,
-      command: "npm test",
-      hasLog: true,
-    },
-  ];
-
   const runId = "123";
 
   const baseAgentRecord: AgentInvocationRecord = createAgentInvocationRecord({
@@ -52,7 +21,6 @@ describe("report mapping helpers", () => {
     startedAt: new Date(0).toISOString(),
     completedAt: new Date(0).toISOString(),
     commitSha: "abc123",
-    evals: baseEvalResults,
     artifacts: {
       diffAttempted: true,
       diffCaptured: true,
@@ -79,10 +47,6 @@ describe("report mapping helpers", () => {
     expect(report.diffStatistics).toBe("1 file changed");
     expect(report.diffAttempted).toBe(true);
     expect(report.diffCaptured).toBe(true);
-    expect(report.evals).toHaveLength(baseEvalResults.length);
-    expect(report.evals[0]?.logPath).toBe(
-      `.voratiq/runs/sessions/${runId}/claude/evals/${baseEvalResults[0]?.slug}.log`,
-    );
   });
 
   it("maps run report fields and validates derived flags", () => {
@@ -107,7 +71,7 @@ describe("report mapping helpers", () => {
       status: "succeeded",
     });
 
-    const runReport = toRunReport(runRecord, [agentReport], false, false);
+    const runReport = toRunReport(runRecord, [agentReport], false);
     expect(runReport.runId).toBe(runRecord.runId);
     expect(runReport.createdAt).toBe(runRecord.createdAt);
     expect(runReport.startedAt).toBe(runRecord.startedAt);
@@ -115,7 +79,6 @@ describe("report mapping helpers", () => {
     expect(runReport.baseRevisionSha).toBe(runRecord.baseRevisionSha);
     expect(runReport.agents).toHaveLength(1);
     expect(runReport.hadAgentFailure).toBe(false);
-    expect(runReport.hadEvalFailure).toBe(false);
     expect(runReport.status).toBe("succeeded");
   });
 
@@ -137,10 +100,6 @@ describe("report mapping helpers", () => {
         stdoutPath: ".voratiq/runs/sessions/bad/codex/artifacts/stdout.log",
         stderrPath: ".voratiq/runs/sessions/bad/codex/artifacts/stderr.log",
       },
-      evals: baseEvalResults.map((evaluation) => ({
-        ...evaluation,
-        hasLog: false,
-      })),
       error: "Agent failed to modify the workspace",
       diffAttempted: false,
       diffCaptured: false,
@@ -157,52 +116,9 @@ describe("report mapping helpers", () => {
       status: "succeeded",
     });
 
-    expect(() => toRunReport(runRecord, [failingAgent], false, false)).toThrow(
+    expect(() => toRunReport(runRecord, [failingAgent], false)).toThrow(
       /hadAgentFailure/,
     );
-  });
-
-  it("tracks eval failure independently from execution status", () => {
-    const failingRunId = "tests-failed-run";
-    const evalFailedRecord: AgentInvocationRecord = {
-      ...baseAgentRecord,
-      status: "succeeded",
-      evals: baseEvalResults.map((evaluation) =>
-        evaluation.slug === "lint"
-          ? {
-              ...evaluation,
-              status: "failed" as const,
-              exitCode: 1,
-            }
-          : evaluation,
-      ),
-    };
-
-    const agentReport = toAgentReport(failingRunId, evalFailedRecord, {
-      diffAttempted: true,
-      diffCaptured: true,
-      diffStatistics: "1 file changed",
-      tokenUsageResult: {
-        status: "unavailable",
-        reason: "chat_not_captured",
-        provider: "unknown",
-        modelId: evalFailedRecord.model,
-      },
-    });
-
-    const runRecord = createRunRecord({
-      runId: failingRunId,
-      baseRevisionSha: "abc123",
-      spec: { path: "specs/sample.md" },
-      createdAt: new Date(0).toISOString(),
-      agents: [evalFailedRecord],
-      status: "succeeded",
-    });
-
-    const runReport = toRunReport(runRecord, [agentReport], false, true);
-    expect(runReport.hadEvalFailure).toBe(true);
-    expect(runReport.hadAgentFailure).toBe(false);
-    expect(runReport.status).toBe("succeeded");
   });
 
   it("exposes provider-native token usage on run reports", () => {
@@ -239,7 +155,7 @@ describe("report mapping helpers", () => {
       status: "succeeded",
     });
 
-    const runReport = toRunReport(runRecord, [agentReport], false, false);
+    const runReport = toRunReport(runRecord, [agentReport], false);
     expect(runReport.agents[0]?.tokenUsage).toEqual(tokenUsage);
     expect(runReport.agents[0]?.tokenUsageResult).toEqual({
       status: "available",

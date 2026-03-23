@@ -13,5 +13,4 @@ export interface AgentExecutionPhaseResult {
   readonly agentRecords: AgentInvocationRecord[];
   readonly agentReports: AgentReport[];
   readonly hadAgentFailure: boolean;
-  readonly hadEvalFailure: boolean;
 }

@@ -1,9 +1,5 @@
 import type { SandboxFailFastInfo } from "../../../../agents/runtime/sandbox.js";
 import type { AgentDefinition } from "../../../../configs/agents/types.js";
-import type {
-  AgentEvalResult,
-  EvalDefinition,
-} from "../../../../configs/evals/types.js";
 import type { RunCommandError } from "../../../../domains/runs/competition/errors.js";
 import {
   type AgentExecutionResult,
@@ -12,7 +8,6 @@ import {
 } from "../../../../domains/runs/competition/reports.js";
 import type {
   AgentArtifactState,
-  AgentEvalSnapshot,
   AgentInvocationRecord,
   AgentStatus,
   ExtractedTokenUsage,
@@ -32,28 +27,23 @@ export class AgentRunContext {
 
   public status: AgentStatus = "succeeded";
   public commitSha: string | undefined;
-  public evalResults: AgentEvalResult[];
   public errorMessage: string | undefined;
   public watchdogMetadata: WatchdogMetadata | undefined;
   private failFast: SandboxFailFastInfo | undefined;
   private completedAt: string | undefined;
   private startedAt: string;
-  private readonly evalPlan: readonly EvalDefinition[];
   private readonly runId: string;
   private readonly agent: AgentDefinition;
   private artifactState: AgentArtifactState;
-  private evalWarnings: string[] = [];
 
   constructor(params: {
     agent: AgentDefinition;
     runId: string;
     startedAt: string;
-    evalPlan: readonly EvalDefinition[];
   }) {
     this.agent = params.agent;
     this.runId = params.runId;
     this.startedAt = params.startedAt;
-    this.evalPlan = params.evalPlan;
     this.state = {
       diffAttempted: false,
       diffCaptured: false,
@@ -64,7 +54,6 @@ export class AgentRunContext {
         modelId: params.agent.model,
       }),
     };
-    this.evalResults = buildDefaultEvalResults(this.evalPlan);
     this.artifactState = {
       diffAttempted: false,
       diffCaptured: false,
@@ -124,27 +113,9 @@ export class AgentRunContext {
     this.state.diffCaptured ||= result.diffCaptured;
   }
 
-  public applyEvaluations(results: AgentEvalResult[]): void {
-    const defaults = buildDefaultEvalResults(this.evalPlan);
-    const bySlug = new Map(
-      results.map((evaluation) => [evaluation.slug, evaluation]),
-    );
-    this.evalResults = defaults.map((fallback) => {
-      const evaluation = bySlug.get(fallback.slug);
-      return evaluation ?? fallback;
-    });
-    // Evals are quality signals, not execution outcomes.
-    // Agent status depends only on execution results (process exit code, etc.),
-    // not on eval failures. Eval results are tracked and exposed separately.
-  }
-
   public markChatArtifact(format: ChatArtifactFormat): void {
     this.artifactState.chatCaptured = true;
     this.artifactState.chatFormat = format;
-  }
-
-  public recordEvalWarnings(warnings: readonly string[]): void {
-    this.evalWarnings.push(...warnings);
   }
 
   public setWatchdogMetadata(metadata: WatchdogMetadata): void {
@@ -170,8 +141,6 @@ export class AgentRunContext {
       startedAt: this.startedAt,
       status: this.status,
       artifacts: this.artifactState,
-      evalResults: this.evalResults,
-      warnings: this.evalWarnings,
       diffStatistics: this.state.diffStatistics,
       tokenUsage: this.state.tokenUsage,
       watchdog: this.watchdogMetadata,
@@ -183,7 +152,6 @@ export class AgentRunContext {
 
   /**
    * Build an early failure record for immediate UI surfacing when watchdog triggers.
-   * Includes placeholder evals so the record satisfies agentInvocationRecordSchema.
    */
   public buildEarlyFailureRecord(errorMessage: string): AgentInvocationRecord {
     return buildAgentRecord({
@@ -194,24 +162,12 @@ export class AgentRunContext {
       startedAt: this.startedAt,
       status: "failed",
       artifacts: this.artifactState,
-      evalResults: this.evalResults,
-      warnings: this.evalWarnings,
       diffStatistics: undefined,
       tokenUsage: this.state.tokenUsage,
       watchdog: this.watchdogMetadata,
       failFast: this.failFast,
     });
   }
-}
-
-export function buildDefaultEvalResults(
-  definitions: readonly EvalDefinition[],
-): AgentEvalResult[] {
-  return definitions.map(({ slug, command }) => ({
-    slug,
-    command,
-    status: "skipped" as const,
-  }));
 }
 
 function buildAgentRecord(options: {
@@ -222,8 +178,6 @@ function buildAgentRecord(options: {
   startedAt: string;
   status: AgentStatus;
   artifacts: AgentArtifactState;
-  evalResults: AgentEvalResult[];
-  warnings: readonly string[];
   diffStatistics?: string;
   tokenUsage?: ExtractedTokenUsage;
   watchdog?: WatchdogMetadata;
@@ -237,19 +191,14 @@ function buildAgentRecord(options: {
     startedAt,
     status,
     artifacts,
-    evalResults,
-    warnings,
     diffStatistics,
     tokenUsage,
     watchdog,
     failFast,
   } = options;
 
-  const snapshots = toEvalSnapshots(evalResults);
   const artifactState =
     Object.keys(artifacts).length > 0 ? artifacts : undefined;
-  const normalizedWarnings =
-    warnings.length > 0 ? Array.from(new Set(warnings)) : undefined;
   const normalizedDiffStatistics = normalizeDiffStatistics(diffStatistics);
 
   const record: AgentInvocationRecord = {
@@ -260,9 +209,7 @@ function buildAgentRecord(options: {
     status,
     commitSha,
     artifacts: artifactState,
-    evals: snapshots,
     error: errorMessage,
-    warnings: normalizedWarnings,
     tokenUsage,
     watchdog,
     ...(failFast
@@ -279,15 +226,4 @@ function buildAgentRecord(options: {
   }
 
   return record;
-}
-
-function toEvalSnapshots(results: AgentEvalResult[]): AgentEvalSnapshot[] {
-  return results.map((evaluation) => ({
-    slug: evaluation.slug,
-    status: evaluation.status,
-    command: evaluation.command,
-    exitCode: evaluation.exitCode,
-    hasLog: evaluation.logPath !== undefined,
-    error: evaluation.error,
-  }));
 }

@@ -1,7 +1,10 @@
 import type { InitCommandResult } from "../../commands/init/types.js";
 import { getAgentDefaultsForPreset } from "../../configs/agents/defaults.js";
-import type { EvalSlug } from "../../configs/evals/types.js";
 import { colorize } from "../../utils/colors.js";
+import {
+  formatWorkspacePath,
+  VORATIQ_VERIFICATION_CONFIG_FILE,
+} from "../../workspace/structure.js";
 import { renderTable } from "../utils/table.js";
 import { renderBlocks, renderTranscript } from "../utils/transcript.js";
 import { wrapWords } from "../utils/wrap.js";
@@ -24,32 +27,8 @@ export function renderPresetPromptPreface(firstPrompt: boolean): string[] {
   });
 }
 
-interface EvalCommandPromptRenderOptions {
-  commandName: EvalSlug;
-  commandText: string;
-  firstPrompt: boolean;
-}
-
 interface RenderInitTranscriptOptions {
   includeConfigurationHeading?: boolean;
-}
-
-export function renderEvalCommandPreface({
-  commandName,
-  commandText,
-  firstPrompt,
-}: EvalCommandPromptRenderOptions): string[] {
-  const sections: string[][] = [];
-  if (firstPrompt) {
-    sections.push(["Configuring evals…"]);
-  }
-
-  sections.push([`\`${commandName}\` command detected: \`${commandText}\``]);
-
-  return renderBlocks({
-    sections,
-    leadingBlankLine: firstPrompt,
-  });
 }
 
 export function renderInitTranscript(
@@ -58,7 +37,6 @@ export function renderInitTranscript(
     agentSummary,
     orchestrationSummary,
     environmentSummary,
-    evalSummary,
     sandboxSummary,
   }: InitCommandResult,
   options: RenderInitTranscriptOptions = {},
@@ -73,8 +51,8 @@ export function renderInitTranscript(
     buildConfigurationSummaryTable({
       orchestrationPath: orchestrationSummary.configPath,
       agentsPath: agentSummary.configPath,
+      verificationPath: formatWorkspacePath(VORATIQ_VERIFICATION_CONFIG_FILE),
       environmentPath: environmentSummary.configPath,
-      evalsPath: evalSummary.configPath,
       sandboxPath: sandboxSummary.configPath,
     }),
   );
@@ -102,8 +80,8 @@ export function renderInitTranscript(
 function buildConfigurationSummaryTable(paths: {
   orchestrationPath: string;
   agentsPath: string;
+  verificationPath: string;
   environmentPath: string;
-  evalsPath: string;
   sandboxPath: string;
 }): string[] {
   return renderTable({
@@ -114,8 +92,8 @@ function buildConfigurationSummaryTable(paths: {
     rows: [
       { configuration: "agents", path: paths.agentsPath },
       { configuration: "orchestration", path: paths.orchestrationPath },
+      { configuration: "verification", path: paths.verificationPath },
       { configuration: "environment", path: paths.environmentPath },
-      { configuration: "evals", path: paths.evalsPath },
       { configuration: "sandbox", path: paths.sandboxPath },
     ],
   });

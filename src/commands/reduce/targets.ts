@@ -7,13 +7,13 @@ import {
   TERMINAL_REDUCTION_STATUSES,
 } from "../../domains/reductions/model/types.js";
 import { readReductionRecords } from "../../domains/reductions/persistence/adapter.js";
-import { TERMINAL_REVIEW_STATUSES } from "../../domains/reviews/model/types.js";
-import { readReviewRecords } from "../../domains/reviews/persistence/adapter.js";
 import { buildRunRecordView } from "../../domains/runs/model/enhanced.js";
 import { RunRecordNotFoundError } from "../../domains/runs/model/errors.js";
 import { fetchRunsSafely } from "../../domains/runs/persistence/adapter.js";
 import { TERMINAL_SPEC_STATUSES } from "../../domains/specs/model/types.js";
 import { readSpecRecords } from "../../domains/specs/persistence/adapter.js";
+import { TERMINAL_VERIFICATION_STATUSES } from "../../domains/verifications/model/types.js";
+import { readVerificationRecords } from "../../domains/verifications/persistence/adapter.js";
 import { type RunStatus, TERMINAL_RUN_STATUSES } from "../../status/index.js";
 import { pathExists } from "../../utils/fs.js";
 import {
@@ -21,17 +21,14 @@ import {
   relativeToRoot,
   resolvePath,
 } from "../../utils/path.js";
-import {
-  REDUCTION_DATA_FILENAME,
-  REVIEW_RECOMMENDATION_FILENAME,
-} from "../../workspace/structure.js";
+import { REDUCTION_DATA_FILENAME } from "../../workspace/structure.js";
 
 export interface ReductionTargetValidationInput {
   root: string;
   specsFilePath: string;
   runsFilePath: string;
-  reviewsFilePath: string;
   reductionsFilePath: string;
+  verificationsFilePath: string;
   target: ReductionTarget;
 }
 
@@ -47,8 +44,8 @@ export async function assertReductionTargetEligible(
     case "run":
       await assertRunTargetEligible(input);
       return;
-    case "review":
-      await assertReviewTargetEligible(input);
+    case "verification":
+      await assertVerificationTargetEligible(input);
       return;
     case "reduction":
       await assertReductionTargetEligibleInternal(input);
@@ -198,50 +195,50 @@ function assertRunArtifactsPresent(status: RunStatus, runId: string): void {
   );
 }
 
-async function assertReviewTargetEligible(
+async function assertVerificationTargetEligible(
   input: ReductionTargetValidationInput,
 ): Promise<void> {
-  const { root, reviewsFilePath, target } = input;
+  const { root, verificationsFilePath, target } = input;
 
-  const [record] = await readReviewRecords({
+  const [record] = await readVerificationRecords({
     root,
-    reviewsFilePath,
+    verificationsFilePath,
     limit: 1,
     predicate: (entry) => entry.sessionId === target.id,
   });
 
   if (!record) {
     throw new CliError(
-      `Review session \`${target.id}\` not found.`,
+      `Verification session \`${target.id}\` not found.`,
       [],
       [
-        "Re-run `voratiq review` or confirm the session id in `.voratiq/reviews/index.json`.",
+        "Re-run `voratiq verify` or confirm the session id in `.voratiq/verifications/index.json`.",
       ],
     );
   }
 
-  if (!TERMINAL_REVIEW_STATUSES.includes(record.status)) {
+  if (!TERMINAL_VERIFICATION_STATUSES.includes(record.status)) {
     throw new CliError(
-      `Review session \`${target.id}\` is not complete.`,
+      `Verification session \`${target.id}\` is not complete.`,
       [`Status: \`${record.status}\`.`],
-      ["Wait for the review to finish or re-run `voratiq review`."],
+      ["Wait for the verification to finish or re-run `voratiq verify`."],
     );
   }
 
-  if (record.status !== "succeeded") {
+  if (record.status === "aborted") {
     throw new CliError(
-      `Review session \`${target.id}\` did not complete.`,
+      `Verification session \`${target.id}\` did not complete.`,
       [`Status: \`${record.status}\`.`],
-      ["Re-run `voratiq review` to generate a complete artifact set."],
+      ["Re-run `voratiq verify` to generate a complete artifact set."],
     );
   }
 
-  const missing = await findMissingReviewArtifacts(root, record.reviewers);
+  const missing = await findMissingVerificationArtifacts(root, record.methods);
   if (missing.length > 0) {
     throw new CliError(
-      `Review session \`${target.id}\` is missing required artifacts.`,
+      `Verification session \`${target.id}\` is missing required artifacts.`,
       missing.map((path) => `Missing: \`${path}\`.`),
-      ["Re-run `voratiq review` to regenerate review artifacts."],
+      ["Re-run `voratiq verify` to regenerate verification artifacts."],
     );
   }
 }
@@ -300,29 +297,21 @@ async function assertReductionTargetEligibleInternal(
   }
 }
 
-async function findMissingReviewArtifacts(
+async function findMissingVerificationArtifacts(
   root: string,
-  reviewers: ReadonlyArray<{ outputPath: string }>,
+  methods: ReadonlyArray<{ artifactPath?: string }>,
 ): Promise<string[]> {
   const missing: string[] = [];
   const seen = new Set<string>();
 
-  for (const reviewer of reviewers) {
-    const reviewPath = reviewer.outputPath;
-    const reviewAbsolute = resolvePath(root, reviewPath);
-    if (!(await pathExists(reviewAbsolute))) {
-      registerMissing(missing, seen, reviewPath);
+  for (const method of methods) {
+    if (!method.artifactPath) {
+      continue;
     }
-
-    const recommendationPath = normalizePathForDisplay(
-      relativeToRoot(
-        root,
-        resolvePath(root, dirname(reviewPath), REVIEW_RECOMMENDATION_FILENAME),
-      ),
-    );
-    const recommendationAbsolute = resolvePath(root, recommendationPath);
-    if (!(await pathExists(recommendationAbsolute))) {
-      registerMissing(missing, seen, recommendationPath);
+    const artifactPath = normalizePathForDisplay(method.artifactPath);
+    const artifactAbsolute = resolvePath(root, artifactPath);
+    if (!(await pathExists(artifactAbsolute))) {
+      registerMissing(missing, seen, artifactPath);
     }
   }
 

@@ -12,11 +12,6 @@ import {
   loadEnvironmentConfig,
 } from "../../configs/environment/loader.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
-import {
-  buildEvalDefinitions,
-  loadEvalConfig,
-} from "../../configs/evals/loader.js";
-import type { EvalDefinition } from "../../configs/evals/types.js";
 import { loadRepoSettings } from "../../configs/settings/loader.js";
 import {
   NoAgentsEnabledError,
@@ -40,7 +35,6 @@ export interface ValidationResult {
   readonly specContent: string;
   readonly baseRevisionSha: string;
   readonly agents: readonly AgentDefinition[];
-  readonly evalPlan: readonly EvalDefinition[];
   readonly effectiveMaxParallel: number;
   readonly environment: EnvironmentConfig;
 }
@@ -140,9 +134,6 @@ export async function validateAndPrepare(
     }
   })();
 
-  const evalConfig = loadEvalConfig({ root });
-  const evalPlan = buildEvalDefinitions(evalConfig);
-
   const effectiveMaxParallel = resolveEffectiveMaxParallel({
     competitorCount: agents.length,
     requestedMaxParallel,
@@ -152,7 +143,6 @@ export async function validateAndPrepare(
     specContent,
     baseRevisionSha,
     agents,
-    evalPlan,
     effectiveMaxParallel,
     environment,
   };

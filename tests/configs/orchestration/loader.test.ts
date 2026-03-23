@@ -67,7 +67,7 @@ profiles:
       agents:
         - id: codex
         - id: gemini
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -104,7 +104,7 @@ agents:
       ["codex", "gemini"],
     );
     expect(
-      config.profiles.default.review.agents.map((agent) => agent.id),
+      config.profiles.default.verify.agents.map((agent) => agent.id),
     ).toEqual(["codex"]);
     expect(
       config.profiles.default.spec.agents.map((agent) => agent.id),
@@ -121,7 +121,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -159,7 +159,7 @@ profiles:
   default:
     run:
       agents: []
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -187,7 +187,7 @@ agents:
 
     expect(config.profiles.default.run.agents).toEqual([]);
     expect(
-      config.profiles.default.review.agents.map((agent) => agent.id),
+      config.profiles.default.verify.agents.map((agent) => agent.id),
     ).toEqual(["codex"]);
     expect(config.profiles.default.spec.agents).toEqual([]);
     expect(config.profiles.default.reduce.agents).toEqual([]);
@@ -200,7 +200,7 @@ profiles:
   default:
     run:
       agents: []
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -240,7 +240,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -281,7 +281,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -294,7 +294,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -307,7 +307,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -352,7 +352,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -365,7 +365,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -407,7 +407,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -420,7 +420,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -461,7 +461,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -501,7 +501,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -543,7 +543,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     reduce:
@@ -573,7 +573,7 @@ agents:
     expect(load).toThrow(/profiles\.default\.spec/u);
   });
 
-  test("fails when profiles.default.review is missing", () => {
+  test("fails when profiles.default.verify is missing", () => {
     const orchestrationYaml = `
 profiles:
   default:
@@ -607,7 +607,7 @@ agents:
       });
 
     expect(load).toThrow(OrchestrationSchemaValidationError);
-    expect(load).toThrow(/profiles\.default\.review/u);
+    expect(load).toThrow(/profiles\.default\.verify/u);
   });
 
   test("fails when profiles.default.reduce is missing", () => {
@@ -617,7 +617,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -654,7 +654,7 @@ profiles:
     run:
       agents:
         - codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -694,7 +694,7 @@ profiles:
       agents:
         - id: codex
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -734,7 +734,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: ghost
     spec:
@@ -766,7 +766,7 @@ agents:
     expect(load).toThrow(OrchestrationSchemaValidationError);
     expect(load).toThrow(/Agent `ghost` is not defined in `agents\.yaml`/u);
     const message = getThrownMessage(load);
-    expect(message).not.toContain("profiles.default.review.agents[0].id");
+    expect(message).not.toContain("profiles.default.verify.agents[0].id");
   });
 
   test("fails when run stage references an unknown agent id", () => {
@@ -776,7 +776,7 @@ profiles:
     run:
       agents:
         - id: ghost
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -818,7 +818,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -860,7 +860,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -902,7 +902,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:
@@ -934,7 +934,7 @@ profiles:
     run:
       agents:
         - id: codex
-    review:
+    verify:
       agents:
         - id: codex
     spec:

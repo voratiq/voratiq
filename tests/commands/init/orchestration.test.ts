@@ -77,7 +77,7 @@ describe("init orchestration bootstrap", () => {
     expect(
       orchestration.profiles.default.run.agents.map((agent) => agent.id),
     ).toEqual(expectedProIds);
-    expect(orchestration.profiles.default.review.agents).toEqual([]);
+    expect(orchestration.profiles.default.verify.agents).toEqual([]);
     expect(orchestration.profiles.default.reduce.agents).toEqual([]);
   });
 
@@ -106,7 +106,7 @@ describe("init orchestration bootstrap", () => {
     const runIds = orchestration.profiles.default.run.agents.map(
       (agent) => agent.id,
     );
-    const reviewIds = orchestration.profiles.default.review.agents.map(
+    const reviewIds = orchestration.profiles.default.verify.agents.map(
       (agent) => agent.id,
     );
     const specIds = orchestration.profiles.default.spec.agents.map(
@@ -157,7 +157,7 @@ describe("init orchestration bootstrap", () => {
     expect(
       orchestration.profiles.default.run.agents.map((agent) => agent.id),
     ).toEqual(expectedLiteIds);
-    expect(orchestration.profiles.default.review.agents).toEqual([]);
+    expect(orchestration.profiles.default.verify.agents).toEqual([]);
     expect(orchestration.profiles.default.reduce.agents).toEqual([]);
   });
 
@@ -181,7 +181,7 @@ describe("init orchestration bootstrap", () => {
 
     expect(orchestration.profiles.default.spec.agents).toEqual([]);
     expect(orchestration.profiles.default.run.agents).toEqual([]);
-    expect(orchestration.profiles.default.review.agents).toEqual([]);
+    expect(orchestration.profiles.default.verify.agents).toEqual([]);
     expect(orchestration.profiles.default.reduce.agents).toEqual([]);
   });
 
@@ -210,7 +210,7 @@ describe("init orchestration bootstrap", () => {
     expect(
       orchestration.profiles.default.run.agents.map((agent) => agent.id),
     ).toEqual(expectedProIds);
-    expect(orchestration.profiles.default.review.agents).toEqual([]);
+    expect(orchestration.profiles.default.verify.agents).toEqual([]);
     expect(orchestration.profiles.default.reduce.agents).toEqual([]);
   });
 
@@ -225,7 +225,7 @@ describe("init orchestration bootstrap", () => {
         "      agents: []",
         "    run:",
         "      agents: []",
-        "    review:",
+        "    verify:",
         "      agents: []",
         "    reduce:",
         "      agents: []",
@@ -252,7 +252,7 @@ describe("init orchestration bootstrap", () => {
         "      agents: []",
         "    run:",
         "      agents: []",
-        "    review:",
+        "    verify:",
         "      agents: []",
         "    reduce:",
         "      agents: []",

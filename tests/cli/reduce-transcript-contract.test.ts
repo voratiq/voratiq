@@ -58,10 +58,12 @@ describe("reduce transcript contract", () => {
         workspaceDir: "/repo/.voratiq",
         runsDir: "/repo/.voratiq/runs",
         runsFile: "/repo/.voratiq/runs/index.json",
-        reviewsDir: "/repo/.voratiq/reviews",
-        reviewsFile: "/repo/.voratiq/reviews/index.json",
+        reductionsDir: "/repo/.voratiq/reductions",
+        reductionsFile: "/repo/.voratiq/reductions/index.json",
         specsDir: "/repo/.voratiq/specs",
         specsFile: "/repo/.voratiq/specs/index.json",
+        verificationsDir: "/repo/.voratiq/verifications",
+        verificationsFile: "/repo/.voratiq/verifications/index.json",
       },
     });
   });
@@ -143,10 +145,10 @@ describe("reduce transcript contract", () => {
     expect(body).not.toContain("--extra-context");
   });
 
-  it("does not emit a continuation hint for review targets either", async () => {
+  it("does not emit a continuation hint for verification targets either", async () => {
     executeReduceCommandMock.mockResolvedValue({
       reductionId: "reduce-789",
-      target: { type: "review", id: "review-123" },
+      target: { type: "verification", id: "verify-123" },
       reducerAgentIds: ["alpha"],
       reductions: [],
     } as unknown as Awaited<ReturnType<typeof executeReduceCommand>>);
@@ -154,7 +156,7 @@ describe("reduce transcript contract", () => {
     readReductionRecordsMock.mockResolvedValue([
       {
         sessionId: "reduce-789",
-        target: { type: "review", id: "review-123" },
+        target: { type: "verification", id: "verify-123" },
         createdAt: "2026-01-01T00:00:00.000Z",
         completedAt: "2026-01-01T00:00:10.000Z",
         status: "succeeded",
@@ -179,7 +181,7 @@ describe("reduce transcript contract", () => {
       "## Reduction\n**Sources**: x\n**Summary**: ok\n",
     );
     const result = await runReduceCommand({
-      target: { type: "review", id: "review-123" },
+      target: { type: "verification", id: "verify-123" },
       stdout: { write: () => true, isTTY: false },
       writeOutput: () => undefined,
     });
@@ -192,7 +194,7 @@ describe("reduce transcript contract", () => {
   it("does not emit reuse hints on full failure", async () => {
     executeReduceCommandMock.mockResolvedValue({
       reductionId: "reduce-456",
-      target: { type: "review", id: "review-123" },
+      target: { type: "verification", id: "verify-123" },
       reducerAgentIds: ["alpha", "beta"],
       reductions: [],
     } as unknown as Awaited<ReturnType<typeof executeReduceCommand>>);
@@ -200,7 +202,7 @@ describe("reduce transcript contract", () => {
     readReductionRecordsMock.mockResolvedValue([
       {
         sessionId: "reduce-456",
-        target: { type: "review", id: "review-123" },
+        target: { type: "verification", id: "verify-123" },
         createdAt: "2026-01-01T00:00:00.000Z",
         completedAt: "2026-01-01T00:00:10.000Z",
         status: "failed",
@@ -231,7 +233,7 @@ describe("reduce transcript contract", () => {
     ]);
 
     const result = await runReduceCommand({
-      target: { type: "review", id: "review-123" },
+      target: { type: "verification", id: "verify-123" },
       stdout: { write: () => true, isTTY: true },
       writeOutput: () => undefined,
     });

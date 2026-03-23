@@ -19,7 +19,7 @@ import type {
 import { toErrorMessage } from "../../../../utils/errors.js";
 import { GIT_AUTHOR_EMAIL, GIT_AUTHOR_NAME } from "../../../../utils/git.js";
 import { extractProviderNativeTokenUsageForSession } from "../../../../workspace/chat/native-usage.js";
-import { runPostProcessingAndEvaluations } from "./eval-runner.js";
+import { runPostProcessingAndCollectArtifacts } from "./post-processing.js";
 import { AgentRunContext } from "./run-context.js";
 import type { PreparedAgentExecution } from "./types.js";
 
@@ -39,7 +39,6 @@ export async function executeAgentLifecycle(
     baseRevisionSha,
     root,
     prompt,
-    evalPlan,
     environment,
   } = execution;
   let manifestEnv: Record<string, string> = {};
@@ -102,10 +101,7 @@ export async function executeAgentLifecycle(
       },
       captureChat: true,
       teardownAuthOnExit: false,
-      ...composeStageSandboxPolicy({
-        stageWriteProtectedPaths: [workspacePaths.evalsDirPath],
-        stageReadProtectedPaths: [workspacePaths.evalsDirPath],
-      }),
+      ...composeStageSandboxPolicy({}),
       onWatchdogTrigger,
     });
 
@@ -167,24 +163,15 @@ export async function executeAgentLifecycle(
   }
 
   try {
-    const postProcessResult = await runPostProcessingAndEvaluations({
-      evalPlan,
+    const artifacts = await runPostProcessingAndCollectArtifacts({
       workspacePaths,
       baseRevisionSha,
       root,
-      manifestEnv,
       environment,
       persona: resolveSandboxPersona(manifestEnv),
     });
 
-    agentContext.applyArtifacts(postProcessResult.artifacts);
-    if (postProcessResult.warnings.length > 0) {
-      for (const warning of postProcessResult.warnings) {
-        console.warn(`[voratiq] ${warning}`);
-      }
-      agentContext.recordEvalWarnings(postProcessResult.warnings);
-    }
-    agentContext.applyEvaluations(postProcessResult.evaluations);
+    agentContext.applyArtifacts(artifacts);
   } catch (rawError) {
     const failure = classifyPostProcessError(rawError);
     return finalizeExecution(execution, async () =>

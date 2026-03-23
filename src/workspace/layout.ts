@@ -4,11 +4,12 @@ import { dirname } from "node:path";
 import type { AgentId } from "../configs/agents/types.js";
 import { normalizePathForDisplay, resolvePath } from "../utils/path.js";
 import {
+  ARTIFACTS_DIRNAME,
+  CONTEXT_DIRNAME,
   getAgentSessionArtifactsDirectoryPath,
   getAgentSessionContextDirectoryPath,
   getAgentSessionDirectoryPath,
   getAgentSessionManifestPath,
-  getAgentSessionReviewPath,
   getAgentSessionRuntimeDirectoryPath,
   getAgentSessionSandboxDirectoryPath,
   getAgentSessionSandboxHomePath,
@@ -17,7 +18,14 @@ import {
   getAgentSessionStdoutPath,
   getAgentSessionWorkspaceDirectoryPath,
   getRunDirectoryPath,
+  MANIFEST_FILENAME,
+  RUNTIME_DIRNAME,
+  SANDBOX_DIRNAME,
+  SANDBOX_SETTINGS_FILENAME,
+  STDERR_FILENAME,
+  STDOUT_FILENAME,
   VORATIQ_RUNS_DIR,
+  WORKSPACE_DIRNAME,
 } from "./structure.js";
 
 export interface RunWorkspacePaths {
@@ -44,7 +52,6 @@ export interface AgentWorkspacePaths {
   contextPath: string;
   stdoutPath: string;
   stderrPath: string;
-  reviewPath: string;
   workspacePath: string;
   runtimeManifestPath: string;
   sandboxPath: string;
@@ -114,10 +121,6 @@ const AGENT_WORKSPACE_ARTIFACTS = {
     getRelativePath: ({ domain, sessionId, agentId }) =>
       getAgentSessionStderrPath(domain, sessionId, agentId),
     initializeEmptyFile: true,
-  },
-  reviewPath: {
-    getRelativePath: ({ domain, sessionId, agentId }) =>
-      getAgentSessionReviewPath(domain, sessionId, agentId),
   },
   workspacePath: {
     getRelativePath: ({ domain, sessionId, agentId }) =>
@@ -224,6 +227,34 @@ export function buildAgentSessionWorkspacePaths(options: {
   return {
     agentRoot,
     ...absoluteArtifacts,
+  };
+}
+
+export function buildScopedAgentWorkspacePaths(options: {
+  agentRoot: string;
+}): AgentWorkspacePaths {
+  const { agentRoot } = options;
+
+  return {
+    agentRoot,
+    artifactsPath: resolvePath(agentRoot, ARTIFACTS_DIRNAME),
+    contextPath: resolvePath(agentRoot, CONTEXT_DIRNAME),
+    stdoutPath: resolvePath(agentRoot, ARTIFACTS_DIRNAME, STDOUT_FILENAME),
+    stderrPath: resolvePath(agentRoot, ARTIFACTS_DIRNAME, STDERR_FILENAME),
+    workspacePath: resolvePath(agentRoot, WORKSPACE_DIRNAME),
+    runtimeManifestPath: resolvePath(
+      agentRoot,
+      RUNTIME_DIRNAME,
+      MANIFEST_FILENAME,
+    ),
+    sandboxPath: resolvePath(agentRoot, SANDBOX_DIRNAME),
+    sandboxHomePath: resolvePath(agentRoot, SANDBOX_DIRNAME),
+    sandboxSettingsPath: resolvePath(
+      agentRoot,
+      RUNTIME_DIRNAME,
+      SANDBOX_SETTINGS_FILENAME,
+    ),
+    runtimePath: resolvePath(agentRoot, RUNTIME_DIRNAME),
   };
 }
 

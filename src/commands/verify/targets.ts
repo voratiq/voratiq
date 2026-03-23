@@ -1,0 +1,427 @@
+import { CliError, RunNotFoundCliError } from "../../cli/errors.js";
+import type { ReductionRecord } from "../../domains/reductions/model/types.js";
+import { TERMINAL_REDUCTION_STATUSES } from "../../domains/reductions/model/types.js";
+import { readReductionRecords } from "../../domains/reductions/persistence/adapter.js";
+import { RunRecordNotFoundError } from "../../domains/runs/model/errors.js";
+import type { RunRecord } from "../../domains/runs/model/types.js";
+import { fetchRunsSafely } from "../../domains/runs/persistence/adapter.js";
+import type { SpecRecord } from "../../domains/specs/model/types.js";
+import { TERMINAL_SPEC_STATUSES } from "../../domains/specs/model/types.js";
+import { readSpecRecords } from "../../domains/specs/persistence/adapter.js";
+import type {
+  ResolvedVerificationTarget,
+  VerificationCompetitiveCandidate,
+} from "../../domains/verifications/competition/target.js";
+import { readVerificationRecords } from "../../domains/verifications/persistence/adapter.js";
+import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
+
+export type VerifyTargetKind = "spec" | "run" | "reduce";
+
+export interface VerifyTargetSelection {
+  kind: VerifyTargetKind;
+  sessionId: string;
+}
+
+export interface ResolveVerifyTargetInput {
+  root: string;
+  specsFilePath: string;
+  runsFilePath: string;
+  reductionsFilePath: string;
+  verificationsFilePath: string;
+  target: VerifyTargetSelection;
+}
+
+export type VerifyCompetitiveCandidate = VerificationCompetitiveCandidate;
+
+export type ResolvedVerifyTarget = ResolvedVerificationTarget;
+
+export async function resolveVerifyTarget(
+  input: ResolveVerifyTargetInput,
+): Promise<ResolvedVerifyTarget> {
+  const { target } = input;
+
+  switch (target.kind) {
+    case "spec":
+      return resolveSpecVerifyTarget(input);
+    case "run":
+      return resolveRunVerifyTarget(input);
+    case "reduce":
+      return resolveReductionVerifyTarget(input);
+  }
+}
+
+async function resolveSpecVerifyTarget(
+  input: ResolveVerifyTargetInput,
+): Promise<ResolvedVerifyTarget> {
+  const { root, specsFilePath, target } = input;
+
+  const [record] = await readSpecRecords({
+    root,
+    specsFilePath,
+    limit: 1,
+    predicate: (entry) => entry.sessionId === target.sessionId,
+  });
+
+  if (!record) {
+    throw new CliError(
+      `Spec session \`${target.sessionId}\` not found.`,
+      [],
+      [
+        "Re-run `voratiq spec` or confirm the session id in `.voratiq/specs/index.json`.",
+      ],
+    );
+  }
+
+  if (!TERMINAL_SPEC_STATUSES.includes(record.status)) {
+    throw new CliError(
+      `Spec session \`${target.sessionId}\` is not complete.`,
+      [`Status: \`${record.status}\`.`],
+      ["Wait for the spec to finish before running `voratiq verify`."],
+    );
+  }
+
+  return {
+    baseRevisionSha: resolveSpecBaseRevisionSha(record),
+    competitiveCandidates: record.agents
+      .filter((agent) => agent.status === "succeeded" && agent.outputPath)
+      .map((agent) => ({
+        canonicalId: agent.agentId,
+        forbiddenIdentityTokens: [agent.agentId],
+      })),
+    target: {
+      kind: "spec",
+      sessionId: record.sessionId,
+    },
+    specRecord: record,
+  };
+}
+
+async function resolveRunVerifyTarget(
+  input: ResolveVerifyTargetInput,
+): Promise<ResolvedVerifyTarget> {
+  const { root, runsFilePath, target } = input;
+
+  const { records } = await fetchRunsSafely({
+    root,
+    runsFilePath,
+    runId: target.sessionId,
+    filters: { includeDeleted: true },
+  }).catch((error) => {
+    if (error instanceof RunRecordNotFoundError) {
+      throw new RunNotFoundCliError(target.sessionId);
+    }
+    throw error;
+  });
+
+  const record = records[0];
+  if (!record) {
+    throw new RunNotFoundCliError(target.sessionId);
+  }
+
+  if (record.deletedAt) {
+    throw new CliError(
+      `Run \`${target.sessionId}\` has been pruned.`,
+      [],
+      ["Re-run `voratiq run` to regenerate artifacts before verification."],
+    );
+  }
+
+  if (!TERMINAL_RUN_STATUSES.includes(record.status)) {
+    throw new CliError(
+      `Run \`${target.sessionId}\` is not complete.`,
+      [`Status: \`${record.status}\`.`],
+      ["Wait for the run to finish before running `voratiq verify`."],
+    );
+  }
+
+  const candidateIds = [
+    ...new Set(record.agents.map((agent) => agent.agentId)),
+  ].sort((left, right) => left.localeCompare(right));
+
+  if (candidateIds.length === 0) {
+    throw new CliError(
+      `Run \`${target.sessionId}\` has no candidate agents to verify.`,
+      [],
+      ["Re-run `voratiq run` to generate verifiable candidates."],
+    );
+  }
+
+  return {
+    baseRevisionSha: record.baseRevisionSha,
+    competitiveCandidates: candidateIds.map((candidateId) => ({
+      canonicalId: candidateId,
+      forbiddenIdentityTokens: collectRunCandidateIdentityTokens({
+        runRecord: record,
+        candidateId,
+      }),
+    })),
+    target: {
+      kind: "run",
+      sessionId: record.runId,
+      candidateIds,
+    },
+    runRecord: record,
+  };
+}
+
+async function resolveReductionVerifyTarget(
+  input: ResolveVerifyTargetInput,
+): Promise<ResolvedVerifyTarget> {
+  const { root, reductionsFilePath, target } = input;
+
+  const [record] = await readReductionRecords({
+    root,
+    reductionsFilePath,
+    limit: 1,
+    predicate: (entry) => entry.sessionId === target.sessionId,
+  });
+
+  if (!record) {
+    throw new CliError(
+      `Reduction session \`${target.sessionId}\` not found.`,
+      [],
+      [
+        "Re-run `voratiq reduce` or confirm the session id in `.voratiq/reductions/index.json`.",
+      ],
+    );
+  }
+
+  if (!TERMINAL_REDUCTION_STATUSES.includes(record.status)) {
+    throw new CliError(
+      `Reduction session \`${target.sessionId}\` is not complete.`,
+      [`Status: \`${record.status}\`.`],
+      ["Wait for the reduction to finish before running `voratiq verify`."],
+    );
+  }
+
+  return {
+    baseRevisionSha: await resolveReductionBaseRevisionSha({
+      ...input,
+      reductionRecord: record,
+    }),
+    competitiveCandidates: record.reducers
+      .filter((reducer) => reducer.status === "succeeded" && reducer.outputPath)
+      .map((reducer) => ({
+        canonicalId: reducer.agentId,
+        forbiddenIdentityTokens: [reducer.agentId],
+      })),
+    target: {
+      kind: "reduce",
+      sessionId: record.sessionId,
+    },
+    reductionRecord: record,
+  };
+}
+
+function collectRunCandidateIdentityTokens(options: {
+  runRecord: RunRecord;
+  candidateId: string;
+}): string[] {
+  const { runRecord, candidateId } = options;
+  const tokens = new Set<string>();
+  tokens.add(candidateId);
+  for (const agent of runRecord.agents) {
+    if (agent.agentId !== candidateId) {
+      continue;
+    }
+    tokens.add(agent.agentId);
+    if (agent.model.trim().length > 0) {
+      tokens.add(agent.model);
+    }
+  }
+  return Array.from(tokens);
+}
+
+async function resolveReductionBaseRevisionSha(options: {
+  root: string;
+  specsFilePath: string;
+  runsFilePath: string;
+  reductionsFilePath: string;
+  verificationsFilePath: string;
+  reductionRecord: ReductionRecord;
+  seenReductionIds?: Set<string>;
+}): Promise<string> {
+  const {
+    root,
+    specsFilePath,
+    runsFilePath,
+    reductionsFilePath,
+    verificationsFilePath,
+    reductionRecord,
+    seenReductionIds = new Set<string>(),
+  } = options;
+
+  if (seenReductionIds.has(reductionRecord.sessionId)) {
+    throw new CliError(
+      `Reduction session \`${reductionRecord.sessionId}\` has a recursive target chain.`,
+      [],
+      [
+        "Inspect `.voratiq/reductions/index.json` and repair the reduction target metadata.",
+      ],
+    );
+  }
+  seenReductionIds.add(reductionRecord.sessionId);
+
+  switch (reductionRecord.target.type) {
+    case "spec": {
+      const [record] = await readSpecRecords({
+        root,
+        specsFilePath,
+        limit: 1,
+        predicate: (entry) => entry.sessionId === reductionRecord.target.id,
+      });
+      if (!record) {
+        throw new CliError(
+          `Spec session \`${reductionRecord.target.id}\` referenced by reduction \`${reductionRecord.sessionId}\` was not found.`,
+        );
+      }
+      return resolveSpecBaseRevisionSha(record, {
+        ownerLabel: `reduction \`${reductionRecord.sessionId}\``,
+      });
+    }
+    case "run": {
+      const { records } = await fetchRunsSafely({
+        root,
+        runsFilePath,
+        runId: reductionRecord.target.id,
+        filters: { includeDeleted: true },
+      }).catch((error) => {
+        if (error instanceof RunRecordNotFoundError) {
+          throw new RunNotFoundCliError(reductionRecord.target.id);
+        }
+        throw error;
+      });
+      const runRecord = records[0];
+      if (!runRecord) {
+        throw new RunNotFoundCliError(reductionRecord.target.id);
+      }
+      return runRecord.baseRevisionSha;
+    }
+    case "verification": {
+      const [verificationRecord] = await readVerificationRecords({
+        root,
+        verificationsFilePath,
+        limit: 1,
+        predicate: (entry) => entry.sessionId === reductionRecord.target.id,
+      });
+      if (!verificationRecord) {
+        throw new CliError(
+          `Verification session \`${reductionRecord.target.id}\` referenced by reduction \`${reductionRecord.sessionId}\` was not found.`,
+        );
+      }
+
+      switch (verificationRecord.target.kind) {
+        case "run": {
+          const { records } = await fetchRunsSafely({
+            root,
+            runsFilePath,
+            runId: verificationRecord.target.sessionId,
+            filters: { includeDeleted: true },
+          }).catch((error) => {
+            if (error instanceof RunRecordNotFoundError) {
+              throw new RunNotFoundCliError(
+                verificationRecord.target.sessionId,
+              );
+            }
+            throw error;
+          });
+          const runRecord = records[0];
+          if (!runRecord) {
+            throw new RunNotFoundCliError(verificationRecord.target.sessionId);
+          }
+          return runRecord.baseRevisionSha;
+        }
+        case "spec": {
+          const [record] = await readSpecRecords({
+            root,
+            specsFilePath,
+            limit: 1,
+            predicate: (entry) =>
+              entry.sessionId === verificationRecord.target.sessionId,
+          });
+          if (!record) {
+            throw new CliError(
+              `Spec session \`${verificationRecord.target.sessionId}\` referenced by verification \`${verificationRecord.sessionId}\` was not found.`,
+            );
+          }
+          return resolveSpecBaseRevisionSha(record, {
+            ownerLabel: `verification \`${verificationRecord.sessionId}\``,
+          });
+        }
+        case "reduce": {
+          const [parentReduction] = await readReductionRecords({
+            root,
+            reductionsFilePath,
+            limit: 1,
+            predicate: (entry) =>
+              entry.sessionId === verificationRecord.target.sessionId,
+          });
+          if (!parentReduction) {
+            throw new CliError(
+              `Reduction session \`${verificationRecord.target.sessionId}\` referenced by verification \`${verificationRecord.sessionId}\` was not found.`,
+            );
+          }
+          return await resolveReductionBaseRevisionSha({
+            root,
+            specsFilePath,
+            runsFilePath,
+            reductionsFilePath,
+            verificationsFilePath,
+            reductionRecord: parentReduction,
+            seenReductionIds,
+          });
+        }
+      }
+      throw new CliError(
+        `Verification session \`${verificationRecord.sessionId}\` references an unsupported target kind.`,
+      );
+    }
+    case "reduction": {
+      const [parentReduction] = await readReductionRecords({
+        root,
+        reductionsFilePath,
+        limit: 1,
+        predicate: (entry) => entry.sessionId === reductionRecord.target.id,
+      });
+      if (!parentReduction) {
+        throw new CliError(
+          `Reduction session \`${reductionRecord.target.id}\` referenced by reduction \`${reductionRecord.sessionId}\` was not found.`,
+        );
+      }
+      return await resolveReductionBaseRevisionSha({
+        root,
+        specsFilePath,
+        runsFilePath,
+        reductionsFilePath,
+        verificationsFilePath,
+        reductionRecord: parentReduction,
+        seenReductionIds,
+      });
+    }
+  }
+}
+
+function resolveSpecBaseRevisionSha(
+  record: SpecRecord,
+  options: {
+    ownerLabel?: string;
+  } = {},
+): string {
+  if (record.baseRevisionSha) {
+    return record.baseRevisionSha;
+  }
+
+  const ownerLabel = options.ownerLabel
+    ? `${options.ownerLabel} targets legacy spec session \`${record.sessionId}\``
+    : `Spec session \`${record.sessionId}\``;
+
+  throw new CliError(
+    `${ownerLabel} is missing \`baseRevisionSha\`.`,
+    [
+      "This spec record was created before base revisions were persisted for spec sessions.",
+    ],
+    [
+      "Re-run `voratiq spec` to regenerate the spec session before running `voratiq verify`.",
+    ],
+  );
+}

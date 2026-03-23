@@ -1,5 +1,6 @@
 import { rm } from "node:fs/promises";
 
+import type { SandboxStageId } from "../agents/runtime/policy.js";
 import type { AgentId } from "../configs/agents/types.js";
 import type { EnvironmentConfig } from "../configs/environment/types.js";
 import { WorkspaceSetupRunError } from "../domains/runs/competition/errors.js";
@@ -16,15 +17,10 @@ export interface SandboxPersona {
   authorEmail: string;
 }
 
-export async function prepareAgentWorkspace(options: {
+export async function prepareScratchAgentWorkspace(options: {
   paths: AgentWorkspacePaths;
-  baseRevisionSha: string;
-  root: string;
-  agentId: AgentId;
-  runId: string;
-  environment: EnvironmentConfig;
 }): Promise<void> {
-  const { paths, baseRevisionSha, root, agentId, runId, environment } = options;
+  const { paths } = options;
 
   try {
     await scaffoldAgentWorkspace(paths);
@@ -35,12 +31,34 @@ export async function prepareAgentWorkspace(options: {
   } catch (error) {
     throw ensureWorkspaceError(error);
   }
+}
+
+export async function prepareStageAgentWorkspace(options: {
+  paths: AgentWorkspacePaths;
+  baseRevisionSha: string;
+  root: string;
+  agentId: AgentId;
+  sessionId: string;
+  stageId: SandboxStageId;
+  environment: EnvironmentConfig;
+}): Promise<void> {
+  const {
+    paths,
+    baseRevisionSha,
+    root,
+    agentId,
+    sessionId,
+    stageId,
+    environment,
+  } = options;
+
+  await prepareScratchAgentWorkspace({ paths });
 
   try {
     await createWorktree({
       root,
       worktreePath: paths.workspacePath,
-      branch: `voratiq/run/${runId}/${agentId}`,
+      branch: `voratiq/${stageId}/${sessionId}/${agentId}`,
       baseRevision: baseRevisionSha,
     });
     await ensureWorkspaceDependencies({
@@ -54,6 +72,25 @@ export async function prepareAgentWorkspace(options: {
   } catch (error) {
     throw ensureWorkspaceError(error);
   }
+}
+
+export async function prepareAgentWorkspace(options: {
+  paths: AgentWorkspacePaths;
+  baseRevisionSha: string;
+  root: string;
+  agentId: AgentId;
+  runId: string;
+  environment: EnvironmentConfig;
+}): Promise<void> {
+  return await prepareStageAgentWorkspace({
+    paths: options.paths,
+    baseRevisionSha: options.baseRevisionSha,
+    root: options.root,
+    agentId: options.agentId,
+    sessionId: options.runId,
+    stageId: "run",
+    environment: options.environment,
+  });
 }
 
 export function ensureWorkspaceError(error: unknown): WorkspaceSetupRunError {

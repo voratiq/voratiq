@@ -12,8 +12,8 @@ import { gitAddAll, gitCommitAll, runGitCommand } from "../../src/utils/git.js";
 describe("deriveBranchNameFromSpecPath", () => {
   it("extracts basename without extension from nested path", () => {
     expect(
-      deriveBranchNameFromSpecPath("specs/separate-eval-outcomes.md"),
-    ).toBe("separate-eval-outcomes");
+      deriveBranchNameFromSpecPath("specs/separate-verification-outcomes.md"),
+    ).toBe("separate-verification-outcomes");
   });
 
   it("extracts basename without extension from deeply nested path", () => {
@@ -149,7 +149,15 @@ describe("checkoutOrCreateBranch", () => {
 
 async function initGitRepositoryWithCommit(): Promise<string> {
   const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-branch-"));
-  await runGitCommand(["init"], { cwd: repoRoot });
+  const templateDir = process.env.VORATIQ_TEST_GIT_TEMPLATE_DIR;
+  await runGitCommand(
+    [
+      "init",
+      "--initial-branch=main",
+      ...(templateDir ? ["--template", templateDir] : []),
+    ],
+    { cwd: repoRoot },
+  );
   await writeFile(join(repoRoot, "README.md"), "# Test Repo\n", "utf8");
   await gitAddAll(repoRoot);
   await gitCommitAll({ cwd: repoRoot, message: "chore: initial commit" });

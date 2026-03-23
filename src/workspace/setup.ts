@@ -1,6 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import { readAgentsConfig } from "../configs/agents/loader.js";
+import {
+  loadEnvironmentConfig,
+  type LoadEnvironmentConfigOptions,
+} from "../configs/environment/loader.js";
+import type { EnvironmentConfig } from "../configs/environment/types.js";
 import { buildDefaultOrchestrationTemplate } from "../configs/orchestration/bootstrap.js";
 import { toErrorMessage } from "../utils/errors.js";
 import { isDirectory, isFile, pathExists } from "../utils/fs.js";
@@ -15,14 +21,10 @@ import {
   resolveWorkspacePath,
   VORATIQ_AGENTS_FILE,
   VORATIQ_ENVIRONMENT_FILE,
-  VORATIQ_EVALS_FILE,
   VORATIQ_ORCHESTRATION_FILE,
   VORATIQ_REDUCTIONS_DIR,
   VORATIQ_REDUCTIONS_FILE,
   VORATIQ_REDUCTIONS_SESSIONS_DIR,
-  VORATIQ_REVIEWS_DIR,
-  VORATIQ_REVIEWS_FILE,
-  VORATIQ_REVIEWS_SESSIONS_DIR,
   VORATIQ_RUNS_DIR,
   VORATIQ_RUNS_FILE,
   VORATIQ_RUNS_SESSIONS_DIR,
@@ -30,14 +32,82 @@ import {
   VORATIQ_SPECS_DIR,
   VORATIQ_SPECS_FILE,
   VORATIQ_SPECS_SESSIONS_DIR,
+  VORATIQ_VERIFICATION_CONFIG_FILE,
+  VORATIQ_VERIFICATIONS_DIR,
+  VORATIQ_VERIFICATIONS_FILE,
+  VORATIQ_VERIFICATIONS_SESSIONS_DIR,
+  VORATIQ_VERIFICATIONS_TEMPLATES_DIR,
 } from "./structure.js";
 import {
   buildDefaultAgentsTemplate,
   buildDefaultEnvironmentTemplate,
-  buildDefaultEvalsTemplate,
   buildDefaultSandboxTemplate,
 } from "./templates.js";
 import type { CreateWorkspaceResult } from "./types.js";
+import {
+  buildDefaultVerificationConfigYaml,
+  SHIPPED_VERIFICATION_TEMPLATES,
+} from "./verification-defaults.js";
+
+async function seedVerificationSurface(
+  root: string,
+  options: {
+    verificationConfigPath?: string;
+    configExists?: boolean;
+  } = {},
+): Promise<{ createdDirectories: string[]; createdFiles: string[] }> {
+  const createdDirectories: string[] = [];
+  const createdFiles: string[] = [];
+
+  const verificationConfigPath =
+    options.verificationConfigPath ??
+    resolveWorkspacePath(root, VORATIQ_VERIFICATION_CONFIG_FILE);
+  const configExists =
+    options.configExists ?? (await pathExists(verificationConfigPath));
+
+  if (!configExists) {
+    await mkdir(dirname(verificationConfigPath), { recursive: true });
+    const seededConfig = await buildSeededVerificationConfig(root);
+    await writeFile(verificationConfigPath, seededConfig, { encoding: "utf8" });
+    createdFiles.push(relativeToRoot(root, verificationConfigPath));
+  }
+
+  const templatesRoot = resolveWorkspacePath(
+    root,
+    VORATIQ_VERIFICATIONS_TEMPLATES_DIR,
+  );
+  if (!(await pathExists(templatesRoot))) {
+    await mkdir(templatesRoot, { recursive: true });
+    createdDirectories.push(relativeToRoot(root, templatesRoot));
+  }
+
+  for (const template of SHIPPED_VERIFICATION_TEMPLATES) {
+    const templateDir = join(templatesRoot, template.name);
+    if (!(await pathExists(templateDir))) {
+      await mkdir(templateDir, { recursive: true });
+      createdDirectories.push(relativeToRoot(root, templateDir));
+    }
+
+    const promptPath = join(templateDir, "prompt.md");
+    const rubricPath = join(templateDir, "rubric.md");
+    const schemaPath = join(templateDir, "schema.yaml");
+
+    if (!(await pathExists(promptPath))) {
+      await writeFile(promptPath, `${template.prompt.trimEnd()}\n`, "utf8");
+      createdFiles.push(relativeToRoot(root, promptPath));
+    }
+    if (!(await pathExists(rubricPath))) {
+      await writeFile(rubricPath, `${template.rubric.trimEnd()}\n`, "utf8");
+      createdFiles.push(relativeToRoot(root, rubricPath));
+    }
+    if (!(await pathExists(schemaPath))) {
+      await writeFile(schemaPath, `${template.schema.trimEnd()}\n`, "utf8");
+      createdFiles.push(relativeToRoot(root, schemaPath));
+    }
+  }
+
+  return { createdDirectories, createdFiles };
+}
 
 interface WorkspaceDomainStructureDefinition {
   readonly directorySegment: string;
@@ -74,22 +144,22 @@ const DOMAIN_STRUCTURE_DEFINITIONS: readonly WorkspaceDomainStructureDefinition[
       indexVersion: 1,
     },
     {
-      directorySegment: VORATIQ_REVIEWS_DIR,
-      sessionsSegment: VORATIQ_REVIEWS_SESSIONS_DIR,
-      indexSegment: VORATIQ_REVIEWS_FILE,
-      indexVersion: 1,
-    },
-    {
       directorySegment: VORATIQ_SPECS_DIR,
       sessionsSegment: VORATIQ_SPECS_SESSIONS_DIR,
       indexSegment: VORATIQ_SPECS_FILE,
+      indexVersion: 1,
+    },
+    {
+      directorySegment: VORATIQ_VERIFICATIONS_DIR,
+      sessionsSegment: VORATIQ_VERIFICATIONS_SESSIONS_DIR,
+      indexSegment: VORATIQ_VERIFICATIONS_FILE,
       indexVersion: 1,
     },
   ];
 
 const WORKSPACE_CONFIG_SEGMENTS: readonly string[] = [
   VORATIQ_AGENTS_FILE,
-  VORATIQ_EVALS_FILE,
+  VORATIQ_VERIFICATION_CONFIG_FILE,
   VORATIQ_ENVIRONMENT_FILE,
   VORATIQ_SANDBOX_FILE,
   VORATIQ_ORCHESTRATION_FILE,
@@ -105,7 +175,6 @@ export async function createWorkspace(
   const domainStructures = resolveWorkspaceDomainStructures(root);
 
   const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
-  const evalsConfigPath = resolveWorkspacePath(root, VORATIQ_EVALS_FILE);
   const environmentConfigPath = resolveWorkspacePath(
     root,
     VORATIQ_ENVIRONMENT_FILE,
@@ -115,18 +184,22 @@ export async function createWorkspace(
     root,
     VORATIQ_ORCHESTRATION_FILE,
   );
+  const verificationConfigPath = resolveWorkspacePath(
+    root,
+    VORATIQ_VERIFICATION_CONFIG_FILE,
+  );
 
   const workspaceExists = await pathExists(workspaceDir);
-  const [agentsConfigExists, evalsConfigExists, environmentConfigExists] =
-    await Promise.all([
-      pathExists(agentsConfigPath),
-      pathExists(evalsConfigPath),
-      pathExists(environmentConfigPath),
-    ]);
-  const [sandboxConfigExists, orchestrationConfigExists] = await Promise.all([
-    pathExists(sandboxConfigPath),
-    pathExists(orchestrationConfigPath),
+  const [agentsConfigExists, environmentConfigExists] = await Promise.all([
+    pathExists(agentsConfigPath),
+    pathExists(environmentConfigPath),
   ]);
+  const [sandboxConfigExists, orchestrationConfigExists, verificationExists] =
+    await Promise.all([
+      pathExists(sandboxConfigPath),
+      pathExists(orchestrationConfigPath),
+      pathExists(verificationConfigPath),
+    ]);
 
   if (!workspaceExists) {
     await mkdir(workspaceDir, { recursive: true });
@@ -156,12 +229,6 @@ export async function createWorkspace(
     createdFiles.push(relativeToRoot(root, agentsConfigPath));
   }
 
-  if (!evalsConfigExists) {
-    const evalsTemplate = buildDefaultEvalsTemplate();
-    await writeFile(evalsConfigPath, evalsTemplate, { encoding: "utf8" });
-    createdFiles.push(relativeToRoot(root, evalsConfigPath));
-  }
-
   if (!environmentConfigExists) {
     const environmentTemplate = buildDefaultEnvironmentTemplate();
     await writeFile(environmentConfigPath, environmentTemplate, {
@@ -189,6 +256,13 @@ export async function createWorkspace(
     createdFiles.push(relativeToRoot(root, orchestrationConfigPath));
   }
 
+  const seededVerification = await seedVerificationSurface(root, {
+    verificationConfigPath,
+    configExists: verificationExists,
+  });
+  createdDirectories.push(...seededVerification.createdDirectories);
+  createdFiles.push(...seededVerification.createdFiles);
+
   return { createdDirectories, createdFiles };
 }
 
@@ -203,8 +277,23 @@ export async function repairWorkspaceStructure(
 
   // Additive repair must not mutate config semantics.
   for (const configPath of resolveWorkspaceConfigPaths(root)) {
+    const kind = await detectPathKind(configPath);
+    if (
+      kind === "missing" &&
+      configPath.endsWith(VORATIQ_VERIFICATION_CONFIG_FILE)
+    ) {
+      await mkdir(dirname(configPath), { recursive: true });
+      const seededConfig = await buildSeededVerificationConfig(root);
+      await writeFile(configPath, seededConfig, { encoding: "utf8" });
+      createdFiles.push(relativeToRoot(root, configPath));
+      continue;
+    }
     await ensureWorkspaceFileEntry(root, configPath);
   }
+
+  const seededVerification = await seedVerificationSurface(root);
+  createdDirectories.push(...seededVerification.createdDirectories);
+  createdFiles.push(...seededVerification.createdFiles);
 
   const domainStructures = resolveWorkspaceDomainStructures(root);
   const missingDirectories: string[] = [];
@@ -260,6 +349,26 @@ export async function repairWorkspaceStructure(
   }
 
   return { repaired: true, createdDirectories, createdFiles };
+}
+
+function loadVerificationSeedingEnvironment(
+  root: string,
+  options: LoadEnvironmentConfigOptions = {},
+): EnvironmentConfig {
+  try {
+    return loadEnvironmentConfig({
+      root,
+      optional: true,
+      ...options,
+    });
+  } catch {
+    return {};
+  }
+}
+
+async function buildSeededVerificationConfig(root: string): Promise<string> {
+  const environment = loadVerificationSeedingEnvironment(root);
+  return buildDefaultVerificationConfigYaml({ root, environment });
 }
 
 export async function validateWorkspace(root: string): Promise<void> {

@@ -25,10 +25,12 @@ describe("voratiq init (cli)", () => {
         workspaceDir: "/repo/.voratiq",
         runsDir: "/repo/.voratiq/runs",
         runsFile: "/repo/.voratiq/runs/index.json",
-        reviewsDir: "/repo/.voratiq/reviews",
-        reviewsFile: "/repo/.voratiq/reviews/index.json",
+        reductionsDir: "/repo/.voratiq/reductions",
+        reductionsFile: "/repo/.voratiq/reductions/index.json",
         specsDir: "/repo/.voratiq/specs",
         specsFile: "/repo/.voratiq/specs/index.json",
+        verificationsDir: "/repo/.voratiq/verifications",
+        verificationsFile: "/repo/.voratiq/verifications/index.json",
       },
     });
     executeInitCommandMock.mockResolvedValue({
@@ -55,12 +57,6 @@ describe("voratiq init (cli)", () => {
         configUpdated: false,
         config: {},
       },
-      evalSummary: {
-        configPath: ".voratiq/evals.yaml",
-        configuredEvals: [],
-        configCreated: false,
-        configUpdated: false,
-      },
       sandboxSummary: {
         configPath: ".voratiq/sandbox.yaml",
         configCreated: false,
@@ -82,10 +78,12 @@ describe("voratiq init (cli)", () => {
         workspaceDir: "/repo/.voratiq",
         runsDir: "/repo/.voratiq/runs",
         runsFile: "/repo/.voratiq/runs/index.json",
-        reviewsDir: "/repo/.voratiq/reviews",
-        reviewsFile: "/repo/.voratiq/reviews/index.json",
+        reductionsDir: "/repo/.voratiq/reductions",
+        reductionsFile: "/repo/.voratiq/reductions/index.json",
         specsDir: "/repo/.voratiq/specs",
         specsFile: "/repo/.voratiq/specs/index.json",
+        verificationsDir: "/repo/.voratiq/verifications",
+        verificationsFile: "/repo/.voratiq/verifications/index.json",
       },
     });
     executeInitCommandMock.mockImplementation((input) => {
@@ -113,12 +111,6 @@ describe("voratiq init (cli)", () => {
           configCreated: false,
           configUpdated: false,
           config: {},
-        },
-        evalSummary: {
-          configPath: ".voratiq/evals.yaml",
-          configuredEvals: [],
-          configCreated: false,
-          configUpdated: false,
         },
         sandboxSummary: {
           configPath: ".voratiq/sandbox.yaml",

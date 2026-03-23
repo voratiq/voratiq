@@ -3,11 +3,10 @@ import { jest } from "@jest/globals";
 import {
   type AutoApplyStageResult,
   type AutoCommandDependencies,
-  type AutoReviewStageResult,
   type AutoRunStageResult,
+  type AutoVerifyStageResult,
   executeAutoCommand,
 } from "../../../src/commands/auto/command.js";
-import type { ReviewSelectionInput } from "../../../src/policy/index.js";
 
 function createDependencies(
   overrides: Partial<AutoCommandDependencies> = {},
@@ -18,22 +17,18 @@ function createDependencies(
   const runRunStage: jest.MockedFunction<
     AutoCommandDependencies["runRunStage"]
   > = jest.fn();
-  const runReviewStage: jest.MockedFunction<
-    AutoCommandDependencies["runReviewStage"]
+  const runVerifyStage: jest.MockedFunction<
+    AutoCommandDependencies["runVerifyStage"]
   > = jest.fn();
   const runApplyStage: jest.MockedFunction<
     AutoCommandDependencies["runApplyStage"]
-  > = jest.fn();
-  const loadReviewSelectionInput: jest.MockedFunction<
-    AutoCommandDependencies["loadReviewSelectionInput"]
   > = jest.fn();
 
   return {
     runSpecStage,
     runRunStage,
-    runReviewStage,
+    runVerifyStage,
     runApplyStage,
-    loadReviewSelectionInput,
     ...overrides,
   };
 }
@@ -55,25 +50,12 @@ function createRunStageResult(
   };
 }
 
-function createReviewStageResult(
-  overrides: Partial<AutoReviewStageResult> = {},
-): AutoReviewStageResult {
+function createVerifyStageResult(
+  overrides: Partial<AutoVerifyStageResult> = {},
+): AutoVerifyStageResult {
   return {
-    reviewId: "review-1",
-    body: "review body",
-    outputPath: "reviews/review.md",
-    reviews: [
-      {
-        agentId: "reviewer-a",
-        status: "succeeded",
-        outputPath: "reviews/reviewer-a/review.md",
-      },
-      {
-        agentId: "reviewer-b",
-        status: "succeeded",
-        outputPath: "reviews/reviewer-b/review.md",
-      },
-    ],
+    verificationId: "verify-1",
+    body: "verify body",
     ...overrides,
   };
 }
@@ -88,28 +70,6 @@ function createApplyStageResult(
   };
 }
 
-function createReviewSelectionInput(
-  preferredAgents: readonly string[],
-): ReviewSelectionInput {
-  return preferredAgents
-    .map((preferredAgent, index) => ({
-      reviewerAgentId: `reviewer-${String.fromCharCode(97 + index)}`,
-      status: "succeeded" as const,
-      preferredCandidateId: preferredAgent,
-      resolvedPreferredCandidateId: preferredAgent,
-    }))
-    .reduce<ReviewSelectionInput>(
-      (input, reviewer) => ({
-        ...input,
-        reviewers: [...input.reviewers, reviewer],
-      }),
-      {
-        canonicalAgentIds: ["alpha", "beta"],
-        reviewers: [],
-      },
-    );
-}
-
 describe("executeAutoCommand", () => {
   it("returns action required when spec generation produces multiple drafts", async () => {
     const runRunStage = jest.fn<AutoCommandDependencies["runRunStage"]>();
@@ -118,6 +78,7 @@ describe("executeAutoCommand", () => {
       runSpecStage: jest
         .fn<AutoCommandDependencies["runSpecStage"]>()
         .mockResolvedValue({
+          sessionId: "spec-session-multi",
           body: "spec body",
           generatedSpecPaths: ["specs/a.md", "specs/b.md"],
         }),
@@ -150,7 +111,7 @@ describe("executeAutoCommand", () => {
     );
   });
 
-  it("auto-applies from unanimous reviewer recommendations in the application layer", async () => {
+  it("auto-applies from unanimous verifier recommendations in the application layer", async () => {
     const onEvent = jest.fn();
     const runApplyStage = jest
       .fn<AutoCommandDependencies["runApplyStage"]>()
@@ -161,13 +122,19 @@ describe("executeAutoCommand", () => {
       runRunStage: jest
         .fn<AutoCommandDependencies["runRunStage"]>()
         .mockResolvedValue(createRunStageResult()),
-      runReviewStage: jest
-        .fn<AutoCommandDependencies["runReviewStage"]>()
-        .mockResolvedValue(createReviewStageResult()),
+      runVerifyStage: jest
+        .fn<AutoCommandDependencies["runVerifyStage"]>()
+        .mockResolvedValue(
+          createVerifyStageResult({
+            selection: {
+              state: "resolvable",
+              applyable: true,
+              selectedCanonicalAgentId: "beta",
+              unresolvedReasons: [],
+            },
+          }),
+        ),
       runApplyStage,
-      loadReviewSelectionInput: jest
-        .fn<AutoCommandDependencies["loadReviewSelectionInput"]>()
-        .mockResolvedValue(createReviewSelectionInput(["beta", "beta"])),
     });
 
     const result = await executeAutoCommand(
@@ -192,7 +159,7 @@ describe("executeAutoCommand", () => {
     );
     expect(onEvent).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ kind: "body", body: "review body" }),
+      expect.objectContaining({ kind: "body", body: "verify body" }),
     );
     expect(onEvent).toHaveBeenNthCalledWith(
       3,
@@ -200,7 +167,7 @@ describe("executeAutoCommand", () => {
     );
   });
 
-  it("returns action required when reviewers disagree instead of letting the CLI decide", async () => {
+  it("returns action required when verifiers disagree instead of letting the CLI decide", async () => {
     const runApplyStage = jest.fn<AutoCommandDependencies["runApplyStage"]>();
     const dependencies = createDependencies({
       now: () => 0,
@@ -214,13 +181,32 @@ describe("executeAutoCommand", () => {
             },
           }),
         ),
-      runReviewStage: jest
-        .fn<AutoCommandDependencies["runReviewStage"]>()
-        .mockResolvedValue(createReviewStageResult()),
+      runVerifyStage: jest
+        .fn<AutoCommandDependencies["runVerifyStage"]>()
+        .mockResolvedValue(
+          createVerifyStageResult({
+            selection: {
+              state: "unresolved",
+              applyable: false,
+              unresolvedReasons: [
+                {
+                  code: "verifier_disagreement",
+                  selections: [
+                    {
+                      verifierAgentId: "verifier-a",
+                      selectedCanonicalAgentId: "alpha",
+                    },
+                    {
+                      verifierAgentId: "verifier-b",
+                      selectedCanonicalAgentId: "beta",
+                    },
+                  ],
+                },
+              ],
+            },
+          }),
+        ),
       runApplyStage,
-      loadReviewSelectionInput: jest
-        .fn<AutoCommandDependencies["loadReviewSelectionInput"]>()
-        .mockResolvedValue(createReviewSelectionInput(["alpha", "beta"])),
     });
 
     const result = await executeAutoCommand(
@@ -235,16 +221,164 @@ describe("executeAutoCommand", () => {
     expect(result.auto.status).toBe("action_required");
     expect(result.apply.status).toBe("skipped");
     expect(result.auto.detail).toBe(
-      "Reviewers disagreed on preferred candidate; manual review required.",
+      "Verifiers disagreed on the preferred candidate; manual selection required.",
     );
     expect(result.events).toContainEqual(
       expect.objectContaining({
         kind: "action_required",
         detail:
-          "Reviewers disagreed on preferred candidate; manual review required.",
+          "Verifiers disagreed on the preferred candidate; manual selection required.",
         message:
-          "Reviewers disagreed on preferred candidate; manual review required.",
+          "Verifiers disagreed on the preferred candidate; manual selection required.",
       }),
+    );
+  });
+
+  it("returns action required when verify(run) is unresolved even without apply", async () => {
+    const runApplyStage = jest.fn<AutoCommandDependencies["runApplyStage"]>();
+    const dependencies = createDependencies({
+      now: () => 0,
+      runRunStage: jest
+        .fn<AutoCommandDependencies["runRunStage"]>()
+        .mockResolvedValue(
+          createRunStageResult({
+            report: {
+              ...createRunStageResult().report,
+              runId: "run-3",
+            },
+          }),
+        ),
+      runVerifyStage: jest
+        .fn<AutoCommandDependencies["runVerifyStage"]>()
+        .mockResolvedValue(
+          createVerifyStageResult({
+            selection: {
+              state: "unresolved",
+              applyable: false,
+              unresolvedReasons: [
+                {
+                  code: "verifier_disagreement",
+                  selections: [
+                    {
+                      verifierAgentId: "verifier-a",
+                      selectedCanonicalAgentId: "alpha",
+                    },
+                    {
+                      verifierAgentId: "verifier-b",
+                      selectedCanonicalAgentId: "beta",
+                    },
+                  ],
+                },
+              ],
+            },
+          }),
+        ),
+      runApplyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        specPath: "specs/task.md",
+      },
+      dependencies,
+    );
+
+    expect(runApplyStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("action_required");
+    expect(result.apply.status).toBe("skipped");
+    expect(result.auto.detail).toBe(
+      "Verifiers disagreed on the preferred candidate; manual selection required.",
+    );
+    expect(result.summary.verify.detail).toBe(
+      "Verifiers disagreed on the preferred candidate; manual selection required.",
+    );
+    expect(result.events).toContainEqual(
+      expect.objectContaining({
+        kind: "action_required",
+        detail:
+          "Verifiers disagreed on the preferred candidate; manual selection required.",
+        message:
+          "Verifiers disagreed on the preferred candidate; manual selection required.",
+      }),
+    );
+  });
+
+  it("emits the spec verification transcript body before the run stage", async () => {
+    const onEvent = jest.fn();
+    const runVerifyStage = jest
+      .fn<AutoCommandDependencies["runVerifyStage"]>()
+      .mockImplementation((input) =>
+        Promise.resolve(
+          input.target.kind === "spec"
+            ? createVerifyStageResult({
+                body: "spec verify body",
+                selectedSpecPath: "specs/selected.md",
+              })
+            : createVerifyStageResult({
+                body: "run verify body",
+              }),
+        ),
+      );
+    const dependencies = createDependencies({
+      now: () => 0,
+      onEvent,
+      runSpecStage: jest
+        .fn<AutoCommandDependencies["runSpecStage"]>()
+        .mockResolvedValue({
+          body: "spec body",
+          sessionId: "spec-session-1",
+          generatedSpecPaths: ["specs/generated.md"],
+          specPath: "specs/generated.md",
+        }),
+      runRunStage: jest
+        .fn<AutoCommandDependencies["runRunStage"]>()
+        .mockResolvedValue(
+          createRunStageResult({
+            report: {
+              ...createRunStageResult().report,
+              spec: { path: "specs/selected.md" },
+            },
+            body: "run body",
+          }),
+        ),
+      runVerifyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        description: "Define the task",
+      },
+      dependencies,
+    );
+
+    expect(result.auto.status).toBe("succeeded");
+    expect(runVerifyStage).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        target: { kind: "spec", sessionId: "spec-session-1" },
+      }),
+    );
+    expect(runVerifyStage).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        target: { kind: "run", sessionId: "run-1" },
+      }),
+    );
+    expect(onEvent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ kind: "body", body: "spec body" }),
+    );
+    expect(onEvent).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ kind: "body", body: "spec verify body" }),
+    );
+    expect(onEvent).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ kind: "body", body: "run body" }),
+    );
+    expect(onEvent).toHaveBeenNthCalledWith(
+      4,
+      expect.objectContaining({ kind: "body", body: "run verify body" }),
     );
   });
 });

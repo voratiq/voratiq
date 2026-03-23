@@ -1,13 +1,10 @@
 import {
   AGENT_STATUS_VALUES,
-  EVAL_REQUIRED_AGENT_STATUSES,
   IN_PROGRESS_AGENT_STATUSES,
-  REVIEW_STATUS_VALUES,
   RUN_STATUS_VALUES,
   SPEC_RECORD_STATUS_VALUES,
   TERMINABLE_RUN_STATUSES,
   TERMINAL_AGENT_STATUSES,
-  TERMINAL_REVIEW_STATUSES,
   TERMINAL_SPEC_STATUSES,
 } from "../../src/status/index.js";
 
@@ -21,12 +18,6 @@ describe("status groupings", () => {
 
     it("IN_PROGRESS_AGENT_STATUSES contains only valid AgentStatus values", () => {
       for (const status of IN_PROGRESS_AGENT_STATUSES) {
-        expect(AGENT_STATUS_VALUES).toContain(status);
-      }
-    });
-
-    it("EVAL_REQUIRED_AGENT_STATUSES contains only valid AgentStatus values", () => {
-      for (const status of EVAL_REQUIRED_AGENT_STATUSES) {
         expect(AGENT_STATUS_VALUES).toContain(status);
       }
     });
@@ -53,13 +44,6 @@ describe("status groupings", () => {
         expect(allGrouped.has(status)).toBe(true);
       }
     });
-
-    it("EVAL_REQUIRED_AGENT_STATUSES is a subset of TERMINAL_AGENT_STATUSES", () => {
-      const terminal = new Set(TERMINAL_AGENT_STATUSES);
-      for (const status of EVAL_REQUIRED_AGENT_STATUSES) {
-        expect(terminal.has(status)).toBe(true);
-      }
-    });
   });
 
   describe("run status groupings", () => {
@@ -67,18 +51,6 @@ describe("status groupings", () => {
       for (const status of TERMINABLE_RUN_STATUSES) {
         expect(RUN_STATUS_VALUES).toContain(status);
       }
-    });
-  });
-
-  describe("review status groupings", () => {
-    it("TERMINAL_REVIEW_STATUSES contains only valid ReviewStatus values", () => {
-      for (const status of TERMINAL_REVIEW_STATUSES) {
-        expect(REVIEW_STATUS_VALUES).toContain(status);
-      }
-    });
-
-    it("TERMINAL_REVIEW_STATUSES excludes running", () => {
-      expect(TERMINAL_REVIEW_STATUSES).not.toContain("running");
     });
   });
 

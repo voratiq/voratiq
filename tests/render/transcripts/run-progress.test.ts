@@ -42,14 +42,6 @@ function createAgentReport(
       ".voratiq/runs/sessions/run-123/test-agent/runtime.json",
     baseDirectory: ".voratiq/runs/sessions/run-123/test-agent",
     assets: {},
-    evals: [
-      {
-        slug: "format",
-        status: "succeeded",
-        exitCode: 0,
-        command: "npm run format",
-      },
-    ],
     startedAt: "2025-11-05T12:00:00.000Z",
     completedAt: "2025-11-05T12:00:03.000Z",
     diffStatistics: "2 files changed, 5 insertions(+)",
@@ -203,6 +195,7 @@ describe("createRunRenderer", () => {
       expect(transcript).toContain(status.toUpperCase());
       expect(transcript).toContain("AGENT");
       expect(transcript).toContain("test-agent");
+      expect(transcript).not.toContain("EVALS");
       expect((transcript.match(/AGENT/gu) ?? []).length).toBe(1);
     },
   );
@@ -270,7 +263,7 @@ describe("createRunRenderer", () => {
     expect(normalizeFrame(ttyFrame)).toBe(normalizeFrame(nonTtyFrame));
   });
 
-  it("shows elapsed and final eval/diff data in the non-TTY final frame", () => {
+  it("shows elapsed and final diff data in the non-TTY final frame", () => {
     const baseTime = new Date("2025-11-05T12:00:00.000Z").getTime();
     const startedAt = "2025-11-05T12:00:10.000Z";
     const completedAt = "2025-11-05T12:01:05.000Z";
@@ -309,7 +302,7 @@ describe("createRunRenderer", () => {
     expect(plain).toContain("Elapsed");
     expect(plain).toContain("55s");
     expect(plain).toContain("2f +5");
-    expect(plain).toContain("format");
+    expect(plain).not.toContain("EVALS");
   });
 
   it("shows live elapsed while keeping running table duration frozen", () => {

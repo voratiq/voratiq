@@ -90,7 +90,6 @@ describe("collectAgentArtifacts", () => {
       contextPath: join(repoRoot, "agent", "context"),
       stdoutPath: join(artifactsPath, "stdout.log"),
       stderrPath: join(artifactsPath, "stderr.log"),
-      reviewPath: join(artifactsPath, "review.md"),
       workspacePath,
       runtimeManifestPath: join(repoRoot, "runtime", "manifest.json"),
       sandboxPath: join(repoRoot, "sandbox"),
@@ -99,7 +98,6 @@ describe("collectAgentArtifacts", () => {
       runtimePath: join(repoRoot, "runtime"),
       diffPath,
       summaryPath,
-      evalsDirPath: join(repoRoot, "evals"),
     };
 
     await mkdir(workspacePath, { recursive: true });

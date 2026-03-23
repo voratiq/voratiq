@@ -8,7 +8,6 @@ import type {
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import {
   buildAgentArtifactPaths,
-  buildAgentEvalViews,
   getAgentDirectoryPath,
   getAgentManifestPath,
 } from "../../../workspace/structure.js";
@@ -43,12 +42,6 @@ export function toAgentReport(
   record: AgentInvocationRecord,
   derivations: AgentExecutionState,
 ): AgentReport {
-  if (!record.evals) {
-    throw new RunReportInvariantError(
-      `Agent ${record.agentId} is missing evaluation results for status ${record.status}.`,
-    );
-  }
-
   if (!record.startedAt || !record.completedAt) {
     throw new RunReportInvariantError(
       `Agent ${record.agentId} is missing lifecycle timestamps for status ${record.status}.`,
@@ -70,11 +63,6 @@ export function toAgentReport(
     baseDirectory: getAgentDirectoryPath(runId, record.agentId),
     diffStatistics: derivations.diffStatistics,
     assets,
-    evals: buildAgentEvalViews({
-      runId,
-      agentId: record.agentId,
-      evals: record.evals,
-    }),
     error: record.error,
     warnings: record.warnings,
     startedAt: record.startedAt,
@@ -84,35 +72,18 @@ export function toAgentReport(
   };
 }
 
-export function hasEvalFailures(reports: AgentReport[]): boolean {
-  return reports.some((report) =>
-    report.evals.some(
-      (evaluation) =>
-        evaluation.status === "failed" || evaluation.status === "errored",
-    ),
-  );
-}
-
 export function toRunReport(
   record: RunRecord,
   agents: AgentReport[],
   hadAgentFailure: boolean,
-  hadEvalFailure: boolean,
 ): RunReport {
   const derivedAgentFailure = agents.some(
     (agent) => agent.status === "failed" || agent.status === "errored",
   );
-  const derivedEvalFailure = hasEvalFailures(agents);
 
   if (hadAgentFailure !== derivedAgentFailure) {
     throw new RunReportInvariantError(
       `RunReport mismatch: hadAgentFailure (${hadAgentFailure}) does not match derived value (${derivedAgentFailure}).`,
-    );
-  }
-
-  if (hadEvalFailure !== derivedEvalFailure) {
-    throw new RunReportInvariantError(
-      `RunReport mismatch: hadEvalFailure (${hadEvalFailure}) does not match derived value (${derivedEvalFailure}).`,
     );
   }
 
@@ -126,6 +97,5 @@ export function toRunReport(
     baseRevisionSha: record.baseRevisionSha,
     agents,
     hadAgentFailure: derivedAgentFailure,
-    hadEvalFailure: derivedEvalFailure,
   };
 }

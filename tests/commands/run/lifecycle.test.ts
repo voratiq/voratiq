@@ -107,12 +107,6 @@ describe("terminateActiveRun", () => {
           status: "succeeded",
           startedAt: "2025-11-04T17:00:00.000Z",
           completedAt: "2025-11-04T17:30:00.000Z",
-          evals: [
-            {
-              slug: "checks",
-              status: "succeeded",
-            },
-          ],
         },
       ],
     };

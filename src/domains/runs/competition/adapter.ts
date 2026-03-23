@@ -5,7 +5,6 @@ import type {
 import type { ResolvedExtraContextFile } from "../../../competition/shared/extra-context.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
-import type { EvalDefinition } from "../../../configs/evals/types.js";
 import { prepareAgents } from "../../../domains/runs/competition/agent-preparation.js";
 import { runPreparedAgent } from "../../../domains/runs/competition/agents/lifecycle.js";
 import type { PreparedAgentExecution } from "../../../domains/runs/competition/agents/types.js";
@@ -18,7 +17,6 @@ export interface CreateRunCompetitionAdapterInput {
   readonly root: string;
   readonly specContent: string;
   readonly extraContextFiles?: readonly ResolvedExtraContextFile[];
-  readonly evalPlan: readonly EvalDefinition[];
   readonly mutators: AgentRecordMutators;
   readonly environment: EnvironmentConfig;
 }
@@ -31,7 +29,6 @@ interface RunCompetitionAdapterDependencies {
     root: string;
     specContent: string;
     extraContextFiles: readonly ResolvedExtraContextFile[];
-    evalPlan: readonly EvalDefinition[];
     environment: EnvironmentConfig;
   }) => Promise<
     CompetitionPreparationResult<PreparedAgentExecution, AgentExecutionResult>
@@ -55,7 +52,6 @@ export function createRunCompetitionAdapter(
     root,
     specContent,
     extraContextFiles = [],
-    evalPlan,
     mutators,
     environment,
   } = input;
@@ -78,7 +74,6 @@ export function createRunCompetitionAdapter(
         root,
         specContent,
         extraContextFiles,
-        evalPlan,
         environment,
       }),
     onPreparationFailure: async (failure) => {

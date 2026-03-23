@@ -31,7 +31,6 @@ import {
 import type { CreateWorkspaceResult } from "../../workspace/types.js";
 import { configureAgents } from "./agents.js";
 import { configureEnvironment } from "./environment.js";
-import { configureEvals } from "./evals.js";
 import type {
   InitCommandInput,
   InitCommandResult,
@@ -96,14 +95,6 @@ export async function executeInitCommand(
     interactive: false,
   });
 
-  const evalSummary = await configureEvals(
-    root,
-    {
-      interactive: false,
-    },
-    environmentSummary.config,
-  );
-
   const sandboxSummary = buildSandboxSummary(workspaceResult);
 
   return {
@@ -112,7 +103,6 @@ export async function executeInitCommand(
     agentSummary,
     orchestrationSummary,
     environmentSummary,
-    evalSummary,
     sandboxSummary,
   };
 }

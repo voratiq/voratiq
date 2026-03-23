@@ -132,7 +132,7 @@ describe("sandbox policy normalization", () => {
 });
 
 describe("shared sandbox builder", () => {
-  function build(stageId: "run" | "spec" | "review", overrides = {}) {
+  function build(stageId: "run" | "spec" | "verify", overrides = {}) {
     return buildSandboxPolicy({
       stageId,
       root: ROOT,
@@ -156,10 +156,10 @@ describe("shared sandbox builder", () => {
     });
   }
 
-  it("applies shared baseline by stage (run/spec/review) with deterministic keys", () => {
+  it("applies shared baseline by stage (run/spec/verify) with deterministic keys", () => {
     const runPolicy = build("run");
     const specPolicy = build("spec");
-    const reviewPolicy = build("review");
+    const verifyPolicy = build("verify");
 
     expect(Object.keys(runPolicy.filesystem)).toEqual([
       "denyRead",
@@ -174,28 +174,36 @@ describe("shared sandbox builder", () => {
         "/repo/.git",
         "/repo/.voratiq/runs/index.json",
         "/repo/.voratiq/runs/history.lock",
-        "/repo/.voratiq/reviews",
+        "/repo/.voratiq/verifications",
       ]),
     );
 
     expect(specPolicy.filesystem.denyWrite).toEqual(
-      expect.arrayContaining(["/repo/.voratiq/runs", "/repo/.voratiq/reviews"]),
+      expect.arrayContaining([
+        "/repo/.voratiq/runs",
+        "/repo/.voratiq/verifications",
+        "/repo/.voratiq/reductions",
+      ]),
     );
     expect(specPolicy.filesystem.denyRead).toEqual(
       specPolicy.filesystem.denyWrite,
     );
 
-    expect(reviewPolicy.filesystem.denyWrite).toEqual(
-      expect.arrayContaining(["/repo/.voratiq/runs", "/repo/.voratiq/specs"]),
+    expect(verifyPolicy.filesystem.denyWrite).toEqual(
+      expect.arrayContaining([
+        "/repo/.voratiq/runs",
+        "/repo/.voratiq/specs",
+        "/repo/.voratiq/reductions",
+      ]),
     );
-    expect(reviewPolicy.filesystem.denyRead).toEqual(
+    expect(verifyPolicy.filesystem.denyRead).toEqual(
       expect.arrayContaining(["/repo/.git"]),
     );
-    expect(reviewPolicy.filesystem.denyWrite).not.toContain("/repo/.git");
+    expect(verifyPolicy.filesystem.denyWrite).not.toContain("/repo/.git");
   });
 
   it("collapses stage overlay child denies when baseline already denies parent", () => {
-    const policy = build("review", {
+    const policy = build("verify", {
       stageDenyWritePaths: ["/repo/.voratiq/runs/sessions/run-123"],
       stageDenyReadPaths: ["/repo/.voratiq/runs/sessions/run-123"],
     });

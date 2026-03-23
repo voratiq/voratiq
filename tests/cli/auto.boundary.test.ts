@@ -2,9 +2,9 @@ import { jest } from "@jest/globals";
 
 import * as applyCli from "../../src/cli/apply.js";
 import { runAutoCommand } from "../../src/cli/auto.js";
-import * as reviewCli from "../../src/cli/review.js";
 import * as runCli from "../../src/cli/run.js";
 import * as specCli from "../../src/cli/spec.js";
+import * as verifyCli from "../../src/cli/verify.js";
 import * as autoCommandModule from "../../src/commands/auto/command.js";
 
 jest.mock("../../src/commands/auto/command.js", () => ({
@@ -19,8 +19,8 @@ jest.mock("../../src/cli/spec.js", () => ({
   runSpecCommand: jest.fn(),
 }));
 
-jest.mock("../../src/cli/review.js", () => ({
-  runReviewCommand: jest.fn(),
+jest.mock("../../src/cli/verify.js", () => ({
+  runVerifyCommand: jest.fn(),
 }));
 
 jest.mock("../../src/cli/apply.js", () => ({
@@ -45,7 +45,7 @@ describe("runAutoCommand boundary", () => {
     executeAutoCommandMock.mockReset();
     jest.mocked(runCli.runRunCommand).mockReset();
     jest.mocked(specCli.runSpecCommand).mockReset();
-    jest.mocked(reviewCli.runReviewCommand).mockReset();
+    jest.mocked(verifyCli.runVerifyCommand).mockReset();
     jest.mocked(applyCli.runApplyCommand).mockReset();
   });
 
@@ -65,7 +65,7 @@ describe("runAutoCommand boundary", () => {
         totalDurationMs: 0,
         spec: { status: "skipped" },
         run: { status: "succeeded", runId: "run-1" },
-        review: { status: "skipped" },
+        verify: { status: "skipped" },
         apply: { status: "skipped" },
       },
       events: [],
@@ -83,12 +83,11 @@ describe("runAutoCommand boundary", () => {
     expect(dependencies).toBeDefined();
     expect(typeof dependencies?.runSpecStage).toBe("function");
     expect(typeof dependencies?.runRunStage).toBe("function");
-    expect(typeof dependencies?.runReviewStage).toBe("function");
+    expect(typeof dependencies?.runVerifyStage).toBe("function");
     expect(typeof dependencies?.runApplyStage).toBe("function");
-    expect(typeof dependencies?.loadReviewSelectionInput).toBe("function");
     expect(jest.mocked(runCli.runRunCommand)).not.toHaveBeenCalled();
     expect(jest.mocked(specCli.runSpecCommand)).not.toHaveBeenCalled();
-    expect(jest.mocked(reviewCli.runReviewCommand)).not.toHaveBeenCalled();
+    expect(jest.mocked(verifyCli.runVerifyCommand)).not.toHaveBeenCalled();
     expect(jest.mocked(applyCli.runApplyCommand)).not.toHaveBeenCalled();
   });
 });

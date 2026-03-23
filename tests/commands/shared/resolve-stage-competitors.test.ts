@@ -24,9 +24,9 @@ describe("resolveStageCompetitors", () => {
     try {
       resolveStageCompetitors({
         root: "/unused",
-        stageId: "review",
+        stageId: "verify",
         cliAgentIds: ["alpha", "beta"],
-        cliOverrideFlag: "--review-agent",
+        cliOverrideFlag: "--verify-agent",
         enforceSingleCompetitor: true,
       });
     } catch (error) {
@@ -36,10 +36,10 @@ describe("resolveStageCompetitors", () => {
     expect(caught).toBeInstanceOf(HintedError);
     const hinted = caught as HintedError;
     expect(hinted.headline).toBe(
-      "Multiple agents configured for stage `review`.",
+      "Multiple agents configured for stage `verify`.",
     );
     expect(hinted.hintLines).toContain(
-      "Configure exactly one agent under `profiles.default.review.agents` in `orchestration.yaml`.",
+      "Configure exactly one agent under `profiles.default.verify.agents` in `orchestration.yaml`.",
     );
   });
 
@@ -53,7 +53,7 @@ describe("resolveStageCompetitors", () => {
         "      agents: []",
         "    run:",
         "      agents: []",
-        "    review:",
+        "    verify:",
         "      agents: []",
         "    reduce:",
         "      agents: []",
@@ -99,7 +99,7 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: alpha",
-        "    review:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "    reduce:",
@@ -113,7 +113,7 @@ describe("resolveStageCompetitors", () => {
         "        - id: gamma",
         "        - id: alpha",
         "        - id: beta",
-        "    review:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "    reduce:",
@@ -148,7 +148,7 @@ describe("resolveStageCompetitors", () => {
         "      agents:",
         "        - id: beta",
         "        - id: alpha",
-        "    review:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "    reduce:",
@@ -160,7 +160,7 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: gamma",
-        "    review:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "    reduce:",
@@ -193,7 +193,7 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: alpha",
-        "    review:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "    reduce:",
@@ -205,7 +205,7 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: beta",
-        "    review:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "    reduce:",
@@ -241,7 +241,7 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: alpha",
-        "    review:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "    reduce:",
@@ -253,7 +253,7 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: beta",
-        "    review:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "    reduce:",
@@ -300,7 +300,7 @@ describe("resolveStageCompetitors", () => {
         "      agents: []",
         "    run:",
         "      agents: []",
-        "    review:",
+        "    verify:",
         "      agents: []",
         "    reduce:",
         "      agents:",

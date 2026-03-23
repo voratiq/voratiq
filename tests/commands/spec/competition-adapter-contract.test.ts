@@ -142,7 +142,6 @@ function toWorkspacePaths(id: string): AgentWorkspacePaths {
     contextPath: `${base}/context`,
     stdoutPath: `${base}/artifacts/stdout.log`,
     stderrPath: `${base}/artifacts/stderr.log`,
-    reviewPath: `${base}/artifacts/review.md`,
     workspacePath: `${base}/workspace`,
     runtimeManifestPath: `${base}/runtime/manifest.json`,
     sandboxPath: `${base}/sandbox`,

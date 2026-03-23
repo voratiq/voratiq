@@ -24,6 +24,7 @@ import {
 import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import type { SpecProgressRenderer } from "../../render/transcripts/spec.js";
 import { toErrorMessage } from "../../utils/errors.js";
+import { getHeadRevision } from "../../utils/git.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
@@ -97,6 +98,7 @@ export async function executeSpecCommand(
       ? providedTitle.trim()
       : undefined;
 
+  const baseRevisionSha = await getHeadRevision(root);
   const sessionId = generateSessionId();
   const startedAt = new Date().toISOString();
   const createdAt = startedAt;
@@ -111,6 +113,7 @@ export async function executeSpecCommand(
     createdAt,
     startedAt,
     status: "running",
+    baseRevisionSha,
     description,
     agents: initialAgents,
     ...buildPersistedExtraContextFields(extraContextFiles),

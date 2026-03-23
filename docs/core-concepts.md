@@ -8,7 +8,7 @@ Voratiq is built around six ideas:
 
 - [Parallel Comparison](#parallel-comparison) — Run multiple agents concurrently to compare approaches
 - [Specs As the Source of Truth](#specs-as-the-source-of-truth) — Every run requires a Markdown spec that defines intent
-- [Eval Supported Review](#eval-supported-review) — Automated checks help gauge agent performance
+- [Verification-Native Judgment](#verification-native-judgment) — Programmatic checks and rubric verifiers select the best candidate
 - [Sandboxed Execution](#sandboxed-execution) — Agents run with minimal permissions by default
 - [Everything Is Auditable](#everything-is-auditable) — Complete audit trail preserved for every run
 - [Open & Transparent](#open--transparent) — The entire stack is inspectable, modifiable, and community-owned
@@ -19,7 +19,7 @@ This document walks through each concept and explains how it shapes Voratiq's de
 
 Voratiq runs multiple agents concurrently against the same spec. Each agent receives identical instructions but may approach the problem differently based on its model, training, or configuration.
 
-Running agents in parallel lets you compare model capabilities, test different prompting strategies, or hedge against any single agent's failure. Evals help you determine which outputs meet your quality bar.
+Running agents in parallel lets you compare model capabilities, test different prompting strategies, or hedge against any single agent's failure. Verification helps you determine which outputs meet your quality bar.
 
 Disable agents in the agent configuration or limit concurrency when you need results from only one agent.
 
@@ -35,15 +35,15 @@ You can rerun the same spec against different agents or models to compare approa
 
 See [CLI Reference](https://github.com/voratiq/voratiq/blob/main/docs/cli-reference.md) for `voratiq run` usage.
 
-## Eval Supported Review
+## Verification-Native Judgment
 
-After each agent finishes, Voratiq runs evals (tests, linters, build checks, custom scripts) in the agent's workspace. Non-zero exit codes mark the eval and agent as failed. Voratiq seeds a default eval set during `voratiq init` using heuristics to detect common tests, linters, and build commands.
+After candidates are produced, Voratiq runs verification: programmatic checks (tests, linters, build checks, custom scripts) plus rubric verifiers. Voratiq seeds a default verification config during `voratiq init` using heuristics to detect common checks.
 
-Evals are automated ways of gauging agent performance, checking correctness, style, security, or any criteria you define. They don't replace manual review but help catch issues early.
+Programmatic checks are automated ways of gauging agent performance, checking correctness, style, security, or any criteria you define. Rubric verifiers provide a structured judgment signal over the artifacts.
 
-Extend or replace the default eval set with custom scripts when needed.
+Extend or replace the default checks and templates when needed.
 
-See [Eval Configuration](https://github.com/voratiq/voratiq/blob/main/docs/configs/evals.md) for defining custom checks.
+See [Verification Configuration](https://github.com/voratiq/voratiq/blob/main/docs/configs/verification.md) for defining programmatic and rubric verification.
 
 ## Sandboxed Execution
 
@@ -57,9 +57,9 @@ See [Sandbox Configuration](https://github.com/voratiq/voratiq/blob/main/docs/co
 
 ## Everything Is Auditable
 
-Voratiq preserves a complete audit trail for every run under `.voratiq/runs/sessions/<run-id>/`. Each run directory contains the base git revision, agent logs (stdout/stderr), generated diffs, eval results, and agent summaries.
+Voratiq preserves a complete audit trail for every run under `.voratiq/runs/sessions/<run-id>/`. Each run directory contains the base git revision, agent logs (stdout/stderr), generated diffs, and agent summaries.
 
-Review any past run, inspect what an agent changed, understand why an eval failed, or compare multiple agents' approaches to the same spec. Nothing is lost or overwritten.
+Inspect any past run, compare multiple agents' approaches to the same spec, or drill into verification artifacts to understand why a candidate was selected. Nothing is lost or overwritten.
 
 Example run directory:
 
@@ -72,7 +72,6 @@ Example run directory:
 │   │   ├── stdout.log      # Agent's standard output stream
 │   │   ├── stderr.log      # Agent's standard error stream
 │   │   └── summary.txt     # Agent-written summary of what changed and why
-│   ├── evals/              # Eval execution logs (one file per eval)
 │   ├── runtime/            # Agent invocation details
 │   │   ├── manifest.json   # Binary path, argv, env vars, workspace path
 │   │   └── sandbox.json    # Applied network and filesystem policies
@@ -80,12 +79,10 @@ Example run directory:
 │   └── workspace/          # Agent's git worktree (preserved for inspection)
 ├── gpt-5-1-codex/
 │   ├── artifacts/
-│   ├── evals/
 │   ├── runtime/
 │   └── workspace/
 └── gemini-2-5-pro/
     ├── artifacts/
-    ├── evals/
     ├── runtime/
     └── workspace/
 ```
@@ -100,6 +97,6 @@ Voratiq is fully open source. The CLI, orchestration layers, sandbox policies, a
 
 Open design lets you verify behavior, audit security decisions, and adapt the tool to your environment. All runs execute locally. You control where artifacts are stored, who accesses them, and when they're deleted.
 
-Configuration is stored in plain text (YAML, JSON, Markdown). Add new agents, wire in custom evals, or swap sandbox rules by editing config files.
+Configuration is stored in plain text (YAML, JSON, Markdown). Add new agents, wire in custom verification checks, or swap sandbox rules by editing config files.
 
 See the [Voratiq repository](https://github.com/voratiq/voratiq) for source code and contribution guidance.

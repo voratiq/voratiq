@@ -1,10 +1,10 @@
 import { reductionRecordSchema } from "../../src/domains/reductions/model/types.js";
-import { reviewRecordSchema } from "../../src/domains/reviews/model/types.js";
 import { runRecordSchema } from "../../src/domains/runs/model/types.js";
 import { specRecordSchema } from "../../src/domains/specs/model/types.js";
+import { verificationRecordSchema } from "../../src/domains/verifications/model/types.js";
 
 describe("shared record path validation", () => {
-  it("rejects the same invalid repo-relative path across spec, run, review, and reduction records", () => {
+  it("rejects the same invalid repo-relative path across spec, run, verification, and reduction records", () => {
     const invalidPath = "../outside";
 
     const specResult = specRecordSchema.safeParse({
@@ -13,6 +13,7 @@ describe("shared record path validation", () => {
       startedAt: "2026-01-01T00:00:00.000Z",
       completedAt: "2026-01-01T00:01:00.000Z",
       status: "succeeded",
+      baseRevisionSha: "abc123",
       description: "Spec",
       agents: [
         {
@@ -42,32 +43,18 @@ describe("shared record path validation", () => {
           status: "succeeded",
           startedAt: "2026-01-01T00:00:00.000Z",
           completedAt: "2026-01-01T00:01:00.000Z",
-          evals: [
-            {
-              slug: "lint",
-              status: "succeeded",
-            },
-          ],
         },
       ],
     });
 
-    const reviewResult = reviewRecordSchema.safeParse({
-      sessionId: "review-123",
-      runId: "run-123",
+    const verificationResult = verificationRecordSchema.safeParse({
+      sessionId: "verify-123",
       createdAt: "2026-01-01T00:00:00.000Z",
       startedAt: "2026-01-01T00:00:00.000Z",
       completedAt: "2026-01-01T00:01:00.000Z",
       status: "succeeded",
-      reviewers: [
-        {
-          agentId: "reviewer-1",
-          status: "succeeded",
-          outputPath: invalidPath,
-          startedAt: "2026-01-01T00:00:00.000Z",
-          completedAt: "2026-01-01T00:01:00.000Z",
-        },
-      ],
+      target: { kind: "spec", sessionId: "spec-123", specPath: invalidPath },
+      methods: [],
     });
 
     const reductionResult = reductionRecordSchema.safeParse({
@@ -94,7 +81,7 @@ describe("shared record path validation", () => {
 
     expect(specResult.success).toBe(false);
     expect(runResult.success).toBe(false);
-    expect(reviewResult.success).toBe(false);
+    expect(verificationResult.success).toBe(false);
     expect(reductionResult.success).toBe(false);
 
     const specIssueMessages =
@@ -102,7 +89,7 @@ describe("shared record path validation", () => {
     expect(specIssueMessages).toContain(expectedMessage);
     expect(runResult.error?.issues[0]?.message).toBe(expectedMessage);
     expect(runResult.error?.issues[1]?.message).toBe(expectedMessage);
-    expect(reviewResult.error?.issues[0]?.message).toBe(expectedMessage);
+    expect(verificationResult.error?.issues[0]?.message).toBe(expectedMessage);
     expect(reductionResult.error?.issues[0]?.message).toBe(expectedMessage);
     expect(reductionResult.error?.issues[1]?.message).toBe(expectedMessage);
   });

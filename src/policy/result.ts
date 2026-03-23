@@ -1,5 +1,5 @@
-export interface ReviewAgreementSelection {
-  reviewerAgentId: string;
+export interface VerifierAgreementSelection {
+  verifierAgentId: string;
   selectedCanonicalAgentId: string;
 }
 
@@ -10,26 +10,26 @@ export interface SelectorResolutionMatch {
 
 export type SelectionDecisionUnresolvedReason =
   | {
-      code: "no_successful_reviewers";
-      failedReviewerAgentIds: readonly string[];
+      code: "no_successful_verifiers";
+      failedVerifierAgentIds: readonly string[];
     }
   | {
-      code: "reviewer_failed";
-      failedReviewerAgentIds: readonly string[];
+      code: "verifier_failed";
+      failedVerifierAgentIds: readonly string[];
     }
   | {
-      code: "reviewer_preference_missing";
-      reviewerAgentId: string;
+      code: "verifier_preference_missing";
+      verifierAgentId: string;
     }
   | {
-      code: "reviewer_preference_unresolved";
-      reviewerAgentId: string;
+      code: "verifier_preference_unresolved";
+      verifierAgentId: string;
       preferredCandidateId?: string;
       resolvedPreferredCandidateId?: string;
     }
   | {
-      code: "reviewer_disagreement";
-      selections: readonly ReviewAgreementSelection[];
+      code: "verifier_disagreement";
+      selections: readonly VerifierAgreementSelection[];
     }
   | {
       code: "selector_unresolved";
@@ -41,6 +41,19 @@ export type SelectionDecisionUnresolvedReason =
       code: "selector_ambiguous";
       selector: string;
       resolutions: readonly SelectorResolutionMatch[];
+    }
+  | {
+      code: "no_programmatic_candidates_passed";
+      candidateIds: readonly string[];
+    }
+  | {
+      code: "multiple_programmatic_candidates_passed";
+      eligibleCanonicalAgentIds: readonly string[];
+    }
+  | {
+      code: "selected_candidate_failed_programmatic";
+      selectedCanonicalAgentId: string;
+      eligibleCanonicalAgentIds: readonly string[];
     };
 
 export interface ResolvableSelectionDecision {

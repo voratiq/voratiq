@@ -194,7 +194,6 @@ describe("run preflight error summary", () => {
 
     await mkdir(join(root, ".voratiq"), { recursive: true });
     await writeFile(join(root, ".voratiq", "environment.yaml"), "{}\n", "utf8");
-    await writeFile(join(root, ".voratiq", "evals.yaml"), "{}\n", "utf8");
 
     const result = await validateAndPrepare({
       root,

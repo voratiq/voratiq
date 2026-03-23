@@ -2,10 +2,6 @@ import { z } from "zod";
 
 import { agentIdSchema } from "../../../configs/agents/types.js";
 import {
-  evalSlugSchema,
-  evalStatusSchema,
-} from "../../../configs/evals/types.js";
-import {
   extraContextMetadataEntrySchema,
   persistedExtraContextPathSchema,
 } from "../../../persistence/extra-context.js";
@@ -14,7 +10,6 @@ import {
   type AgentStatus,
   agentStatusSchema,
   applyStatusSchema as applyStatusValueSchema,
-  EVAL_REQUIRED_AGENT_STATUSES,
   IN_PROGRESS_AGENT_STATUSES,
   runStatusSchema,
   TERMINAL_AGENT_STATUSES,
@@ -30,7 +25,6 @@ import {
 export type { AgentStatus };
 export {
   agentStatusSchema,
-  EVAL_REQUIRED_AGENT_STATUSES,
   IN_PROGRESS_AGENT_STATUSES,
   TERMINAL_AGENT_STATUSES,
 };
@@ -154,19 +148,6 @@ export const agentArtifactStateSchema = z.object({
 
 export type AgentArtifactState = z.infer<typeof agentArtifactStateSchema>;
 
-export const agentEvalSnapshotSchema = z.object({
-  slug: evalSlugSchema,
-  status: evalStatusSchema,
-  exitCode: z.number().nullable().optional(),
-  command: z.string().optional(),
-  hasLog: z.boolean().optional(),
-  error: z.string().optional(),
-});
-
-export type AgentEvalSnapshot = z.infer<typeof agentEvalSnapshotSchema>;
-
-export type AgentEvalView = AgentEvalSnapshot & { logPath?: string };
-
 export const agentInvocationRecordSchema = z
   .object({
     agentId: agentIdSchema,
@@ -176,7 +157,6 @@ export const agentInvocationRecordSchema = z
     completedAt: z.string().optional(),
     commitSha: z.string().optional(),
     artifacts: agentArtifactStateSchema.optional(),
-    evals: z.array(agentEvalSnapshotSchema).optional(),
     error: z.string().optional(),
     warnings: z.array(z.string()).optional(),
     diffStatistics: z.string().optional(),
@@ -200,14 +180,6 @@ export const agentInvocationRecordSchema = z
         terminal: TERMINAL_AGENT_STATUSES,
       },
     );
-
-    if (EVAL_REQUIRED_AGENT_STATUSES.includes(data.status) && !data.evals) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["evals"],
-        message: "eval results are required once the agent completes",
-      });
-    }
 
     if (data.failFastTriggered) {
       if (!data.failFastTarget) {
@@ -325,7 +297,6 @@ export type AgentReport = {
     summaryPath?: string;
     chatPath?: string;
   };
-  evals: AgentEvalView[];
   startedAt: string;
   completedAt: string;
   diffStatistics?: string;
@@ -345,5 +316,4 @@ export type RunReport = {
   baseRevisionSha: RunRecord["baseRevisionSha"];
   agents: AgentReport[];
   hadAgentFailure: boolean;
-  hadEvalFailure: boolean;
 };

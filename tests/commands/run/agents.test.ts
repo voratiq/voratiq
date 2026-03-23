@@ -15,9 +15,8 @@ import { runSandboxedAgent } from "../../../src/agents/runtime/harness.js";
 import { runPreparedWithLimit } from "../../../src/competition/core.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
-import type { EvalDefinition } from "../../../src/configs/evals/types.js";
-import { runPostProcessingAndEvaluations } from "../../../src/domains/runs/competition/agents/eval-runner.js";
 import { runPreparedAgent } from "../../../src/domains/runs/competition/agents/lifecycle.js";
+import { runPostProcessingAndCollectArtifacts } from "../../../src/domains/runs/competition/agents/post-processing.js";
 import { AgentRunContext } from "../../../src/domains/runs/competition/agents/run-context.js";
 import type { PreparedAgentExecution } from "../../../src/domains/runs/competition/agents/types.js";
 import { buildRunAgentWorkspacePaths } from "../../../src/domains/runs/competition/agents/workspace.js";
@@ -31,9 +30,9 @@ jest.mock("../../../src/agents/runtime/harness.js", () => ({
 }));
 
 jest.mock(
-  "../../../src/domains/runs/competition/agents/eval-runner.js",
+  "../../../src/domains/runs/competition/agents/post-processing.js",
   () => ({
-    runPostProcessingAndEvaluations: jest.fn(),
+    runPostProcessingAndCollectArtifacts: jest.fn(),
   }),
 );
 
@@ -42,20 +41,14 @@ jest.mock("../../../src/workspace/chat/native-usage.js", () => ({
 }));
 
 const runSandboxedAgentMock = jest.mocked(runSandboxedAgent);
-const runPostProcessingAndEvaluationsMock = jest.mocked(
-  runPostProcessingAndEvaluations,
+const runPostProcessingAndCollectArtifactsMock = jest.mocked(
+  runPostProcessingAndCollectArtifacts,
 );
 const extractProviderNativeTokenUsageForSessionMock = jest.mocked(
   extractProviderNativeTokenUsageForSession,
 );
 
 const TEMP_DIR_PREFIX = "voratiq-agent-lifecycle-";
-const evalPlan: EvalDefinition[] = [
-  { slug: "format" },
-  { slug: "lint" },
-  { slug: "typecheck" },
-  { slug: "tests" },
-];
 const environment: EnvironmentConfig = {};
 
 const tempRoots: string[] = [];
@@ -88,7 +81,7 @@ describe("executeAgentLifecycle integration", () => {
     expect(progress.onCompleted).toHaveBeenCalledTimes(1);
     expect(progress.onCompleted).toHaveBeenCalledWith(result);
     expect(result.record.status).toBe("failed");
-    expect(runPostProcessingAndEvaluationsMock).not.toHaveBeenCalled();
+    expect(runPostProcessingAndCollectArtifactsMock).not.toHaveBeenCalled();
   });
 
   it("prefers extracted failure detail over fatal watchdog pattern text", async () => {
@@ -128,14 +121,10 @@ describe("executeAgentLifecycle integration", () => {
       sandboxSettings: minimalSandboxSettings(),
       manifestEnv: {},
     });
-    runPostProcessingAndEvaluationsMock.mockResolvedValue({
-      artifacts: {
-        summaryCaptured: false,
-        diffAttempted: false,
-        diffCaptured: false,
-      },
-      evaluations: [],
-      warnings: [],
+    runPostProcessingAndCollectArtifactsMock.mockResolvedValue({
+      summaryCaptured: false,
+      diffAttempted: false,
+      diffCaptured: false,
     });
 
     const [result] = await runPreparedExecutionsWithLimit([execution], 1);
@@ -144,7 +133,7 @@ describe("executeAgentLifecycle integration", () => {
     expect(progress.onCompleted).toHaveBeenCalledTimes(1);
     expect(progress.onCompleted).toHaveBeenCalledWith(result);
     expect(result.record.status).toBe("succeeded");
-    expect(runPostProcessingAndEvaluationsMock).toHaveBeenCalledTimes(1);
+    expect(runPostProcessingAndCollectArtifactsMock).toHaveBeenCalledTimes(1);
   });
 
   it("defers sandbox teardown until run-level cleanup", async () => {
@@ -155,14 +144,10 @@ describe("executeAgentLifecycle integration", () => {
       sandboxSettings: minimalSandboxSettings(),
       manifestEnv: {},
     });
-    runPostProcessingAndEvaluationsMock.mockResolvedValue({
-      artifacts: {
-        summaryCaptured: false,
-        diffAttempted: false,
-        diffCaptured: false,
-      },
-      evaluations: [],
-      warnings: [],
+    runPostProcessingAndCollectArtifactsMock.mockResolvedValue({
+      summaryCaptured: false,
+      diffAttempted: false,
+      diffCaptured: false,
     });
 
     await runPreparedExecutionsWithLimit([execution], 1);
@@ -182,20 +167,11 @@ describe("executeAgentLifecycle integration", () => {
     });
 
     const diffStatistics = "3 files changed, 4 insertions(+), 1 deletion(-)";
-    runPostProcessingAndEvaluationsMock.mockResolvedValue({
-      artifacts: {
-        summaryCaptured: true,
-        diffAttempted: true,
-        diffCaptured: true,
-        diffStatistics,
-      },
-      evaluations: evalPlan.map((definition) => ({
-        slug: definition.slug,
-        status: "succeeded" as const,
-        command: definition.command,
-        exitCode: 0,
-      })),
-      warnings: [],
+    runPostProcessingAndCollectArtifactsMock.mockResolvedValue({
+      summaryCaptured: true,
+      diffAttempted: true,
+      diffCaptured: true,
+      diffStatistics,
     });
 
     const [result] = await runPreparedExecutionsWithLimit([execution], 1);
@@ -234,14 +210,10 @@ describe("executeAgentLifecycle integration", () => {
         manifestEnv: {},
       });
 
-    runPostProcessingAndEvaluationsMock.mockResolvedValue({
-      artifacts: {
-        summaryCaptured: false,
-        diffAttempted: false,
-        diffCaptured: false,
-      },
-      evaluations: [],
-      warnings: [],
+    runPostProcessingAndCollectArtifactsMock.mockResolvedValue({
+      summaryCaptured: false,
+      diffAttempted: false,
+      diffCaptured: false,
     });
 
     const results = await runPreparedExecutionsWithLimit([first, second], 1);
@@ -277,14 +249,10 @@ describe("executeAgentLifecycle integration", () => {
         artifactPath: "/tmp/codex.chat.jsonl",
       },
     });
-    runPostProcessingAndEvaluationsMock.mockResolvedValue({
-      artifacts: {
-        summaryCaptured: false,
-        diffAttempted: false,
-        diffCaptured: false,
-      },
-      evaluations: [],
-      warnings: [],
+    runPostProcessingAndCollectArtifactsMock.mockResolvedValue({
+      summaryCaptured: false,
+      diffAttempted: false,
+      diffCaptured: false,
     });
     extractProviderNativeTokenUsageForSessionMock.mockResolvedValue({
       status: "available",
@@ -360,7 +328,7 @@ describe("executeAgentLifecycle integration", () => {
     const [result] = await runPreparedExecutionsWithLimit([execution], 1);
 
     expect(result.record.status).toBe("failed");
-    expect(runPostProcessingAndEvaluationsMock).not.toHaveBeenCalled();
+    expect(runPostProcessingAndCollectArtifactsMock).not.toHaveBeenCalled();
     expect(extractProviderNativeTokenUsageForSessionMock).toHaveBeenCalledWith({
       root: execution.root,
       domain: "runs",
@@ -396,14 +364,10 @@ describe("executeAgentLifecycle integration", () => {
         artifactPath: "/tmp/gemini.chat.json",
       },
     });
-    runPostProcessingAndEvaluationsMock.mockResolvedValue({
-      artifacts: {
-        summaryCaptured: false,
-        diffAttempted: false,
-        diffCaptured: false,
-      },
-      evaluations: [],
-      warnings: [],
+    runPostProcessingAndCollectArtifactsMock.mockResolvedValue({
+      summaryCaptured: false,
+      diffAttempted: false,
+      diffCaptured: false,
     });
     extractProviderNativeTokenUsageForSessionMock.mockResolvedValue({
       status: "unavailable",
@@ -424,14 +388,14 @@ describe("executeAgentLifecycle integration", () => {
       modelId: "gemini-2.5",
       message: "Chat usage extraction failed: boom",
     });
-    expect(runPostProcessingAndEvaluationsMock).toHaveBeenCalledTimes(1);
+    expect(runPostProcessingAndCollectArtifactsMock).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("AgentRunContext", () => {
-  it("persists an empty eval array when the plan is empty", () => {
+  it("does not persist legacy placeholders when finalizing", () => {
     const agent: AgentDefinition = {
-      id: "agent-empty-evals",
+      id: "agent-placeholder",
       provider: "none",
       model: "mock",
       binary: "node",
@@ -440,15 +404,14 @@ describe("AgentRunContext", () => {
 
     const context = new AgentRunContext({
       agent,
-      runId: "run-empty-evals",
+      runId: "run-placeholder",
       startedAt: new Date().toISOString(),
-      evalPlan: [],
     });
 
     context.setCompleted();
     const result = context.finalize();
 
-    expect(result.record.evals).toEqual([]);
+    expect("evals" in result.record).toBe(false);
   });
 });
 
@@ -470,7 +433,6 @@ async function createPreparedExecution(agentId = "agent-id"): Promise<{
 
   await mkdir(corePaths.agentRoot, { recursive: true });
   await mkdir(corePaths.workspacePath, { recursive: true });
-  await mkdir(workspacePaths.evalsDirPath, { recursive: true });
   await mkdir(corePaths.sandboxPath, { recursive: true });
   await mkdir(corePaths.sandboxHomePath, { recursive: true });
   await mkdir(corePaths.runtimePath, { recursive: true });
@@ -495,7 +457,6 @@ async function createPreparedExecution(agentId = "agent-id"): Promise<{
     agent,
     runId,
     startedAt: new Date().toISOString(),
-    evalPlan,
   });
 
   const progress = {
@@ -517,7 +478,6 @@ async function createPreparedExecution(agentId = "agent-id"): Promise<{
     root,
     runId,
     prompt: "# test prompt\n",
-    evalPlan,
     environment,
     progress,
   };

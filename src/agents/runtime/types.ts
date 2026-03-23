@@ -18,7 +18,7 @@ export interface AgentRuntimePaths {
   /** Base directory for the agent session (contains `runtime/` + `artifacts/`). */
   readonly agentRoot: string;
 
-  /** Agent working directory (e.g., a worktree). */
+  /** Agent working directory (for example, a worktree or scratch workspace). */
   readonly workspacePath: string;
 
   /** Writable sandbox home directory for auth staging and HOME isolation. */
@@ -68,7 +68,7 @@ export interface AgentRuntimeHarnessInput {
   readonly sandboxPolicyOverrides?: SandboxPolicyOverrides;
 
   /**
-   * Extra paths that must be write-protected from the sandboxed process (e.g., run-specific eval dirs).
+   * Extra paths that must be write-protected from the sandboxed process (e.g., run-specific verification dirs).
    */
   readonly extraWriteProtectedPaths?: readonly string[];
 

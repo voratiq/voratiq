@@ -9,10 +9,6 @@ import {
   type AgentConfigEntry,
   agentConfigEntrySchema,
 } from "../configs/agents/types.js";
-import {
-  listEvalDefaults,
-  serializeEvalDefaults,
-} from "../configs/evals/defaults.js";
 import { listSandboxProviderDefaults } from "../configs/sandbox/defaults.js";
 export type { AgentPreset } from "../configs/agents/defaults.js";
 export { AGENT_PRESET_CHOICES } from "../configs/agents/defaults.js";
@@ -101,11 +97,6 @@ export function listAgentPresetTemplates(): AgentPresetTemplateDescriptor[] {
     preset,
     template: buildAgentsTemplate(preset),
   }));
-}
-
-export function buildDefaultEvalsTemplate(): string {
-  const lines = serializeEvalDefaults(listEvalDefaults());
-  return `${lines.join("\n")}\n`;
 }
 
 export function buildDefaultEnvironmentTemplate(): string {

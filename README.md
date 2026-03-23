@@ -41,7 +41,7 @@ This uses ensembles to:
 
 - draft the spec
 - generate candidate implementations
-- select the best result through evals and review
+- verify and select the best result
 
 ## Documentation
 
@@ -55,7 +55,7 @@ Configuration:
 
 - [Agents](https://github.com/voratiq/voratiq/blob/main/docs/configs/agents.md) - Agent catalog and invocation details
 - [Orchestration](https://github.com/voratiq/voratiq/blob/main/docs/configs/orchestration.md) - Which agents run at each stage
-- [Evals](https://github.com/voratiq/voratiq/blob/main/docs/configs/evals.md) - Checks that gate candidate output
+- [Verification](https://github.com/voratiq/voratiq/blob/main/docs/configs/verification.md) - Programmatic and rubric verification
 - [Environment](https://github.com/voratiq/voratiq/blob/main/docs/configs/environment.md) - Runtime dependencies for agents
 - [Sandbox](https://github.com/voratiq/voratiq/blob/main/docs/configs/sandbox.md) - Network and filesystem restrictions
 

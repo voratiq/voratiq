@@ -8,19 +8,18 @@ import {
   resolveWorkspacePath,
   VORATIQ_AGENTS_FILE,
   VORATIQ_ENVIRONMENT_FILE,
-  VORATIQ_EVALS_FILE,
   VORATIQ_HISTORY_LOCK_FILENAME,
   VORATIQ_ORCHESTRATION_FILE,
   VORATIQ_REDUCTIONS_DIR,
-  VORATIQ_REVIEWS_DIR,
   VORATIQ_RUNS_DIR,
   VORATIQ_RUNS_FILE,
   VORATIQ_SANDBOX_FILE,
   VORATIQ_SPECS_DIR,
+  VORATIQ_VERIFICATIONS_DIR,
 } from "../../workspace/structure.js";
 import type { SandboxPolicyOverrides } from "./types.js";
 
-export type SandboxStageId = "run" | "spec" | "review" | "reduce";
+export type SandboxStageId = "run" | "spec" | "verify" | "reduce";
 
 export interface BuildSandboxPolicyInput {
   stageId: SandboxStageId;
@@ -201,7 +200,6 @@ function buildBaselineFilesystemPolicy(options: {
   const { root, stageId } = options;
   const commonSensitivePaths = [
     resolveWorkspacePath(root, VORATIQ_AGENTS_FILE),
-    resolveWorkspacePath(root, VORATIQ_EVALS_FILE),
     resolveWorkspacePath(root, VORATIQ_ENVIRONMENT_FILE),
     resolveWorkspacePath(root, VORATIQ_ORCHESTRATION_FILE),
     resolveWorkspacePath(root, VORATIQ_SANDBOX_FILE),
@@ -234,7 +232,7 @@ function resolveStageRoots(
           VORATIQ_RUNS_DIR,
           VORATIQ_HISTORY_LOCK_FILENAME,
         ),
-        resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR),
+        resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_DIR),
       ],
       readOnly: [],
     };
@@ -244,21 +242,22 @@ function resolveStageRoots(
     return {
       symmetric: [
         resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
-        resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR),
+        resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_DIR),
         resolveWorkspacePath(root, VORATIQ_REDUCTIONS_DIR),
       ],
       readOnly: [],
     };
   }
 
-  if (stageId === "review") {
+  if (stageId === "verify") {
     return {
       symmetric: [
         resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
         resolveWorkspacePath(root, VORATIQ_SPECS_DIR),
         resolveWorkspacePath(root, VORATIQ_REDUCTIONS_DIR),
       ],
-      // Reviewers should never inspect repository metadata during blinded review.
+      // Verification agents should never inspect repository metadata during
+      // blinded review.
       readOnly: [resolveAbsolute(root, ".git")],
     };
   }
@@ -267,7 +266,6 @@ function resolveStageRoots(
     symmetric: [
       resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
       resolveWorkspacePath(root, VORATIQ_SPECS_DIR),
-      resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR),
     ],
     readOnly: [resolveAbsolute(root, ".git")],
   };

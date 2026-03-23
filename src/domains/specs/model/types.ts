@@ -84,6 +84,7 @@ export const specRecordSchema = z
     startedAt: z.string(),
     completedAt: z.string().optional(),
     status: specRecordStatusSchema,
+    baseRevisionSha: z.string().optional(),
     description: z.string(),
     extraContext: z.array(persistedExtraContextPathSchema).optional(),
     extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),

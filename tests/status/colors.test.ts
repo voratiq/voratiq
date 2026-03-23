@@ -1,11 +1,11 @@
 import {
   getAgentStatusStyle,
-  getEvalStatusStyle,
+  getCheckStatusStyle,
   getRunStatusStyle,
 } from "../../src/status/colors.js";
 import {
   AGENT_STATUS_VALUES,
-  EVAL_STATUS_VALUES,
+  CHECK_STATUS_VALUES,
   RUN_STATUS_VALUES,
 } from "../../src/status/index.js";
 
@@ -22,10 +22,10 @@ describe("status color helpers", () => {
     );
   });
 
-  it("maps eval statuses to deterministic colors", () => {
-    const colors = EVAL_STATUS_VALUES.map(
-      (status: (typeof EVAL_STATUS_VALUES)[number]) =>
-        getEvalStatusStyle(status).cli,
+  it("maps check statuses to deterministic colors", () => {
+    const colors = CHECK_STATUS_VALUES.map(
+      (status: (typeof CHECK_STATUS_VALUES)[number]) =>
+        getCheckStatusStyle(status).cli,
     );
     expect(colors).toEqual(["green", "red", "red", "gray"]);
   });

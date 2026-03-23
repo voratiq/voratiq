@@ -8,7 +8,7 @@ import type { AgentConfigEntry, AgentsConfig } from "../agents/types.js";
 const ORCHESTRATION_BOOTSTRAP_STAGE_IDS = [
   "spec",
   "run",
-  "review",
+  "verify",
   "reduce",
 ] as const;
 

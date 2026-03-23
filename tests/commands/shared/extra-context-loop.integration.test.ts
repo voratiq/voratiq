@@ -12,6 +12,7 @@ import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-st
 import { executeSpecCommand } from "../../../src/commands/spec/command.js";
 import { resolveExtraContextFiles } from "../../../src/competition/shared/extra-context.js";
 import { appendSpecRecord } from "../../../src/domains/specs/persistence/adapter.js";
+import { getHeadRevision } from "../../../src/utils/git.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
 jest.mock("../../../src/agents/runtime/harness.js", () => ({
@@ -33,18 +34,24 @@ jest.mock("../../../src/commands/shared/resolve-stage-competitors.js", () => ({
   resolveStageCompetitors: jest.fn(),
 }));
 
+jest.mock("../../../src/utils/git.js", () => ({
+  getHeadRevision: jest.fn(),
+}));
+
 const runSandboxedAgentMock = jest.mocked(harness.runSandboxedAgent);
 const verifyAgentProvidersMock = jest.mocked(verifyAgentProviders);
 const resolveReductionCompetitorsMock = jest.mocked(
   resolveReductionCompetitors,
 );
 const resolveStageCompetitorsMock = jest.mocked(resolveStageCompetitors);
+const getHeadRevisionMock = jest.mocked(getHeadRevision);
 
 describe("end-to-end extra-context reuse loop", () => {
   it("reduces a spec and stages the reducer's reduction.json into a later spec invocation", async () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-extra-context-loop-"));
     try {
       await createWorkspace(root);
+      getHeadRevisionMock.mockResolvedValue("spec-base-sha");
 
       const seedSpecId = "spec-seed";
       const seedSpecPath = ".voratiq/specs/seed.md";
@@ -80,6 +87,7 @@ describe("end-to-end extra-context reuse loop", () => {
           startedAt: "2026-01-01T00:00:00.000Z",
           completedAt: "2026-01-01T00:00:01.000Z",
           status: "succeeded",
+          baseRevisionSha: "abc123",
           description: "Seed",
           agents: [
             {
@@ -229,8 +237,13 @@ describe("end-to-end extra-context reuse loop", () => {
         root,
         specsFilePath: join(root, ".voratiq", "specs", "index.json"),
         runsFilePath: join(root, ".voratiq", "runs", "index.json"),
-        reviewsFilePath: join(root, ".voratiq", "reviews", "index.json"),
         reductionsFilePath: join(root, ".voratiq", "reductions", "index.json"),
+        verificationsFilePath: join(
+          root,
+          ".voratiq",
+          "verifications",
+          "index.json",
+        ),
         target: { type: "spec", id: seedSpecId },
         agentIds: ["alpha"],
       });

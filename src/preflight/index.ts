@@ -20,12 +20,12 @@ import {
   resolveWorkspacePath,
   VORATIQ_REDUCTIONS_DIR,
   VORATIQ_REDUCTIONS_FILE,
-  VORATIQ_REVIEWS_DIR,
-  VORATIQ_REVIEWS_FILE,
   VORATIQ_RUNS_DIR,
   VORATIQ_RUNS_FILE,
   VORATIQ_SPECS_DIR,
   VORATIQ_SPECS_FILE,
+  VORATIQ_VERIFICATIONS_DIR,
+  VORATIQ_VERIFICATIONS_FILE,
 } from "../workspace/structure.js";
 import {
   DirtyWorkingTreeError,
@@ -44,10 +44,10 @@ export interface WorkspacePaths {
   runsFile: string;
   reductionsDir?: string;
   reductionsFile?: string;
-  reviewsDir: string;
-  reviewsFile: string;
   specsDir: string;
   specsFile: string;
+  verificationsDir?: string;
+  verificationsFile?: string;
 }
 
 export interface CliContext {
@@ -105,10 +105,10 @@ export async function resolveCliContext(
     runsFile: resolveWorkspacePath(root, VORATIQ_RUNS_FILE),
     reductionsDir: resolveWorkspacePath(root, VORATIQ_REDUCTIONS_DIR),
     reductionsFile: resolveWorkspacePath(root, VORATIQ_REDUCTIONS_FILE),
-    reviewsDir: resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR),
-    reviewsFile: resolveWorkspacePath(root, VORATIQ_REVIEWS_FILE),
     specsDir: resolveWorkspacePath(root, VORATIQ_SPECS_DIR),
     specsFile: resolveWorkspacePath(root, VORATIQ_SPECS_FILE),
+    verificationsDir: resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_DIR),
+    verificationsFile: resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_FILE),
   };
 
   return {
