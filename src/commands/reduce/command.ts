@@ -235,7 +235,7 @@ async function assertReducePreflight(
   );
 
   if (providerIssues.length > 0) {
-    throw new ReducePreflightError(providerIssues);
+    throw new ReducePreflightError(providerIssues, []);
   }
 }
 

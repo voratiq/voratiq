@@ -49,4 +49,30 @@ describe("shared preflight issue formatting", () => {
       "Run `voratiq init` to configure the workspace.",
     ]);
   });
+
+  it("allows auth-only preflight errors to suppress the generic init hint", () => {
+    const runError = new RunPreflightError(
+      [
+        {
+          agentId: "agent-a",
+          message:
+            "Claude authentication failed. Authenticate directly via Claude before continuing.",
+        },
+      ],
+      [],
+    );
+    const reduceError = new ReducePreflightError(
+      [
+        {
+          agentId: "reducer-a",
+          message:
+            "Claude authentication failed. Authenticate directly via Claude before continuing.",
+        },
+      ],
+      [],
+    );
+
+    expect(runError.hintLines).toEqual([]);
+    expect(reduceError.hintLines).toEqual([]);
+  });
 });

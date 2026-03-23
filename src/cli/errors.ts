@@ -6,10 +6,15 @@ export class CliError extends HintedError {
   constructor(
     headline: string,
     detailLines: readonly string[] = [],
-    hintLines: readonly string[] = [],
+    hintLines?: readonly string[],
   ) {
-    const normalizedHint = hintLines[0] ?? DEFAULT_CLI_ERROR_HINT;
-    super(headline, { detailLines, hintLines: [normalizedHint] });
+    super(headline, {
+      detailLines,
+      hintLines:
+        hintLines === undefined
+          ? [DEFAULT_CLI_ERROR_HINT]
+          : Array.from(hintLines),
+    });
     this.name = "CliError";
   }
 }

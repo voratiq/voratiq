@@ -148,6 +148,44 @@ describe("run preflight error summary", () => {
     expect(preflightError.detailLines[0]).toContain("Invalid settings file");
   });
 
+  it("suppresses the generic init hint when preflight only has auth provider issues", async () => {
+    const diagnostics: AgentCatalogDiagnostics = {
+      enabledAgents: [
+        {
+          id: "claude-sonnet",
+          provider: "claude",
+          model: "model",
+          enabled: true,
+          binary: "/bin/true",
+        },
+      ],
+      catalog: [],
+      issues: [],
+    };
+    loadAgentCatalogDiagnosticsMock.mockReturnValue(diagnostics);
+    verifyAgentProvidersMock.mockResolvedValue([
+      {
+        agentId: "claude-sonnet",
+        message:
+          "Claude authentication failed. Authenticate directly via Claude before continuing.",
+      },
+    ]);
+
+    let captured: unknown;
+    try {
+      await validateAndPrepare({ root, specAbsolutePath: specPath });
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(captured).toBeInstanceOf(RunPreflightError);
+    const preflightError = captured as RunPreflightError;
+    expect(preflightError.detailLines).toEqual([
+      "- claude-sonnet: Claude authentication failed. Authenticate directly via Claude before continuing.",
+    ]);
+    expect(preflightError.hintLines).toEqual([]);
+  });
+
   it("does not block selected run agents on diagnostics issues from unselected enabled agents", async () => {
     const diagnostics: AgentCatalogDiagnostics = {
       enabledAgents: [

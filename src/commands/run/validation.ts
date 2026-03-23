@@ -108,6 +108,7 @@ export async function validateAndPrepare(
     });
   }
 
+  const preProviderIssueCount = preflightIssues.length;
   const providerIssues = await verifyAgentProviders(
     agents.map((agent) => ({
       id: agent.id,
@@ -117,7 +118,10 @@ export async function validateAndPrepare(
 
   preflightIssues.push(...providerIssues);
   if (preflightIssues.length > 0) {
-    throw new RunPreflightError(preflightIssues);
+    throw new RunPreflightError(
+      preflightIssues,
+      preProviderIssueCount === 0 ? [] : undefined,
+    );
   }
 
   const environment = (() => {
