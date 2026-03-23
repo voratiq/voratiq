@@ -415,14 +415,6 @@ export async function executeAutoCommand(
         verifyStatus = "failed";
         verifyDetail = "One or more verifiers failed.";
         hardFailure = true;
-      } else if (verifySelection?.state === "unresolved") {
-        const actionRequiredMessage =
-          describeUnresolvedAutoApplyDecision(verifySelection);
-        verifyDetail = actionRequiredMessage.detail;
-        markActionRequired(
-          actionRequiredMessage.detail,
-          actionRequiredMessage.message,
-        );
       }
 
       recordEvent({
@@ -431,6 +423,16 @@ export async function executeAutoCommand(
         stderr: verifyResult.stderr,
         exitCode: verifyResult.exitCode,
       });
+
+      if (verifySelection?.state === "unresolved") {
+        const actionRequiredMessage =
+          describeUnresolvedAutoApplyDecision(verifySelection);
+        verifyDetail = actionRequiredMessage.detail;
+        markActionRequired(
+          actionRequiredMessage.detail,
+          actionRequiredMessage.message,
+        );
+      }
     } catch (error) {
       verifyStatus = "failed";
       verifyDetail = toHeadline(error);

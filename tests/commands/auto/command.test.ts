@@ -70,6 +70,13 @@ function createApplyStageResult(
   };
 }
 
+function findEventIndex(
+  events: readonly { kind: string }[],
+  kind: string,
+): number {
+  return events.findIndex((event) => event.kind === kind);
+}
+
 describe("executeAutoCommand", () => {
   it("returns action required when spec generation produces multiple drafts", async () => {
     const runRunStage = jest.fn<AutoCommandDependencies["runRunStage"]>();
@@ -232,6 +239,9 @@ describe("executeAutoCommand", () => {
           "Verifiers disagreed on the preferred candidate; manual selection required.",
       }),
     );
+    expect(findEventIndex(result.events, "body")).toBeLessThan(
+      findEventIndex(result.events, "action_required"),
+    );
   });
 
   it("returns action required when verify(run) is unresolved even without apply", async () => {
@@ -300,6 +310,65 @@ describe("executeAutoCommand", () => {
         message:
           "Verifiers disagreed on the preferred candidate; manual selection required.",
       }),
+    );
+    expect(findEventIndex(result.events, "body")).toBeLessThan(
+      findEventIndex(result.events, "action_required"),
+    );
+  });
+
+  it("emits the verify transcript body before action required when no programmatic candidates passed", async () => {
+    const dependencies = createDependencies({
+      now: () => 0,
+      runRunStage: jest
+        .fn<AutoCommandDependencies["runRunStage"]>()
+        .mockResolvedValue(createRunStageResult()),
+      runVerifyStage: jest
+        .fn<AutoCommandDependencies["runVerifyStage"]>()
+        .mockResolvedValue(
+          createVerifyStageResult({
+            body: "run verify body",
+            selection: {
+              state: "unresolved",
+              applyable: false,
+              unresolvedReasons: [
+                {
+                  code: "no_programmatic_candidates_passed",
+                  candidateIds: ["alpha", "beta"],
+                },
+              ],
+            },
+          }),
+        ),
+    });
+
+    const result = await executeAutoCommand(
+      {
+        specPath: "specs/task.md",
+      },
+      dependencies,
+    );
+
+    expect(result.auto.status).toBe("action_required");
+    expect(result.summary.verify.detail).toBe(
+      "No run candidate passed programmatic verification; manual selection required.",
+    );
+    expect(result.events).toContainEqual(
+      expect.objectContaining({
+        kind: "body",
+        body: "run verify body",
+      }),
+    );
+    expect(result.events).toContainEqual(
+      expect.objectContaining({
+        kind: "action_required",
+        detail:
+          "No run candidate passed programmatic verification; manual selection required.",
+        message:
+          "No run candidate passed programmatic verification; manual selection required.",
+      }),
+    );
+    expect(findEventIndex(result.events, "body")).toBeLessThan(
+      findEventIndex(result.events, "action_required"),
     );
   });
 
