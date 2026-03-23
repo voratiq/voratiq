@@ -34,7 +34,9 @@ import {
 import { formatRenderLifecycleDuration } from "../render/utils/duration.js";
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { renderTable } from "../render/utils/table.js";
+import { getCheckStatusStyle } from "../status/colors.js";
 import { TERMINAL_VERIFICATION_STATUSES } from "../status/index.js";
+import { colorize } from "../utils/colors.js";
 import { toErrorMessage } from "../utils/errors.js";
 import {
   normalizePathForDisplay,
@@ -109,6 +111,7 @@ export async function runVerifyCommand(
     stdout,
     stderr,
   });
+  const isTty = stdout?.isTTY ?? process.stdout.isTTY;
 
   const execution = await executeVerifyCommand({
     root,
@@ -135,6 +138,7 @@ export async function runVerifyCommand(
         root,
         aliasMap: execution.record.blinded?.aliasMap,
         method,
+        isTty,
       });
 
       return {
@@ -210,8 +214,8 @@ export async function runVerifyCommand(
     suppressHint,
     warningMessage: selectionWarning,
     hintMessage,
-    isTty: stdout?.isTTY ?? process.stdout.isTTY,
-    includeSummarySection: !(stdout?.isTTY ?? process.stdout.isTTY),
+    isTty,
+    includeSummarySection: !isTty,
   });
 
   return {
@@ -401,8 +405,9 @@ async function buildMethodBodyLines(options: {
   root: string;
   aliasMap?: Record<string, string>;
   method: VerificationMethodResultRef;
+  isTty?: boolean;
 }): Promise<string[] | undefined> {
-  const { root, aliasMap, method } = options;
+  const { root, aliasMap, method, isTty } = options;
   if (!method.artifactPath) {
     return undefined;
   }
@@ -428,7 +433,16 @@ async function buildMethodBodyLines(options: {
             {
               header: "CHECKS",
               accessor: (row: (typeof artifact.candidates)[number]) =>
-                row.results.map((result) => result.slug).join(" "),
+                row.results
+                  .map((result) =>
+                    isTty
+                      ? colorize(
+                          result.slug,
+                          getCheckStatusStyle(result.status).cli,
+                        )
+                      : result.slug,
+                  )
+                  .join(" "),
             },
           ],
           rows: [...artifact.candidates],

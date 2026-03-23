@@ -16,6 +16,7 @@ import {
   ensureSandboxDependencies,
   resolveCliContext,
 } from "../../src/preflight/index.js";
+import { colorize } from "../../src/utils/colors.js";
 import { silenceCommander } from "../support/commander.js";
 
 const executeVerifyCommandMock = jest.mocked(executeVerifyCommand);
@@ -263,6 +264,79 @@ describe("voratiq verify", () => {
     );
     expect(result.body).not.toContain("Method:");
     expect(result.body).not.toContain("Summary:");
+  });
+
+  it("colors programmatic check slugs per status in TTY transcripts without recoloring the verifier label", async () => {
+    readFileMock.mockImplementation((path) => {
+      const displayPath = normalizeReadFilePath(path);
+      if (
+        displayPath.endsWith(
+          "/.voratiq/verifications/sessions/verify-123/programmatic/artifacts/result.json",
+        )
+      ) {
+        return Promise.resolve(
+          JSON.stringify({
+            method: "programmatic",
+            generatedAt: "2026-03-19T20:00:03.000Z",
+            target: {
+              kind: "run",
+              sessionId: "run-123",
+              candidateIds: ["agent-a"],
+            },
+            scope: "run",
+            candidates: [
+              {
+                candidateId: "agent-a",
+                results: [
+                  { slug: "format", status: "succeeded" },
+                  { slug: "tests", status: "failed" },
+                ],
+              },
+            ],
+          }),
+        );
+      }
+      throw new Error(`Unexpected read: ${displayPath}`);
+    });
+
+    executeVerifyCommandMock.mockResolvedValue({
+      verificationId: "verify-123",
+      record: {
+        sessionId: "verify-123",
+        createdAt: "2026-03-19T20:00:00.000Z",
+        startedAt: "2026-03-19T20:00:01.000Z",
+        completedAt: "2026-03-19T20:00:05.000Z",
+        status: "succeeded",
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+          candidateIds: ["agent-a"],
+        },
+        methods: [
+          {
+            method: "programmatic",
+            scope: { kind: "run" },
+            status: "succeeded",
+            artifactPath:
+              ".voratiq/verifications/sessions/verify-123/programmatic/artifacts/result.json",
+            startedAt: "2026-03-19T20:00:01.000Z",
+            completedAt: "2026-03-19T20:00:03.000Z",
+          },
+        ],
+      },
+    });
+
+    const result = await runVerifyCommand({
+      target: { kind: "run", sessionId: "run-123" },
+      stdout: { write: () => true, isTTY: true },
+    } satisfies VerifyCommandOptions);
+
+    expect(result.body).toContain("AGENT");
+    expect(result.body).toContain("CHECKS");
+    expect(result.body).toContain(
+      `${colorize("format", "green")} ${colorize("tests", "red")}`,
+    );
+    expect(result.body).not.toContain(colorize("programmatic", "green"));
   });
 
   it("does not surface unknown blinded aliases as canonical ids in transcripts or apply hints", async () => {
