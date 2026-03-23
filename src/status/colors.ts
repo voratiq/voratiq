@@ -1,6 +1,5 @@
-import type { EvalStatus } from "../configs/evals/types.js";
 import type { TerminalColor } from "../utils/colors.js";
-import type { AgentStatus, RunStatus } from "./index.js";
+import type { AgentStatus, CheckStatus, RunStatus } from "./index.js";
 
 interface StatusStyle {
   cli: TerminalColor;
@@ -16,7 +15,7 @@ const agentStatusStyles: Record<AgentStatus, StatusStyle> = {
   queued: { cli: "gray" },
 };
 
-const evalStatusStyles: Record<EvalStatus, StatusStyle> = {
+const checkStatusStyles: Record<CheckStatus, StatusStyle> = {
   succeeded: { cli: "green" },
   failed: { cli: "red" },
   errored: { cli: "red" },
@@ -37,8 +36,8 @@ export function getAgentStatusStyle(status: AgentStatus): StatusStyle {
   return agentStatusStyles[status];
 }
 
-export function getEvalStatusStyle(status: EvalStatus): StatusStyle {
-  return evalStatusStyles[status];
+export function getCheckStatusStyle(status: CheckStatus): StatusStyle {
+  return checkStatusStyles[status];
 }
 
 export function getRunStatusStyle(status: RunStatus): StatusStyle {

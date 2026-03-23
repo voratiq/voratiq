@@ -1,7 +1,6 @@
 import type { ResolvedExtraContextFile } from "../../../../competition/shared/extra-context.js";
 import type { AgentDefinition } from "../../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../../configs/environment/types.js";
-import type { EvalDefinition } from "../../../../configs/evals/types.js";
 import type { AgentExecutionResult } from "../../../../domains/runs/competition/reports.js";
 import type { AgentInvocationRecord } from "../../../../domains/runs/model/types.js";
 import { AgentRunContext } from "./run-context.js";
@@ -14,7 +13,6 @@ export interface AgentExecutionContext {
   root: string;
   specContent: string;
   extraContextFiles: readonly ResolvedExtraContextFile[];
-  evalPlan: readonly EvalDefinition[];
   environment: EnvironmentConfig;
 }
 
@@ -33,7 +31,6 @@ export interface PreparedAgentExecution {
   root: string;
   runId: string;
   prompt: string;
-  evalPlan: readonly EvalDefinition[];
   environment: EnvironmentConfig;
   progress?: AgentProgressCallbacks;
 }

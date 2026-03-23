@@ -22,8 +22,6 @@ export interface AgentRecordMutators {
   recordAgentSnapshot: (record: AgentInvocationRecord) => Promise<void>;
 }
 
-type AgentEvalEntry = NonNullable<AgentInvocationRecord["evals"]>[number];
-
 export interface MutatorFactoryInput {
   readonly root: string;
   readonly runsFilePath: string;
@@ -123,27 +121,6 @@ function mergeArtifactState(
   };
 }
 
-function mergeEvalSnapshots(
-  existing: AgentInvocationRecord["evals"],
-  incoming: AgentInvocationRecord["evals"],
-): AgentInvocationRecord["evals"] {
-  if (!existing && !incoming) {
-    return undefined;
-  }
-
-  const bySlug = new Map<string, AgentEvalEntry>();
-
-  for (const evaluation of existing ?? []) {
-    bySlug.set(evaluation.slug, evaluation);
-  }
-
-  for (const evaluation of incoming ?? []) {
-    bySlug.set(evaluation.slug, evaluation);
-  }
-
-  return Array.from(bySlug.values());
-}
-
 function mergeAgentRecords(
   existing: AgentInvocationRecord | undefined,
   incoming: AgentInvocationRecord,
@@ -169,13 +146,6 @@ function mergeAgentRecords(
     merged.artifacts = mergedArtifacts;
   } else {
     delete merged.artifacts;
-  }
-
-  const mergedEvals = mergeEvalSnapshots(existing?.evals, incoming.evals);
-  if (mergedEvals && mergedEvals.length > 0) {
-    merged.evals = mergedEvals;
-  } else {
-    delete merged.evals;
   }
 
   const normalizedIncomingDiff = normalizeDiffStatistics(

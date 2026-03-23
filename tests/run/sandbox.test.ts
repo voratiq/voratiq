@@ -131,8 +131,6 @@ async function setupSandboxProbe(options: {
       sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
       runtimePath: workspacePaths.runtimePath,
       artifactsPath: workspacePaths.artifactsPath,
-      extraWriteProtectedPaths: [workspacePaths.evalsDirPath],
-      extraReadProtectedPaths: [workspacePaths.evalsDirPath],
     });
 
     setupComplete = true;

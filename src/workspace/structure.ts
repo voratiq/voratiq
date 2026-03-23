@@ -1,6 +1,4 @@
 import { agentIdSchema } from "../configs/agents/types.js";
-import type { EvalStatus } from "../configs/evals/types.js";
-import { evalSlugSchema } from "../configs/evals/types.js";
 import {
   assertRepoRelativePath,
   resolvePathWithinRoot,
@@ -11,44 +9,42 @@ export const VORATIQ_DIR = ".voratiq";
 export const VORATIQ_RUNS_DIR = "runs";
 export const VORATIQ_RUNS_FILE = "runs/index.json";
 export const VORATIQ_RUNS_SESSIONS_DIR = "runs/sessions";
-export const VORATIQ_REVIEWS_DIR = "reviews";
-export const VORATIQ_REVIEWS_FILE = "reviews/index.json";
-export const VORATIQ_REVIEWS_SESSIONS_DIR = "reviews/sessions";
 export const VORATIQ_REDUCTIONS_DIR = "reductions";
 export const VORATIQ_REDUCTIONS_FILE = "reductions/index.json";
 export const VORATIQ_REDUCTIONS_SESSIONS_DIR = "reductions/sessions";
 export const VORATIQ_SPECS_DIR = "specs";
 export const VORATIQ_SPECS_FILE = "specs/index.json";
 export const VORATIQ_SPECS_SESSIONS_DIR = "specs/sessions";
+export const VORATIQ_VERIFICATIONS_DIR = "verifications";
+export const VORATIQ_VERIFICATIONS_FILE = "verifications/index.json";
+export const VORATIQ_VERIFICATIONS_SESSIONS_DIR = "verifications/sessions";
+export const VORATIQ_VERIFICATIONS_TEMPLATES_DIR = "verifications/templates";
 export const VORATIQ_INDEX_FILENAME = "index.json";
 export const VORATIQ_HISTORY_LOCK_FILENAME = "history.lock";
 export const VORATIQ_SESSIONS_DIRNAME = "sessions";
 export const VORATIQ_AGENTS_FILE = "agents.yaml";
-export const VORATIQ_EVALS_FILE = "evals.yaml";
+export const VORATIQ_VERIFICATION_CONFIG_FILE = "verification.yaml";
 export const VORATIQ_ENVIRONMENT_FILE = "environment.yaml";
 export const VORATIQ_SANDBOX_FILE = "sandbox.yaml";
 export const VORATIQ_ORCHESTRATION_FILE = "orchestration.yaml";
 
 export const WORKSPACE_DIRNAME = "workspace";
 export const CONTEXT_DIRNAME = "context";
-export const EVALS_DIRNAME = "evals";
 export const STDOUT_FILENAME = "stdout.log";
 export const STDERR_FILENAME = "stderr.log";
 export const DIFF_FILENAME = "diff.patch";
 export const SUMMARY_FILENAME = "summary.txt";
 export const CHAT_JSON_FILENAME = "chat.json";
 export const CHAT_JSONL_FILENAME = "chat.jsonl";
-export const REVIEW_FILENAME = "review.md";
-export const REVIEW_RECOMMENDATION_FILENAME = "recommendation.json";
 export const REDUCTION_FILENAME = "reduction.md";
 export const REDUCTION_DATA_FILENAME = "reduction.json";
 export const RUNTIME_DIRNAME = "runtime";
 export const ARTIFACTS_DIRNAME = "artifacts";
 export const MANIFEST_FILENAME = "manifest.json";
-export const REVIEW_ARTIFACT_INFO_FILENAME = "artifact-information.json";
 export const REDUCTION_ARTIFACT_INFO_FILENAME = "artifact-information.json";
 export const SANDBOX_DIRNAME = "sandbox";
 export const SANDBOX_SETTINGS_FILENAME = "sandbox.json";
+export const PROGRAMMATIC_RESULT_FILENAME = "result.json";
 
 export function resolveWorkspacePath(
   root: string,
@@ -62,7 +58,7 @@ export function formatWorkspacePath(...segments: string[]): string {
 }
 
 function assertPathSegment(
-  label: "runId" | "agentId" | "segment" | "evalSlug" | "domain" | "sessionId",
+  label: "runId" | "agentId" | "segment" | "domain" | "sessionId",
   value: string,
 ): string {
   if (typeof value !== "string") {
@@ -83,10 +79,6 @@ function assertDomainSegment(domain: string): string {
 
 function assertSessionId(sessionId: string): string {
   return assertPathSegment("sessionId", sessionId);
-}
-
-function assertEvalSlug(evalSlug: string): string {
-  return evalSlugSchema.parse(assertPathSegment("evalSlug", evalSlug));
 }
 
 function formatDomainScopedPath(domain: string, ...segments: string[]): string {
@@ -167,6 +159,18 @@ export function getSpecsSessionsDirectoryPath(): string {
   return getDomainSessionsDirectoryPath(VORATIQ_SPECS_DIR);
 }
 
+export function getVerificationsDirectoryPath(): string {
+  return getDomainDirectoryPath(VORATIQ_VERIFICATIONS_DIR);
+}
+
+export function getVerificationsIndexPath(): string {
+  return getDomainIndexPath(VORATIQ_VERIFICATIONS_DIR);
+}
+
+export function getVerificationsSessionsDirectoryPath(): string {
+  return getDomainSessionsDirectoryPath(VORATIQ_VERIFICATIONS_DIR);
+}
+
 export function getReductionsDirectoryPath(): string {
   return getDomainDirectoryPath(VORATIQ_REDUCTIONS_DIR);
 }
@@ -196,6 +200,74 @@ export function getSpecSessionDirectoryPath(sessionId: string): string {
 
 export function getReductionSessionDirectoryPath(sessionId: string): string {
   return getSessionDirectoryPath(VORATIQ_REDUCTIONS_DIR, sessionId);
+}
+
+export function getVerificationSessionDirectoryPath(sessionId: string): string {
+  return getSessionDirectoryPath(VORATIQ_VERIFICATIONS_DIR, sessionId);
+}
+
+export function getVerificationSessionArtifactsDirectoryPath(
+  sessionId: string,
+): string {
+  return formatSessionScopedPath(
+    VORATIQ_VERIFICATIONS_DIR,
+    sessionId,
+    ARTIFACTS_DIRNAME,
+  );
+}
+
+export function getVerificationSessionRecordPath(sessionId: string): string {
+  return formatSessionScopedPath(
+    VORATIQ_VERIFICATIONS_DIR,
+    sessionId,
+    "record.json",
+  );
+}
+
+export function getVerificationProgrammaticResultPath(
+  sessionId: string,
+): string {
+  return formatSessionScopedPath(
+    VORATIQ_VERIFICATIONS_DIR,
+    sessionId,
+    "programmatic",
+    ARTIFACTS_DIRNAME,
+    PROGRAMMATIC_RESULT_FILENAME,
+  );
+}
+
+export function getVerificationRubricResultPath(options: {
+  sessionId: string;
+  verifierId: string;
+  template: string;
+}): string {
+  const { sessionId, verifierId, template } = options;
+  const safeVerifierId = agentIdSchema.parse(verifierId);
+  const safeTemplate = assertPathSegment("segment", template);
+  return formatAgentSessionScopedPath(
+    VORATIQ_VERIFICATIONS_DIR,
+    sessionId,
+    safeVerifierId,
+    safeTemplate,
+    ARTIFACTS_DIRNAME,
+    "result.json",
+  );
+}
+
+export function getVerificationRubricExecutionDirectoryPath(options: {
+  sessionId: string;
+  verifierId: string;
+  template: string;
+}): string {
+  const { sessionId, verifierId, template } = options;
+  const safeVerifierId = agentIdSchema.parse(verifierId);
+  const safeTemplate = assertPathSegment("segment", template);
+  return formatAgentSessionScopedPath(
+    VORATIQ_VERIFICATIONS_DIR,
+    sessionId,
+    safeVerifierId,
+    safeTemplate,
+  );
 }
 
 export function getAgentSessionDirectoryPath(
@@ -335,20 +407,6 @@ export function getAgentSessionSummaryPath(
   );
 }
 
-export function getAgentSessionReviewPath(
-  domain: string,
-  sessionId: string,
-  agentId: string,
-): string {
-  return formatAgentSessionScopedPath(
-    domain,
-    sessionId,
-    agentId,
-    ARTIFACTS_DIRNAME,
-    REVIEW_FILENAME,
-  );
-}
-
 export function getAgentSessionReductionPath(
   domain: string,
   sessionId: string,
@@ -390,35 +448,6 @@ export function getAgentSessionChatArtifactPath(
     agentId,
     ARTIFACTS_DIRNAME,
     filename,
-  );
-}
-
-export function getAgentSessionEvalsDirectoryPath(
-  domain: string,
-  sessionId: string,
-  agentId: string,
-): string {
-  return formatAgentSessionScopedPath(
-    domain,
-    sessionId,
-    agentId,
-    EVALS_DIRNAME,
-  );
-}
-
-export function getAgentSessionEvalLogPath(
-  domain: string,
-  sessionId: string,
-  agentId: string,
-  evalSlug: string,
-): string {
-  const safeSlug = assertEvalSlug(evalSlug);
-  return formatAgentSessionScopedPath(
-    domain,
-    sessionId,
-    agentId,
-    EVALS_DIRNAME,
-    `${safeSlug}.log`,
   );
 }
 
@@ -521,10 +550,6 @@ export function getAgentSummaryPath(runId: string, agentId: string): string {
   return getAgentSessionSummaryPath(VORATIQ_RUNS_DIR, runId, agentId);
 }
 
-export function getAgentReviewPath(runId: string, agentId: string): string {
-  return getAgentSessionReviewPath(VORATIQ_RUNS_DIR, runId, agentId);
-}
-
 export function getAgentChatArtifactPath(
   runId: string,
   agentId: string,
@@ -555,19 +580,6 @@ export interface AgentArtifactPaths {
   chatPath?: string;
 }
 
-export interface AgentEvalSnapshotLike {
-  slug: string;
-  status: EvalStatus;
-  command?: string;
-  exitCode?: number | null;
-  hasLog?: boolean;
-  error?: string;
-}
-
-export interface AgentEvalViewLike extends AgentEvalSnapshotLike {
-  logPath?: string;
-}
-
 export function buildAgentArtifactPaths(options: {
   runId: string;
   agentId: string;
@@ -593,35 +605,6 @@ export function buildAgentArtifactPaths(options: {
       ? getAgentChatArtifactPath(runId, agentId, chatFormat)
       : undefined,
   };
-}
-
-export function buildAgentEvalViews(options: {
-  runId: string;
-  agentId: string;
-  evals?: readonly AgentEvalSnapshotLike[] | null;
-}): AgentEvalViewLike[] {
-  const { runId, agentId, evals } = options;
-  return (evals ?? []).map((evaluation) => ({
-    ...evaluation,
-    logPath: evaluation.hasLog
-      ? getAgentEvalLogPath(runId, agentId, evaluation.slug)
-      : undefined,
-  }));
-}
-
-export function getAgentEvalsDirectoryPath(
-  runId: string,
-  agentId: string,
-): string {
-  return getAgentSessionEvalsDirectoryPath(VORATIQ_RUNS_DIR, runId, agentId);
-}
-
-export function getAgentEvalLogPath(
-  runId: string,
-  agentId: string,
-  evalSlug: string,
-): string {
-  return getAgentSessionEvalLogPath(VORATIQ_RUNS_DIR, runId, agentId, evalSlug);
 }
 
 export function getAgentSandboxDirectoryPath(

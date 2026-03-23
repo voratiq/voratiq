@@ -44,18 +44,19 @@ function buildValidWorkspaceTree(
     [`${root}/.voratiq/reductions`]: null,
     [`${root}/.voratiq/reductions/sessions`]: null,
     [`${root}/.voratiq/reductions/index.json`]: '{"version":1,"sessions":[]}\n',
-    [`${root}/.voratiq/reviews`]: null,
-    [`${root}/.voratiq/reviews/sessions`]: null,
-    [`${root}/.voratiq/reviews/index.json`]: '{"version":1,"sessions":[]}\n',
     [`${root}/.voratiq/specs`]: null,
     [`${root}/.voratiq/specs/sessions`]: null,
     [`${root}/.voratiq/specs/index.json`]: '{"version":1,"sessions":[]}\n',
+    [`${root}/.voratiq/verifications`]: null,
+    [`${root}/.voratiq/verifications/sessions`]: null,
+    [`${root}/.voratiq/verifications/index.json`]:
+      '{"version":1,"sessions":[]}\n',
     [`${root}/.voratiq/agents.yaml`]: "agents: []\n",
-    [`${root}/.voratiq/evals.yaml`]: "\n",
+    [`${root}/.voratiq/verification.yaml`]: "\n",
     [`${root}/.voratiq/environment.yaml`]: "\n",
     [`${root}/.voratiq/sandbox.yaml`]: "providers: {}\n",
     [`${root}/.voratiq/orchestration.yaml`]:
-      "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    review:\n      agents: []\n    reduce:\n      agents: []\n",
+      "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    verify:\n      agents: []\n    reduce:\n      agents: []\n",
   };
 }
 
@@ -71,10 +72,10 @@ describe("CLI Context", () => {
       await fs.promises.mkdir(`${root}/.voratiq/reductions/sessions`, {
         recursive: true,
       });
-      await fs.promises.mkdir(`${root}/.voratiq/reviews/sessions`, {
+      await fs.promises.mkdir(`${root}/.voratiq/specs/sessions`, {
         recursive: true,
       });
-      await fs.promises.mkdir(`${root}/.voratiq/specs/sessions`, {
+      await fs.promises.mkdir(`${root}/.voratiq/verifications/sessions`, {
         recursive: true,
       });
 
@@ -87,18 +88,18 @@ describe("CLI Context", () => {
         '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
-        `${root}/.voratiq/reviews/index.json`,
+        `${root}/.voratiq/specs/index.json`,
         '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
-        `${root}/.voratiq/specs/index.json`,
+        `${root}/.voratiq/verifications/index.json`,
         '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
         `${root}/.voratiq/agents.yaml`,
         "agents: []\n",
       );
-      await fs.promises.writeFile(`${root}/.voratiq/evals.yaml`, "\n");
+      await fs.promises.writeFile(`${root}/.voratiq/verification.yaml`, "\n");
       await fs.promises.writeFile(`${root}/.voratiq/environment.yaml`, "\n");
       await fs.promises.writeFile(
         `${root}/.voratiq/sandbox.yaml`,
@@ -106,7 +107,7 @@ describe("CLI Context", () => {
       );
       await fs.promises.writeFile(
         `${root}/.voratiq/orchestration.yaml`,
-        "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    review:\n      agents: []\n    reduce:\n      agents: []\n",
+        "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    verify:\n      agents: []\n    reduce:\n      agents: []\n",
       );
 
       return {
@@ -132,12 +133,6 @@ describe("CLI Context", () => {
           configCreated: true,
           configUpdated: true,
           config: {},
-        },
-        evalSummary: {
-          configPath: ".voratiq/evals.yaml",
-          configuredEvals: [],
-          configCreated: true,
-          configUpdated: true,
         },
         sandboxSummary: {
           configPath: ".voratiq/sandbox.yaml",
@@ -272,7 +267,7 @@ describe("CLI Context", () => {
 
     it("repairs a legacy workspace missing one domain index file", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/reviews/index.json", {
+      await fs.promises.rm("/app/voratiq/.voratiq/verifications/index.json", {
         force: true,
       });
 
@@ -280,7 +275,7 @@ describe("CLI Context", () => {
 
       expect(context.workspaceAutoRepaired).toBe(true);
       await expect(
-        fs.promises.readFile("/app/voratiq/.voratiq/reviews/index.json", {
+        fs.promises.readFile("/app/voratiq/.voratiq/verifications/index.json", {
           encoding: "utf8",
         }),
       ).resolves.toContain('"version": 1');
@@ -305,7 +300,7 @@ describe("CLI Context", () => {
 
     it("repairs multiple missing domain storage entries in one pass", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/reviews", {
+      await fs.promises.rm("/app/voratiq/.voratiq/verifications", {
         recursive: true,
         force: true,
       });
@@ -321,7 +316,7 @@ describe("CLI Context", () => {
 
       expect(context.workspaceAutoRepaired).toBe(true);
       await expect(
-        fs.promises.access("/app/voratiq/.voratiq/reviews/sessions"),
+        fs.promises.access("/app/voratiq/.voratiq/verifications/sessions"),
       ).resolves.toBeUndefined();
       await expect(
         fs.promises.readFile("/app/voratiq/.voratiq/specs/index.json", "utf8"),
@@ -352,8 +347,8 @@ describe("CLI Context", () => {
     it.each([
       ["/app/voratiq/.voratiq/runs/index.json", ".voratiq/runs/index.json"],
       [
-        "/app/voratiq/.voratiq/reviews/index.json",
-        ".voratiq/reviews/index.json",
+        "/app/voratiq/.voratiq/verifications/index.json",
+        ".voratiq/verifications/index.json",
       ],
       ["/app/voratiq/.voratiq/specs/index.json", ".voratiq/specs/index.json"],
       [
@@ -408,43 +403,31 @@ describe("CLI Context", () => {
 
     it("fails when a required index path exists as a directory", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/reviews/index.json", {
+      await fs.promises.rm("/app/voratiq/.voratiq/verifications/index.json", {
         force: true,
       });
-      await fs.promises.mkdir("/app/voratiq/.voratiq/reviews/index.json");
+      await fs.promises.mkdir("/app/voratiq/.voratiq/verifications/index.json");
 
       await expect(resolveCliContext()).rejects.toThrow(
         WorkspaceWrongTypeEntryError,
       );
       await expect(resolveCliContext()).rejects.toThrow(
-        "Wrong workspace entry type: `.voratiq/reviews/index.json` must be a file.",
+        "Wrong workspace entry type: `.voratiq/verifications/index.json` must be a file.",
       );
     });
 
     it("fails when a required config path exists as a directory", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/evals.yaml", {
+      await fs.promises.rm("/app/voratiq/.voratiq/verification.yaml", {
         force: true,
       });
-      await fs.promises.mkdir("/app/voratiq/.voratiq/evals.yaml");
+      await fs.promises.mkdir("/app/voratiq/.voratiq/verification.yaml");
 
       await expect(resolveCliContext()).rejects.toThrow(
         WorkspaceWrongTypeEntryError,
       );
       await expect(resolveCliContext()).rejects.toThrow(
-        "Wrong workspace entry type: `.voratiq/evals.yaml` must be a file.",
-      );
-      expect(executeInitCommandMock).not.toHaveBeenCalled();
-    });
-
-    it("fails when a required config file is missing", async () => {
-      vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/evals.yaml", {
-        force: true,
-      });
-
-      await expect(resolveCliContext()).rejects.toThrow(
-        WorkspaceMissingEntryError,
+        "Wrong workspace entry type: `.voratiq/verification.yaml` must be a file.",
       );
       expect(executeInitCommandMock).not.toHaveBeenCalled();
     });

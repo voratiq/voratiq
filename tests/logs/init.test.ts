@@ -43,12 +43,6 @@ describe("renderInitTranscript", () => {
         node: { dependencyRoots: ["node_modules"] },
       },
     },
-    evalSummary: {
-      configPath: ".voratiq/evals.yaml",
-      configuredEvals: ["format", "lint", "typecheck", "tests"],
-      configCreated: false,
-      configUpdated: true,
-    },
     sandboxSummary: {
       configPath: ".voratiq/sandbox.yaml",
       configCreated: false,
@@ -63,8 +57,8 @@ describe("renderInitTranscript", () => {
     expect(output).toContain("CONFIGURATION  FILE");
     expect(output).toContain("agents         .voratiq/agents.yaml");
     expect(output).toContain("orchestration  .voratiq/orchestration.yaml");
+    expect(output).toContain("verification   .voratiq/verification.yaml");
     expect(output).toContain("environment    .voratiq/environment.yaml");
-    expect(output).toContain("evals          .voratiq/evals.yaml");
     expect(output).toContain("sandbox        .voratiq/sandbox.yaml");
     expect(
       findLineIndex(lines, "agents         .voratiq/agents.yaml"),
@@ -74,13 +68,15 @@ describe("renderInitTranscript", () => {
     expect(
       findLineIndex(lines, "orchestration  .voratiq/orchestration.yaml"),
     ).toBeLessThan(
+      findLineIndex(lines, "verification   .voratiq/verification.yaml"),
+    );
+    expect(
+      findLineIndex(lines, "verification   .voratiq/verification.yaml"),
+    ).toBeLessThan(
       findLineIndex(lines, "environment    .voratiq/environment.yaml"),
     );
     expect(
       findLineIndex(lines, "environment    .voratiq/environment.yaml"),
-    ).toBeLessThan(findLineIndex(lines, "evals          .voratiq/evals.yaml"));
-    expect(
-      findLineIndex(lines, "evals          .voratiq/evals.yaml"),
     ).toBeLessThan(
       findLineIndex(lines, "sandbox        .voratiq/sandbox.yaml"),
     );

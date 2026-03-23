@@ -17,14 +17,6 @@ const baseRunRecord = {
       startedAt: "2025-01-01T00:00:00.000Z",
       completedAt: "2025-01-01T00:01:00.000Z",
       commitSha: "def456",
-      evals: [
-        {
-          slug: "lint",
-          status: "succeeded",
-          exitCode: 0,
-          command: "npm run lint",
-        },
-      ],
     },
   ],
   deletedAt: null,
@@ -73,7 +65,7 @@ describe("runRecordSchema", () => {
       auto: {
         status: "action_required" as const,
         completedAt: "2025-01-01T03:00:00.000Z",
-        detail: "manual review required",
+        detail: "manual selection required",
         apply: {
           status: "skipped" as const,
           detail: "no shared recommendation",

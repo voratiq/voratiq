@@ -24,7 +24,7 @@ export interface AutoSummaryInput {
     specPath?: string;
     baseRevisionSha?: string;
   };
-  review: AutoPhaseSummary & { outputPath?: string };
+  verify: AutoPhaseSummary;
   apply?: AutoPhaseSummary & { agentId?: string };
 }
 

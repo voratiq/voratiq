@@ -107,27 +107,16 @@ export const IN_PROGRESS_AGENT_STATUSES: readonly AgentStatus[] = [
   "running",
 ] as const satisfies readonly AgentStatus[];
 
-/**
- * Agent statuses that require eval results to be present.
- * "aborted" is excluded because agents can be cancelled before evals are produced.
- */
-export const EVAL_REQUIRED_AGENT_STATUSES: readonly AgentStatus[] = [
-  "succeeded",
-  "failed",
-  "errored",
-  "skipped",
-] as const satisfies readonly AgentStatus[];
-
-export const EVAL_STATUS_VALUES = [
+export const CHECK_STATUS_VALUES = [
   "succeeded",
   "failed",
   "errored",
   "skipped",
 ] as const;
 
-export type EvalStatus = (typeof EVAL_STATUS_VALUES)[number];
+export type CheckStatus = (typeof CHECK_STATUS_VALUES)[number];
 
-export const evalStatusSchema = z.enum(EVAL_STATUS_VALUES);
+export const checkStatusSchema = z.enum(CHECK_STATUS_VALUES);
 
 export const APPLY_STATUS_VALUES = ["succeeded", "failed"] as const;
 
@@ -135,7 +124,7 @@ export type ApplyStatus = (typeof APPLY_STATUS_VALUES)[number];
 
 export const applyStatusSchema = z.enum(APPLY_STATUS_VALUES);
 
-export const REVIEW_STATUS_VALUES = [
+export const VERIFICATION_STATUS_VALUES = [
   "queued",
   "running",
   "succeeded",
@@ -143,23 +132,18 @@ export const REVIEW_STATUS_VALUES = [
   "aborted",
 ] as const;
 
-export type ReviewStatus = (typeof REVIEW_STATUS_VALUES)[number];
+export type VerificationStatus = (typeof VERIFICATION_STATUS_VALUES)[number];
 
-export const reviewStatusSchema = z.enum(REVIEW_STATUS_VALUES);
+export const verificationStatusSchema = z.enum(VERIFICATION_STATUS_VALUES);
 
-/**
- * Review statuses that indicate the review session has finished.
- */
-export const TERMINAL_REVIEW_STATUSES: readonly ReviewStatus[] = [
+export const TERMINAL_VERIFICATION_STATUSES: readonly VerificationStatus[] = [
   "succeeded",
   "failed",
   "aborted",
-] as const satisfies readonly ReviewStatus[];
+] as const satisfies readonly VerificationStatus[];
 
-export const IN_PROGRESS_REVIEW_STATUSES: readonly ReviewStatus[] = [
-  "queued",
-  "running",
-] as const satisfies readonly ReviewStatus[];
+export const IN_PROGRESS_VERIFICATION_STATUSES: readonly VerificationStatus[] =
+  ["queued", "running"] as const satisfies readonly VerificationStatus[];
 
 export const REDUCTION_STATUS_VALUES = [
   "queued",

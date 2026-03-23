@@ -2,9 +2,7 @@ import type {
   AgentInvocationRecord,
   RunReport,
 } from "../../domains/runs/model/types.js";
-import { getEvalStatusStyle } from "../../status/colors.js";
 import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
-import { colorize } from "../../utils/colors.js";
 import { formatCompactDiffStatistics } from "../../utils/diff.js";
 import {
   formatAgentDuration,
@@ -58,7 +56,6 @@ interface AgentRow {
   status: string;
   duration: string;
   diff: string;
-  evals: string;
 }
 
 const ERASE_LINE = "\u001b[2K";
@@ -304,7 +301,6 @@ export function createRunRenderer(
           status: formatAgentStatusLabelWithStyle(record.status, style),
           duration: formatDuration(record),
           diff: formatDiffCell(record.diffStatistics),
-          evals: formatEvals(record, style),
         };
       });
 
@@ -313,10 +309,7 @@ export function createRunRenderer(
       agent: (row) => row.agentId,
       status: (row) => row.status,
       duration: (row) => row.duration,
-      extras: [
-        { header: "CHANGES", accessor: (row) => row.diff },
-        { header: "EVALS", accessor: (row) => row.evals },
-      ],
+      extras: [{ header: "CHANGES", accessor: (row) => row.diff }],
     });
   }
 
@@ -352,25 +345,6 @@ export function createRunRenderer(
     });
   }
 
-  function formatEvals(
-    record: AgentInvocationRecord,
-    style: TranscriptShellStyleOptions,
-  ): string {
-    if (!record.evals || record.evals.length === 0) {
-      return DASH;
-    }
-
-    if (!style.isTty) {
-      return record.evals.map((evaluation) => evaluation.slug).join(" ");
-    }
-
-    return record.evals
-      .map((evaluation) =>
-        colorize(evaluation.slug, getEvalStatusStyle(evaluation.status).cli),
-      )
-      .join(" ");
-  }
-
   function upsertRecord(record: AgentInvocationRecord): void {
     if (!agentOrder.includes(record.agentId)) {
       agentOrder.push(record.agentId);
@@ -393,7 +367,6 @@ export function createRunRenderer(
         startedAt: agent.startedAt,
         completedAt: agent.completedAt,
         diffStatistics: agent.diffStatistics,
-        evals: agent.evals,
         error: agent.error,
         warnings: agent.warnings,
       });
@@ -486,7 +459,7 @@ export function createRunRenderer(
       const hint = options?.suppressHint
         ? undefined
         : {
-            message: `To review results:\n  voratiq review --run ${report.runId}`,
+            message: `To verify results:\n  voratiq verify --run ${report.runId}`,
           };
 
       if (stdout.isTTY) {

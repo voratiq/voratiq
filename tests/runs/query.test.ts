@@ -43,7 +43,6 @@ function createMockAgentRecord(
       stdoutCaptured: true,
       stderrCaptured: true,
     },
-    evals: [],
     ...overrides,
   });
 }

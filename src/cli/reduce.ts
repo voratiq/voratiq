@@ -32,7 +32,11 @@ import {
   resolvePath,
 } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
-import { VORATIQ_REDUCTIONS_FILE } from "../workspace/structure.js";
+import {
+  resolveWorkspacePath,
+  VORATIQ_REDUCTIONS_FILE,
+  VORATIQ_VERIFICATIONS_FILE,
+} from "../workspace/structure.js";
 import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
 
@@ -93,9 +97,11 @@ export async function runReduceCommand(
     root,
     specsFilePath: workspacePaths.specsFile,
     runsFilePath: workspacePaths.runsFile,
-    reviewsFilePath: workspacePaths.reviewsFile,
     reductionsFilePath:
       workspacePaths.reductionsFile ?? resolveReductionIndexPath(root),
+    verificationsFilePath:
+      workspacePaths.verificationsFile ??
+      resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_FILE),
     target,
     agentIds,
     agentOverrideFlag,
@@ -230,7 +236,7 @@ function formatReductionSnippet(reduction: ReductionArtifact): string {
 interface ReduceCommandActionOptions {
   spec?: string;
   run?: string;
-  review?: string;
+  verification?: string;
   reduction?: string;
   agent?: string[];
   profile?: string;
@@ -264,7 +270,11 @@ function resolveTargetFromOptions(
   const entries = [
     { type: "spec" as const, flag: "--spec", value: options.spec },
     { type: "run" as const, flag: "--run", value: options.run },
-    { type: "review" as const, flag: "--review", value: options.review },
+    {
+      type: "verification" as const,
+      flag: "--verification",
+      value: options.verification,
+    },
     {
       type: "reduction" as const,
       flag: "--reduction",
@@ -281,7 +291,7 @@ function resolveTargetFromOptions(
         ? "No target flag was provided."
         : `Provided: ${provided}.`;
     command.error(
-      `error: exactly one of --spec, --run, --review, or --reduction is required (${detail})`,
+      `error: exactly one of --spec, --run, --verification, or --reduction is required (${detail})`,
       { exitCode: 1 },
     );
   }
@@ -289,7 +299,7 @@ function resolveTargetFromOptions(
   const selected = entries[0];
   if (!selected || !selected.value) {
     command.error(
-      "error: exactly one of --spec, --run, --review, or --reduction is required",
+      "error: exactly one of --spec, --run, --verification, or --reduction is required",
       { exitCode: 1 },
     );
   }
@@ -300,14 +310,16 @@ function resolveTargetFromOptions(
 export function createReduceCommand(): Command {
   return new Command("reduce")
     .description("Reduce artifact sets into a summarized form")
-    .addOption(new Option("--spec <spec-session-id>", "Spec session to reduce"))
+    .addOption(new Option("--spec <spec-id>", "Spec to reduce"))
     .addOption(new Option("--run <run-id>", "Run to reduce"))
-    .addOption(new Option("--review <review-id>", "Review to reduce"))
+    .addOption(
+      new Option("--verification <verification-id>", "Verification to reduce"),
+    )
     .addOption(new Option("--reduction <reduction-id>", "Reduction to reduce"))
     .addOption(
       new Option(
         "--agent <agent-id>",
-        "Set reducer agents directly (repeatable; order preserved)",
+        "Set reducers directly (repeatable; order preserved)",
       )
         .default([], "")
         .argParser(collectAgentOption),
@@ -363,14 +375,14 @@ function resolveReductionIndexPath(root: string): string {
 
 function mapTargetLabel(
   targetType: ReductionTarget["type"],
-): "Spec" | "Run" | "Review" | "Reduce" {
+): "Spec" | "Run" | "Verification" | "Reduce" {
   switch (targetType) {
     case "spec":
       return "Spec";
     case "run":
       return "Run";
-    case "review":
-      return "Review";
+    case "verification":
+      return "Verification";
     case "reduction":
       return "Reduce";
   }
@@ -382,8 +394,8 @@ function sourcePathForTarget(target: ReductionTarget): string {
       return `.voratiq/specs/sessions/${target.id}`;
     case "run":
       return `.voratiq/runs/sessions/${target.id}`;
-    case "review":
-      return `.voratiq/reviews/sessions/${target.id}`;
+    case "verification":
+      return `.voratiq/verifications/sessions/${target.id}`;
     case "reduction":
       return `.voratiq/reductions/sessions/${target.id}`;
   }

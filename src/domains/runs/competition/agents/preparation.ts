@@ -20,7 +20,6 @@ export async function prepareAgentForExecution(
     root,
     specContent,
     extraContextFiles,
-    evalPlan,
     environment,
   } = context;
 
@@ -29,7 +28,6 @@ export async function prepareAgentForExecution(
     agent,
     runId,
     startedAt,
-    evalPlan,
   });
 
   let workspacePaths: RunAgentWorkspacePaths;
@@ -76,7 +74,6 @@ export async function prepareAgentForExecution(
       root,
       runId,
       prompt,
-      evalPlan,
       environment,
     },
   };

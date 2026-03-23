@@ -8,7 +8,7 @@ Expose language-specific dependencies to agents at runtime.
 
 ## Overview
 
-Voratiq reads `.voratiq/environment.yaml` to locate Node.js and Python dependencies agents need during code generation and evaluation. `voratiq init` detects `node_modules` and common virtual environment directories. Edit the file to add custom paths or disable runtimes.
+Voratiq reads `.voratiq/environment.yaml` to locate Node.js and Python dependencies agents need during code generation and verification. `voratiq init` detects `node_modules` and common virtual environment directories. Edit the file to add custom paths or disable runtimes.
 
 Pre-populating dependencies locally is safer than granting agents network access to install packages at runtime. It avoids executing arbitrary install scripts during agent execution (see [Sandbox Configuration](https://github.com/voratiq/voratiq/blob/main/docs/configs/sandbox.md)).
 

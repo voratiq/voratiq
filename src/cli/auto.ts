@@ -1,41 +1,34 @@
-import { dirname, join } from "node:path";
-
 import { Command, Option } from "commander";
 
 import {
   type AutoCommandDependencies,
   type AutoCommandEvent,
-  type AutoReviewStageReview,
   executeAutoCommand,
 } from "../commands/auto/command.js";
-import { readReviewRecommendation } from "../domains/reviews/competition/recommendation.js";
-import { readReviewRecords } from "../domains/reviews/persistence/adapter.js";
 import type {
   AutoApplyStatus,
   AutoTerminalStatus,
   RunAutoOutcome,
 } from "../domains/runs/model/types.js";
 import { rewriteRunRecord } from "../domains/runs/persistence/adapter.js";
-import { type ReviewSelectionInput } from "../policy/index.js";
 import { resolveCliContext } from "../preflight/index.js";
 import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
 import { renderCliError } from "../render/utils/errors.js";
+import { HintedError } from "../utils/errors.js";
 import { formatAlertMessage } from "../utils/output.js";
-import { normalizePathForDisplay, resolveDisplayPath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
-import { REVIEW_RECOMMENDATION_FILENAME } from "../workspace/structure.js";
 import { runApplyCommand } from "./apply.js";
-import { CliError, toCliError } from "./errors.js";
+import { toCliError } from "./errors.js";
 import { beginChainedCommandOutput, writeCommandOutput } from "./output.js";
-import { runReviewCommand } from "./review.js";
 import { runRunCommand } from "./run.js";
 import { runSpecCommand } from "./spec.js";
+import { runVerifyCommand } from "./verify.js";
 
 export interface AutoCommandOptions {
   specPath?: string;
   description?: string;
   runAgentIds?: readonly string[];
-  reviewerAgentIds?: readonly string[];
+  verifyAgentIds?: readonly string[];
   profile?: string;
   maxParallel?: number;
   branch?: boolean;
@@ -46,7 +39,6 @@ export interface AutoCommandOptions {
 export interface AutoCommandResult {
   exitCode: number;
   runId?: string;
-  reviewOutputPath?: string;
   appliedAgentId?: string;
   auto: {
     status: AutoTerminalStatus;
@@ -74,111 +66,8 @@ function collectRunAgentOption(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
 
-function collectReviewAgentOption(value: string, previous: string[]): string[] {
+function collectVerifyAgentOption(value: string, previous: string[]): string[] {
   return [...previous, value];
-}
-
-async function loadAutoRecommendation(options: {
-  reviewOutputPath: string;
-  resolutionRoot: string;
-}): Promise<{
-  preferredCandidateId: string;
-  resolvedPreferredCandidateId?: string;
-}> {
-  const recommendationPath = normalizePathForDisplay(
-    join(dirname(options.reviewOutputPath), REVIEW_RECOMMENDATION_FILENAME),
-  );
-  const recommendationAbsolutePath =
-    resolveDisplayPath(options.resolutionRoot, recommendationPath) ??
-    recommendationPath;
-
-  try {
-    const recommendation = await readReviewRecommendation(
-      recommendationAbsolutePath,
-    );
-    return {
-      preferredCandidateId: recommendation.preferred_agent,
-      resolvedPreferredCandidateId:
-        recommendation.resolved_preferred_agent?.trim() || undefined,
-    };
-  } catch (error) {
-    throw new CliError(
-      `Failed to load \`${REVIEW_RECOMMENDATION_FILENAME}\`.`,
-      [toCliError(error).headline],
-      ["Re-run `voratiq review` to regenerate review artifacts."],
-    );
-  }
-}
-
-async function loadReviewSelectionInputForAuto(options: {
-  reviewId: string;
-  reviews: readonly AutoReviewStageReview[];
-  availableAgents: readonly string[];
-}): Promise<ReviewSelectionInput> {
-  let resolutionRoot = process.cwd();
-  let reviewsFilePath: string | undefined;
-  try {
-    const { root, workspacePaths } = await resolveCliContext();
-    resolutionRoot = root;
-    reviewsFilePath = workspacePaths.reviewsFile;
-  } catch {
-    // Unit tests and non-repo contexts may not resolve CLI root.
-    // Fall back to cwd for compatibility.
-  }
-
-  const persistedRecord = reviewsFilePath
-    ? (
-        await readReviewRecords({
-          root: resolutionRoot,
-          reviewsFilePath,
-          limit: 1,
-          predicate: (record) => record.sessionId === options.reviewId,
-        }).catch(() => [])
-      )[0]
-    : undefined;
-
-  const reviewerArtifacts = persistedRecord
-    ? persistedRecord.reviewers.map((reviewer) => ({
-        reviewerAgentId: reviewer.agentId,
-        status: reviewer.status === "succeeded" ? "succeeded" : "failed",
-        outputPath: reviewer.outputPath,
-      }))
-    : options.reviews.map((review) => ({
-        reviewerAgentId: review.agentId,
-        status: review.status,
-        outputPath: review.outputPath,
-      }));
-
-  const reviewers = await Promise.all(
-    reviewerArtifacts.map(async (review) => {
-      if (review.status !== "succeeded") {
-        return {
-          reviewerAgentId: review.reviewerAgentId,
-          status: "failed" as const,
-        };
-      }
-
-      const recommendation = await loadAutoRecommendation({
-        reviewOutputPath: review.outputPath,
-        resolutionRoot,
-      });
-      return {
-        reviewerAgentId: review.reviewerAgentId,
-        status: "succeeded" as const,
-        preferredCandidateId: recommendation.preferredCandidateId,
-        resolvedPreferredCandidateId:
-          recommendation.resolvedPreferredCandidateId,
-      };
-    }),
-  );
-
-  return {
-    canonicalAgentIds: [...options.availableAgents],
-    ...(persistedRecord?.blinded?.aliasMap
-      ? { aliasMap: persistedRecord.blinded.aliasMap }
-      : {}),
-    reviewers,
-  };
 }
 
 function replayAutoCommandEvent(event: AutoCommandEvent): void {
@@ -244,14 +133,28 @@ export async function runAutoCommand(
     const dependencies: AutoCommandDependencies = {
       now,
       onEvent: replayAutoCommandEvent,
-      runSpecStage: async (input) =>
-        runSpecCommand({
+      runSpecStage: async (input) => {
+        const result = await runSpecCommand({
           description: input.description,
           profile: input.profile,
           maxParallel: input.maxParallel,
           suppressHint: input.suppressHint,
           writeOutput: writeCommandOutput,
-        }),
+        });
+
+        if (!result.sessionId) {
+          throw new HintedError("Spec stage did not return a session id.", {
+            hintLines: [
+              "Re-run the spec stage and confirm the spec session persisted correctly.",
+            ],
+          });
+        }
+
+        return {
+          ...result,
+          sessionId: result.sessionId,
+        };
+      },
       runRunStage: async (input) => {
         const suppressBlankLines = !process.stdout.isTTY;
         return runRunCommand({
@@ -269,9 +172,9 @@ export async function runAutoCommand(
           stderr: chainedOutput.stderr,
         });
       },
-      runReviewStage: async (input) =>
-        runReviewCommand({
-          runId: input.runId,
+      runVerifyStage: async (input) =>
+        runVerifyCommand({
+          target: input.target,
           agentIds: input.agentIds ? [...input.agentIds] : undefined,
           agentOverrideFlag: input.agentOverrideFlag,
           profile: input.profile,
@@ -279,16 +182,20 @@ export async function runAutoCommand(
           suppressHint: input.suppressHint,
           stdout: chainedOutput.stdout,
           stderr: chainedOutput.stderr,
-          suppressLeadingBlankLine: !process.stdout.isTTY,
-          suppressTrailingBlankLine: !process.stdout.isTTY,
-        }),
+        }).then((result) => ({
+          verificationId: result.verificationId,
+          body: result.body,
+          stderr: undefined,
+          exitCode: result.exitCode,
+          selectedSpecPath: result.selectedSpecPath,
+          selection: result.selection?.decision,
+        })),
       runApplyStage: async (input) =>
         runApplyCommand({
           runId: input.runId,
           agentId: input.agentId,
           commit: input.commit,
         }),
-      loadReviewSelectionInput: loadReviewSelectionInputForAuto,
     };
 
     const execution = await executeAutoCommand(options, dependencies);
@@ -319,7 +226,6 @@ export async function runAutoCommand(
     return {
       exitCode: execution.exitCode,
       runId: execution.runId,
-      reviewOutputPath: execution.reviewOutputPath,
       ...(execution.appliedAgentId
         ? { appliedAgentId: execution.appliedAgentId }
         : {}),
@@ -335,7 +241,7 @@ interface AutoCommandActionOptions {
   spec?: string;
   description?: string;
   runAgent?: string[];
-  reviewAgent?: string[];
+  verifyAgent?: string[];
   profile?: string;
   maxParallel?: number;
   branch?: boolean;
@@ -345,9 +251,9 @@ interface AutoCommandActionOptions {
 
 export function createAutoCommand(): Command {
   return new Command("auto")
-    .description("Run spec, run, review, and apply as one command")
+    .description("Run spec, run, verify, and apply as one command")
     .option("--spec <path>", "Existing spec to run")
-    .option("--description <text>", "Generate a spec, then run and review it")
+    .option("--description <text>", "Generate a spec, then run and verify it")
     .addOption(
       new Option(
         "--run-agent <agent-id>",
@@ -358,22 +264,22 @@ export function createAutoCommand(): Command {
     )
     .addOption(
       new Option(
-        "--review-agent <agent-id>",
-        "Set review-stage agents directly (repeatable)",
+        "--verify-agent <agent-id>",
+        "Set verify-stage agents directly (repeatable)",
       )
         .default([], "")
-        .argParser(collectReviewAgentOption),
+        .argParser(collectVerifyAgentOption),
     )
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
       "--max-parallel <count>",
-      "Max concurrent agents/reviewers",
+      "Max concurrent agents/verifiers",
       parseMaxParallelOption,
     )
     .option("--branch", "Create or checkout a branch named after the spec")
     .option(
       "--apply",
-      "Apply the recommended candidate after review",
+      "Apply the selected candidate after verification",
       () => true,
     )
     .option("--commit", "Commit after apply (requires --apply)", () => true)
@@ -383,7 +289,7 @@ export function createAutoCommand(): Command {
         specPath: options.spec,
         description: options.description,
         runAgentIds: options.runAgent,
-        reviewerAgentIds: options.reviewAgent,
+        verifyAgentIds: options.verifyAgent,
         profile: options.profile,
         maxParallel: options.maxParallel,
         branch: options.branch,

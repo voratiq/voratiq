@@ -32,8 +32,8 @@ export interface ReduceCommandInput {
   root: string;
   specsFilePath: string;
   runsFilePath: string;
-  reviewsFilePath: string;
   reductionsFilePath: string;
+  verificationsFilePath: string;
   target: ReductionTarget;
   agentIds?: readonly string[];
   agentOverrideFlag?: string;
@@ -57,8 +57,8 @@ export async function executeReduceCommand(
     root,
     specsFilePath,
     runsFilePath,
-    reviewsFilePath,
     reductionsFilePath,
+    verificationsFilePath,
     target,
     agentIds,
     agentOverrideFlag,
@@ -72,8 +72,8 @@ export async function executeReduceCommand(
     root,
     specsFilePath,
     runsFilePath,
-    reviewsFilePath,
     reductionsFilePath,
+    verificationsFilePath,
     target,
   });
 
@@ -117,7 +117,7 @@ export async function executeReduceCommand(
         reductionsFilePath,
         specsFilePath,
         runsFilePath,
-        reviewsFilePath,
+        verificationsFilePath,
         target,
         environment,
         extraContextFiles,
@@ -175,14 +175,14 @@ export async function executeReduceCommand(
 
 function mapReduceSourceLabel(
   targetType: ReductionTarget["type"],
-): "Spec" | "Run" | "Review" | "Reduce" {
+): "Spec" | "Run" | "Verification" | "Reduce" {
   switch (targetType) {
     case "spec":
       return "Spec";
     case "run":
       return "Run";
-    case "review":
-      return "Review";
+    case "verification":
+      return "Verification";
     case "reduction":
       return "Reduce";
   }
@@ -194,8 +194,8 @@ function mapReduceSourcePath(target: ReductionTarget): string {
       return `.voratiq/specs/sessions/${target.id}`;
     case "run":
       return `.voratiq/runs/sessions/${target.id}`;
-    case "review":
-      return `.voratiq/reviews/sessions/${target.id}`;
+    case "verification":
+      return `.voratiq/verifications/sessions/${target.id}`;
     case "reduction":
       return `.voratiq/reductions/sessions/${target.id}`;
   }

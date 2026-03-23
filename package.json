@@ -8,7 +8,7 @@
     "multi-agent",
     "spec-driven",
     "code-generation",
-    "evals",
+    "verification",
     "sandboxing"
   ],
   "homepage": "https://github.com/voratiq/voratiq#readme",

@@ -11,6 +11,7 @@ import { executeCompetitionWithAdapter } from "../../../src/competition/command-
 import { loadEnvironmentConfig } from "../../../src/configs/environment/loader.js";
 import * as specAdapter from "../../../src/domains/specs/competition/adapter.js";
 import { readSpecRecords } from "../../../src/domains/specs/persistence/adapter.js";
+import { getHeadRevision } from "../../../src/utils/git.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
 jest.mock("../../../src/competition/command-adapter.js", () => ({
@@ -29,17 +30,23 @@ jest.mock("../../../src/commands/shared/session-id.js", () => ({
   generateSessionId: jest.fn(),
 }));
 
+jest.mock("../../../src/utils/git.js", () => ({
+  getHeadRevision: jest.fn(),
+}));
+
 const executeCompetitionWithAdapterMock = jest.mocked(
   executeCompetitionWithAdapter,
 );
 const loadEnvironmentConfigMock = jest.mocked(loadEnvironmentConfig);
 const resolveStageCompetitorsMock = jest.mocked(resolveStageCompetitors);
 const generateSessionIdMock = jest.mocked(generateSessionId);
+const getHeadRevisionMock = jest.mocked(getHeadRevision);
 
 describe("executeSpecCommand integration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     loadEnvironmentConfigMock.mockReturnValue({});
+    getHeadRevisionMock.mockResolvedValue("spec-base-sha");
     resolveStageCompetitorsMock.mockReturnValue({
       source: "cli",
       agentIds: ["alpha"],
@@ -110,6 +117,7 @@ describe("executeSpecCommand integration", () => {
       ).resolves.toEqual([
         expect.objectContaining({
           sessionId: "spec-123",
+          baseRevisionSha: "spec-base-sha",
           extraContext: ["../context/a.md"],
           extraContextMetadata: [
             {
@@ -165,6 +173,7 @@ describe("executeSpecCommand integration", () => {
 
       expect(records).toHaveLength(1);
       expect(records[0]?.sessionId).toBe("spec-usage");
+      expect(records[0]?.baseRevisionSha).toBe("spec-base-sha");
       expect(records[0]?.agents[0]?.tokenUsage).toEqual({
         input_tokens: 210,
         output_tokens: 65,

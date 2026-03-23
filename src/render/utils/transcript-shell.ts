@@ -34,13 +34,13 @@ interface BadgeStyle {
 
 export type TranscriptBadgeVariant =
   | "run"
-  | "review"
+  | "verify"
   | "reduce"
   | "spec"
   | "agent";
 
 const BRAND_COLOR = "164;203;153";
-const REVIEW_COLOR = "255;238;140";
+const VERIFY_COLOR = "255;238;140";
 const REDUCE_COLOR = "226;159;115";
 const SPEC_COLOR = "144;190;228";
 
@@ -50,9 +50,9 @@ const BADGE_STYLES: Record<TranscriptBadgeVariant, BadgeStyle> = {
     background: `${ESC}48;2;${BRAND_COLOR}m`,
     bold: true,
   },
-  review: {
+  verify: {
     foreground: `${ESC}38;2;0;0;0m`,
-    background: `${ESC}48;2;${REVIEW_COLOR}m`,
+    background: `${ESC}48;2;${VERIFY_COLOR}m`,
     bold: true,
   },
   reduce: {

@@ -1,16 +1,9 @@
+import type { AgentInvocationEnhanced } from "../../domains/runs/model/enhanced.js";
 import type {
-  AgentEvalEnhanced,
-  AgentInvocationEnhanced,
-} from "../../domains/runs/model/enhanced.js";
-import type {
-  AgentEvalView,
   AgentReport,
   AgentStatus,
 } from "../../domains/runs/model/types.js";
-import {
-  getAgentStatusStyle,
-  getEvalStatusStyle,
-} from "../../status/colors.js";
+import { getAgentStatusStyle } from "../../status/colors.js";
 import { TERMINAL_AGENT_STATUSES } from "../../status/index.js";
 import { colorize } from "../../utils/colors.js";
 import { formatAgentBadge } from "./badges.js";
@@ -37,7 +30,6 @@ type AgentSectionSource = AgentHeaderSource & {
   baseDirectory?: string;
   runtimeManifestPath?: string;
   assets?: AgentInvocationEnhanced["assets"];
-  evals?: (AgentEvalEnhanced | AgentEvalView)[];
 };
 
 export type AgentSectionInput = AgentSectionSource;
@@ -148,11 +140,6 @@ export function buildAgentSectionWithStyle(
     lines.push("", ...indentLines([formatAgentErrorLine(agent.error, style)]));
   }
 
-  const evalLines = buildAgentSectionEvals(agent, agentRoot, style);
-  if (evalLines.length > 0) {
-    lines.push("", ...indentLines(evalLines));
-  }
-
   const artifactLines = buildAgentSectionArtifacts(agent, agentRoot);
   if (artifactLines.length > 0) {
     lines.push("", ...indentLines(artifactLines));
@@ -196,43 +183,6 @@ export function buildAgentSectionArtifacts(
         header: "PATH",
         accessor: (row) => row[1],
       },
-    ],
-    rows,
-  });
-
-  return tableLines;
-}
-
-export function buildAgentSectionEvals(
-  agent: AgentSectionSource,
-  agentRoot?: string,
-  style: TranscriptShellStyleOptions = {},
-): string[] {
-  const evalResults = agent.evals ?? [];
-  if (evalResults.length === 0) {
-    return [];
-  }
-
-  const resolvedStyle = resolveTranscriptShellStyle(style);
-  const rows = evalResults.map((evaluation) => ({
-    slug: evaluation.slug,
-    status: resolvedStyle.isTty
-      ? colorize(
-          evaluation.status.toUpperCase(),
-          getEvalStatusStyle(evaluation.status).cli,
-        )
-      : evaluation.status.toUpperCase(),
-    log:
-      evaluation.logPath !== undefined
-        ? relativizePath(evaluation.logPath, agentRoot)
-        : "—",
-  }));
-
-  const tableLines = renderTable({
-    columns: [
-      { header: "EVAL", accessor: (row) => row.slug },
-      { header: "STATUS", accessor: (row) => row.status },
-      { header: "LOG", accessor: (row) => row.log },
     ],
     rows,
   });

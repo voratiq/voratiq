@@ -38,7 +38,7 @@ const baseSetupFiles = ["<rootDir>/tests/support/jest/setup.ts"];
 const resolverPath = "<rootDir>/tests/support/jest/resolver.cjs";
 
 function createProject(displayName, testRegex, overrides = {}) {
-  const { setupFilesAfterEnv, ...rest } = overrides;
+  const { setupFiles, setupFilesAfterEnv, ...rest } = overrides;
   return {
     displayName,
     testRegex: [testRegex],
@@ -49,7 +49,8 @@ function createProject(displayName, testRegex, overrides = {}) {
     moduleNameMapper,
     testPathIgnorePatterns: sharedIgnorePatterns,
     modulePathIgnorePatterns: sharedIgnorePatterns,
-    setupFilesAfterEnv: setupFilesAfterEnv ?? baseSetupFiles,
+    setupFiles: setupFiles ?? baseSetupFiles,
+    setupFilesAfterEnv: setupFilesAfterEnv ?? [],
     ...rest,
   };
 }
@@ -65,10 +66,7 @@ const commandsProject = createProject(
 );
 
 const cliProject = createProject("cli", buildTestRegex(["cli"]), {
-  setupFilesAfterEnv: [
-    ...baseSetupFiles,
-    "<rootDir>/tests/support/jest/cli-setup.ts",
-  ],
+  setupFilesAfterEnv: ["<rootDir>/tests/support/jest/cli-setup.ts"],
   detectOpenHandles: true,
   maxWorkers: 1,
   testTimeout: 120_000,

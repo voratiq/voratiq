@@ -27,7 +27,6 @@ import {
   readReductionRecords,
   rewriteReductionRecord,
 } from "../../../domains/reductions/persistence/adapter.js";
-import { readReviewRecords } from "../../../domains/reviews/persistence/adapter.js";
 import { buildRunRecordView } from "../../../domains/runs/model/enhanced.js";
 import { RunRecordNotFoundError } from "../../../domains/runs/model/errors.js";
 import type { ExtractedTokenUsage } from "../../../domains/runs/model/types.js";
@@ -43,6 +42,7 @@ import {
   resolveTokenUsage,
 } from "../../../domains/shared/token-usage.js";
 import { readSpecRecords } from "../../../domains/specs/persistence/adapter.js";
+import { readVerificationRecords } from "../../../domains/verifications/persistence/adapter.js";
 import { buildPersistedExtraContextFields } from "../../../extra-context/contract.js";
 import type { ReduceProgressRenderer } from "../../../render/transcripts/reduce.js";
 import { emitStageProgressEvent } from "../../../render/transcripts/stage-progress.js";
@@ -63,7 +63,6 @@ import {
   REDUCTION_ARTIFACT_INFO_FILENAME,
   REDUCTION_DATA_FILENAME,
   REDUCTION_FILENAME,
-  REVIEW_RECOMMENDATION_FILENAME,
   VORATIQ_REDUCTIONS_DIR,
 } from "../../../workspace/structure.js";
 
@@ -106,7 +105,7 @@ export interface CreateReduceCompetitionAdapterInput {
   readonly reductionsFilePath: string;
   readonly specsFilePath: string;
   readonly runsFilePath: string;
-  readonly reviewsFilePath: string;
+  readonly verificationsFilePath: string;
   readonly target: ReductionTarget;
   readonly environment: EnvironmentConfig;
   readonly extraContextFiles?: readonly ResolvedExtraContextFile[];
@@ -127,7 +126,7 @@ export function createReduceCompetitionAdapter(
     reductionsFilePath,
     specsFilePath,
     runsFilePath,
-    reviewsFilePath,
+    verificationsFilePath,
     target,
     environment,
     extraContextFiles = [],
@@ -165,7 +164,7 @@ export function createReduceCompetitionAdapter(
         root,
         specsFilePath,
         runsFilePath,
-        reviewsFilePath,
+        verificationsFilePath,
         reductionsFilePath,
         target,
       });
@@ -223,7 +222,8 @@ export function createReduceCompetitionAdapter(
         });
 
         const prompt = buildReducePrompt({
-          targetOperator: target.type,
+          targetOperator:
+            target.type === "verification" ? "verify" : target.type,
           targetId: target.id,
           artifactInfoPath: REDUCTION_ARTIFACT_INFO_FILENAME,
           repoRootPath: workspacePaths.workspacePath,
@@ -577,7 +577,7 @@ async function prepareReductionTargetContext(options: {
   root: string;
   specsFilePath: string;
   runsFilePath: string;
-  reviewsFilePath: string;
+  verificationsFilePath: string;
   reductionsFilePath: string;
   target: ReductionTarget;
 }): Promise<ReductionTargetContext> {
@@ -587,8 +587,8 @@ async function prepareReductionTargetContext(options: {
       return await prepareSpecTargetContext(options);
     case "run":
       return await prepareRunTargetContext(options);
-    case "review":
-      return await prepareReviewTargetContext(options);
+    case "verification":
+      return await prepareVerificationTargetContext(options);
     case "reduction":
       return await prepareReductionTargetContextInternal(options);
   }
@@ -703,11 +703,6 @@ async function prepareRunTargetContext(options: {
       agentId: agent.agentId,
       status: agent.status,
       model: agent.model,
-      evals: agent.evals.map((evaluation) => ({
-        slug: evaluation.slug,
-        status: evaluation.status,
-        logPath: evaluation.logPath,
-      })),
       ...(agent.tokenUsage ? { tokenUsage: agent.tokenUsage } : {}),
     };
 
@@ -749,64 +744,62 @@ async function prepareRunTargetContext(options: {
   };
 }
 
-async function prepareReviewTargetContext(options: {
+async function prepareVerificationTargetContext(options: {
   root: string;
-  reviewsFilePath: string;
+  verificationsFilePath: string;
   target: ReductionTarget;
 }): Promise<ReductionTargetContext> {
-  const { root, reviewsFilePath, target } = options;
-  const [record] = await readReviewRecords({
+  const { root, verificationsFilePath, target } = options;
+  const [record] = await readVerificationRecords({
     root,
-    reviewsFilePath,
+    verificationsFilePath,
     limit: 1,
     predicate: (entry) => entry.sessionId === target.id,
   });
   if (!record) {
-    throw new Error(`Review session \`${target.id}\` not found.`);
+    throw new Error(`Verification session \`${target.id}\` not found.`);
   }
 
   const stagedFiles: StagedTargetFile[] = [];
   const artifacts: Array<Record<string, unknown>> = [];
 
-  for (const reviewer of record.reviewers) {
-    const reviewRelative = `inputs/reviewers/${reviewer.agentId}/review.md`;
+  for (const method of record.methods) {
+    if (!method.artifactPath) {
+      continue;
+    }
+    const methodActor = method.verifierId ?? method.slug ?? "unknown";
+    const templateSegment = method.template ?? "programmatic";
+    const stagedRelativePath = `inputs/methods/${method.method}/${method.scope.kind}/${methodActor}/${templateSegment}/result.json`;
     stagedFiles.push({
-      sourceAbsolutePath: resolvePath(root, reviewer.outputPath),
-      stagedRelativePath: reviewRelative,
+      sourceAbsolutePath: resolvePath(root, method.artifactPath),
+      stagedRelativePath,
     });
-
-    const recommendationPath = resolveStoredReviewRecommendationPath(
-      root,
-      reviewer.outputPath,
-    );
-    const recommendationRelative = `inputs/reviewers/${reviewer.agentId}/recommendation.json`;
-    stagedFiles.push({
-      sourceAbsolutePath: recommendationPath,
-      stagedRelativePath: recommendationRelative,
-    });
-
     artifacts.push({
-      artifactId: `reviewer:${reviewer.agentId}`,
-      kind: "reviewer",
-      agentId: reviewer.agentId,
-      status: reviewer.status,
-      reviewPath: reviewRelative,
-      recommendationPath: recommendationRelative,
-      ...(reviewer.tokenUsage ? { tokenUsage: reviewer.tokenUsage } : {}),
+      artifactId: `verification-method:${method.method}:${method.scope.kind}:${method.verifierId ?? method.slug ?? "unknown"}`,
+      kind: "verification-method",
+      method: method.method,
+      scope: method.scope,
+      status: method.status,
+      ...(method.verifierId ? { verifierId: method.verifierId } : {}),
+      ...(method.template ? { template: method.template } : {}),
+      artifactPath: stagedRelativePath,
+      ...(method.tokenUsage ? { tokenUsage: method.tokenUsage } : {}),
+      ...(method.error ? { error: method.error } : {}),
     });
   }
 
   return {
     target,
-    displayPath: `.voratiq/reviews/sessions/${record.sessionId}`,
+    displayPath: `.voratiq/verifications/sessions/${record.sessionId}`,
     stagedFiles,
     manifest: {
       target: {
-        operator: "review",
+        operator: "verify",
         id: record.sessionId,
-        path: `.voratiq/reviews/sessions/${record.sessionId}`,
-        runId: record.runId,
+        path: `.voratiq/verifications/sessions/${record.sessionId}`,
+        target: record.target,
         blinded: record.blinded,
+        status: record.status,
       },
       artifacts,
     },
@@ -1033,13 +1026,6 @@ async function assertReductionOutputExists(
       `Reducer output is empty. Inspect \`${stderrDisplay}\` to diagnose the reducer failure.`,
     );
   }
-}
-
-function resolveStoredReviewRecommendationPath(
-  root: string,
-  outputPath: string,
-): string {
-  return resolvePath(root, dirname(outputPath), REVIEW_RECOMMENDATION_FILENAME);
 }
 
 function resolveStoredReductionDataPath(

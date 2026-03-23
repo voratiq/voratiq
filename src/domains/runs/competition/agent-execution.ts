@@ -2,11 +2,9 @@ import { executeCompetitionWithAdapter } from "../../../competition/command-adap
 import type { ResolvedExtraContextFile } from "../../../competition/shared/extra-context.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
-import type { EvalDefinition } from "../../../configs/evals/types.js";
 import { createRunCompetitionAdapter } from "../../../domains/runs/competition/adapter.js";
 import { RunProcessStreamError } from "../../../domains/runs/competition/errors.js";
 import type { AgentExecutionPhaseResult } from "../../../domains/runs/competition/phases.js";
-import { hasEvalFailures } from "../../../domains/runs/competition/reports.js";
 import type { AgentRecordMutators } from "../../../domains/runs/model/mutators.js";
 import { toError } from "../../../utils/errors.js";
 
@@ -17,7 +15,6 @@ export interface AgentExecutionInput {
   readonly root: string;
   readonly specContent: string;
   readonly extraContextFiles: readonly ResolvedExtraContextFile[];
-  readonly evalPlan: readonly EvalDefinition[];
   readonly effectiveMaxParallel: number;
   readonly mutators: AgentRecordMutators;
   readonly environment: EnvironmentConfig;
@@ -36,7 +33,6 @@ export async function executeAgents(
     root,
     specContent,
     extraContextFiles,
-    evalPlan,
     effectiveMaxParallel,
     mutators,
     environment,
@@ -55,7 +51,6 @@ export async function executeAgents(
         root,
         specContent,
         extraContextFiles,
-        evalPlan,
         mutators,
         environment,
       }),
@@ -67,13 +62,11 @@ export async function executeAgents(
     const hadAgentFailure = agentReports.some(
       (report) => report.status === "failed" || report.status === "errored",
     );
-    const hadEvalFailure = hasEvalFailures(agentReports);
 
     phaseResult = {
       agentRecords,
       agentReports,
       hadAgentFailure,
-      hadEvalFailure,
     };
   } catch (error) {
     executionError = error;

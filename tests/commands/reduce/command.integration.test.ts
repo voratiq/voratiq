@@ -157,8 +157,8 @@ describe("executeReduceCommand integration", () => {
       root: "/repo",
       specsFilePath: "/repo/.voratiq/specs/index.json",
       runsFilePath: "/repo/.voratiq/runs/index.json",
-      reviewsFilePath: "/repo/.voratiq/reviews/index.json",
       reductionsFilePath: "/repo/.voratiq/reductions/index.json",
+      verificationsFilePath: "/repo/.voratiq/verifications/index.json",
       target: { type: "run", id: "run-123" },
       maxParallel: 10,
     });
@@ -254,8 +254,8 @@ describe("executeReduceCommand integration", () => {
       root: "/repo",
       specsFilePath: "/repo/.voratiq/specs/index.json",
       runsFilePath: "/repo/.voratiq/runs/index.json",
-      reviewsFilePath: "/repo/.voratiq/reviews/index.json",
       reductionsFilePath: "/repo/.voratiq/reductions/index.json",
+      verificationsFilePath: "/repo/.voratiq/verifications/index.json",
       target: { type: "spec", id: "spec-123" },
       extraContextFiles,
     });
@@ -328,8 +328,8 @@ describe("executeReduceCommand integration", () => {
       root: "/repo",
       specsFilePath: "/repo/.voratiq/specs/index.json",
       runsFilePath: "/repo/.voratiq/runs/index.json",
-      reviewsFilePath: "/repo/.voratiq/reviews/index.json",
       reductionsFilePath: "/repo/.voratiq/reductions/index.json",
+      verificationsFilePath: "/repo/.voratiq/verifications/index.json",
       target: { type: "run", id: "run-123" },
       renderer,
     });
@@ -384,8 +384,8 @@ describe("executeReduceCommand integration", () => {
         root: "/repo",
         specsFilePath: "/repo/.voratiq/specs/index.json",
         runsFilePath: "/repo/.voratiq/runs/index.json",
-        reviewsFilePath: "/repo/.voratiq/reviews/index.json",
         reductionsFilePath: "/repo/.voratiq/reductions/index.json",
+        verificationsFilePath: "/repo/.voratiq/verifications/index.json",
         target: { type: "run", id: "run-123" },
       });
     } catch (error) {

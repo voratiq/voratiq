@@ -185,8 +185,6 @@ describe("executePruneCommand", () => {
       "/repo/.voratiq/runs/sessions/20251110-abc123/codex/artifacts/diff.patch",
       "/repo/.voratiq/runs/sessions/20251110-abc123/claude/artifacts/summary.txt",
       "/repo/.voratiq/runs/sessions/20251110-abc123/codex/artifacts/summary.txt",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/claude/evals",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/codex/evals",
     ]);
     pathExistsMock.mockImplementation((candidate) =>
       Promise.resolve(existingPaths.has(String(candidate))),

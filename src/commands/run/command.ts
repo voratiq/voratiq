@@ -159,7 +159,6 @@ export async function executeRunCommand(
       root,
       specContent: validation.specContent,
       extraContextFiles,
-      evalPlan: validation.evalPlan,
       effectiveMaxParallel: validation.effectiveMaxParallel,
       environment: validation.environment,
       mutators,
@@ -194,7 +193,6 @@ export async function executeRunCommand(
       updatedRunRecord,
       executionResult.agentReports,
       executionResult.hadAgentFailure,
-      executionResult.hadEvalFailure,
     );
   } catch (error) {
     executionError = error;

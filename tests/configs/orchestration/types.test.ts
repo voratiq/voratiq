@@ -9,7 +9,7 @@ describe("orchestration types", () => {
   test("includes reduce in the canonical orchestration stage ids", () => {
     expect(ORCHESTRATION_STAGE_IDS).toEqual([
       "run",
-      "review",
+      "verify",
       "spec",
       "reduce",
     ]);
@@ -18,7 +18,7 @@ describe("orchestration types", () => {
   test("requires reduce in orchestration profiles", () => {
     const result = orchestrationProfileSchema.safeParse({
       run: { agents: [] },
-      review: { agents: [] },
+      verify: { agents: [] },
       spec: { agents: [] },
     });
 

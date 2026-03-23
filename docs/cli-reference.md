@@ -15,7 +15,7 @@ Complete reference for all Voratiq commands.
 
 ## `voratiq auto`
 
-Run `spec`, `run`, `review`, and `apply` as one command.
+Run `spec`, `run`, `verify`, and `apply` as one command.
 
 ### Usage
 
@@ -28,18 +28,18 @@ voratiq auto (--spec <path> | --description <text>) [options]
 Provide exactly one of `--spec` or `--description`.
 
 - `--spec <path>`: Existing spec to run
-- `--description <text>`: Generate a spec, then run and review it
+- `--description <text>`: Generate a spec, then run and verify it
 - `--run-agent <agent-id>`: Set run-stage agents directly (repeatable; order preserved)
-- `--review-agent <agent-id>`: Set review-stage agents directly (repeatable)
+- `--verify-agent <agent-id>`: Set verify-stage agents directly (repeatable)
 - `--profile <name>`: Orchestration profile (default: `default`)
-- `--max-parallel <count>`: Max concurrent agents/reviewers
+- `--max-parallel <count>`: Max concurrent agents/verifiers
 - `--branch`: Create or checkout a branch named after the spec
-- `--apply`: Apply the recommended candidate after review
+- `--apply`: Apply the selected candidate after verification
 - `--commit`: Commit after apply (requires `--apply`)
 
 ### Behavior
 
-Stages run in order: `spec` (if `--description`), `run`, `review`, `apply` (if `--apply`).
+Stages run in order: `spec` (if `--description`), `run`, `verify`, `apply` (if `--apply`).
 
 As a convenience, `voratiq --description <text> ...` is shorthand for `voratiq auto --description <text> ...`.
 
@@ -58,8 +58,8 @@ voratiq auto --description "add retries to billing webhook delivery" --apply --c
 
 - Exactly one of `--spec` or `--description` is required
 - `--commit` requires `--apply`
-- Stage failure in `spec`, `run`, `review`, or `apply`
-- Reviewers disagree and no single candidate resolves
+- Stage failure in `spec`, `run`, `verify`, or `apply`
+- Verifiers disagree and no single candidate resolves
 
 ## `voratiq init`
 
@@ -81,13 +81,13 @@ voratiq init [options]
 Creates:
 
 - `.voratiq/` directory
-- `specs/`, `runs/`, and `reviews/` directories
+- `specs/`, `runs/`, `verifications/`, and `reductions/` directories
 - `agents.yaml` with the full supported agent catalog (binary paths filled for CLIs found on `$PATH`)
 - `orchestration.yaml` with stage-to-agent assignments based on the selected preset
 - `environment.yaml` with environment settings
-- `evals.yaml` with common eval commands
+- `verification.yaml` with verification settings
 - `sandbox.yaml` with sandbox policies
-- `index.json` files under `specs/`, `runs/`, and `reviews/`
+- `index.json` files under `specs/`, `runs/`, `verifications/`, and `reductions/`
 
 If `.voratiq/` already exists, `voratiq init` fills any missing files and directories.
 
@@ -172,13 +172,12 @@ voratiq run --spec <path> [options]
 
 ### Behavior
 
-1. Validates clean git tree, spec exists, agent/eval configs are valid
+1. Validates clean git tree, spec exists, and configs are valid
 2. Generates run ID, creates run workspace, initializes run record
 3. Spawns agents, each in an isolated git worktree
-4. Runs evals in each agent's workspace after the agent completes
-5. Captures diffs, persists records, generates report
+4. Captures diffs, persists records, generates report
 
-Eval failures are quality signals and do not affect exit code.
+Verification (programmatic checks + rubric verifiers) runs separately via `voratiq verify`.
 
 ### Examples
 
@@ -198,50 +197,82 @@ voratiq run --spec .voratiq/specs/refactor.md --branch
 - No agents found for the stage (empty orchestration config and no `--agent` override)
 - Agent binary not found or not executable
 - Stale or missing agent credentials
-- Invalid agent/eval configuration
+- Invalid agent or verification configuration
 
-## `voratiq review`
+## `voratiq reduce`
 
-Review a recorded run.
+Reduce artifact sets into a summarized form.
 
 ### Usage
 
 ```bash
-voratiq review --run <run-id> [options]
+voratiq reduce (--spec <spec-id> | --run <run-id> | --verification <verification-id> | --reduction <reduction-id>) [options]
 ```
 
 ### Options
 
-- `--run <run-id>`: Run ID to review (required)
-- `--agent <agent-id>`: Set reviewers directly (repeatable; order preserved)
+- `--spec <spec-id>`: Spec to reduce
+- `--run <run-id>`: Run to reduce
+- `--verification <verification-id>`: Verification to reduce
+- `--reduction <reduction-id>`: Reduction to reduce
+- `--agent <agent-id>`: Set reducers directly (repeatable; order preserved)
 - `--profile <name>`: Orchestration profile (default: `default`)
-- `--max-parallel <count>`: Max concurrent reviewers (default: all)
+- `--max-parallel <count>`: Max concurrent reducers (default: all)
+- `--extra-context <path>`: Stage an extra context file into each reducer workspace (repeatable)
 
 ### Behavior
 
-Each reviewer runs in a sandbox and writes an independent recommendation. Reviews are blinded — reviewers see randomized candidate ids, not agent names.
-
-Each reviewer produces a `review.md` (narrative) and `recommendation.json` (preferred candidate, rationale, next actions). Artifacts are saved under `.voratiq/reviews/`.
+Reducers read staged artifacts and write `reduction.md` and `reduction.json`. Artifacts are saved under `.voratiq/reductions/`.
 
 ### Examples
 
 ```bash
-voratiq review --run 20251031-232802-abc123
+voratiq reduce --run 20251031-232802-abc123
+```
+
+## `voratiq verify`
+
+Verify a recorded spec, run, or reduction.
+
+### Usage
+
+```bash
+voratiq verify (--spec <spec-id> | --run <run-id> | --reduce <reduce-id>) [options]
+```
+
+### Options
+
+- `--spec <spec-id>`: Spec to verify
+- `--run <run-id>`: Run to verify
+- `--reduce <reduce-id>`: Reduction to verify
+- `--agent <agent-id>`: Set verifiers directly (repeatable; order preserved)
+- `--profile <name>`: Orchestration profile (default: `default`)
+- `--max-parallel <count>`: Max concurrent verifiers (default: all)
+- `--extra-context <path>`: Stage an extra context file into each verifier workspace (repeatable)
+
+### Behavior
+
+Verification is blinded when comparing candidates — verifiers see randomized candidate ids, not agent names. Artifacts are saved under `.voratiq/verifications/`.
+
+### Examples
+
+```bash
+voratiq verify --run 20251031-232802-abc123
 ```
 
 ```bash
-# Set reviewers directly
-voratiq review --run 20251031-232802-abc123 --agent gpt-5-2-codex --agent claude-opus-4-5-20251101
+# Set verifiers directly
+voratiq verify --run 20251031-232802-abc123 --agent gpt-5-2-codex --agent claude-opus-4-5-20251101
 ```
 
 ### Errors
 
-- Run ID not found
-- Run record is malformed
-- No agent found for review stage (stage config empty and no `--agent`)
-- Reviewer authentication fails (aborts before any reviewer starts)
-- Reviewer output contract violation
-- Run artifacts are missing (warns but continues)
+- Target ID not found
+- Target record is malformed
+- No agent found for verify stage (stage config empty and no `--agent`)
+- Verifier authentication fails (aborts before any verifier starts)
+- Verifier output contract violation
+- Target artifacts are missing
 
 ## `voratiq apply`
 

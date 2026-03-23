@@ -1,10 +1,14 @@
 import { readFile } from "node:fs/promises";
 
-import { readReviewRecords } from "../../domains/reviews/persistence/adapter.js";
 import { buildRunRecordEnhanced } from "../../domains/runs/model/enhanced.js";
 import type { RunApplyStatus } from "../../domains/runs/model/types.js";
 import { rewriteRunRecord } from "../../domains/runs/persistence/adapter.js";
-import { deriveSelectorSelectionDecision } from "../../policy/index.js";
+import { readVerificationRecords } from "../../domains/verifications/persistence/adapter.js";
+import {
+  buildVerificationSelectorSource,
+  deriveSelectorSelectionDecision,
+  loadVerificationSelectionPolicyOutput,
+} from "../../policy/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { ensureFileExists } from "../../utils/fs.js";
 import {
@@ -27,13 +31,14 @@ import {
   ApplyGitCommitError,
   ApplyPatchApplicationError,
   ApplyRunDeletedError,
+  ApplyVerificationPolicyLoadError,
 } from "./errors.js";
 import type { ApplyResult } from "./types.js";
 
 export interface ApplyCommandInput {
   root: string;
   runsFilePath: string;
-  reviewsFilePath?: string;
+  verificationsFilePath?: string;
   runId: string;
   agentId: string;
   ignoreBaseMismatch: boolean;
@@ -46,7 +51,7 @@ export async function executeApplyCommand(
   const {
     root,
     runsFilePath,
-    reviewsFilePath,
+    verificationsFilePath,
     runId,
     agentId: selector,
     ignoreBaseMismatch,
@@ -66,7 +71,7 @@ export async function executeApplyCommand(
     runId,
     selector,
     canonicalAgentIds: runRecord.agents.map((agent) => agent.agentId),
-    reviewsFilePath,
+    verificationsFilePath,
   });
 
   const agentRecord = runRecord.agents.find(
@@ -188,44 +193,70 @@ async function resolveApplyAgentSelector(options: {
   runId: string;
   selector: string;
   canonicalAgentIds: readonly string[];
-  reviewsFilePath?: string;
+  verificationsFilePath?: string;
 }): Promise<string> {
-  const { root, runId, selector, canonicalAgentIds, reviewsFilePath } = options;
+  const { root, runId, selector, canonicalAgentIds, verificationsFilePath } =
+    options;
 
-  const effectiveReviewsPath =
-    reviewsFilePath ?? `${root}/.voratiq/reviews/index.json`;
+  if (canonicalAgentIds.includes(selector)) {
+    return selector;
+  }
 
-  const reviewRecords = await readReviewRecords({
+  const effectiveVerificationsPath =
+    verificationsFilePath ?? `${root}/.voratiq/verifications/index.json`;
+
+  const verificationRecords = await readVerificationRecords({
     root,
-    reviewsFilePath: effectiveReviewsPath,
-    predicate: (record) => record.runId === runId,
+    verificationsFilePath: effectiveVerificationsPath,
+    predicate: (record) =>
+      record.target.kind === "run" && record.target.sessionId === runId,
   }).catch(() => []);
+
+  const verificationFailures: Array<{
+    verificationId: string;
+    detail: string;
+  }> = [];
+
+  const sources = (
+    await Promise.all(
+      verificationRecords.map(async (record) => {
+        try {
+          const output = await loadVerificationSelectionPolicyOutput({
+            root,
+            record,
+          });
+          return buildVerificationSelectorSource(output);
+        } catch (error) {
+          verificationFailures.push({
+            verificationId: record.sessionId,
+            detail: toErrorMessage(error),
+          });
+          return undefined;
+        }
+      }),
+    )
+  ).filter(
+    (
+      source,
+    ): source is { sourceId: string; aliasMap: Record<string, string> } =>
+      source !== undefined,
+  );
 
   const selectorDecision = deriveSelectorSelectionDecision({
     selector,
     canonicalAgentIds,
-    sources: reviewRecords
-      .map((record) => {
-        const aliasMap = record.blinded?.aliasMap;
-        if (!aliasMap) {
-          return undefined;
-        }
-
-        return {
-          sourceId: record.sessionId,
-          aliasMap,
-        };
-      })
-      .filter(
-        (
-          source,
-        ): source is { sourceId: string; aliasMap: Record<string, string> } =>
-          source !== undefined,
-      ),
+    sources,
   });
 
   if (selectorDecision.state === "resolvable") {
     return selectorDecision.selectedCanonicalAgentId;
+  }
+
+  if (verificationFailures.length > 0) {
+    throw new ApplyVerificationPolicyLoadError({
+      runId,
+      verificationFailures,
+    });
   }
 
   const ambiguousReason = selectorDecision.unresolvedReasons.find(
@@ -236,7 +267,7 @@ async function resolveApplyAgentSelector(options: {
       runId,
       selector,
       matches: ambiguousReason.resolutions.map((resolution) => ({
-        reviewId: resolution.sourceId,
+        verificationId: resolution.sourceId,
         agentId: resolution.selectedCanonicalAgentId,
       })),
     });

@@ -17,7 +17,6 @@ import {
   getAgentArtifactsDirectoryPath,
   getAgentContextDirectoryPath,
   getAgentManifestPath,
-  getAgentReviewPath,
   getAgentRuntimeDirectoryPath,
   getAgentSandboxDirectoryPath,
   getAgentSandboxHomePath,
@@ -44,7 +43,6 @@ const ARTIFACT_BUILDERS: Record<
   contextPath: (runId, agentId) => getAgentContextDirectoryPath(runId, agentId),
   stdoutPath: (runId, agentId) => getAgentStdoutPath(runId, agentId),
   stderrPath: (runId, agentId) => getAgentStderrPath(runId, agentId),
-  reviewPath: (runId, agentId) => getAgentReviewPath(runId, agentId),
   workspacePath: (runId, agentId) =>
     getAgentWorkspaceDirectoryPath(runId, agentId),
   runtimeManifestPath: (runId, agentId) => getAgentManifestPath(runId, agentId),

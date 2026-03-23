@@ -2,10 +2,9 @@ import type {
   AutoApplyStatus,
   AutoTerminalStatus,
 } from "../../domains/runs/model/types.js";
-import {
-  deriveReviewSelectionDecision,
-  type ReviewSelectionInput,
-  type UnresolvedSelectionDecision,
+import type {
+  SelectionDecision,
+  UnresolvedSelectionDecision,
 } from "../../policy/index.js";
 import { mapRunStatusToExitCode, type RunStatus } from "../../status/index.js";
 import { HintedError, toErrorMessage } from "../../utils/errors.js";
@@ -14,7 +13,7 @@ export interface ExecuteAutoCommandInput {
   specPath?: string;
   description?: string;
   runAgentIds?: readonly string[];
-  reviewerAgentIds?: readonly string[];
+  verifyAgentIds?: readonly string[];
   profile?: string;
   maxParallel?: number;
   branch?: boolean;
@@ -31,6 +30,7 @@ export interface AutoSpecStageInput {
 
 export interface AutoSpecStageResult {
   body: string;
+  sessionId: string;
   generatedSpecPaths?: readonly string[];
   specPath?: string;
 }
@@ -65,14 +65,11 @@ export interface AutoRunStageResult {
   exitCode?: number;
 }
 
-export interface AutoReviewStageReview {
-  agentId: string;
-  status: "succeeded" | "failed";
-  outputPath: string;
-}
-
-export interface AutoReviewStageInput {
-  runId: string;
+export interface AutoVerifyStageInput {
+  target: {
+    kind: "spec" | "run";
+    sessionId: string;
+  };
   agentIds?: readonly string[];
   agentOverrideFlag: string;
   profile?: string;
@@ -80,13 +77,13 @@ export interface AutoReviewStageInput {
   suppressHint: boolean;
 }
 
-export interface AutoReviewStageResult {
-  reviewId?: string;
+export interface AutoVerifyStageResult {
+  verificationId?: string;
   body: string;
   stderr?: string;
   exitCode?: number;
-  outputPath: string;
-  reviews?: readonly AutoReviewStageReview[];
+  selectedSpecPath?: string;
+  selection?: SelectionDecision;
 }
 
 export interface AutoApplyStageInput {
@@ -135,14 +132,13 @@ export interface AutoExecutionSummary {
     specPath?: string;
     baseRevisionSha?: string;
   };
-  review: AutoPhaseSummary & { outputPath?: string };
+  verify: AutoPhaseSummary;
   apply: AutoPhaseSummary & { agentId?: string };
 }
 
 export interface ExecuteAutoCommandResult {
   exitCode: number;
   runId?: string;
-  reviewOutputPath?: string;
   appliedAgentId?: string;
   auto: {
     status: AutoTerminalStatus;
@@ -161,15 +157,10 @@ export interface AutoCommandDependencies {
   onEvent?: (event: AutoCommandEvent) => void;
   runSpecStage: (input: AutoSpecStageInput) => Promise<AutoSpecStageResult>;
   runRunStage: (input: AutoRunStageInput) => Promise<AutoRunStageResult>;
-  runReviewStage: (
-    input: AutoReviewStageInput,
-  ) => Promise<AutoReviewStageResult>;
+  runVerifyStage: (
+    input: AutoVerifyStageInput,
+  ) => Promise<AutoVerifyStageResult>;
   runApplyStage: (input: AutoApplyStageInput) => Promise<AutoApplyStageResult>;
-  loadReviewSelectionInput: (input: {
-    reviewId: string;
-    reviews: readonly AutoReviewStageReview[];
-    availableAgents: readonly string[];
-  }) => Promise<ReviewSelectionInput>;
 }
 
 export async function executeAutoCommand(
@@ -203,6 +194,7 @@ export async function executeAutoCommand(
   let specStatus: "succeeded" | "failed" | "skipped" = "skipped";
   let specPath: string | undefined;
   let specDetail: string | undefined;
+  let specSessionId: string | undefined;
 
   let runStartedAt: number | undefined;
   let runStatus: "succeeded" | "failed" | "skipped" = "skipped";
@@ -212,14 +204,11 @@ export async function executeAutoCommand(
   let runCreatedAt: string | undefined;
   let runSpecPath: string | undefined;
   let runBaseRevisionSha: string | undefined;
-  let runAgentIds: string[] = [];
 
-  let reviewStartedAt: number | undefined;
-  let reviewStatus: "succeeded" | "failed" | "skipped" = "skipped";
-  let reviewId: string | undefined;
-  let reviewOutputPath: string | undefined;
-  let reviewDetail: string | undefined;
-  let reviewResults: readonly AutoReviewStageReview[] | undefined;
+  let verifyStartedAt: number | undefined;
+  let verifyStatus: "succeeded" | "failed" | "skipped" = "skipped";
+  let verifyDetail: string | undefined;
+  let verifySelection: SelectionDecision | undefined;
 
   let applyStartedAt: number | undefined;
   let applyStatus: AutoApplyStatus = "skipped";
@@ -251,7 +240,9 @@ export async function executeAutoCommand(
         suppressHint: true,
       });
       specStatus = "succeeded";
+      specSessionId = specResult.sessionId;
       recordEvent({ kind: "body", body: specResult.body });
+
       const unresolvedSpecSelection =
         describeUnresolvedSpecSelection(specResult);
       if (unresolvedSpecSelection) {
@@ -260,9 +251,6 @@ export async function executeAutoCommand(
           unresolvedSpecSelection.detail,
           unresolvedSpecSelection.message,
         );
-      } else {
-        specPath = resolveSpecPathForAuto(specResult);
-        resolvedSpecPath = specPath;
       }
     } catch (error) {
       specStatus = "failed";
@@ -272,7 +260,70 @@ export async function executeAutoCommand(
     }
   }
 
-  if (!hardFailure && resolvedSpecPath) {
+  if (!hardFailure && !actionRequired && hasDescription) {
+    if (!specSessionId) {
+      specStatus = "failed";
+      specDetail = "Spec stage did not return a session id.";
+      hardFailure = true;
+    } else {
+      try {
+        const specVerifyResult = await dependencies.runVerifyStage({
+          target: {
+            kind: "spec",
+            sessionId: specSessionId,
+          },
+          agentIds: options.verifyAgentIds
+            ? [...options.verifyAgentIds]
+            : undefined,
+          agentOverrideFlag: "--verify-agent",
+          profile: options.profile,
+          maxParallel: options.maxParallel,
+          suppressHint: true,
+        });
+
+        recordEvent({
+          kind: "body",
+          body: specVerifyResult.body,
+          stderr: specVerifyResult.stderr,
+          exitCode: specVerifyResult.exitCode,
+        });
+
+        if (specVerifyResult.exitCode === 1) {
+          specStatus = "failed";
+          specDetail = "One or more spec verifiers failed.";
+          hardFailure = true;
+        } else if (
+          typeof specVerifyResult.selectedSpecPath === "string" &&
+          specVerifyResult.selectedSpecPath.trim().length > 0
+        ) {
+          resolvedSpecPath = specVerifyResult.selectedSpecPath;
+          specPath = specVerifyResult.selectedSpecPath;
+        } else {
+          const unresolvedSpecVerification = describeUnresolvedSpecVerification(
+            specVerifyResult.selection,
+          );
+          specDetail = unresolvedSpecVerification.detail;
+          markActionRequired(
+            unresolvedSpecVerification.detail,
+            unresolvedSpecVerification.message,
+          );
+        }
+      } catch (error) {
+        specStatus = "failed";
+        specDetail = toHeadline(error);
+        hardFailure = true;
+        recordEvent({ kind: "error", error });
+      }
+    }
+  }
+
+  if (!resolvedSpecPath && !hardFailure && !actionRequired && hasDescription) {
+    specStatus = "failed";
+    specDetail = "Spec verification did not select a spec path.";
+    hardFailure = true;
+  }
+
+  if (!hardFailure && !actionRequired && resolvedSpecPath) {
     runStartedAt = now();
 
     try {
@@ -312,7 +363,6 @@ export async function executeAutoCommand(
       runCreatedAt = runResult.report.createdAt;
       runSpecPath = runResult.report.spec?.path;
       runBaseRevisionSha = runResult.report.baseRevisionSha;
-      runAgentIds = runResult.report.agents.map((agent) => agent.agentId);
 
       if (runStatus === "failed") {
         const statusDetail = runRecordStatus
@@ -337,103 +387,94 @@ export async function executeAutoCommand(
     }
   }
 
-  const shouldAttemptReview = hasDescription
-    ? runStatus === "succeeded" && typeof runId === "string"
-    : !hardFailure || runId !== undefined;
+  const shouldAttemptVerifyRun =
+    runId !== undefined &&
+    (!hardFailure || (!hasDescription && runStatus !== "skipped"));
 
-  if (shouldAttemptReview) {
-    if (!runId) {
-      reviewStatus = "skipped";
-    } else {
-      reviewStartedAt = now();
+  if (shouldAttemptVerifyRun && runId) {
+    verifyStartedAt = now();
 
-      try {
-        const reviewResult = await dependencies.runReviewStage({
-          runId,
-          agentIds: options.reviewerAgentIds
-            ? [...options.reviewerAgentIds]
-            : undefined,
-          agentOverrideFlag: "--review-agent",
-          profile: options.profile,
-          maxParallel: options.maxParallel,
-          suppressHint: options.apply === true,
-        });
+    try {
+      const verifyResult = await dependencies.runVerifyStage({
+        target: {
+          kind: "run",
+          sessionId: runId,
+        },
+        agentIds: options.verifyAgentIds
+          ? [...options.verifyAgentIds]
+          : undefined,
+        agentOverrideFlag: "--verify-agent",
+        profile: options.profile,
+        maxParallel: options.maxParallel,
+        suppressHint: options.apply === true,
+      });
 
-        reviewStatus = "succeeded";
-        reviewId = reviewResult.reviewId;
-        reviewOutputPath = reviewResult.outputPath;
-        reviewResults = reviewResult.reviews;
-        if (reviewResult.exitCode === 1) {
-          reviewStatus = "failed";
-          reviewDetail = "One or more reviewers failed.";
-          hardFailure = true;
-        }
-
-        recordEvent({
-          kind: "body",
-          body: reviewResult.body,
-          stderr: reviewResult.stderr,
-          exitCode: reviewResult.exitCode,
-        });
-      } catch (error) {
-        reviewStatus = "failed";
-        reviewDetail = toHeadline(error);
+      verifyStatus = "succeeded";
+      verifySelection = verifyResult.selection;
+      if (verifyResult.exitCode === 1) {
+        verifyStatus = "failed";
+        verifyDetail = "One or more verifiers failed.";
         hardFailure = true;
-        recordEvent({ kind: "error", error });
+      } else if (verifySelection?.state === "unresolved") {
+        const actionRequiredMessage =
+          describeUnresolvedAutoApplyDecision(verifySelection);
+        verifyDetail = actionRequiredMessage.detail;
+        markActionRequired(
+          actionRequiredMessage.detail,
+          actionRequiredMessage.message,
+        );
       }
+
+      recordEvent({
+        kind: "body",
+        body: verifyResult.body,
+        stderr: verifyResult.stderr,
+        exitCode: verifyResult.exitCode,
+      });
+    } catch (error) {
+      verifyStatus = "failed";
+      verifyDetail = toHeadline(error);
+      hardFailure = true;
+      recordEvent({ kind: "error", error });
     }
   }
 
   if (
     options.apply &&
     runId &&
-    reviewStatus === "succeeded" &&
+    verifyStatus === "succeeded" &&
+    !actionRequired &&
     (!hasDescription || runStatus === "succeeded")
   ) {
     applyStartedAt = now();
     try {
-      if (!reviewId) {
-        throw new HintedError("Review stage did not return a review id.", {
-          hintLines: [
-            "Re-run `voratiq review` to regenerate review artifacts.",
-          ],
-        });
-      }
-
-      if (!reviewResults || reviewResults.length === 0) {
-        throw new HintedError("Failed to resolve reviewer recommendations.", {
-          hintLines: [
-            "Re-run `voratiq review` to regenerate review artifacts.",
-          ],
-        });
-      }
-
-      const reviewSelectionInput = await dependencies.loadReviewSelectionInput({
-        reviewId,
-        reviews: reviewResults,
-        availableAgents: runAgentIds,
-      });
-      const reviewSelectionDecision =
-        deriveReviewSelectionDecision(reviewSelectionInput);
-
-      if (reviewSelectionDecision.state === "unresolved") {
-        const actionRequiredMessage = describeUnresolvedAutoApplyDecision({
-          input: reviewSelectionInput,
-          decision: reviewSelectionDecision,
-        });
-        markActionRequired(
-          actionRequiredMessage.detail,
-          actionRequiredMessage.message,
+      if (!verifySelection) {
+        throw new HintedError(
+          "Verify stage did not return a selection policy.",
+          {
+            hintLines: [
+              "Re-run `voratiq verify` to regenerate verification data.",
+            ],
+          },
+        );
+      } else if (verifySelection.state !== "resolvable") {
+        throw new HintedError(
+          "Verify stage did not return a resolvable selection.",
+          {
+            hintLines: [
+              "Re-run `voratiq verify` to inspect the unresolved decision.",
+            ],
+          },
         );
       } else {
         const applyResult = await dependencies.runApplyStage({
           runId,
-          agentId: reviewSelectionDecision.selectedCanonicalAgentId,
+          agentId: verifySelection.selectedCanonicalAgentId,
           commit: options.commit ?? false,
         });
 
         applyStatus = "succeeded";
-        applyAgentId = reviewSelectionDecision.selectedCanonicalAgentId;
+        applyAgentId = verifySelection.selectedCanonicalAgentId;
 
         recordEvent({
           kind: "body",
@@ -459,8 +500,8 @@ export async function executeAutoCommand(
     specStartedAt !== undefined ? now() - specStartedAt : undefined;
   const runDurationMs =
     runStartedAt !== undefined ? now() - runStartedAt : undefined;
-  const reviewDurationMs =
-    reviewStartedAt !== undefined ? now() - reviewStartedAt : undefined;
+  const verifyDurationMs =
+    verifyStartedAt !== undefined ? now() - verifyStartedAt : undefined;
   const applyDurationMs =
     applyStartedAt !== undefined ? now() - applyStartedAt : undefined;
 
@@ -472,8 +513,9 @@ export async function executeAutoCommand(
     status: autoStatus,
     actionRequiredDetail,
     applyDetail,
-    reviewDetail,
+    verifyDetail,
     runDetail,
+    specDetail,
   });
   const normalizedApplyDetail = truncateOutcomeDetail(applyDetail);
   const exitCode = mapAutoTerminalStatusToExitCode(autoStatus);
@@ -481,7 +523,6 @@ export async function executeAutoCommand(
   return {
     exitCode,
     runId,
-    reviewOutputPath,
     ...(applyAgentId ? { appliedAgentId: applyAgentId } : {}),
     auto: {
       status: autoStatus,
@@ -514,13 +555,12 @@ export async function executeAutoCommand(
         ...(runBaseRevisionSha ? { baseRevisionSha: runBaseRevisionSha } : {}),
         ...(runDetail ? { detail: runDetail } : {}),
       },
-      review: {
-        status: reviewStatus,
-        ...(typeof reviewDurationMs === "number"
-          ? { durationMs: reviewDurationMs }
+      verify: {
+        status: verifyStatus,
+        ...(typeof verifyDurationMs === "number"
+          ? { durationMs: verifyDurationMs }
           : {}),
-        ...(reviewOutputPath ? { outputPath: reviewOutputPath } : {}),
-        ...(reviewDetail ? { detail: reviewDetail } : {}),
+        ...(verifyDetail ? { detail: verifyDetail } : {}),
       },
       apply: {
         status: applyStatus,
@@ -558,33 +598,6 @@ function assertAutoOptionCompatibility(options: ExecuteAutoCommandInput): void {
   }
 }
 
-function resolveSpecPathForAuto(result: AutoSpecStageResult): string {
-  const specPathCandidate =
-    typeof result.specPath === "string" && result.specPath.trim().length > 0
-      ? result.specPath.trim()
-      : undefined;
-  if (specPathCandidate) {
-    return specPathCandidate;
-  }
-
-  if ((result.generatedSpecPaths?.length ?? 0) > 1) {
-    throw new HintedError(
-      "Spec stage generated multiple drafts and did not select one.",
-      {
-        hintLines: [
-          "Review the generated spec artifacts manually before continuing.",
-        ],
-      },
-    );
-  }
-
-  throw new HintedError("Spec stage did not return a spec path.", {
-    hintLines: [
-      "Re-run the spec stage and check for generated artifacts in the output.",
-    ],
-  });
-}
-
 function describeUnresolvedSpecSelection(
   result: AutoSpecStageResult,
 ): { detail: string; message: string } | undefined {
@@ -598,46 +611,69 @@ function describeUnresolvedSpecSelection(
   return undefined;
 }
 
-function describeUnresolvedAutoApplyDecision(options: {
-  input: ReviewSelectionInput;
-  decision: UnresolvedSelectionDecision;
-}): {
+function describeUnresolvedSpecVerification(decision?: SelectionDecision): {
   detail: string;
   message: string;
 } {
-  const { input, decision } = options;
-
   if (
+    decision?.state === "unresolved" &&
     decision.unresolvedReasons.some(
-      (reason) => reason.code === "reviewer_disagreement",
+      (reason) => reason.code === "verifier_disagreement",
     )
   ) {
     return {
       detail:
-        "Reviewers disagreed on preferred candidate; manual review required.",
+        "Spec verifiers disagreed on the preferred draft; manual selection required.",
       message:
-        "Reviewers disagreed on preferred candidate; manual review required.",
-    };
-  }
-
-  const successfulReviewerCount = input.reviewers.filter(
-    (reviewer) => reviewer.status === "succeeded",
-  ).length;
-
-  if (successfulReviewerCount > 1) {
-    return {
-      detail:
-        "No shared reviewer recommendation could be resolved; manual review required.",
-      message:
-        "No shared reviewer recommendation could be resolved; manual review required.",
+        "Spec verifiers disagreed on the preferred draft; manual selection required.",
     };
   }
 
   return {
     detail:
-      "No resolvable recommendation was produced; manual review required.",
+      "Spec verification did not select a draft; manual selection required.",
     message:
-      "No resolvable recommendation was produced; manual review required.",
+      "Spec verification did not select a draft; manual selection required.",
+  };
+}
+
+function describeUnresolvedAutoApplyDecision(
+  decision: UnresolvedSelectionDecision,
+): {
+  detail: string;
+  message: string;
+} {
+  if (
+    decision.unresolvedReasons.some(
+      (reason) => reason.code === "verifier_disagreement",
+    )
+  ) {
+    return {
+      detail:
+        "Verifiers disagreed on the preferred candidate; manual selection required.",
+      message:
+        "Verifiers disagreed on the preferred candidate; manual selection required.",
+    };
+  }
+
+  if (
+    decision.unresolvedReasons.some(
+      (reason) => reason.code === "no_programmatic_candidates_passed",
+    )
+  ) {
+    return {
+      detail:
+        "No run candidate passed programmatic verification; manual selection required.",
+      message:
+        "No run candidate passed programmatic verification; manual selection required.",
+    };
+  }
+
+  return {
+    detail:
+      "Verification did not produce a resolvable candidate; manual selection required.",
+    message:
+      "Verification did not produce a resolvable candidate; manual selection required.",
   };
 }
 
@@ -673,8 +709,9 @@ function resolveAutoTerminalDetail(options: {
   status: AutoTerminalStatus;
   actionRequiredDetail?: string;
   applyDetail?: string;
-  reviewDetail?: string;
+  verifyDetail?: string;
   runDetail?: string;
+  specDetail?: string;
 }): string | undefined {
   if (options.status === "action_required") {
     return truncateOutcomeDetail(
@@ -684,7 +721,10 @@ function resolveAutoTerminalDetail(options: {
 
   if (options.status === "failed") {
     return truncateOutcomeDetail(
-      options.applyDetail ?? options.reviewDetail ?? options.runDetail,
+      options.applyDetail ??
+        options.verifyDetail ??
+        options.runDetail ??
+        options.specDetail,
     );
   }
 

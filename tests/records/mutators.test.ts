@@ -115,7 +115,6 @@ describe("createAgentRecordMutators", () => {
       startedAt: "2025-11-05T12:01:00.000Z",
       completedAt: "2025-11-05T12:03:00.000Z",
       diffStatistics: "2 files changed, 5 insertions(+)",
-      evals: [{ slug: "format", status: "succeeded" }],
       artifacts: {
         stdoutCaptured: true,
         stderrCaptured: true,
@@ -130,7 +129,6 @@ describe("createAgentRecordMutators", () => {
       startedAt: "2025-11-05T12:01:00.000Z",
       completedAt: "2025-11-05T12:03:00.000Z",
       warnings: ["noop update"],
-      evals: [{ slug: "format", status: "succeeded" }],
     });
 
     const agentRecord = currentRecord.agents[0];
@@ -172,7 +170,6 @@ describe("createAgentRecordMutators", () => {
       status: "failed",
       startedAt: "2025-11-05T13:01:00.000Z",
       completedAt: "2025-11-05T13:02:00.000Z",
-      evals: [{ slug: "format", status: "failed" }],
       error: "Agent process failed",
     });
 
@@ -216,7 +213,6 @@ describe("createAgentRecordMutators", () => {
         model: "gpt-4",
         status: "failed",
         completedAt: "2025-11-05T13:02:00.000Z",
-        evals: [{ slug: "format", status: "failed" }],
         error: "Agent process failed",
       }),
     ).rejects.toThrow(/canonical lifecycle timestamps/u);
@@ -271,7 +267,6 @@ describe("createAgentRecordMutators", () => {
       status: "succeeded",
       startedAt: "2025-11-05T14:01:00.000Z",
       completedAt: "2025-11-05T14:03:00.000Z",
-      evals: [{ slug: "format", status: "succeeded" }],
       tokenUsage: {
         input_tokens: 120,
         cached_input_tokens: 30,
@@ -287,7 +282,6 @@ describe("createAgentRecordMutators", () => {
       status: "succeeded",
       startedAt: "2025-11-05T14:01:00.000Z",
       completedAt: "2025-11-05T14:03:00.000Z",
-      evals: [{ slug: "format", status: "succeeded" }],
       warnings: ["noop update"],
     });
 

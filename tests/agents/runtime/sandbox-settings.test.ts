@@ -9,7 +9,7 @@ import type { AgentId } from "../../../src/configs/agents/types.js";
 import { buildAgentWorkspacePaths } from "../../../src/workspace/layout.js";
 import {
   resolveWorkspacePath,
-  VORATIQ_REVIEWS_DIR,
+  VORATIQ_VERIFICATIONS_DIR,
 } from "../../../src/workspace/structure.js";
 
 describe("generateSandboxSettings", () => {
@@ -50,7 +50,7 @@ describe("generateSandboxSettings", () => {
     expect(settings.filesystem.denyWrite).toEqual(
       expect.arrayContaining([
         workspacePaths.artifactsPath,
-        resolveWorkspacePath(root, VORATIQ_REVIEWS_DIR),
+        resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_DIR),
       ]),
     );
     await rm(root, { recursive: true, force: true });

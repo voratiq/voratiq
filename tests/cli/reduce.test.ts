@@ -14,7 +14,7 @@ describe("reduce command options", () => {
     await expect(
       program.parseAsync(["reduce", "--agent", "alpha"], { from: "user" }),
     ).rejects.toThrow(
-      /exactly one of --spec, --run, --review, or --reduction/i,
+      /exactly one of --spec, --run, --verification, or --reduction/i,
     );
   });
 
@@ -30,7 +30,7 @@ describe("reduce command options", () => {
         from: "user",
       }),
     ).rejects.toThrow(
-      /exactly one of --spec, --run, --review, or --reduction/i,
+      /exactly one of --spec, --run, --verification, or --reduction/i,
     );
   });
 

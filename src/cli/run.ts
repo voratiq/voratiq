@@ -132,7 +132,7 @@ export async function runRunCommand(
  * Derives a branch name from a spec file path by extracting the basename without extension.
  *
  * Examples:
- * - `specs/separate-eval-outcomes.md` → `separate-eval-outcomes`
+ * - `specs/separate-verification-outcomes.md` → `separate-verification-outcomes`
  * - `specs/foo/bar.md` → `bar`
  * - `my-feature.md` → `my-feature`
  */

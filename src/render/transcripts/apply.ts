@@ -3,7 +3,6 @@ import { colorize } from "../../utils/colors.js";
 import { formatRunWorkspaceRelative } from "../../workspace/layout.js";
 import {
   buildAgentArtifactPaths,
-  buildAgentEvalViews,
   getAgentDirectoryPath,
   getAgentManifestPath,
 } from "../../workspace/structure.js";
@@ -33,11 +32,6 @@ export function renderApplyTranscript(result: ApplyResult): string {
     baseDirectory: getAgentDirectoryPath(result.runId, agent.agentId),
     runtimeManifestPath: getAgentManifestPath(result.runId, agent.agentId),
     assets,
-    evals: buildAgentEvalViews({
-      runId: result.runId,
-      agentId: agent.agentId,
-      evals: agent.evals,
-    }),
   } satisfies AgentSectionInput;
 
   const warnings = result.ignoredBaseMismatch

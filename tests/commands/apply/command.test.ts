@@ -13,13 +13,14 @@ import {
   ApplyAgentSummaryNotRecordedError,
   ApplyBaseMismatchError,
   ApplyPatchApplicationError,
+  ApplyVerificationPolicyLoadError,
 } from "../../../src/commands/apply/errors.js";
-import { appendReviewRecord } from "../../../src/domains/reviews/persistence/adapter.js";
 import type { RunRecord } from "../../../src/domains/runs/model/types.js";
 import {
   appendRunRecord,
   rewriteRunRecord,
 } from "../../../src/domains/runs/persistence/adapter.js";
+import { appendVerificationRecord } from "../../../src/domains/verifications/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 import {
   createAgentInvocationRecord,
@@ -98,7 +99,7 @@ describe("executeApplyCommand", () => {
     }
   });
 
-  it("resolves blinded aliases to canonical agent ids via review records", async () => {
+  it("resolves blinded aliases to canonical agent ids via verification records", async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-alias-"));
     try {
       await initGitRepository(repoRoot);
@@ -122,10 +123,10 @@ describe("executeApplyCommand", () => {
         diffStatistics,
       });
 
-      const alias = "r_aaaaaaaaaa";
-      await writeReviewRecord({
+      const alias = "v_aaaaaaaaaa";
+      await writeVerificationRecord({
         repoRoot,
-        reviewId: "review-alias-1",
+        verificationId: "verify-alias-1",
         runId,
         aliasMap: { [alias]: agentId },
       });
@@ -133,7 +134,151 @@ describe("executeApplyCommand", () => {
       const result = await executeApplyCommand({
         root: repoRoot,
         runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
-        reviewsFilePath: join(repoRoot, ".voratiq", "reviews", "index.json"),
+        verificationsFilePath: join(
+          repoRoot,
+          ".voratiq",
+          "verifications",
+          "index.json",
+        ),
+        runId,
+        agentId: alias,
+        ignoreBaseMismatch: false,
+      });
+
+      expect(result.agent.agentId).toBe(agentId);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves non-winning blinded aliases to canonical agent ids", async () => {
+    const repoRoot = await mkdtemp(
+      join(tmpdir(), "voratiq-apply-non-winning-"),
+    );
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const srcDir = join(repoRoot, "src");
+      await mkdir(srcDir, { recursive: true });
+
+      const fileA = join(srcDir, "artifact-a.ts");
+      const fileB = join(srcDir, "artifact-b.ts");
+      await writeFile(fileA, "console.log('a');\n", "utf8");
+      await writeFile(fileB, "console.log('b');\n", "utf8");
+      await runGit(repoRoot, ["add", "src/artifact-a.ts", "src/artifact-b.ts"]);
+      await runGit(repoRoot, ["commit", "-m", "seed artifacts"]);
+
+      const baseRevisionSha = await runGit(repoRoot, ["rev-parse", "HEAD"]);
+
+      await writeFile(fileA, "console.log('a apply');\n", "utf8");
+      const diffA = await runGit(repoRoot, ["diff"], { trim: false });
+      const diffStatsA = await runGit(repoRoot, ["diff", "--shortstat"]);
+      await runGit(repoRoot, ["checkout", "--", "src/artifact-a.ts"]);
+
+      await writeFile(fileB, "console.log('b apply');\n", "utf8");
+      const diffB = await runGit(repoRoot, ["diff"], { trim: false });
+      const diffStatsB = await runGit(repoRoot, ["diff", "--shortstat"]);
+      await runGit(repoRoot, ["checkout", "--", "src/artifact-b.ts"]);
+
+      const runId = "run-non-winning-alias";
+      const agentA = "agent-a";
+      const agentB = "agent-b";
+
+      await writeRunRecordWithAgents({
+        repoRoot,
+        runId,
+        baseRevisionSha,
+        agents: [
+          {
+            agentId: agentA,
+            diffContent: diffA,
+            diffStatistics: diffStatsA,
+          },
+          {
+            agentId: agentB,
+            diffContent: diffB,
+            diffStatistics: diffStatsB,
+          },
+        ],
+      });
+
+      const winningAlias = "v_winner0000";
+      const nonWinningAlias = "v_runner0000";
+      await writeVerificationRecord({
+        repoRoot,
+        verificationId: "verify-non-winning",
+        runId,
+        aliasMap: {
+          [winningAlias]: agentA,
+          [nonWinningAlias]: agentB,
+        },
+      });
+
+      const result = await executeApplyCommand({
+        root: repoRoot,
+        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        verificationsFilePath: join(
+          repoRoot,
+          ".voratiq",
+          "verifications",
+          "index.json",
+        ),
+        runId,
+        agentId: nonWinningAlias,
+        ignoreBaseMismatch: false,
+      });
+
+      expect(result.agent.agentId).toBe(agentB);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves aliases when the winner came from programmatic-only verification", async () => {
+    const repoRoot = await mkdtemp(
+      join(tmpdir(), "voratiq-apply-programmatic-alias-"),
+    );
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const { baseRevisionSha, diffContent, diffStatistics } =
+        await createDiffFixture({
+          repoRoot,
+          original: "console.log('hello');\n",
+          updated: "console.log('hello programmatic apply');\n",
+        });
+
+      const runId = "run-programmatic-alias";
+      const agentId = "claude";
+      await writeRunRecord({
+        repoRoot,
+        runId,
+        agentId,
+        baseRevisionSha,
+        diffContent,
+        diffStatistics,
+      });
+
+      const alias = "v_prog000000";
+      await writeProgrammaticVerificationRecord({
+        repoRoot,
+        verificationId: "verify-programmatic-alias",
+        runId,
+        aliasMap: { [alias]: agentId },
+        passingCandidateIds: [agentId],
+      });
+
+      const result = await executeApplyCommand({
+        root: repoRoot,
+        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        verificationsFilePath: join(
+          repoRoot,
+          ".voratiq",
+          "verifications",
+          "index.json",
+        ),
         runId,
         agentId: alias,
         ignoreBaseMismatch: false,
@@ -173,9 +318,14 @@ describe("executeApplyCommand", () => {
         executeApplyCommand({
           root: repoRoot,
           runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
-          reviewsFilePath: join(repoRoot, ".voratiq", "reviews", "index.json"),
+          verificationsFilePath: join(
+            repoRoot,
+            ".voratiq",
+            "verifications",
+            "index.json",
+          ),
           runId,
-          agentId: "r_bbbbbbbbbb",
+          agentId: "v_bbbbbbbbbb",
           ignoreBaseMismatch: false,
         }),
       ).rejects.toBeInstanceOf(ApplyAgentSelectorUnresolvedError);
@@ -184,7 +334,7 @@ describe("executeApplyCommand", () => {
     }
   });
 
-  it("fails with ambiguity guidance when an alias collides across review sessions", async () => {
+  it("fails with ambiguity guidance when an alias collides across verification sessions", async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-ambig-"));
     try {
       await initGitRepository(repoRoot);
@@ -234,16 +384,16 @@ describe("executeApplyCommand", () => {
         ],
       });
 
-      const alias = "r_cccccccccc";
-      await writeReviewRecord({
+      const alias = "v_cccccccccc";
+      await writeVerificationRecord({
         repoRoot,
-        reviewId: "review-ambig-1",
+        verificationId: "verify-ambig-1",
         runId,
         aliasMap: { [alias]: agentA },
       });
-      await writeReviewRecord({
+      await writeVerificationRecord({
         repoRoot,
-        reviewId: "review-ambig-2",
+        verificationId: "verify-ambig-2",
         runId,
         aliasMap: { [alias]: agentB },
       });
@@ -252,12 +402,70 @@ describe("executeApplyCommand", () => {
         executeApplyCommand({
           root: repoRoot,
           runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
-          reviewsFilePath: join(repoRoot, ".voratiq", "reviews", "index.json"),
+          verificationsFilePath: join(
+            repoRoot,
+            ".voratiq",
+            "verifications",
+            "index.json",
+          ),
           runId,
           agentId: alias,
           ignoreBaseMismatch: false,
         }),
       ).rejects.toBeInstanceOf(ApplyAgentSelectorAmbiguousError);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("surfaces verification policy load failures during alias resolution", async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-corrupt-"));
+    try {
+      await initGitRepository(repoRoot);
+      await createWorkspace(repoRoot);
+
+      const { baseRevisionSha, diffContent, diffStatistics } =
+        await createDiffFixture({
+          repoRoot,
+          original: "console.log('hello');\n",
+          updated: "console.log('hello corrupt apply');\n",
+        });
+
+      const runId = "run-corrupt-verify";
+      const agentId = "claude";
+      await writeRunRecord({
+        repoRoot,
+        runId,
+        agentId,
+        baseRevisionSha,
+        diffContent,
+        diffStatistics,
+      });
+
+      const alias = "v_corrupt000";
+      await writeVerificationRecord({
+        repoRoot,
+        verificationId: "verify-corrupt",
+        runId,
+        aliasMap: { [alias]: agentId },
+        corruptArtifact: true,
+      });
+
+      await expect(
+        executeApplyCommand({
+          root: repoRoot,
+          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          verificationsFilePath: join(
+            repoRoot,
+            ".voratiq",
+            "verifications",
+            "index.json",
+          ),
+          runId,
+          agentId: alias,
+          ignoreBaseMismatch: false,
+        }),
+      ).rejects.toBeInstanceOf(ApplyVerificationPolicyLoadError);
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
@@ -1009,33 +1217,199 @@ async function writeRunRecordWithAgents(options: {
   await appendRunRecord({ root: repoRoot, runsFilePath, record: runRecord });
 }
 
-async function writeReviewRecord(options: {
+async function writeVerificationRecord(options: {
   repoRoot: string;
-  reviewId: string;
+  verificationId: string;
   runId: string;
   aliasMap: Record<string, string>;
+  preferredSelector?: string;
+  corruptArtifact?: boolean;
 }): Promise<void> {
-  const { repoRoot, reviewId, runId, aliasMap } = options;
+  const {
+    repoRoot,
+    verificationId,
+    runId,
+    aliasMap,
+    preferredSelector,
+    corruptArtifact = false,
+  } = options;
   const now = new Date().toISOString();
-  const reviewsFilePath = join(repoRoot, ".voratiq", "reviews", "index.json");
-  await appendReviewRecord({
+  const verificationsFilePath = join(
+    repoRoot,
+    ".voratiq",
+    "verifications",
+    "index.json",
+  );
+  const resolvedPreferredSelector =
+    preferredSelector ?? Object.keys(aliasMap)[0];
+  if (!resolvedPreferredSelector) {
+    throw new Error("Expected at least one alias");
+  }
+  const artifactPath = `.voratiq/verifications/sessions/${verificationId}/reviewer/run-review/artifacts/result.json`;
+  await mkdir(
+    join(
+      repoRoot,
+      ".voratiq",
+      "verifications",
+      "sessions",
+      verificationId,
+      "reviewer",
+      "run-review",
+      "artifacts",
+    ),
+    {
+      recursive: true,
+    },
+  );
+  await writeFile(
+    join(repoRoot, artifactPath),
+    JSON.stringify(
+      corruptArtifact
+        ? {
+            method: "rubric",
+            template: "spec-review",
+            verifierId: "reviewer",
+            generatedAt: now,
+            status: "succeeded",
+            result: {},
+          }
+        : {
+            method: "rubric",
+            template: "run-review",
+            verifierId: "reviewer",
+            generatedAt: now,
+            status: "succeeded",
+            result: {
+              preferred: resolvedPreferredSelector,
+              ranking: [resolvedPreferredSelector],
+              rationale: `${resolvedPreferredSelector} is preferred.`,
+            },
+          },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  await appendVerificationRecord({
     root: repoRoot,
-    reviewsFilePath,
+    verificationsFilePath,
     record: {
-      sessionId: reviewId,
-      runId,
+      sessionId: verificationId,
       createdAt: now,
       startedAt: now,
       completedAt: now,
       status: "succeeded",
-      reviewers: [
+      target: {
+        kind: "run",
+        sessionId: runId,
+        candidateIds: Array.from(new Set(Object.values(aliasMap))).sort(),
+      },
+      methods: [
         {
-          agentId: "reviewer",
+          method: "rubric",
+          template: "run-review",
+          verifierId: "reviewer",
+          scope: { kind: "run" },
           status: "succeeded",
-          outputPath: `.voratiq/reviews/sessions/${reviewId}/reviewer/artifacts/review.md`,
           startedAt: now,
           completedAt: now,
-          error: null,
+          artifactPath,
+        },
+      ],
+      blinded: {
+        enabled: true,
+        aliasMap,
+      },
+    },
+  });
+}
+
+async function writeProgrammaticVerificationRecord(options: {
+  repoRoot: string;
+  verificationId: string;
+  runId: string;
+  aliasMap: Record<string, string>;
+  passingCandidateIds: readonly string[];
+}): Promise<void> {
+  const { repoRoot, verificationId, runId, aliasMap, passingCandidateIds } =
+    options;
+  const now = new Date().toISOString();
+  const verificationsFilePath = join(
+    repoRoot,
+    ".voratiq",
+    "verifications",
+    "index.json",
+  );
+  const artifactPath = `.voratiq/verifications/sessions/${verificationId}/programmatic/artifacts/result.json`;
+  await mkdir(
+    join(
+      repoRoot,
+      ".voratiq",
+      "verifications",
+      "sessions",
+      verificationId,
+      "programmatic",
+      "artifacts",
+    ),
+    {
+      recursive: true,
+    },
+  );
+  await writeFile(
+    join(repoRoot, artifactPath),
+    JSON.stringify(
+      {
+        method: "programmatic",
+        generatedAt: now,
+        status: "succeeded",
+        target: {
+          kind: "run",
+          sessionId: runId,
+          candidateIds: Array.from(new Set(Object.values(aliasMap))).sort(),
+        },
+        scope: "run",
+        candidates: Array.from(new Set(Object.values(aliasMap)))
+          .sort()
+          .map((candidateId) => ({
+            candidateId,
+            results: [
+              {
+                slug: "tests",
+                status: passingCandidateIds.includes(candidateId)
+                  ? "succeeded"
+                  : "failed",
+              },
+            ],
+          })),
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  await appendVerificationRecord({
+    root: repoRoot,
+    verificationsFilePath,
+    record: {
+      sessionId: verificationId,
+      createdAt: now,
+      startedAt: now,
+      completedAt: now,
+      status: "succeeded",
+      target: {
+        kind: "run",
+        sessionId: runId,
+        candidateIds: Array.from(new Set(Object.values(aliasMap))).sort(),
+      },
+      methods: [
+        {
+          method: "programmatic",
+          slug: "programmatic",
+          scope: { kind: "run" },
+          status: "succeeded",
+          startedAt: now,
+          completedAt: now,
+          artifactPath,
         },
       ],
       blinded: {
@@ -1047,7 +1421,14 @@ async function writeReviewRecord(options: {
 }
 
 async function initGitRepository(root: string): Promise<void> {
-  await execFileAsync("git", ["init"], { cwd: root });
+  const templateDir = join(root, ".git-template");
+  const gitDir = join(root, "gitdir");
+  await mkdir(templateDir, { recursive: true });
+  await execFileAsync(
+    "git",
+    ["init", "--template", templateDir, "--separate-git-dir", gitDir],
+    { cwd: root },
+  );
   await execFileAsync("git", ["config", "user.email", "test@example.com"], {
     cwd: root,
   });

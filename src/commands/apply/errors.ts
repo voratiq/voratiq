@@ -82,7 +82,9 @@ export class ApplyAgentSelectorUnresolvedError extends ApplyError {
     super(
       `Agent selector \`${selector}\` did not match run \`${runId}\`.`,
       detailLines,
-      ["Use an agent id or blinded alias from this run's review output."],
+      [
+        "Use an agent id or a verification-selected blinded alias for this run.",
+      ],
     );
     this.name = "ApplyAgentSelectorUnresolvedError";
   }
@@ -92,22 +94,49 @@ export class ApplyAgentSelectorAmbiguousError extends ApplyError {
   constructor(options: {
     runId: string;
     selector: string;
-    matches: Array<{ reviewId: string; agentId: string }>;
+    matches: Array<{ verificationId: string; agentId: string }>;
   }) {
     const { runId, selector, matches } = options;
     const lines = matches
       .slice(0, 10)
-      .map((match) => `- \`${match.reviewId}\`: \`${match.agentId}\``);
+      .map((match) => `- \`${match.verificationId}\`: \`${match.agentId}\``);
     super(
       `Blinded alias \`${selector}\` is ambiguous for run \`${runId}\`.`,
       [
-        "This alias resolves differently across review sessions:",
+        "This alias resolves differently across verification sessions:",
         ...lines,
         matches.length > 10 ? "- ..." : "",
       ].filter((line) => line.length > 0),
       ["Use a canonical agent id for this run."],
     );
     this.name = "ApplyAgentSelectorAmbiguousError";
+  }
+}
+
+export class ApplyVerificationPolicyLoadError extends ApplyError {
+  constructor(options: {
+    runId: string;
+    verificationFailures: readonly {
+      verificationId: string;
+      detail: string;
+    }[];
+  }) {
+    const { runId, verificationFailures } = options;
+    const detailLines = verificationFailures
+      .slice(0, 10)
+      .flatMap((failure) => [
+        `Verification: \`${failure.verificationId}\`.`,
+        failure.detail,
+      ]);
+
+    super(
+      `Failed to load verification policy data for run \`${runId}\`.`,
+      detailLines,
+      [
+        "Re-run `voratiq verify` for this run to regenerate verification artifacts.",
+      ],
+    );
+    this.name = "ApplyVerificationPolicyLoadError";
   }
 }
 
@@ -119,7 +148,7 @@ export class ApplyAgentDiffNotRecordedError extends ApplyError {
     super(
       `Agent \`${agentId}\` did not record a diff for run \`${runId}\`.`,
       [],
-      ["Select an agent that produced a diff in the run review output."],
+      ["Select an agent that produced a diff in the recorded run."],
     );
     this.name = "ApplyAgentDiffNotRecordedError";
   }

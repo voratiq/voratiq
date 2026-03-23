@@ -40,7 +40,7 @@ export async function runApplyCommand(
   const result = await executeApplyCommand({
     root,
     runsFilePath: workspacePaths.runsFile,
-    reviewsFilePath: workspacePaths.reviewsFile,
+    verificationsFilePath: workspacePaths.verificationsFile,
     runId,
     agentId,
     ignoreBaseMismatch,

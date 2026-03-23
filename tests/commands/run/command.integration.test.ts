@@ -133,7 +133,6 @@ describe("executeRunCommand integration", () => {
           argv: ["index.mjs"],
         },
       ],
-      evalPlan: [],
       effectiveMaxParallel: 1,
       environment: {},
     };
@@ -183,15 +182,6 @@ describe("executeRunCommand integration", () => {
       status: "succeeded",
       startedAt: "2025-11-10T00:00:00.000Z",
       completedAt: "2025-11-10T00:10:00.000Z",
-      evals: [
-        {
-          slug: "quality",
-          status: "succeeded",
-          command: "npm test",
-          exitCode: 0,
-          hasLog: false,
-        },
-      ],
     };
 
     const agentReport: AgentReport = {
@@ -204,7 +194,6 @@ describe("executeRunCommand integration", () => {
         stdoutPath: "/repo/stdout.log",
         stderrPath: "/repo/stderr.log",
       },
-      evals: [],
       startedAt: "2025-11-10T00:00:00.000Z",
       completedAt: "2025-11-10T00:10:00.000Z",
       diffAttempted: false,
@@ -215,7 +204,6 @@ describe("executeRunCommand integration", () => {
       agentRecords: [agentRecord],
       agentReports: [agentReport],
       hadAgentFailure: false,
-      hadEvalFailure: false,
     };
     executeAgentsMock.mockResolvedValue(executionResult);
 
@@ -238,7 +226,6 @@ describe("executeRunCommand integration", () => {
       baseRevisionSha: runRecord.baseRevisionSha,
       agents: [],
       hadAgentFailure: false,
-      hadEvalFailure: false,
     };
     toRunReportMock.mockReturnValue(runReport);
 
@@ -322,7 +309,6 @@ describe("executeRunCommand integration", () => {
           argv: ["index.mjs"],
         },
       ],
-      evalPlan: [],
       effectiveMaxParallel: 2,
       environment: {},
     };
@@ -363,7 +349,6 @@ describe("executeRunCommand integration", () => {
         status: "succeeded",
         startedAt: "2025-11-10T01:00:00.000Z",
         completedAt: "2025-11-10T01:10:00.000Z",
-        evals: [],
       },
       {
         agentId: "beta",
@@ -371,7 +356,6 @@ describe("executeRunCommand integration", () => {
         status: "failed",
         startedAt: "2025-11-10T01:00:00.000Z",
         completedAt: "2025-11-10T01:05:00.000Z",
-        evals: [],
         error: "agent failed",
       },
     ];
@@ -384,7 +368,6 @@ describe("executeRunCommand integration", () => {
         runtimeManifestPath: "/repo/alpha.json",
         baseDirectory: "/repo/alpha",
         assets: {},
-        evals: [],
         startedAt: "2025-11-10T01:00:00.000Z",
         completedAt: "2025-11-10T01:10:00.000Z",
         diffAttempted: false,
@@ -397,7 +380,6 @@ describe("executeRunCommand integration", () => {
         runtimeManifestPath: "/repo/beta.json",
         baseDirectory: "/repo/beta",
         assets: {},
-        evals: [],
         error: "agent failed",
         startedAt: "2025-11-10T01:00:00.000Z",
         completedAt: "2025-11-10T01:05:00.000Z",
@@ -410,7 +392,6 @@ describe("executeRunCommand integration", () => {
       agentRecords,
       agentReports,
       hadAgentFailure: true,
-      hadEvalFailure: false,
     };
     executeAgentsMock.mockResolvedValue(executionResult);
 
@@ -428,7 +409,6 @@ describe("executeRunCommand integration", () => {
       baseRevisionSha: initialRecord.baseRevisionSha,
       agents: agentReports,
       hadAgentFailure: true,
-      hadEvalFailure: false,
     };
     toRunReportMock.mockReturnValue(runReport);
 
@@ -487,7 +467,6 @@ describe("executeRunCommand integration", () => {
           argv: ["index.mjs"],
         },
       ],
-      evalPlan: [],
       effectiveMaxParallel: 2,
       environment: {},
     };
@@ -528,7 +507,6 @@ describe("executeRunCommand integration", () => {
         status: "errored",
         startedAt: "2025-11-10T02:00:00.000Z",
         completedAt: "2025-11-10T02:01:00.000Z",
-        evals: [],
         error: "runtime error",
       },
       {
@@ -537,7 +515,6 @@ describe("executeRunCommand integration", () => {
         status: "errored",
         startedAt: "2025-11-10T02:00:00.000Z",
         completedAt: "2025-11-10T02:01:00.000Z",
-        evals: [],
         error: "runtime error",
       },
     ];
@@ -550,7 +527,6 @@ describe("executeRunCommand integration", () => {
         runtimeManifestPath: "/repo/alpha.json",
         baseDirectory: "/repo/alpha",
         assets: {},
-        evals: [],
         error: "runtime error",
         startedAt: "2025-11-10T02:00:00.000Z",
         completedAt: "2025-11-10T02:01:00.000Z",
@@ -564,7 +540,6 @@ describe("executeRunCommand integration", () => {
         runtimeManifestPath: "/repo/beta.json",
         baseDirectory: "/repo/beta",
         assets: {},
-        evals: [],
         error: "runtime error",
         startedAt: "2025-11-10T02:00:00.000Z",
         completedAt: "2025-11-10T02:01:00.000Z",
@@ -577,7 +552,6 @@ describe("executeRunCommand integration", () => {
       agentRecords,
       agentReports,
       hadAgentFailure: true,
-      hadEvalFailure: false,
     };
     executeAgentsMock.mockResolvedValue(executionResult);
 
@@ -595,7 +569,6 @@ describe("executeRunCommand integration", () => {
       baseRevisionSha: initialRecord.baseRevisionSha,
       agents: agentReports,
       hadAgentFailure: true,
-      hadEvalFailure: false,
     };
     toRunReportMock.mockReturnValue(runReport);
 
@@ -626,7 +599,6 @@ describe("executeRunCommand integration", () => {
           argv: ["index.mjs"],
         },
       ],
-      evalPlan: [],
       effectiveMaxParallel: 1,
       environment: {},
     };
@@ -676,15 +648,6 @@ describe("executeRunCommand integration", () => {
       status: "succeeded",
       startedAt: "2025-11-10T00:00:00.000Z",
       completedAt: "2025-11-10T00:10:00.000Z",
-      evals: [
-        {
-          slug: "quality",
-          status: "succeeded",
-          command: "npm test",
-          exitCode: 0,
-          hasLog: false,
-        },
-      ],
     };
 
     const agentReport: AgentReport = {
@@ -697,7 +660,6 @@ describe("executeRunCommand integration", () => {
         stdoutPath: "/repo/stdout.log",
         stderrPath: "/repo/stderr.log",
       },
-      evals: [],
       startedAt: "2025-11-10T00:00:00.000Z",
       completedAt: "2025-11-10T00:10:00.000Z",
       diffAttempted: false,
@@ -708,7 +670,6 @@ describe("executeRunCommand integration", () => {
       agentRecords: [agentRecord],
       agentReports: [agentReport],
       hadAgentFailure: false,
-      hadEvalFailure: false,
     };
     executeAgentsMock.mockResolvedValue(executionResult);
 
@@ -746,7 +707,6 @@ describe("executeRunCommand integration", () => {
       baseRevisionSha: abortedSnapshot.baseRevisionSha,
       agents: [],
       hadAgentFailure: false,
-      hadEvalFailure: false,
     };
     toRunReportMock.mockReturnValue(runReport);
 
@@ -763,7 +723,6 @@ describe("executeRunCommand integration", () => {
       abortedSnapshot,
       executionResult.agentReports,
       executionResult.hadAgentFailure,
-      executionResult.hadEvalFailure,
     );
     expect(report).toEqual(runReport);
   });
@@ -782,7 +741,6 @@ describe("executeRunCommand integration", () => {
           argv: ["index.mjs"],
         },
       ],
-      evalPlan: [],
       effectiveMaxParallel: 1,
       environment: {},
     });
@@ -846,7 +804,6 @@ describe("executeRunCommand integration", () => {
           argv: ["index.mjs"],
         },
       ],
-      evalPlan: [],
       effectiveMaxParallel: 1,
       environment: {},
     });
@@ -902,7 +859,6 @@ describe("executeRunCommand integration", () => {
           argv: ["index.mjs"],
         },
       ],
-      evalPlan: [],
       effectiveMaxParallel: 1,
       environment: {},
     });
@@ -936,7 +892,6 @@ describe("executeRunCommand integration", () => {
       agentRecords: [],
       agentReports: [],
       hadAgentFailure: false,
-      hadEvalFailure: false,
     } satisfies AgentExecutionPhaseResult);
     rewriteRunRecordMock.mockResolvedValue({
       runId: "run-xyz",
@@ -955,7 +910,6 @@ describe("executeRunCommand integration", () => {
       baseRevisionSha: "abc123",
       agents: [],
       hadAgentFailure: false,
-      hadEvalFailure: false,
     });
 
     const extraContextFiles: ResolvedExtraContextFile[] = [

@@ -4,7 +4,7 @@ import { agentIdSchema } from "../agents/types.js";
 
 export const ORCHESTRATION_STAGE_IDS = [
   "run",
-  "review",
+  "verify",
   "spec",
   "reduce",
 ] as const;

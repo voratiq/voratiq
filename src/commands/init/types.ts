@@ -1,5 +1,4 @@
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
-import type { EvalSlug } from "../../configs/evals/types.js";
 import type {
   ConfirmationOptions,
   PromptOptions,
@@ -24,7 +23,6 @@ export interface InitCommandResult {
   agentSummary: AgentInitSummary;
   orchestrationSummary: OrchestrationInitSummary;
   environmentSummary: EnvironmentInitSummary;
-  evalSummary: EvalInitSummary;
   sandboxSummary: SandboxInitSummary;
 }
 
@@ -42,13 +40,6 @@ export interface AgentInitSummary {
 export interface DetectedProviderSummary {
   provider: string;
   binary: string;
-}
-
-export interface EvalInitSummary {
-  configPath: string;
-  configuredEvals: EvalSlug[];
-  configCreated: boolean;
-  configUpdated: boolean;
 }
 
 export interface EnvironmentInitSummary {

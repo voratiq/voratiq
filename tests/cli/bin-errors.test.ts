@@ -64,13 +64,16 @@ describe("CLI entrypoint error handling", () => {
 
   it("renders workspace wrong-type entry hint", () => {
     const cliError = toCliError(
-      new WorkspaceWrongTypeEntryError(".voratiq/reviews/index.json", "file"),
+      new WorkspaceWrongTypeEntryError(
+        ".voratiq/verifications/index.json",
+        "file",
+      ),
     );
 
     const rendered = stripAnsi(renderCliError(cliError));
     expect(rendered).toBe(
       [
-        "Error: Wrong workspace entry type: `.voratiq/reviews/index.json` must be a file.",
+        "Error: Wrong workspace entry type: `.voratiq/verifications/index.json` must be a file.",
         "",
         "Run `voratiq init` to configure the workspace.",
       ].join("\n"),

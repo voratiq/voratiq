@@ -13,7 +13,7 @@ jest.mock("../../../src/render/utils/transcript-shell.js", () => {
   };
 });
 
-import { renderReviewTranscript } from "../../../src/render/transcripts/review.js";
+import { renderVerifyTranscript } from "../../../src/render/transcripts/verify.js";
 import { buildRunMetadataSectionWithStyle } from "../../../src/render/utils/runs.js";
 import { buildTranscriptShellSection } from "../../../src/render/utils/transcript-shell.js";
 
@@ -44,15 +44,16 @@ describe("shared transcript shell helpers", () => {
     expect(buildTranscriptShellSectionMock).toHaveBeenCalledTimes(1);
   });
 
-  it("renders review header via buildTranscriptShellSection", () => {
-    renderReviewTranscript({
-      runId: "run-123",
-      reviewId: "review-123",
+  it("renders verify header via buildTranscriptShellSection", () => {
+    renderVerifyTranscript({
+      verificationId: "verify-123",
       createdAt: "2026-01-01T00:00:00.000Z",
       elapsed: "10s",
-      workspacePath: ".voratiq/reviews/sessions/review-123",
+      workspacePath: ".voratiq/verifications/sessions/verify-123",
+      targetKind: "run",
+      targetSessionId: "run-123",
       status: "running",
-      reviewers: [],
+      methods: [],
       suppressHint: true,
       isTty: false,
     });
