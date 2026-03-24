@@ -267,14 +267,15 @@ const PRO_AGENT_PRESET_ENTRIES: readonly AgentCatalogEntry[] = [
     extraArgs: ["--effort", "high"],
   },
   {
-    id: "gpt-5-3-codex",
+    id: "gpt-5-4-high",
     provider: "codex",
-    model: "gpt-5.3-codex",
+    model: "gpt-5.4",
+    extraArgs: ["--config", "model_reasoning_effort=high"],
   },
   {
-    id: "gemini-2-5-pro",
+    id: "gemini-3-1-pro-preview",
     provider: "gemini",
-    model: "gemini-2.5-pro",
+    model: "gemini-3.1-pro-preview",
   },
 ] as const;
 
