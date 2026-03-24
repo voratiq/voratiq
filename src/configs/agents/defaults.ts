@@ -102,26 +102,31 @@ const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     id: "claude-haiku-4-5-20251001",
     provider: "claude",
     model: "claude-haiku-4-5-20251001",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "claude-sonnet-4-5-20250929",
     provider: "claude",
     model: "claude-sonnet-4-5-20250929",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "claude-sonnet-4-6",
     provider: "claude",
     model: "claude-sonnet-4-6",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "claude-opus-4-5-20251101",
     provider: "claude",
     model: "claude-opus-4-5-20251101",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "claude-opus-4-6",
     provider: "claude",
     model: "claude-opus-4-6",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "gpt-5-codex",
@@ -259,6 +264,7 @@ const PRO_AGENT_PRESET_ENTRIES: readonly AgentCatalogEntry[] = [
     id: "claude-opus-4-6",
     provider: "claude",
     model: "claude-opus-4-6",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "gpt-5-3-codex",
@@ -277,6 +283,7 @@ const LITE_AGENT_PRESET_ENTRIES: readonly AgentCatalogEntry[] = [
     id: "claude-haiku-4-5-20251001",
     provider: "claude",
     model: "claude-haiku-4-5-20251001",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "gpt-5-1-codex-mini",
