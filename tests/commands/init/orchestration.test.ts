@@ -70,15 +70,23 @@ describe("init orchestration bootstrap", () => {
     expect(content).toBe(expected);
 
     const orchestration = readOrchestrationConfig(content);
-    const expectedProIds = getAgentDefaultsForPreset("pro").map((agent) =>
-      getAgentDefaultId(agent),
+    const presetDefaults = getAgentDefaultsForPreset("pro");
+    const allIds = presetDefaults.map((agent) => getAgentDefaultId(agent));
+    const nonRunOnlyIds = presetDefaults
+      .filter((agent) => !agent.runOnly)
+      .map((agent) => getAgentDefaultId(agent));
+    expect(orchestration.profiles.default.spec.agents.map((a) => a.id)).toEqual(
+      nonRunOnlyIds,
     );
-    expect(orchestration.profiles.default.spec.agents).toEqual([]);
     expect(
       orchestration.profiles.default.run.agents.map((agent) => agent.id),
-    ).toEqual(expectedProIds);
-    expect(orchestration.profiles.default.verify.agents).toEqual([]);
-    expect(orchestration.profiles.default.reduce.agents).toEqual([]);
+    ).toEqual(allIds);
+    expect(
+      orchestration.profiles.default.verify.agents.map((a) => a.id),
+    ).toEqual(nonRunOnlyIds);
+    expect(
+      orchestration.profiles.default.reduce.agents.map((a) => a.id),
+    ).toEqual(nonRunOnlyIds);
   });
 
   it("seeds lite run from detected enabled providers only", async () => {
@@ -98,31 +106,33 @@ describe("init orchestration bootstrap", () => {
       await readFile(orchestrationPath, "utf8"),
     );
 
-    const expectedLiteIds = getAgentDefaultsForPreset("lite")
-      .filter(
-        (agent) => agent.provider === "codex" || agent.provider === "gemini",
-      )
+    const liteDefaults = getAgentDefaultsForPreset("lite").filter(
+      (agent) => agent.provider === "codex" || agent.provider === "gemini",
+    );
+    const allIds = liteDefaults.map((agent) => getAgentDefaultId(agent));
+    const nonRunOnlyIds = liteDefaults
+      .filter((agent) => !agent.runOnly)
       .map((agent) => getAgentDefaultId(agent));
     const runIds = orchestration.profiles.default.run.agents.map(
       (agent) => agent.id,
     );
-    const reviewIds = orchestration.profiles.default.verify.agents.map(
+    const specIds = orchestration.profiles.default.spec.agents.map(
       (agent) => agent.id,
     );
-    const specIds = orchestration.profiles.default.spec.agents.map(
+    const verifyIds = orchestration.profiles.default.verify.agents.map(
       (agent) => agent.id,
     );
     const reduceIds = orchestration.profiles.default.reduce.agents.map(
       (agent) => agent.id,
     );
 
-    expect(runIds).toEqual(expectedLiteIds);
-    expect(reviewIds).toEqual([]);
-    expect(specIds).toEqual([]);
-    expect(reduceIds).toEqual([]);
+    expect(runIds).toEqual(allIds);
+    expect(specIds).toEqual(nonRunOnlyIds);
+    expect(verifyIds).toEqual(nonRunOnlyIds);
+    expect(reduceIds).toEqual(nonRunOnlyIds);
   });
 
-  it("recreates missing orchestration.yaml with run-only seeding from updated preset", async () => {
+  it("recreates missing orchestration.yaml with seeding from updated preset", async () => {
     await mkdir(join(repoRoot, ".voratiq"), { recursive: true });
     await writeFile(
       join(repoRoot, ".voratiq", "agents.yaml"),
@@ -147,18 +157,26 @@ describe("init orchestration bootstrap", () => {
       await readFile(orchestrationPath, "utf8"),
     );
 
-    const expectedLiteIds = getAgentDefaultsForPreset("lite")
-      .filter(
-        (agent) => agent.provider === "codex" || agent.provider === "gemini",
-      )
+    const liteDefaults = getAgentDefaultsForPreset("lite").filter(
+      (agent) => agent.provider === "codex" || agent.provider === "gemini",
+    );
+    const allIds = liteDefaults.map((agent) => getAgentDefaultId(agent));
+    const nonRunOnlyIds = liteDefaults
+      .filter((agent) => !agent.runOnly)
       .map((agent) => getAgentDefaultId(agent));
 
-    expect(orchestration.profiles.default.spec.agents).toEqual([]);
+    expect(orchestration.profiles.default.spec.agents.map((a) => a.id)).toEqual(
+      nonRunOnlyIds,
+    );
     expect(
       orchestration.profiles.default.run.agents.map((agent) => agent.id),
-    ).toEqual(expectedLiteIds);
-    expect(orchestration.profiles.default.verify.agents).toEqual([]);
-    expect(orchestration.profiles.default.reduce.agents).toEqual([]);
+    ).toEqual(allIds);
+    expect(
+      orchestration.profiles.default.verify.agents.map((a) => a.id),
+    ).toEqual(nonRunOnlyIds);
+    expect(
+      orchestration.profiles.default.reduce.agents.map((a) => a.id),
+    ).toEqual(nonRunOnlyIds);
   });
 
   it("seeds empty stage agent lists for manual preset", async () => {
@@ -202,16 +220,24 @@ describe("init orchestration bootstrap", () => {
     const orchestration = readOrchestrationConfig(
       await readFile(orchestrationPath, "utf8"),
     );
-    const expectedProIds = getAgentDefaultsForPreset("pro").map((agent) =>
-      getAgentDefaultId(agent),
-    );
+    const proDefaults = getAgentDefaultsForPreset("pro");
+    const allIds = proDefaults.map((agent) => getAgentDefaultId(agent));
+    const nonRunOnlyIds = proDefaults
+      .filter((agent) => !agent.runOnly)
+      .map((agent) => getAgentDefaultId(agent));
 
-    expect(orchestration.profiles.default.spec.agents).toEqual([]);
+    expect(orchestration.profiles.default.spec.agents.map((a) => a.id)).toEqual(
+      nonRunOnlyIds,
+    );
     expect(
       orchestration.profiles.default.run.agents.map((agent) => agent.id),
-    ).toEqual(expectedProIds);
-    expect(orchestration.profiles.default.verify.agents).toEqual([]);
-    expect(orchestration.profiles.default.reduce.agents).toEqual([]);
+    ).toEqual(allIds);
+    expect(
+      orchestration.profiles.default.verify.agents.map((a) => a.id),
+    ).toEqual(nonRunOnlyIds);
+    expect(
+      orchestration.profiles.default.reduce.agents.map((a) => a.id),
+    ).toEqual(nonRunOnlyIds);
   });
 
   it("does not overwrite existing orchestration.yaml", async () => {

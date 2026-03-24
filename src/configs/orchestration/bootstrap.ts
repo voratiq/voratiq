@@ -12,6 +12,11 @@ const ORCHESTRATION_BOOTSTRAP_STAGE_IDS = [
   "reduce",
 ] as const;
 
+export interface ResolvedPresetAgent {
+  readonly id: string;
+  readonly runOnly?: true;
+}
+
 export function collectEnabledAgentIdsForBootstrap(
   agents: readonly Pick<AgentConfigEntry, "id" | "enabled">[],
 ): string[] {
@@ -35,30 +40,23 @@ export function collectEnabledAgentIdsForBootstrap(
 }
 
 export function serializeDefaultOrchestrationYaml(
-  runStageAgentIds: readonly string[],
+  presetAgents: readonly ResolvedPresetAgent[],
 ): string {
   const lines = ["profiles:", "  default:"];
 
-  for (const [
-    stageIndex,
-    stageId,
-  ] of ORCHESTRATION_BOOTSTRAP_STAGE_IDS.entries()) {
+  for (const stageId of ORCHESTRATION_BOOTSTRAP_STAGE_IDS) {
     lines.push(`    ${stageId}:`);
 
-    const usePresetAgents = stageId === "run";
-    const agents = usePresetAgents ? runStageAgentIds : [];
+    const agents =
+      stageId === "run" ? presetAgents : presetAgents.filter((a) => !a.runOnly);
 
     if (agents.length === 0) {
       lines.push("      agents: []");
     } else {
       lines.push("      agents:");
-      for (const agentId of agents) {
-        lines.push(`        - id: ${formatYamlScalar(agentId)}`);
+      for (const agent of agents) {
+        lines.push(`        - id: ${formatYamlScalar(agent.id)}`);
       }
-    }
-
-    if (stageIndex < ORCHESTRATION_BOOTSTRAP_STAGE_IDS.length - 1) {
-      lines.push("");
     }
   }
 
@@ -80,17 +78,17 @@ export function listEnabledAgentIdsForOrchestrationBootstrap(
   return collectEnabledAgentIdsForBootstrap(config.agents);
 }
 
-export function listPresetStageAgentIdsForOrchestrationBootstrap(
+export function listPresetStageAgentsForOrchestrationBootstrap(
   config: AgentsConfig,
   preset: AgentPreset,
-): string[] {
+): ResolvedPresetAgent[] {
   if (preset === "manual") {
     return [];
   }
 
   const enabledByProvider = groupEnabledAgentsByProvider(config.agents);
   const seenAgentIds = new Set<string>();
-  const stageAgentIds: string[] = [];
+  const stageAgents: ResolvedPresetAgent[] = [];
 
   for (const agentDefault of getAgentDefaultsForPreset(preset)) {
     const candidates = enabledByProvider.get(agentDefault.provider);
@@ -106,10 +104,13 @@ export function listPresetStageAgentIdsForOrchestrationBootstrap(
     }
 
     seenAgentIds.add(selectedId);
-    stageAgentIds.push(selectedId);
+    stageAgents.push({
+      id: selectedId,
+      ...(agentDefault.runOnly ? { runOnly: true } : {}),
+    });
   }
 
-  return stageAgentIds;
+  return stageAgents;
 }
 
 function groupEnabledAgentsByProvider(
@@ -145,9 +146,9 @@ export function buildDefaultOrchestrationTemplate(
   config: AgentsConfig,
   preset: AgentPreset = "pro",
 ): string {
-  const stageAgentIds = listPresetStageAgentIdsForOrchestrationBootstrap(
+  const stageAgents = listPresetStageAgentsForOrchestrationBootstrap(
     config,
     preset,
   );
-  return serializeDefaultOrchestrationYaml(stageAgentIds);
+  return serializeDefaultOrchestrationYaml(stageAgents);
 }
