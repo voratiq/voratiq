@@ -8,6 +8,7 @@ export interface AgentDefault {
   readonly model: string;
   readonly extraArgs?: readonly string[];
   readonly argv: readonly string[];
+  readonly runOnly?: true;
 }
 
 export const AGENT_PRESET_CHOICES = ["pro", "lite", "manual"] as const;
@@ -20,6 +21,7 @@ export interface AgentCatalogEntry {
   readonly model: string;
   readonly id?: string;
   readonly extraArgs?: readonly string[];
+  readonly runOnly?: true;
 }
 
 const CLAUDE_DEFAULT_ARGV = [
@@ -88,12 +90,13 @@ function resolveAgentCatalogEntryId(entry: {
 function generateAgentDefaults(
   entries: readonly AgentCatalogEntry[],
 ): readonly AgentDefault[] {
-  return entries.map(({ provider, model, id, extraArgs }) => ({
+  return entries.map(({ provider, model, id, extraArgs, runOnly }) => ({
     id: resolveAgentCatalogEntryId({ id, model }),
     provider,
     model,
     extraArgs: extraArgs && extraArgs.length > 0 ? [...extraArgs] : undefined,
     argv: DEFAULT_ARGV_BY_PROVIDER[provider],
+    ...(runOnly ? { runOnly } : {}),
   }));
 }
 
@@ -276,6 +279,7 @@ const PRO_AGENT_PRESET_ENTRIES: readonly AgentCatalogEntry[] = [
     id: "gemini-3-1-pro-preview",
     provider: "gemini",
     model: "gemini-3.1-pro-preview",
+    runOnly: true,
   },
 ] as const;
 
@@ -295,6 +299,7 @@ const LITE_AGENT_PRESET_ENTRIES: readonly AgentCatalogEntry[] = [
     id: "gemini-3-flash-preview",
     provider: "gemini",
     model: "gemini-3-flash-preview",
+    runOnly: true,
   },
 ] as const;
 
