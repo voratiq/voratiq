@@ -287,14 +287,14 @@ const LITE_AGENT_PRESET_ENTRIES: readonly AgentCatalogEntry[] = [
     extraArgs: ["--effort", "high"],
   },
   {
-    id: "gpt-5-1-codex-mini",
+    id: "gpt-5-3-codex-spark",
     provider: "codex",
-    model: "gpt-5.1-codex-mini",
+    model: "gpt-5.3-codex-spark",
   },
   {
-    id: "gemini-2-5-flash",
+    id: "gemini-3-flash-preview",
     provider: "gemini",
-    model: "gemini-2.5-flash",
+    model: "gemini-3-flash-preview",
   },
 ] as const;
 
