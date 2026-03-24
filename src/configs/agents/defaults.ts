@@ -102,26 +102,31 @@ const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     id: "claude-haiku-4-5-20251001",
     provider: "claude",
     model: "claude-haiku-4-5-20251001",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "claude-sonnet-4-5-20250929",
     provider: "claude",
     model: "claude-sonnet-4-5-20250929",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "claude-sonnet-4-6",
     provider: "claude",
     model: "claude-sonnet-4-6",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "claude-opus-4-5-20251101",
     provider: "claude",
     model: "claude-opus-4-5-20251101",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "claude-opus-4-6",
     provider: "claude",
     model: "claude-opus-4-6",
+    extraArgs: ["--effort", "high"],
   },
   {
     id: "gpt-5-codex",
@@ -259,16 +264,18 @@ const PRO_AGENT_PRESET_ENTRIES: readonly AgentCatalogEntry[] = [
     id: "claude-opus-4-6",
     provider: "claude",
     model: "claude-opus-4-6",
+    extraArgs: ["--effort", "high"],
   },
   {
-    id: "gpt-5-3-codex",
+    id: "gpt-5-4-high",
     provider: "codex",
-    model: "gpt-5.3-codex",
+    model: "gpt-5.4",
+    extraArgs: ["--config", "model_reasoning_effort=high"],
   },
   {
-    id: "gemini-2-5-pro",
+    id: "gemini-3-1-pro-preview",
     provider: "gemini",
-    model: "gemini-2.5-pro",
+    model: "gemini-3.1-pro-preview",
   },
 ] as const;
 
@@ -277,16 +284,17 @@ const LITE_AGENT_PRESET_ENTRIES: readonly AgentCatalogEntry[] = [
     id: "claude-haiku-4-5-20251001",
     provider: "claude",
     model: "claude-haiku-4-5-20251001",
+    extraArgs: ["--effort", "high"],
   },
   {
-    id: "gpt-5-1-codex-mini",
+    id: "gpt-5-3-codex-spark",
     provider: "codex",
-    model: "gpt-5.1-codex-mini",
+    model: "gpt-5.3-codex-spark",
   },
   {
-    id: "gemini-2-5-flash",
+    id: "gemini-3-flash-preview",
     provider: "gemini",
-    model: "gemini-2.5-flash",
+    model: "gemini-3-flash-preview",
   },
 ] as const;
 
