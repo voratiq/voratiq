@@ -751,6 +751,7 @@ describe("voratiq spec (CLI)", () => {
 
   it("promotes spec artifacts and updates session records", async () => {
     const title = "Payment Flow";
+    const slug = "payment-flow";
 
     const result = await runSpecCommand({
       description: "Design a payment flow",
@@ -809,6 +810,12 @@ describe("voratiq spec (CLI)", () => {
     expect(record.agents[0]?.status).toBe("succeeded");
     expect(record.agents[0]?.outputPath).toBeDefined();
     expect(record.agents[0]?.dataPath).toBeDefined();
+    expect(record.agents[0]?.outputPath).toBe(
+      `.voratiq/specs/sessions/${sessionId}/claude-haiku-4-5-20251001/artifacts/${slug}.md`,
+    );
+    expect(record.agents[0]?.dataPath).toBe(
+      `.voratiq/specs/sessions/${sessionId}/claude-haiku-4-5-20251001/artifacts/${slug}.json`,
+    );
 
     const artifactPath = join(
       repoRoot,
@@ -818,7 +825,7 @@ describe("voratiq spec (CLI)", () => {
       sessionId,
       "claude-haiku-4-5-20251001",
       "artifacts",
-      "spec.md",
+      `${slug}.md`,
     );
 
     await expect(readFile(artifactPath, "utf8")).resolves.toContain(
@@ -834,7 +841,7 @@ describe("voratiq spec (CLI)", () => {
           sessionId,
           "claude-haiku-4-5-20251001",
           "artifacts",
-          "spec.json",
+          `${slug}.json`,
         ),
         "utf8",
       ),

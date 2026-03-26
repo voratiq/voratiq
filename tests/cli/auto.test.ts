@@ -1805,8 +1805,8 @@ describe("voratiq auto", () => {
     runSpecCommandMock.mockResolvedValue({
       sessionId: "spec-session-123",
       generatedSpecPaths: [
-        ".voratiq/specs/sessions/spec-123/alpha/artifacts/spec.md",
-        ".voratiq/specs/sessions/spec-123/beta/artifacts/spec.md",
+        ".voratiq/specs/sessions/spec-123/alpha/artifacts/migration-plan.md",
+        ".voratiq/specs/sessions/spec-123/beta/artifacts/migration-plan-v2.md",
       ],
       body: "SPEC BODY",
     });
