@@ -1,4 +1,4 @@
-import type { ExtractedTokenUsage } from "../../domains/runs/model/types.js";
+import type { ExtractedTokenUsage } from "../../domain/run/model/types.js";
 import type { ChatArtifactFormat } from "./types.js";
 
 export const TOKEN_USAGE_UNAVAILABLE_REASONS = [

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { buildRunPrompt } from "../../../src/domains/runs/competition/prompt.js";
+import { buildRunPrompt } from "../../../src/domain/run/competition/prompt.js";
 
 describe("buildRunPrompt", () => {
   it("includes cleanup and summary artifact instructions", () => {
     const prompt = buildRunPrompt({
       specContent: "# Spec\n\nDo the thing.\n",
-      workspacePath: "/repo/.voratiq/runs/sessions/run-1/agent/workspace",
+      workspacePath: "/repo/.voratiq/run/sessions/run-1/agent/workspace",
     });
 
     expect(prompt).toContain(
@@ -21,7 +21,7 @@ describe("buildRunPrompt", () => {
   it("lists staged extra-context files when provided", () => {
     const prompt = buildRunPrompt({
       specContent: "# Spec\n\nDo the thing.\n",
-      workspacePath: "/repo/.voratiq/runs/sessions/run-1/agent/workspace",
+      workspacePath: "/repo/.voratiq/run/sessions/run-1/agent/workspace",
       extraContextFiles: [
         {
           absolutePath: "/repo/notes/a.md",

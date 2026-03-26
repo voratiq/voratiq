@@ -7,7 +7,7 @@ import {
   createSpecCompetitionAdapter,
   type PreparedSpecCompetitionCandidate,
   type SpecCompetitionExecution,
-} from "../../../src/domains/specs/competition/adapter.js";
+} from "../../../src/domain/spec/competition/adapter.js";
 import type { AgentWorkspacePaths } from "../../../src/workspace/layout.js";
 import {
   type AdapterContractScenarioInput,
@@ -135,7 +135,7 @@ function toAgentDefinition(id: string): AgentDefinition {
 }
 
 function toWorkspacePaths(id: string): AgentWorkspacePaths {
-  const base = `/repo/.voratiq/specs/sessions/spec-session/${id}`;
+  const base = `/repo/.voratiq/spec/sessions/spec-session/${id}`;
   return {
     agentRoot: base,
     artifactsPath: `${base}/artifacts`,
@@ -152,9 +152,9 @@ function toWorkspacePaths(id: string): AgentWorkspacePaths {
 }
 
 function normalizeSpecPath(id: string): string {
-  return `.voratiq/specs/sessions/spec-session/${id}/artifacts/task-spec.md`;
+  return `.voratiq/spec/sessions/spec-session/${id}/artifacts/task-spec.md`;
 }
 
 function normalizeSpecDataPath(id: string): string {
-  return `.voratiq/specs/sessions/spec-session/${id}/artifacts/task-spec.json`;
+  return `.voratiq/spec/sessions/spec-session/${id}/artifacts/task-spec.json`;
 }

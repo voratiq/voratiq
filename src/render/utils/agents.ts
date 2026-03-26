@@ -1,8 +1,5 @@
-import type { AgentInvocationEnhanced } from "../../domains/runs/model/enhanced.js";
-import type {
-  AgentReport,
-  AgentStatus,
-} from "../../domains/runs/model/types.js";
+import type { AgentInvocationEnhanced } from "../../domain/run/model/enhanced.js";
+import type { AgentReport, AgentStatus } from "../../domain/run/model/types.js";
 import { getAgentStatusStyle } from "../../status/colors.js";
 import { TERMINAL_AGENT_STATUSES } from "../../status/index.js";
 import { colorize } from "../../utils/colors.js";

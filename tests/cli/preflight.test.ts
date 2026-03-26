@@ -38,19 +38,18 @@ function buildValidWorkspaceTree(
   return {
     [`${root}/.git`]: "",
     [`${root}/.voratiq`]: null,
-    [`${root}/.voratiq/runs`]: null,
-    [`${root}/.voratiq/runs/sessions`]: null,
-    [`${root}/.voratiq/runs/index.json`]: '{"version":2,"sessions":[]}\n',
-    [`${root}/.voratiq/reductions`]: null,
-    [`${root}/.voratiq/reductions/sessions`]: null,
-    [`${root}/.voratiq/reductions/index.json`]: '{"version":1,"sessions":[]}\n',
-    [`${root}/.voratiq/specs`]: null,
-    [`${root}/.voratiq/specs/sessions`]: null,
-    [`${root}/.voratiq/specs/index.json`]: '{"version":1,"sessions":[]}\n',
-    [`${root}/.voratiq/verifications`]: null,
-    [`${root}/.voratiq/verifications/sessions`]: null,
-    [`${root}/.voratiq/verifications/index.json`]:
-      '{"version":1,"sessions":[]}\n',
+    [`${root}/.voratiq/run`]: null,
+    [`${root}/.voratiq/run/sessions`]: null,
+    [`${root}/.voratiq/run/index.json`]: '{"version":2,"sessions":[]}\n',
+    [`${root}/.voratiq/reduce`]: null,
+    [`${root}/.voratiq/reduce/sessions`]: null,
+    [`${root}/.voratiq/reduce/index.json`]: '{"version":1,"sessions":[]}\n',
+    [`${root}/.voratiq/spec`]: null,
+    [`${root}/.voratiq/spec/sessions`]: null,
+    [`${root}/.voratiq/spec/index.json`]: '{"version":1,"sessions":[]}\n',
+    [`${root}/.voratiq/verify`]: null,
+    [`${root}/.voratiq/verify/sessions`]: null,
+    [`${root}/.voratiq/verify/index.json`]: '{"version":1,"sessions":[]}\n',
     [`${root}/.voratiq/agents.yaml`]: "agents: []\n",
     [`${root}/.voratiq/verification.yaml`]: "\n",
     [`${root}/.voratiq/environment.yaml`]: "\n",
@@ -66,33 +65,33 @@ describe("CLI Context", () => {
     jest.spyOn(process, "cwd").mockReturnValue("/app/voratiq");
     executeInitCommandMock.mockReset();
     executeInitCommandMock.mockImplementation(async ({ root }) => {
-      await fs.promises.mkdir(`${root}/.voratiq/runs/sessions`, {
+      await fs.promises.mkdir(`${root}/.voratiq/run/sessions`, {
         recursive: true,
       });
-      await fs.promises.mkdir(`${root}/.voratiq/reductions/sessions`, {
+      await fs.promises.mkdir(`${root}/.voratiq/reduce/sessions`, {
         recursive: true,
       });
-      await fs.promises.mkdir(`${root}/.voratiq/specs/sessions`, {
+      await fs.promises.mkdir(`${root}/.voratiq/spec/sessions`, {
         recursive: true,
       });
-      await fs.promises.mkdir(`${root}/.voratiq/verifications/sessions`, {
+      await fs.promises.mkdir(`${root}/.voratiq/verify/sessions`, {
         recursive: true,
       });
 
       await fs.promises.writeFile(
-        `${root}/.voratiq/runs/index.json`,
+        `${root}/.voratiq/run/index.json`,
         '{"version":2,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
-        `${root}/.voratiq/reductions/index.json`,
+        `${root}/.voratiq/reduce/index.json`,
         '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
-        `${root}/.voratiq/specs/index.json`,
+        `${root}/.voratiq/spec/index.json`,
         '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
-        `${root}/.voratiq/verifications/index.json`,
+        `${root}/.voratiq/verify/index.json`,
         '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
@@ -243,7 +242,7 @@ describe("CLI Context", () => {
 
     it("repairs a legacy workspace missing one domain directory", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/reductions", {
+      await fs.promises.rm("/app/voratiq/.voratiq/reduce", {
         recursive: true,
         force: true,
       });
@@ -252,13 +251,13 @@ describe("CLI Context", () => {
 
       expect(context.workspaceAutoRepaired).toBe(true);
       await expect(
-        fs.promises.access("/app/voratiq/.voratiq/reductions"),
+        fs.promises.access("/app/voratiq/.voratiq/reduce"),
       ).resolves.toBeUndefined();
       await expect(
-        fs.promises.access("/app/voratiq/.voratiq/reductions/sessions"),
+        fs.promises.access("/app/voratiq/.voratiq/reduce/sessions"),
       ).resolves.toBeUndefined();
       await expect(
-        fs.promises.readFile("/app/voratiq/.voratiq/reductions/index.json", {
+        fs.promises.readFile("/app/voratiq/.voratiq/reduce/index.json", {
           encoding: "utf8",
         }),
       ).resolves.toContain('"version": 1');
@@ -267,7 +266,7 @@ describe("CLI Context", () => {
 
     it("repairs a legacy workspace missing one domain index file", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/verifications/index.json", {
+      await fs.promises.rm("/app/voratiq/.voratiq/verify/index.json", {
         force: true,
       });
 
@@ -275,7 +274,7 @@ describe("CLI Context", () => {
 
       expect(context.workspaceAutoRepaired).toBe(true);
       await expect(
-        fs.promises.readFile("/app/voratiq/.voratiq/verifications/index.json", {
+        fs.promises.readFile("/app/voratiq/.voratiq/verify/index.json", {
           encoding: "utf8",
         }),
       ).resolves.toContain('"version": 1');
@@ -284,7 +283,7 @@ describe("CLI Context", () => {
 
     it("repairs a legacy workspace missing one domain sessions directory", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/specs/sessions", {
+      await fs.promises.rm("/app/voratiq/.voratiq/spec/sessions", {
         recursive: true,
         force: true,
       });
@@ -293,21 +292,21 @@ describe("CLI Context", () => {
 
       expect(context.workspaceAutoRepaired).toBe(true);
       await expect(
-        fs.promises.access("/app/voratiq/.voratiq/specs/sessions"),
+        fs.promises.access("/app/voratiq/.voratiq/spec/sessions"),
       ).resolves.toBeUndefined();
       expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it("repairs multiple missing domain storage entries in one pass", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/verifications", {
+      await fs.promises.rm("/app/voratiq/.voratiq/verify", {
         recursive: true,
         force: true,
       });
-      await fs.promises.rm("/app/voratiq/.voratiq/specs/index.json", {
+      await fs.promises.rm("/app/voratiq/.voratiq/spec/index.json", {
         force: true,
       });
-      await fs.promises.rm("/app/voratiq/.voratiq/runs/sessions", {
+      await fs.promises.rm("/app/voratiq/.voratiq/run/sessions", {
         recursive: true,
         force: true,
       });
@@ -316,45 +315,39 @@ describe("CLI Context", () => {
 
       expect(context.workspaceAutoRepaired).toBe(true);
       await expect(
-        fs.promises.access("/app/voratiq/.voratiq/verifications/sessions"),
+        fs.promises.access("/app/voratiq/.voratiq/verify/sessions"),
       ).resolves.toBeUndefined();
       await expect(
-        fs.promises.readFile("/app/voratiq/.voratiq/specs/index.json", "utf8"),
+        fs.promises.readFile("/app/voratiq/.voratiq/spec/index.json", "utf8"),
       ).resolves.toContain('"version": 1');
       await expect(
-        fs.promises.access("/app/voratiq/.voratiq/runs/sessions"),
+        fs.promises.access("/app/voratiq/.voratiq/run/sessions"),
       ).resolves.toBeUndefined();
       expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it("fails when a required path exists with the wrong type", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/reductions", {
+      await fs.promises.rm("/app/voratiq/.voratiq/reduce", {
         recursive: true,
         force: true,
       });
-      await fs.promises.writeFile("/app/voratiq/.voratiq/reductions", "");
+      await fs.promises.writeFile("/app/voratiq/.voratiq/reduce", "");
 
       await expect(resolveCliContext()).rejects.toThrow(
         WorkspaceWrongTypeEntryError,
       );
       await expect(resolveCliContext()).rejects.toThrow(
-        "Wrong workspace entry type: `.voratiq/reductions` must be a directory.",
+        "Wrong workspace entry type: `.voratiq/reduce` must be a directory.",
       );
       expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it.each([
-      ["/app/voratiq/.voratiq/runs/index.json", ".voratiq/runs/index.json"],
-      [
-        "/app/voratiq/.voratiq/verifications/index.json",
-        ".voratiq/verifications/index.json",
-      ],
-      ["/app/voratiq/.voratiq/specs/index.json", ".voratiq/specs/index.json"],
-      [
-        "/app/voratiq/.voratiq/reductions/index.json",
-        ".voratiq/reductions/index.json",
-      ],
+      ["/app/voratiq/.voratiq/run/index.json", ".voratiq/run/index.json"],
+      ["/app/voratiq/.voratiq/verify/index.json", ".voratiq/verify/index.json"],
+      ["/app/voratiq/.voratiq/spec/index.json", ".voratiq/spec/index.json"],
+      ["/app/voratiq/.voratiq/reduce/index.json", ".voratiq/reduce/index.json"],
     ])(
       "fails preflight when %s is malformed even with no missing entries",
       async (indexPath, displayPath) => {
@@ -371,48 +364,48 @@ describe("CLI Context", () => {
     it("fails when an existing index is malformed instead of overwriting it during repair", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
       await fs.promises.writeFile(
-        "/app/voratiq/.voratiq/runs/index.json",
+        "/app/voratiq/.voratiq/run/index.json",
         '{"version":2,',
       );
-      await fs.promises.rm("/app/voratiq/.voratiq/reductions/sessions", {
+      await fs.promises.rm("/app/voratiq/.voratiq/reduce/sessions", {
         recursive: true,
         force: true,
       });
 
       await expect(resolveCliContext()).rejects.toThrow(WorkspaceSetupError);
       await expect(resolveCliContext()).rejects.toThrow(
-        "Failed to parse workspace index `.voratiq/runs/index.json`:",
+        "Failed to parse workspace index `.voratiq/run/index.json`:",
       );
     });
 
     it("fails when a required sessions directory path exists as a file", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/specs/sessions", {
+      await fs.promises.rm("/app/voratiq/.voratiq/spec/sessions", {
         recursive: true,
         force: true,
       });
-      await fs.promises.writeFile("/app/voratiq/.voratiq/specs/sessions", "");
+      await fs.promises.writeFile("/app/voratiq/.voratiq/spec/sessions", "");
 
       await expect(resolveCliContext()).rejects.toThrow(
         WorkspaceWrongTypeEntryError,
       );
       await expect(resolveCliContext()).rejects.toThrow(
-        "Wrong workspace entry type: `.voratiq/specs/sessions` must be a directory.",
+        "Wrong workspace entry type: `.voratiq/spec/sessions` must be a directory.",
       );
     });
 
     it("fails when a required index path exists as a directory", async () => {
       vol.fromJSON(buildValidWorkspaceTree());
-      await fs.promises.rm("/app/voratiq/.voratiq/verifications/index.json", {
+      await fs.promises.rm("/app/voratiq/.voratiq/verify/index.json", {
         force: true,
       });
-      await fs.promises.mkdir("/app/voratiq/.voratiq/verifications/index.json");
+      await fs.promises.mkdir("/app/voratiq/.voratiq/verify/index.json");
 
       await expect(resolveCliContext()).rejects.toThrow(
         WorkspaceWrongTypeEntryError,
       );
       await expect(resolveCliContext()).rejects.toThrow(
-        "Wrong workspace entry type: `.voratiq/verifications/index.json` must be a file.",
+        "Wrong workspace entry type: `.voratiq/verify/index.json` must be a file.",
       );
     });
 

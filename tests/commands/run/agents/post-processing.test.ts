@@ -1,16 +1,13 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import { collectAgentArtifacts } from "../../../../src/domains/runs/competition/agents/artifacts.js";
-import { runPostProcessingAndCollectArtifacts } from "../../../../src/domains/runs/competition/agents/post-processing.js";
-import { buildRunAgentWorkspacePaths } from "../../../../src/domains/runs/competition/agents/workspace.js";
+import { collectAgentArtifacts } from "../../../../src/domain/run/competition/agents/artifacts.js";
+import { runPostProcessingAndCollectArtifacts } from "../../../../src/domain/run/competition/agents/post-processing.js";
+import { buildRunAgentWorkspacePaths } from "../../../../src/domain/run/competition/agents/workspace.js";
 import { buildAgentWorkspacePaths } from "../../../../src/workspace/layout.js";
 
-jest.mock(
-  "../../../../src/domains/runs/competition/agents/artifacts.js",
-  () => ({
-    collectAgentArtifacts: jest.fn(),
-  }),
-);
+jest.mock("../../../../src/domain/run/competition/agents/artifacts.js", () => ({
+  collectAgentArtifacts: jest.fn(),
+}));
 
 const collectAgentArtifactsMock = jest.mocked(collectAgentArtifacts);
 

@@ -10,12 +10,12 @@ import {
   VORATIQ_ENVIRONMENT_FILE,
   VORATIQ_HISTORY_LOCK_FILENAME,
   VORATIQ_ORCHESTRATION_FILE,
-  VORATIQ_REDUCTIONS_DIR,
-  VORATIQ_RUNS_DIR,
-  VORATIQ_RUNS_FILE,
+  VORATIQ_REDUCTION_DIR,
+  VORATIQ_RUN_DIR,
+  VORATIQ_RUN_FILE,
   VORATIQ_SANDBOX_FILE,
-  VORATIQ_SPECS_DIR,
-  VORATIQ_VERIFICATIONS_DIR,
+  VORATIQ_SPEC_DIR,
+  VORATIQ_VERIFICATION_DIR,
 } from "../../workspace/structure.js";
 import type { SandboxPolicyOverrides } from "./types.js";
 
@@ -226,13 +226,13 @@ function resolveStageRoots(
     return {
       symmetric: [
         resolveAbsolute(root, ".git"),
-        resolveWorkspacePath(root, VORATIQ_RUNS_FILE),
+        resolveWorkspacePath(root, VORATIQ_RUN_FILE),
         resolveWorkspacePath(
           root,
-          VORATIQ_RUNS_DIR,
+          VORATIQ_RUN_DIR,
           VORATIQ_HISTORY_LOCK_FILENAME,
         ),
-        resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_DIR),
+        resolveWorkspacePath(root, VORATIQ_VERIFICATION_DIR),
       ],
       readOnly: [],
     };
@@ -241,9 +241,9 @@ function resolveStageRoots(
   if (stageId === "spec") {
     return {
       symmetric: [
-        resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
-        resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_DIR),
-        resolveWorkspacePath(root, VORATIQ_REDUCTIONS_DIR),
+        resolveWorkspacePath(root, VORATIQ_RUN_DIR),
+        resolveWorkspacePath(root, VORATIQ_VERIFICATION_DIR),
+        resolveWorkspacePath(root, VORATIQ_REDUCTION_DIR),
       ],
       readOnly: [],
     };
@@ -252,9 +252,9 @@ function resolveStageRoots(
   if (stageId === "verify") {
     return {
       symmetric: [
-        resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
-        resolveWorkspacePath(root, VORATIQ_SPECS_DIR),
-        resolveWorkspacePath(root, VORATIQ_REDUCTIONS_DIR),
+        resolveWorkspacePath(root, VORATIQ_RUN_DIR),
+        resolveWorkspacePath(root, VORATIQ_SPEC_DIR),
+        resolveWorkspacePath(root, VORATIQ_REDUCTION_DIR),
       ],
       // Verification agents should never inspect repository metadata during
       // blinded review.
@@ -264,8 +264,8 @@ function resolveStageRoots(
 
   return {
     symmetric: [
-      resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
-      resolveWorkspacePath(root, VORATIQ_SPECS_DIR),
+      resolveWorkspacePath(root, VORATIQ_RUN_DIR),
+      resolveWorkspacePath(root, VORATIQ_SPEC_DIR),
     ],
     readOnly: [resolveAbsolute(root, ".git")],
   };

@@ -2,7 +2,7 @@ import {
   fetchRunsSafely,
   type RunQueryFilters,
   type RunRecordWarning,
-} from "../../domains/runs/persistence/adapter.js";
+} from "../../domain/run/persistence/adapter.js";
 import { renderListTranscript } from "../../render/transcripts/list.js";
 import { pathExists } from "../../utils/fs.js";
 

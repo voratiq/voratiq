@@ -15,11 +15,11 @@ import type {
   PruneCommandInput,
   PruneConfirmationHandler,
 } from "../../../src/commands/prune/types.js";
-import type { RunRecord } from "../../../src/domains/runs/model/types.js";
+import type { RunRecord } from "../../../src/domain/run/model/types.js";
 import {
   fetchRunsSafely,
   rewriteRunRecord,
-} from "../../../src/domains/runs/persistence/adapter.js";
+} from "../../../src/domain/run/persistence/adapter.js";
 import {
   renderPruneAllTranscript,
   renderPruneTranscript,
@@ -65,7 +65,7 @@ jest.mock("../../../src/utils/git.js", () => ({
   getGitStderr: jest.fn(),
 }));
 
-jest.mock("../../../src/domains/runs/persistence/adapter.js", () => ({
+jest.mock("../../../src/domain/run/persistence/adapter.js", () => ({
   fetchRunsSafely: jest.fn(),
   rewriteRunRecord: jest.fn(),
   RUN_RECORD_FILENAME: "record.json",
@@ -88,8 +88,8 @@ function buildInput(
 ): PruneCommandInput {
   return {
     root: "/repo",
-    runsDir: "/repo/.voratiq/runs",
-    runsFilePath: "/repo/.voratiq/runs/index.json",
+    runsDir: "/repo/.voratiq/run",
+    runsFilePath: "/repo/.voratiq/run/index.json",
     runId: "20251110-abc123",
     confirm: () => Promise.resolve(true),
     ...overrides,
@@ -174,17 +174,17 @@ describe("executePruneCommand", () => {
     fetchRunSafelyMock.mockResolvedValue(runRecord);
 
     const existingPaths = new Set<string>([
-      "/repo/.voratiq/runs/sessions/20251110-abc123",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/claude/workspace",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/codex/workspace",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/claude/artifacts/stdout.log",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/codex/artifacts/stdout.log",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/claude/artifacts/stderr.log",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/codex/artifacts/stderr.log",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/claude/artifacts/diff.patch",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/codex/artifacts/diff.patch",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/claude/artifacts/summary.txt",
-      "/repo/.voratiq/runs/sessions/20251110-abc123/codex/artifacts/summary.txt",
+      "/repo/.voratiq/run/sessions/20251110-abc123",
+      "/repo/.voratiq/run/sessions/20251110-abc123/claude/workspace",
+      "/repo/.voratiq/run/sessions/20251110-abc123/codex/workspace",
+      "/repo/.voratiq/run/sessions/20251110-abc123/claude/artifacts/stdout.log",
+      "/repo/.voratiq/run/sessions/20251110-abc123/codex/artifacts/stdout.log",
+      "/repo/.voratiq/run/sessions/20251110-abc123/claude/artifacts/stderr.log",
+      "/repo/.voratiq/run/sessions/20251110-abc123/codex/artifacts/stderr.log",
+      "/repo/.voratiq/run/sessions/20251110-abc123/claude/artifacts/diff.patch",
+      "/repo/.voratiq/run/sessions/20251110-abc123/codex/artifacts/diff.patch",
+      "/repo/.voratiq/run/sessions/20251110-abc123/claude/artifacts/summary.txt",
+      "/repo/.voratiq/run/sessions/20251110-abc123/codex/artifacts/summary.txt",
     ]);
     pathExistsMock.mockImplementation((candidate) =>
       Promise.resolve(existingPaths.has(String(candidate))),
@@ -226,14 +226,14 @@ describe("executePruneCommand", () => {
     expect(result.artifacts.purged).toBe(true);
     expect(result.workspaces.removed).toEqual(
       expect.arrayContaining([
-        ".voratiq/runs/sessions/20251110-abc123/claude/workspace",
-        ".voratiq/runs/sessions/20251110-abc123/codex/workspace",
+        ".voratiq/run/sessions/20251110-abc123/claude/workspace",
+        ".voratiq/run/sessions/20251110-abc123/codex/workspace",
       ]),
     );
     expect(result.artifacts.removed).toEqual(
       expect.arrayContaining([
-        ".voratiq/runs/sessions/20251110-abc123/claude/artifacts/stdout.log",
-        ".voratiq/runs/sessions/20251110-abc123/codex/artifacts/summary.txt",
+        ".voratiq/run/sessions/20251110-abc123/claude/artifacts/stdout.log",
+        ".voratiq/run/sessions/20251110-abc123/codex/artifacts/summary.txt",
       ]),
     );
     expect(result.branches.deleted).toEqual([
@@ -242,12 +242,12 @@ describe("executePruneCommand", () => {
     ]);
     expect(removeRunDirectoryMock).not.toHaveBeenCalled();
     expect(removeWorkspaceEntryMock).toHaveBeenCalledWith({
-      path: "/repo/.voratiq/runs/sessions/20251110-abc123/claude",
+      path: "/repo/.voratiq/run/sessions/20251110-abc123/claude",
       root: "/repo",
       recursive: true,
     });
     expect(removeWorkspaceEntryMock).toHaveBeenCalledWith({
-      path: "/repo/.voratiq/runs/sessions/20251110-abc123/codex",
+      path: "/repo/.voratiq/run/sessions/20251110-abc123/codex",
       root: "/repo",
       recursive: true,
     });
@@ -319,8 +319,8 @@ describe("executePruneAllCommand", () => {
 
     const result = await executePruneAllCommand({
       root: "/repo",
-      runsDir: "/repo/.voratiq/runs",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsDir: "/repo/.voratiq/run",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       confirm,
       purge: false,
     });
@@ -368,8 +368,8 @@ describe("executePruneAllCommand", () => {
 
     const result = await executePruneAllCommand({
       root: "/repo",
-      runsDir: "/repo/.voratiq/runs",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsDir: "/repo/.voratiq/run",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       confirm,
       purge: false,
     });
@@ -418,8 +418,8 @@ describe("executePruneAllCommand", () => {
 
     const result = await executePruneAllCommand({
       root: "/repo",
-      runsDir: "/repo/.voratiq/runs",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsDir: "/repo/.voratiq/run",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       confirm,
       purge: false,
     });
@@ -436,7 +436,7 @@ describe("renderPruneTranscript", () => {
       status: "aborted",
       runId: "2025",
       specPath: "specs/demo.md",
-      runPath: ".voratiq/runs/sessions/2025",
+      runPath: ".voratiq/run/sessions/2025",
     });
 
     expect(transcript).toContain("Prune aborted; no changes were made.");
@@ -448,7 +448,7 @@ describe("renderPruneTranscript", () => {
       status: "pruned",
       runId: "2025",
       specPath: "specs/demo.md",
-      runPath: ".voratiq/runs/sessions/2025",
+      runPath: ".voratiq/run/sessions/2025",
       createdAt: "2025-11-10T10:00:00.000Z",
       deletedAt: "2025-11-10T11:00:00.000Z",
       workspaces: { removed: [], missing: [] },

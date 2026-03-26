@@ -1,4 +1,4 @@
-import { RunHistoryLockTimeoutError } from "../domains/runs/model/errors.js";
+import { RunHistoryLockTimeoutError } from "../domain/run/model/errors.js";
 import { toErrorMessage } from "../utils/errors.js";
 import { isFileSystemError } from "../utils/fs.js";
 import {

@@ -3,7 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import type {
   AgentInvocationRecord,
   RunReport,
-} from "../../../src/domains/runs/model/types.js";
+} from "../../../src/domain/run/model/types.js";
 import { createRunRenderer } from "../../../src/render/transcripts/run.js";
 import { formatCliOutput } from "../../../src/utils/output.js";
 import { createRunReport } from "../../support/factories/run-records.js";
@@ -39,8 +39,8 @@ function createAgentReport(
       modelId: "unknown",
     },
     runtimeManifestPath:
-      ".voratiq/runs/sessions/run-123/test-agent/runtime.json",
-    baseDirectory: ".voratiq/runs/sessions/run-123/test-agent",
+      ".voratiq/run/sessions/run-123/test-agent/runtime.json",
+    baseDirectory: ".voratiq/run/sessions/run-123/test-agent",
     assets: {},
     startedAt: "2025-11-05T12:00:00.000Z",
     completedAt: "2025-11-05T12:00:03.000Z",
@@ -166,7 +166,7 @@ describe("createRunRenderer", () => {
         runId: "run-123",
         status: "running",
         specPath: "specs/test.md",
-        workspacePath: ".voratiq/runs/sessions/run-123",
+        workspacePath: ".voratiq/run/sessions/run-123",
         createdAt: "2025-11-05T12:00:00.000Z",
         baseRevisionSha: "abc123",
       });
@@ -205,7 +205,7 @@ describe("createRunRenderer", () => {
       runId: "run-123",
       status: "running" as const,
       specPath: "specs/test.md",
-      workspacePath: ".voratiq/runs/sessions/run-123",
+      workspacePath: ".voratiq/run/sessions/run-123",
       createdAt: "2025-11-05T12:00:00.000Z",
       baseRevisionSha: "abc123",
     };
@@ -279,7 +279,7 @@ describe("createRunRenderer", () => {
       runId: "run-123",
       status: "running",
       specPath: "specs/test.md",
-      workspacePath: ".voratiq/runs/sessions/run-123",
+      workspacePath: ".voratiq/run/sessions/run-123",
       createdAt: "2025-11-05T12:00:00.000Z",
       startedAt,
       baseRevisionSha: "abc123",
@@ -317,7 +317,7 @@ describe("createRunRenderer", () => {
       runId: "run-123",
       status: "running",
       specPath: "specs/test.md",
-      workspacePath: ".voratiq/runs/sessions/run-123",
+      workspacePath: ".voratiq/run/sessions/run-123",
       createdAt: "2025-11-05T12:00:00.000Z",
       startedAt: "2025-11-05T12:00:00.000Z",
       baseRevisionSha: "abc123",
@@ -367,7 +367,7 @@ describe("createRunRenderer", () => {
       runId: "run-123",
       status: "running",
       specPath: "specs/test.md",
-      workspacePath: ".voratiq/runs/sessions/run-123",
+      workspacePath: ".voratiq/run/sessions/run-123",
       createdAt: "2025-11-05T12:00:00.000Z",
       baseRevisionSha: "abc123",
     });

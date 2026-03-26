@@ -118,8 +118,8 @@ describe("reduce live progress renderer", () => {
       reductionId: "reduce-123",
       createdAt: "2026-01-01T00:00:00.000Z",
       sourceLabel: "Run",
-      sourcePath: ".voratiq/runs/sessions/run-123",
-      workspacePath: ".voratiq/reductions/sessions/reduce-123",
+      sourcePath: ".voratiq/run/sessions/run-123",
+      workspacePath: ".voratiq/reduce/sessions/reduce-123",
       status: "running",
     });
     renderer.update({
@@ -152,8 +152,8 @@ describe("reduce live progress renderer", () => {
       reductionId: "reduce-123",
       createdAt: "2026-01-01T00:00:00.000Z",
       sourceLabel: "Run",
-      sourcePath: ".voratiq/runs/sessions/run-123",
-      workspacePath: ".voratiq/reductions/sessions/reduce-123",
+      sourcePath: ".voratiq/run/sessions/run-123",
+      workspacePath: ".voratiq/reduce/sessions/reduce-123",
       status: "running",
     });
     renderer.update({
@@ -177,8 +177,8 @@ describe("reduce live progress renderer", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
       elapsed: "3s",
       sourceLabel: "Run",
-      sourcePath: ".voratiq/runs/sessions/run-123",
-      workspacePath: ".voratiq/reductions/sessions/reduce-123",
+      sourcePath: ".voratiq/run/sessions/run-123",
+      workspacePath: ".voratiq/reduce/sessions/reduce-123",
       status: "succeeded",
       reducers: [
         {
@@ -212,8 +212,8 @@ describe("reduce live progress renderer", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
       startedAt: "2026-01-01T00:00:00.000Z",
       sourceLabel: "Run",
-      sourcePath: ".voratiq/runs/sessions/run-123",
-      workspacePath: ".voratiq/reductions/sessions/reduce-123",
+      sourcePath: ".voratiq/run/sessions/run-123",
+      workspacePath: ".voratiq/reduce/sessions/reduce-123",
       status: "running",
     });
     renderer.update({

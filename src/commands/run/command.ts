@@ -1,24 +1,24 @@
 import { teardownSessionAuth } from "../../agents/runtime/registry.js";
 import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { createTeardownController } from "../../competition/shared/teardown.js";
-import { executeAgents } from "../../domains/runs/competition/agent-execution.js";
+import { executeAgents } from "../../domain/run/competition/agent-execution.js";
 import {
   RunCommandError,
   RunProcessStreamError,
-} from "../../domains/runs/competition/errors.js";
-import { toRunReport } from "../../domains/runs/competition/reports.js";
-import { generateRunId } from "../../domains/runs/model/id.js";
-import { createAgentRecordMutators } from "../../domains/runs/model/mutators.js";
+} from "../../domain/run/competition/errors.js";
+import { toRunReport } from "../../domain/run/competition/reports.js";
+import { generateRunId } from "../../domain/run/model/id.js";
+import { createAgentRecordMutators } from "../../domain/run/model/mutators.js";
 import type {
   AgentInvocationRecord,
   RunRecord,
   RunReport,
-} from "../../domains/runs/model/types.js";
+} from "../../domain/run/model/types.js";
 import {
   flushRunRecordBuffer,
   rewriteRunRecord,
-} from "../../domains/runs/persistence/adapter.js";
-import { buildRecordLifecycleCompleteFields } from "../../domains/shared/lifecycle.js";
+} from "../../domain/run/persistence/adapter.js";
+import { buildRecordLifecycleCompleteFields } from "../../domain/shared/lifecycle.js";
 import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import type { RunProgressRenderer } from "../../render/transcripts/run.js";
 import { deriveRunStatusFromAgents } from "../../status/index.js";

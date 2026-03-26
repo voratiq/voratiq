@@ -64,16 +64,13 @@ describe("CLI entrypoint error handling", () => {
 
   it("renders workspace wrong-type entry hint", () => {
     const cliError = toCliError(
-      new WorkspaceWrongTypeEntryError(
-        ".voratiq/verifications/index.json",
-        "file",
-      ),
+      new WorkspaceWrongTypeEntryError(".voratiq/verify/index.json", "file"),
     );
 
     const rendered = stripAnsi(renderCliError(cliError));
     expect(rendered).toBe(
       [
-        "Error: Wrong workspace entry type: `.voratiq/verifications/index.json` must be a file.",
+        "Error: Wrong workspace entry type: `.voratiq/verify/index.json` must be a file.",
         "",
         "Run `voratiq init` to configure the workspace.",
       ].join("\n"),
@@ -84,16 +81,16 @@ describe("CLI entrypoint error handling", () => {
     const cliError = toCliError(
       new WorkspaceNotInitializedError([
         ".voratiq/",
-        ".voratiq/runs/sessions/",
-        ".voratiq/runs/index.json",
+        ".voratiq/run/sessions/",
+        ".voratiq/run/index.json",
       ]),
     );
 
     expect(cliError.detailLines).toEqual([
       "Missing workspace entries:",
       "  - `.voratiq/`",
-      "  - `.voratiq/runs/sessions/`",
-      "  - `.voratiq/runs/index.json`",
+      "  - `.voratiq/run/sessions/`",
+      "  - `.voratiq/run/index.json`",
     ]);
     expect(cliError.hintLines).toEqual([
       "Run `voratiq init` from the repository root, then retry.",
@@ -102,7 +99,7 @@ describe("CLI entrypoint error handling", () => {
     const rendered = renderCliError(cliError);
     expect(rendered).toContain("Voratiq workspace is not initialized.");
     expect(rendered).toContain("Missing workspace entries:");
-    expect(rendered).toContain(".voratiq/runs/index.json");
+    expect(rendered).toContain(".voratiq/run/index.json");
     expect(rendered).toContain(
       "Run `voratiq init` from the repository root, then retry.",
     );

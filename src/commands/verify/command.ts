@@ -2,29 +2,29 @@ import { teardownSessionAuth } from "../../agents/runtime/registry.js";
 import { createTeardownController } from "../../competition/shared/teardown.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import { loadVerificationConfig } from "../../configs/verification/loader.js";
-import { buildBlindedAliasMap } from "../../domains/verifications/competition/blinding.js";
+import { buildBlindedAliasMap } from "../../domain/verify/competition/blinding.js";
 import {
   deriveVerificationStatusFromMethods,
   maybePersistSelectedSpecPath,
-} from "../../domains/verifications/competition/finalize.js";
-import { executeAndPersistProgrammaticMethod } from "../../domains/verifications/competition/programmatic.js";
-import { executeAndPersistRubricMethods } from "../../domains/verifications/competition/rubric.js";
-import { createVerificationRecordMutators } from "../../domains/verifications/model/mutators.js";
+} from "../../domain/verify/competition/finalize.js";
+import { executeAndPersistProgrammaticMethod } from "../../domain/verify/competition/programmatic.js";
+import { executeAndPersistRubricMethods } from "../../domain/verify/competition/rubric.js";
+import { createVerificationRecordMutators } from "../../domain/verify/model/mutators.js";
 import type {
   VerificationRecord,
   VerificationStatus,
-} from "../../domains/verifications/model/types.js";
+} from "../../domain/verify/model/types.js";
 import {
   appendVerificationRecord,
   flushVerificationRecordBuffer,
-} from "../../domains/verifications/persistence/adapter.js";
+} from "../../domain/verify/persistence/adapter.js";
 import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import type { VerifyProgressRenderer } from "../../render/transcripts/verify.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
 import {
   resolveWorkspacePath,
-  VORATIQ_VERIFICATIONS_SESSIONS_DIR,
+  VORATIQ_VERIFICATION_SESSIONS_DIR,
 } from "../../workspace/structure.js";
 import { generateSessionId } from "../shared/session-id.js";
 import {
@@ -127,7 +127,7 @@ export async function executeVerifyCommand(
         root,
         resolveWorkspacePath(
           root,
-          VORATIQ_VERIFICATIONS_SESSIONS_DIR,
+          VORATIQ_VERIFICATION_SESSIONS_DIR,
           verificationId,
         ),
       ),

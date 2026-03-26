@@ -1,7 +1,7 @@
 import type {
   AgentInvocationRecord,
   RunReport,
-} from "../../domains/runs/model/types.js";
+} from "../../domain/run/model/types.js";
 import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
 import { formatCompactDiffStatistics } from "../../utils/diff.js";
 import {

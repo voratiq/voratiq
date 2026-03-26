@@ -118,7 +118,7 @@ describe("voratiq auto", () => {
         "--description",
         "write a spec",
         "--spec",
-        ".voratiq/specs/existing.md",
+        ".voratiq/spec/existing.md",
         "--verify-agent",
         "reviewer",
       ]),
@@ -150,14 +150,14 @@ describe("voratiq auto", () => {
 
     runSpecCommandMock.mockResolvedValue({
       sessionId: "spec-session-flat-parity",
-      generatedSpecPaths: [".voratiq/specs/generated.md"],
-      specPath: ".voratiq/specs/generated.md",
-      body: "Spec saved: .voratiq/specs/generated.md",
+      generatedSpecPaths: [".voratiq/spec/generated.md"],
+      specPath: ".voratiq/spec/generated.md",
+      body: "Spec saved: .voratiq/spec/generated.md",
     });
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-flat-parity",
-        spec: { path: ".voratiq/specs/generated.md" },
+        spec: { path: ".voratiq/spec/generated.md" },
         status: "succeeded",
         createdAt: fixedTimestamp,
         baseRevisionSha: "deadbeef",
@@ -169,7 +169,7 @@ describe("voratiq auto", () => {
     mockRunVerifyResolvedValue(
       buildVerifyResult({
         verificationId: "verify-flat-parity",
-        outputPath: ".voratiq/verifications/sessions/verify-flat-parity",
+        outputPath: ".voratiq/verify/sessions/verify-flat-parity",
         body: "review-flat-parity SUCCEEDED",
       }),
     );
@@ -225,14 +225,14 @@ describe("voratiq auto", () => {
 
     runSpecCommandMock.mockResolvedValue({
       sessionId: "spec-session-flat-apply-parity",
-      generatedSpecPaths: [".voratiq/specs/generated.md"],
-      specPath: ".voratiq/specs/generated.md",
-      body: "Spec saved: .voratiq/specs/generated.md",
+      generatedSpecPaths: [".voratiq/spec/generated.md"],
+      specPath: ".voratiq/spec/generated.md",
+      body: "Spec saved: .voratiq/spec/generated.md",
     });
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-flat-apply-parity",
-        spec: { path: ".voratiq/specs/generated.md" },
+        spec: { path: ".voratiq/spec/generated.md" },
         status: "succeeded",
         createdAt: fixedTimestamp,
         baseRevisionSha: "deadbeef",
@@ -244,7 +244,7 @@ describe("voratiq auto", () => {
     mockRunVerifyResolvedValue(
       buildVerifyResult({
         verificationId: "verify-flat-apply-parity",
-        outputPath: ".voratiq/verifications/sessions/verify-flat-apply-parity",
+        outputPath: ".voratiq/verify/sessions/verify-flat-apply-parity",
         body: "review-flat-apply-parity SUCCEEDED",
         selection: {
           state: "resolvable",
@@ -369,7 +369,7 @@ describe("voratiq auto", () => {
       "node",
       "voratiq",
       "--spec",
-      ".voratiq/specs/existing.md",
+      ".voratiq/spec/existing.md",
       "--profile",
       "quality",
     ]);
@@ -388,7 +388,7 @@ describe("voratiq auto", () => {
       "node",
       "voratiq",
       "--spec",
-      ".voratiq/specs/existing.md",
+      ".voratiq/spec/existing.md",
       "--run-agent",
       "gamma",
       "--run-agent",
@@ -412,7 +412,7 @@ describe("voratiq auto", () => {
       "node",
       "voratiq",
       "--spec",
-      ".voratiq/specs/existing.md",
+      ".voratiq/spec/existing.md",
     ]);
 
     expect((received as { verifyAgent?: string[] }).verifyAgent).toEqual([]);
@@ -425,7 +425,7 @@ describe("voratiq auto", () => {
         "node",
         "voratiq",
         "--spec",
-        ".voratiq/specs/existing.md",
+        ".voratiq/spec/existing.md",
         "--verify-agent",
         "reviewer",
         "--commit",
@@ -451,15 +451,15 @@ describe("voratiq auto", () => {
       });
       return Promise.resolve({
         sessionId: "spec-session-123",
-        generatedSpecPaths: [".voratiq/specs/generated.md"],
-        specPath: ".voratiq/specs/generated.md",
+        generatedSpecPaths: [".voratiq/spec/generated.md"],
+        specPath: ".voratiq/spec/generated.md",
         body: [
-          "Spec saved: .voratiq/specs/generated.md",
+          "Spec saved: .voratiq/spec/generated.md",
           "",
           "---",
           "",
           "Next:",
-          "  voratiq run --spec .voratiq/specs/generated.md",
+          "  voratiq run --spec .voratiq/spec/generated.md",
         ].join("\n"),
       });
     });
@@ -470,7 +470,7 @@ describe("voratiq auto", () => {
       return Promise.resolve({
         report: {
           runId: "run-123",
-          spec: { path: ".voratiq/specs/generated.md" },
+          spec: { path: ".voratiq/spec/generated.md" },
           status: "succeeded",
           createdAt: new Date().toISOString(),
           baseRevisionSha: "deadbeef",
@@ -490,7 +490,7 @@ describe("voratiq auto", () => {
         return Promise.resolve({
           ...buildVerifyResult({
             verificationId: "verify-spec-123",
-            outputPath: ".voratiq/verifications/sessions/verify-spec-123",
+            outputPath: ".voratiq/verify/sessions/verify-spec-123",
             body: [
               "spec-review-123 SUCCEEDED",
               "",
@@ -498,14 +498,14 @@ describe("voratiq auto", () => {
               "reviewer",
             ].join("\n"),
           }),
-          selectedSpecPath: ".voratiq/specs/generated.md",
+          selectedSpecPath: ".voratiq/spec/generated.md",
           exitCode: 0,
         });
       }
       return Promise.resolve({
         ...buildVerifyResult({
           verificationId: "verify-123",
-          outputPath: ".voratiq/verifications/sessions/verify-123",
+          outputPath: ".voratiq/verify/sessions/verify-123",
           body: [
             "verify-run-123 SUCCEEDED",
             "",
@@ -535,7 +535,7 @@ describe("voratiq auto", () => {
     );
     expect(runRunCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        specPath: ".voratiq/specs/generated.md",
+        specPath: ".voratiq/spec/generated.md",
       }),
     );
     expect(runVerifyCommandMock).toHaveBeenCalledWith(
@@ -555,7 +555,7 @@ describe("voratiq auto", () => {
     expect((output.match(/Executing run…/gu) ?? []).length).toBe(1);
     expect((output.match(/Generating verification…/gu) ?? []).length).toBe(2);
     expect(
-      (output.match(/Spec saved: \.voratiq\/specs\/generated\.md/gu) ?? [])
+      (output.match(/Spec saved: \.voratiq\/spec\/generated\.md/gu) ?? [])
         .length,
     ).toBe(1);
     expect((output.match(/spec-review-123 SUCCEEDED/gu) ?? []).length).toBe(1);
@@ -564,10 +564,10 @@ describe("voratiq auto", () => {
     expect(verifyInvocationCount).toBe(2);
 
     expect(output.indexOf("Generating specification…")).toBeLessThan(
-      output.indexOf("Spec saved: .voratiq/specs/generated.md"),
+      output.indexOf("Spec saved: .voratiq/spec/generated.md"),
     );
     expect(
-      output.indexOf("Spec saved: .voratiq/specs/generated.md"),
+      output.indexOf("Spec saved: .voratiq/spec/generated.md"),
     ).toBeLessThan(output.indexOf("Generating verification…"));
     expect(output.indexOf("Generating verification…")).toBeLessThan(
       output.indexOf("spec-review-123 SUCCEEDED"),
@@ -598,14 +598,14 @@ describe("voratiq auto", () => {
 
     runSpecCommandMock.mockResolvedValue({
       sessionId: "spec-session-apply-123",
-      generatedSpecPaths: [".voratiq/specs/generated.md"],
-      specPath: ".voratiq/specs/generated.md",
-      body: "Spec saved: .voratiq/specs/generated.md",
+      generatedSpecPaths: [".voratiq/spec/generated.md"],
+      specPath: ".voratiq/spec/generated.md",
+      body: "Spec saved: .voratiq/spec/generated.md",
     });
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-apply-123",
-        spec: { path: ".voratiq/specs/generated.md" },
+        spec: { path: ".voratiq/spec/generated.md" },
         status: "succeeded",
         createdAt: new Date().toISOString(),
         baseRevisionSha: "deadbeef",
@@ -619,7 +619,7 @@ describe("voratiq auto", () => {
         return Promise.resolve(
           buildVerifyResult({
             verificationId: "verify-spec-apply-123",
-            outputPath: ".voratiq/verifications/sessions/verify-spec-apply-123",
+            outputPath: ".voratiq/verify/sessions/verify-spec-apply-123",
             body: "verify-spec-apply-123 SUCCEEDED",
           }),
         );
@@ -628,7 +628,7 @@ describe("voratiq auto", () => {
       return Promise.resolve(
         buildVerifyResult({
           verificationId: "verify-apply-123",
-          outputPath: ".voratiq/verifications/sessions/verify-apply-123",
+          outputPath: ".voratiq/verify/sessions/verify-apply-123",
           body: "verify-run-apply-123 SUCCEEDED",
         }),
       );
@@ -641,7 +641,7 @@ describe("voratiq auto", () => {
     await withTempRepo(async (repoRoot) => {
       writeVerificationSelection(
         repoRoot,
-        ".voratiq/verifications/sessions/verify-apply-123",
+        ".voratiq/verify/sessions/verify-apply-123",
         {
           preferred_agent: "agent-good",
           resolved_preferred_agent: "agent-good",
@@ -671,7 +671,7 @@ describe("voratiq auto", () => {
     );
     expect(runRunCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        specPath: ".voratiq/specs/generated.md",
+        specPath: ".voratiq/spec/generated.md",
       }),
     );
     expect(runVerifyCommandMock).toHaveBeenCalledWith(
@@ -690,7 +690,7 @@ describe("voratiq auto", () => {
 
     const output = stripAnsi(stdout.join(""));
     expect(
-      output.indexOf("Spec saved: .voratiq/specs/generated.md"),
+      output.indexOf("Spec saved: .voratiq/spec/generated.md"),
     ).toBeLessThan(output.indexOf("run-apply-123 SUCCEEDED"));
     expect(output.indexOf("run-apply-123 SUCCEEDED")).toBeLessThan(
       output.indexOf("verify-run-apply-123 SUCCEEDED"),
@@ -740,14 +740,14 @@ describe("voratiq auto", () => {
 
     runSpecCommandMock.mockResolvedValue({
       sessionId: "spec-session-desc-fail",
-      generatedSpecPaths: [".voratiq/specs/generated.md"],
-      specPath: ".voratiq/specs/generated.md",
-      body: "Spec saved: .voratiq/specs/generated.md",
+      generatedSpecPaths: [".voratiq/spec/generated.md"],
+      specPath: ".voratiq/spec/generated.md",
+      body: "Spec saved: .voratiq/spec/generated.md",
     });
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-desc-fail",
-        spec: { path: ".voratiq/specs/generated.md" },
+        spec: { path: ".voratiq/spec/generated.md" },
         status: "failed",
         createdAt: new Date().toISOString(),
         baseRevisionSha: "deadbeef",
@@ -760,10 +760,10 @@ describe("voratiq auto", () => {
     mockRunVerifyResolvedValue({
       ...buildVerifyResult({
         verificationId: "verify-spec-desc-fail",
-        outputPath: ".voratiq/verifications/sessions/verify-spec-desc-fail",
+        outputPath: ".voratiq/verify/sessions/verify-spec-desc-fail",
         body: "verify-spec-desc-fail SUCCEEDED",
       }),
-      selectedSpecPath: ".voratiq/specs/generated.md",
+      selectedSpecPath: ".voratiq/spec/generated.md",
       exitCode: 0,
     });
 
@@ -800,7 +800,7 @@ describe("voratiq auto", () => {
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-spec-apply",
-        spec: { path: ".voratiq/specs/existing.md" },
+        spec: { path: ".voratiq/spec/existing.md" },
         status: "succeeded",
         createdAt: new Date().toISOString(),
         baseRevisionSha: "deadbeef",
@@ -812,7 +812,7 @@ describe("voratiq auto", () => {
     mockRunVerifyResolvedValue(
       buildVerifyResult({
         verificationId: "verify-spec-apply",
-        outputPath: ".voratiq/verifications/sessions/verify-spec-apply",
+        outputPath: ".voratiq/verify/sessions/verify-spec-apply",
         body: "review-spec-apply SUCCEEDED",
       }),
     );
@@ -824,7 +824,7 @@ describe("voratiq auto", () => {
     await withTempRepo(async (repoRoot) => {
       writeVerificationSelection(
         repoRoot,
-        ".voratiq/verifications/sessions/verify-spec-apply",
+        ".voratiq/verify/sessions/verify-spec-apply",
         {
           preferred_agent: "agent-good",
           resolved_preferred_agent: "agent-good",
@@ -836,7 +836,7 @@ describe("voratiq auto", () => {
       );
 
       const result = await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer"],
         apply: true,
       });
@@ -888,7 +888,7 @@ describe("voratiq auto", () => {
       return Promise.resolve({
         report: {
           runId: "run-456",
-          spec: { path: ".voratiq/specs/existing.md" },
+          spec: { path: ".voratiq/spec/existing.md" },
           status: "succeeded",
           createdAt: new Date().toISOString(),
           baseRevisionSha: "cafebabe",
@@ -912,7 +912,7 @@ describe("voratiq auto", () => {
     });
 
     await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
+      specPath: ".voratiq/spec/existing.md",
       verifyAgentIds: ["reviewer"],
     });
 
@@ -955,7 +955,7 @@ describe("voratiq auto", () => {
       return Promise.resolve({
         report: {
           runId: "run-789",
-          spec: { path: ".voratiq/specs/existing.md" },
+          spec: { path: ".voratiq/spec/existing.md" },
           status: "succeeded",
           createdAt: new Date().toISOString(),
           baseRevisionSha: "deadbeef",
@@ -980,7 +980,7 @@ describe("voratiq auto", () => {
 
     try {
       await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer"],
       });
     } finally {
@@ -1017,7 +1017,7 @@ describe("voratiq auto", () => {
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-123",
-        spec: { path: ".voratiq/specs/existing.md" },
+        spec: { path: ".voratiq/spec/existing.md" },
         status: "failed",
         createdAt: new Date().toISOString(),
         baseRevisionSha: "deadbeef",
@@ -1031,18 +1031,18 @@ describe("voratiq auto", () => {
     mockRunVerifyResolvedValue(
       buildVerifyResult({
         verificationId: "verify-456",
-        outputPath: ".voratiq/verifications/sessions/verify-456",
+        outputPath: ".voratiq/verify/sessions/verify-456",
       }),
     );
 
     await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
+      specPath: ".voratiq/spec/existing.md",
       verifyAgentIds: ["reviewer"],
     });
 
     expect(runRunCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         agentOverrideFlag: "--run-agent",
       }),
     );
@@ -1073,7 +1073,7 @@ describe("voratiq auto", () => {
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-contradiction",
-        spec: { path: ".voratiq/specs/existing.md" },
+        spec: { path: ".voratiq/spec/existing.md" },
         status: "succeeded",
         createdAt: new Date().toISOString(),
         baseRevisionSha: "deadbeef",
@@ -1085,7 +1085,7 @@ describe("voratiq auto", () => {
     });
 
     await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
+      specPath: ".voratiq/spec/existing.md",
       verifyAgentIds: ["reviewer"],
     });
 
@@ -1117,7 +1117,7 @@ describe("voratiq auto", () => {
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-123",
-        spec: { path: ".voratiq/specs/existing.md" },
+        spec: { path: ".voratiq/spec/existing.md" },
         status: "succeeded",
         createdAt: new Date().toISOString(),
         baseRevisionSha: "deadbeef",
@@ -1130,7 +1130,7 @@ describe("voratiq auto", () => {
     runVerifyCommandMock.mockRejectedValue(new Error("review exploded"));
 
     await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
+      specPath: ".voratiq/spec/existing.md",
       verifyAgentIds: ["reviewer"],
     });
 
@@ -1146,7 +1146,7 @@ describe("voratiq auto", () => {
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-123",
-        spec: { path: ".voratiq/specs/existing.md" },
+        spec: { path: ".voratiq/spec/existing.md" },
         status: "succeeded",
         createdAt: new Date().toISOString(),
         baseRevisionSha: "deadbeef",
@@ -1158,19 +1158,19 @@ describe("voratiq auto", () => {
     mockRunVerifyResolvedValue(
       buildVerifyResult({
         verificationId: "verify-456",
-        outputPath: ".voratiq/verifications/sessions/verify-456",
+        outputPath: ".voratiq/verify/sessions/verify-456",
       }),
     );
 
     await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
+      specPath: ".voratiq/spec/existing.md",
       runAgentIds: ["beta", "alpha"],
       profile: "quality",
     });
 
     expect(runRunCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         agentIds: ["beta", "alpha"],
         agentOverrideFlag: "--run-agent",
         profile: "quality",
@@ -1191,7 +1191,7 @@ describe("voratiq auto", () => {
     mockRunVerifyResolvedValue(buildVerifyResult());
 
     await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
+      specPath: ".voratiq/spec/existing.md",
       verifyAgentIds: ["reviewer"],
       maxParallel: 2,
     });
@@ -1228,7 +1228,7 @@ describe("voratiq auto", () => {
     );
 
     await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
+      specPath: ".voratiq/spec/existing.md",
     });
 
     const output = stripAnsi(stdout.join(""));
@@ -1261,7 +1261,7 @@ describe("voratiq auto", () => {
     );
 
     await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
+      specPath: ".voratiq/spec/existing.md",
       runAgentIds: ["codex", "codex"],
     });
 
@@ -1301,7 +1301,7 @@ describe("voratiq auto", () => {
     );
 
     await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
+      specPath: ".voratiq/spec/existing.md",
     });
 
     const output = stripAnsi(stdout.join(""));
@@ -1325,7 +1325,7 @@ describe("voratiq auto", () => {
       ...buildVerifyResult({
         verificationId: "verify-789",
         outputPath:
-          ".voratiq/verifications/sessions/verify-789/reviewer-a/run-review/artifacts/result.json",
+          ".voratiq/verify/sessions/verify-789/reviewer-a/run-review/artifacts/result.json",
         body: [
           "review-789 FAILED",
           "",
@@ -1343,7 +1343,7 @@ describe("voratiq auto", () => {
           "voratiq apply --run run-123 --agent codex",
           "```",
           "",
-          "Artifact: .voratiq/verifications/sessions/verify-789/reviewer-a/run-review/artifacts/result.json",
+          "Artifact: .voratiq/verify/sessions/verify-789/reviewer-a/run-review/artifacts/result.json",
           "",
           "---",
           "",
@@ -1357,12 +1357,12 @@ describe("voratiq auto", () => {
         buildVerificationExecution({
           agentId: "reviewer-a",
           outputPath:
-            ".voratiq/verifications/sessions/verify-789/reviewer-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-789/reviewer-a/run-review/artifacts/result.json",
         }),
         buildVerificationExecution({
           agentId: "reviewer-b",
           outputPath:
-            ".voratiq/verifications/sessions/verify-789/reviewer-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-789/reviewer-b/run-review/artifacts/result.json",
           status: "failed",
           error: "reviewer violated output contract",
         }),
@@ -1370,7 +1370,7 @@ describe("voratiq auto", () => {
     });
 
     await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
+      specPath: ".voratiq/spec/existing.md",
       verifyAgentIds: ["reviewer-a", "reviewer-b"],
     });
 
@@ -1403,7 +1403,7 @@ describe("voratiq auto", () => {
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-xyz",
-        spec: { path: ".voratiq/specs/existing.md" },
+        spec: { path: ".voratiq/spec/existing.md" },
         status: "succeeded",
         createdAt: new Date().toISOString(),
         baseRevisionSha: "deadbeef",
@@ -1416,13 +1416,13 @@ describe("voratiq auto", () => {
     mockRunVerifyResolvedValue(
       buildVerifyResult({
         verificationId: "verify-xyz",
-        outputPath: ".voratiq/verifications/sessions/verify-xyz",
+        outputPath: ".voratiq/verify/sessions/verify-xyz",
         body: "REVIEW BODY",
       }),
     );
 
     await runAutoCommand({
-      specPath: ".voratiq/specs/existing.md",
+      specPath: ".voratiq/spec/existing.md",
       verifyAgentIds: ["reviewer"],
     });
 
@@ -1466,7 +1466,7 @@ describe("voratiq auto", () => {
 
     await withTempRepo(async () => {
       const result = await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer"],
         apply: true,
       });
@@ -1503,7 +1503,7 @@ describe("voratiq auto", () => {
       ...buildVerifyResult({
         verificationId: "verify-123",
         outputPath:
-          ".voratiq/verifications/sessions/verify-123/reviewer-a/run-review/artifacts/result.json",
+          ".voratiq/verify/sessions/verify-123/reviewer-a/run-review/artifacts/result.json",
         selection: {
           state: "resolvable",
           applyable: true,
@@ -1515,12 +1515,12 @@ describe("voratiq auto", () => {
         buildVerificationExecution({
           agentId: "reviewer-a",
           outputPath:
-            ".voratiq/verifications/sessions/verify-123/reviewer-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/reviewer-a/run-review/artifacts/result.json",
         }),
         buildVerificationExecution({
           agentId: "reviewer-b",
           outputPath:
-            ".voratiq/verifications/sessions/verify-123/reviewer-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/reviewer-b/run-review/artifacts/result.json",
         }),
       ],
     });
@@ -1532,7 +1532,7 @@ describe("voratiq auto", () => {
 
     await withTempRepo(async () => {
       const result = await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer-a", "reviewer-b"],
         apply: true,
       });
@@ -1575,7 +1575,7 @@ describe("voratiq auto", () => {
       ...buildVerifyResult({
         verificationId: "verify-123",
         outputPath:
-          ".voratiq/verifications/sessions/verify-123/reviewer-a/run-review/artifacts/result.json",
+          ".voratiq/verify/sessions/verify-123/reviewer-a/run-review/artifacts/result.json",
         body: [
           "REVIEW BODY",
           "",
@@ -1608,19 +1608,19 @@ describe("voratiq auto", () => {
         buildVerificationExecution({
           agentId: "reviewer-a",
           outputPath:
-            ".voratiq/verifications/sessions/verify-123/reviewer-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/reviewer-a/run-review/artifacts/result.json",
         }),
         buildVerificationExecution({
           agentId: "reviewer-b",
           outputPath:
-            ".voratiq/verifications/sessions/verify-123/reviewer-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/reviewer-b/run-review/artifacts/result.json",
         }),
       ],
     });
 
     await withTempRepo(async () => {
       const result = await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer-a", "reviewer-b"],
         apply: true,
       });
@@ -1659,7 +1659,7 @@ describe("voratiq auto", () => {
       ...buildVerifyResult({
         verificationId: "verify-999",
         outputPath:
-          ".voratiq/verifications/sessions/verify-999/reviewer-a/run-review/artifacts/result.json",
+          ".voratiq/verify/sessions/verify-999/reviewer-a/run-review/artifacts/result.json",
         selection: {
           state: "unresolved",
           applyable: false,
@@ -1684,19 +1684,19 @@ describe("voratiq auto", () => {
         buildVerificationExecution({
           agentId: "reviewer-a",
           outputPath:
-            ".voratiq/verifications/sessions/verify-999/reviewer-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-999/reviewer-a/run-review/artifacts/result.json",
         }),
         buildVerificationExecution({
           agentId: "reviewer-b",
           outputPath:
-            ".voratiq/verifications/sessions/verify-999/reviewer-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-999/reviewer-b/run-review/artifacts/result.json",
         }),
       ],
     });
 
     await withTempRepo(async () => {
       const result = await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer-a", "reviewer-b"],
         apply: true,
       });
@@ -1729,7 +1729,7 @@ describe("voratiq auto", () => {
       ...buildVerifyResult({
         verificationId: "verify-321",
         outputPath:
-          ".voratiq/verifications/sessions/verify-321/reviewer-a/run-review/artifacts/result.json",
+          ".voratiq/verify/sessions/verify-321/reviewer-a/run-review/artifacts/result.json",
         body: [
           "REVIEW BODY",
           "",
@@ -1762,19 +1762,19 @@ describe("voratiq auto", () => {
         buildVerificationExecution({
           agentId: "reviewer-a",
           outputPath:
-            ".voratiq/verifications/sessions/verify-321/reviewer-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-321/reviewer-a/run-review/artifacts/result.json",
         }),
         buildVerificationExecution({
           agentId: "reviewer-b",
           outputPath:
-            ".voratiq/verifications/sessions/verify-321/reviewer-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-321/reviewer-b/run-review/artifacts/result.json",
         }),
       ],
     });
 
     await withTempRepo(async () => {
       const result = await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer-a", "reviewer-b"],
       });
 
@@ -1805,8 +1805,8 @@ describe("voratiq auto", () => {
     runSpecCommandMock.mockResolvedValue({
       sessionId: "spec-session-123",
       generatedSpecPaths: [
-        ".voratiq/specs/sessions/spec-123/alpha/artifacts/migration-plan.md",
-        ".voratiq/specs/sessions/spec-123/beta/artifacts/migration-plan-v2.md",
+        ".voratiq/spec/sessions/spec-123/alpha/artifacts/migration-plan.md",
+        ".voratiq/spec/sessions/spec-123/beta/artifacts/migration-plan-v2.md",
       ],
       body: "SPEC BODY",
     });
@@ -1856,7 +1856,7 @@ describe("voratiq auto", () => {
 
     await withTempRepo(async () => {
       const result = await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer"],
         apply: true,
       });
@@ -1907,7 +1907,7 @@ describe("voratiq auto", () => {
 
     await withTempRepo(async () => {
       const result = await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer"],
         apply: true,
       });
@@ -1936,7 +1936,7 @@ describe("voratiq auto", () => {
     await withTempRepo(async (repoRoot) => {
       writeVerificationSelection(
         repoRoot,
-        ".voratiq/verifications/sessions/verify-123",
+        ".voratiq/verify/sessions/verify-123",
         {
           preferred_agent: "agent-good",
           resolved_preferred_agent: "agent-good",
@@ -1946,7 +1946,7 @@ describe("voratiq auto", () => {
       );
 
       await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer"],
         apply: true,
         commit: true,
@@ -1974,7 +1974,7 @@ describe("voratiq auto", () => {
 
     await withTempRepo(async () => {
       const result = await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer"],
         apply: true,
       });
@@ -2021,7 +2021,7 @@ describe("voratiq auto", () => {
 
     await withTempRepo(async () => {
       await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer"],
         apply: true,
       });
@@ -2064,7 +2064,7 @@ describe("voratiq auto", () => {
 
     await withTempRepo(async () => {
       await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer"],
         apply: true,
       });
@@ -2094,7 +2094,7 @@ describe("voratiq auto", () => {
     await withTempRepo(async (repoRoot) => {
       writeVerificationSelection(
         repoRoot,
-        ".voratiq/verifications/sessions/verify-123",
+        ".voratiq/verify/sessions/verify-123",
         {
           preferred_agent: "agent-good",
           resolved_preferred_agent: "agent-good",
@@ -2104,7 +2104,7 @@ describe("voratiq auto", () => {
       );
 
       await runAutoCommand({
-        specPath: ".voratiq/specs/existing.md",
+        specPath: ".voratiq/spec/existing.md",
         verifyAgentIds: ["reviewer"],
         apply: true,
       });
@@ -2120,7 +2120,7 @@ function buildRunResult(agentIds: readonly string[]) {
   return {
     report: {
       runId: "run-123",
-      spec: { path: ".voratiq/specs/existing.md" },
+      spec: { path: ".voratiq/spec/existing.md" },
       status: "succeeded" as const,
       createdAt: new Date().toISOString(),
       baseRevisionSha: "deadbeef",
@@ -2183,7 +2183,7 @@ function buildVerifyResult(
 ) {
   const verificationId = options.verificationId ?? "verify-123";
   const outputPath =
-    options.outputPath ?? `.voratiq/verifications/sessions/${verificationId}`;
+    options.outputPath ?? `.voratiq/verify/sessions/${verificationId}`;
   const body = options.body ?? "verify body";
   return {
     verificationId,
@@ -2205,7 +2205,7 @@ function buildVerificationExecution(
     agentId: overrides.agentId ?? "reviewer",
     outputPath:
       overrides.outputPath ??
-      ".voratiq/verifications/sessions/verify-123/reviewer/run-review/artifacts/result.json",
+      ".voratiq/verify/sessions/verify-123/reviewer/run-review/artifacts/result.json",
     status: overrides.status ?? ("succeeded" as const),
     missingArtifacts: [],
     tokenUsageResult: {
@@ -2283,7 +2283,7 @@ function withAutoVerifyCompat<T>(value: T): T {
       }
       if (prop === "selectedSpecPath") {
         return (
-          Reflect.get(target, prop, receiver) ?? ".voratiq/specs/generated.md"
+          Reflect.get(target, prop, receiver) ?? ".voratiq/spec/generated.md"
         );
       }
       if (prop === "selection") {

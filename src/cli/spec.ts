@@ -4,7 +4,7 @@ import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
 import { buildMarkdownPreviewLines } from "../commands/shared/preview.js";
 import { executeSpecCommand } from "../commands/spec/command.js";
 import { resolveExtraContextFiles } from "../competition/shared/extra-context.js";
-import { readSpecData, type SpecData } from "../domains/specs/model/output.js";
+import { readSpecData, type SpecData } from "../domain/spec/model/output.js";
 import {
   ensureSandboxDependencies,
   resolveCliContext,
@@ -123,7 +123,7 @@ export async function runSpecCommand(
           startedAt: result.record.startedAt,
           completedAt: result.record.completedAt,
         }) ?? "—",
-      workspacePath: `.voratiq/specs/sessions/${result.sessionId}`,
+      workspacePath: `.voratiq/spec/sessions/${result.sessionId}`,
       status: result.record.status,
       agents: await Promise.all(
         result.agents.map(async (agent) => ({

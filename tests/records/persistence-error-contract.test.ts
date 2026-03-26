@@ -4,8 +4,8 @@ import {
   RunRecordMutationError,
   RunRecordNotFoundError,
   RunRecordParseError,
-} from "../../src/domains/runs/model/errors.js";
-import { runStoreErrorMapper } from "../../src/domains/runs/persistence/error-mapping.js";
+} from "../../src/domain/run/model/errors.js";
+import { runStoreErrorMapper } from "../../src/domain/run/persistence/error-mapping.js";
 import {
   mapSessionStoreError,
   sessionStoreErrorMapper,

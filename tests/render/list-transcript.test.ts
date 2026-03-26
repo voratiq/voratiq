@@ -1,4 +1,4 @@
-import type { RunRecord } from "../../src/domains/runs/model/types.js";
+import type { RunRecord } from "../../src/domain/run/model/types.js";
 import { renderListTranscript } from "../../src/render/transcripts/list.js";
 import { createRunRecord } from "../support/factories/run-records.js";
 

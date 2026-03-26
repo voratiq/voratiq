@@ -1,4 +1,4 @@
-import type { AutoTerminalStatus } from "../../domains/runs/model/types.js";
+import type { AutoTerminalStatus } from "../../domain/run/model/types.js";
 import { getRunStatusStyle } from "../../status/colors.js";
 import type { RunStatus } from "../../status/index.js";
 import { colorize } from "../../utils/colors.js";

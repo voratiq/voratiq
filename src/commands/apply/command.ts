@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 
-import { buildRunRecordEnhanced } from "../../domains/runs/model/enhanced.js";
-import type { RunApplyStatus } from "../../domains/runs/model/types.js";
-import { rewriteRunRecord } from "../../domains/runs/persistence/adapter.js";
-import { readVerificationRecords } from "../../domains/verifications/persistence/adapter.js";
+import { buildRunRecordEnhanced } from "../../domain/run/model/enhanced.js";
+import type { RunApplyStatus } from "../../domain/run/model/types.js";
+import { rewriteRunRecord } from "../../domain/run/persistence/adapter.js";
+import { readVerificationRecords } from "../../domain/verify/persistence/adapter.js";
 import {
   buildVerificationSelectorSource,
   deriveSelectorSelectionDecision,
@@ -201,7 +201,7 @@ async function resolveApplyAgentSelector(options: {
   }
 
   const effectiveVerificationsPath =
-    verificationsFilePath ?? `${root}/.voratiq/verifications/index.json`;
+    verificationsFilePath ?? `${root}/.voratiq/verify/index.json`;
 
   const verificationRecords = await readVerificationRecords({
     root,

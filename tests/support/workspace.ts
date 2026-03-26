@@ -6,12 +6,12 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { runCli } from "../../src/bin.js";
-import type { RunRecord } from "../../src/domains/runs/model/types.js";
-import { appendRunRecord } from "../../src/domains/runs/persistence/adapter.js";
+import type { RunRecord } from "../../src/domain/run/model/types.js";
+import { appendRunRecord } from "../../src/domain/run/persistence/adapter.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
 import {
   resolveWorkspacePath,
-  VORATIQ_RUNS_FILE,
+  VORATIQ_RUN_FILE,
 } from "../../src/workspace/structure.js";
 
 const execFileAsync = promisify(execFile);
@@ -77,7 +77,7 @@ export class TestWorkspace {
   }
 
   get runsFilePath(): string {
-    return resolveWorkspacePath(this.root, VORATIQ_RUNS_FILE);
+    return resolveWorkspacePath(this.root, VORATIQ_RUN_FILE);
   }
 
   async ensureWorkspace(

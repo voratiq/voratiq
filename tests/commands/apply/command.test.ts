@@ -15,12 +15,12 @@ import {
   ApplyPatchApplicationError,
   ApplyVerificationPolicyLoadError,
 } from "../../../src/commands/apply/errors.js";
-import type { RunRecord } from "../../../src/domains/runs/model/types.js";
+import type { RunRecord } from "../../../src/domain/run/model/types.js";
 import {
   appendRunRecord,
   rewriteRunRecord,
-} from "../../../src/domains/runs/persistence/adapter.js";
-import { appendVerificationRecord } from "../../../src/domains/verifications/persistence/adapter.js";
+} from "../../../src/domain/run/persistence/adapter.js";
+import { appendVerificationRecord } from "../../../src/domain/verify/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 import {
   createAgentInvocationRecord,
@@ -57,7 +57,7 @@ describe("executeApplyCommand", () => {
 
       const result = await executeApplyCommand({
         root: repoRoot,
-        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
         runId,
         agentId,
         ignoreBaseMismatch: false,
@@ -75,7 +75,7 @@ describe("executeApplyCommand", () => {
       const recordPath = join(
         repoRoot,
         ".voratiq",
-        "runs",
+        "run",
         "sessions",
         runId,
         "record.json",
@@ -133,11 +133,11 @@ describe("executeApplyCommand", () => {
 
       const result = await executeApplyCommand({
         root: repoRoot,
-        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
         verificationsFilePath: join(
           repoRoot,
           ".voratiq",
-          "verifications",
+          "verify",
           "index.json",
         ),
         runId,
@@ -217,11 +217,11 @@ describe("executeApplyCommand", () => {
 
       const result = await executeApplyCommand({
         root: repoRoot,
-        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
         verificationsFilePath: join(
           repoRoot,
           ".voratiq",
-          "verifications",
+          "verify",
           "index.json",
         ),
         runId,
@@ -272,11 +272,11 @@ describe("executeApplyCommand", () => {
 
       const result = await executeApplyCommand({
         root: repoRoot,
-        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
         verificationsFilePath: join(
           repoRoot,
           ".voratiq",
-          "verifications",
+          "verify",
           "index.json",
         ),
         runId,
@@ -317,11 +317,11 @@ describe("executeApplyCommand", () => {
       await expect(
         executeApplyCommand({
           root: repoRoot,
-          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
           verificationsFilePath: join(
             repoRoot,
             ".voratiq",
-            "verifications",
+            "verify",
             "index.json",
           ),
           runId,
@@ -401,11 +401,11 @@ describe("executeApplyCommand", () => {
       await expect(
         executeApplyCommand({
           root: repoRoot,
-          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
           verificationsFilePath: join(
             repoRoot,
             ".voratiq",
-            "verifications",
+            "verify",
             "index.json",
           ),
           runId,
@@ -454,11 +454,11 @@ describe("executeApplyCommand", () => {
       await expect(
         executeApplyCommand({
           root: repoRoot,
-          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
           verificationsFilePath: join(
             repoRoot,
             ".voratiq",
-            "verifications",
+            "verify",
             "index.json",
           ),
           runId,
@@ -521,7 +521,7 @@ describe("executeApplyCommand", () => {
         ],
       });
 
-      const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
+      const runsFilePath = join(repoRoot, ".voratiq", "run", "index.json");
 
       await executeApplyCommand({
         root: repoRoot,
@@ -534,7 +534,7 @@ describe("executeApplyCommand", () => {
       const recordPath = join(
         repoRoot,
         ".voratiq",
-        "runs",
+        "run",
         "sessions",
         runId,
         "record.json",
@@ -577,7 +577,7 @@ describe("executeApplyCommand", () => {
 
       const runId = "run-running-apply";
       const agentId = "claude";
-      const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
+      const runsFilePath = join(repoRoot, ".voratiq", "run", "index.json");
 
       await writeRunRecordWithAgents({
         repoRoot,
@@ -608,7 +608,7 @@ describe("executeApplyCommand", () => {
       const recordPath = join(
         repoRoot,
         ".voratiq",
-        "runs",
+        "run",
         "sessions",
         runId,
         "record.json",
@@ -648,7 +648,7 @@ describe("executeApplyCommand", () => {
         diffStatistics,
       });
 
-      const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
+      const runsFilePath = join(repoRoot, ".voratiq", "run", "index.json");
       await rewriteRunRecord({
         root: repoRoot,
         runsFilePath,
@@ -675,7 +675,7 @@ describe("executeApplyCommand", () => {
       const recordPath = join(
         repoRoot,
         ".voratiq",
-        "runs",
+        "run",
         "sessions",
         runId,
         "record.json",
@@ -707,7 +707,7 @@ describe("executeApplyCommand", () => {
 
       const runId = "run-pruned-apply";
       const agentId = "claude";
-      const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
+      const runsFilePath = join(repoRoot, ".voratiq", "run", "index.json");
 
       await writeRunRecord({
         repoRoot,
@@ -773,7 +773,7 @@ describe("executeApplyCommand", () => {
 
       const result = await executeApplyCommand({
         root: repoRoot,
-        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
         runId,
         agentId,
         ignoreBaseMismatch: false,
@@ -793,7 +793,7 @@ describe("executeApplyCommand", () => {
       const recordPath = join(
         repoRoot,
         ".voratiq",
-        "runs",
+        "run",
         "sessions",
         runId,
         "record.json",
@@ -837,7 +837,7 @@ describe("executeApplyCommand", () => {
       await expect(
         executeApplyCommand({
           root: repoRoot,
-          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
           runId,
           agentId,
           ignoreBaseMismatch: false,
@@ -887,7 +887,7 @@ describe("executeApplyCommand", () => {
       await expect(
         executeApplyCommand({
           root: repoRoot,
-          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
           runId,
           agentId,
           ignoreBaseMismatch: false,
@@ -936,7 +936,7 @@ describe("executeApplyCommand", () => {
       await expect(
         executeApplyCommand({
           root: repoRoot,
-          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
           runId,
           agentId,
           ignoreBaseMismatch: false,
@@ -979,7 +979,7 @@ describe("executeApplyCommand", () => {
 
       const result = await executeApplyCommand({
         root: repoRoot,
-        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
         runId,
         agentId,
         ignoreBaseMismatch: true,
@@ -1024,7 +1024,7 @@ describe("executeApplyCommand", () => {
       await expect(
         executeApplyCommand({
           root: repoRoot,
-          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
           runId,
           agentId,
           ignoreBaseMismatch: false,
@@ -1064,7 +1064,7 @@ describe("executeApplyCommand", () => {
       await expect(
         executeApplyCommand({
           root: repoRoot,
-          runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+          runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
           runId,
           agentId,
           ignoreBaseMismatch: false,
@@ -1074,7 +1074,7 @@ describe("executeApplyCommand", () => {
       const recordPath = join(
         repoRoot,
         ".voratiq",
-        "runs",
+        "run",
         "sessions",
         runId,
         "record.json",
@@ -1152,7 +1152,7 @@ async function writeRunRecord(options: {
   } = options;
   void diffStatistics;
 
-  const runDir = join(repoRoot, ".voratiq", "runs", "sessions", runId);
+  const runDir = join(repoRoot, ".voratiq", "run", "sessions", runId);
   const agentDir = join(runDir, agentId);
   const workspaceDir = join(agentDir, "workspace");
   const artifactsDir = join(agentDir, "artifacts");
@@ -1169,7 +1169,7 @@ async function writeRunRecord(options: {
   await writeFile(summaryPath, summaryContent, "utf8");
   await writeFile(diffPath, diffContent, "utf8");
 
-  const diffRelative = `.voratiq/runs/sessions/${runId}/${agentId}/artifacts/diff.patch`;
+  const diffRelative = `.voratiq/run/sessions/${runId}/${agentId}/artifacts/diff.patch`;
   const now = new Date().toISOString();
 
   const agentRecord = createAgentInvocationRecord({
@@ -1191,7 +1191,7 @@ async function writeRunRecord(options: {
     status: "succeeded",
   });
 
-  const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
+  const runsFilePath = join(repoRoot, ".voratiq", "run", "index.json");
   await appendRunRecord({ root: repoRoot, runsFilePath, record: runRecord });
 
   return diffRelative;
@@ -1229,7 +1229,7 @@ async function writeRunRecordWithAgents(options: {
       const agentDir = join(
         repoRoot,
         ".voratiq",
-        "runs",
+        "run",
         "sessions",
         runId,
         agentId,
@@ -1267,7 +1267,7 @@ async function writeRunRecordWithAgents(options: {
     status: runStatus ?? "succeeded",
   });
 
-  const runsFilePath = join(repoRoot, ".voratiq", "runs", "index.json");
+  const runsFilePath = join(repoRoot, ".voratiq", "run", "index.json");
   await appendRunRecord({ root: repoRoot, runsFilePath, record: runRecord });
 }
 
@@ -1291,7 +1291,7 @@ async function writeVerificationRecord(options: {
   const verificationsFilePath = join(
     repoRoot,
     ".voratiq",
-    "verifications",
+    "verify",
     "index.json",
   );
   const resolvedPreferredSelector =
@@ -1299,12 +1299,12 @@ async function writeVerificationRecord(options: {
   if (!resolvedPreferredSelector) {
     throw new Error("Expected at least one alias");
   }
-  const artifactPath = `.voratiq/verifications/sessions/${verificationId}/reviewer/run-review/artifacts/result.json`;
+  const artifactPath = `.voratiq/verify/sessions/${verificationId}/reviewer/run-review/artifacts/result.json`;
   await mkdir(
     join(
       repoRoot,
       ".voratiq",
-      "verifications",
+      "verify",
       "sessions",
       verificationId,
       "reviewer",
@@ -1391,15 +1391,15 @@ async function writeProgrammaticVerificationRecord(options: {
   const verificationsFilePath = join(
     repoRoot,
     ".voratiq",
-    "verifications",
+    "verify",
     "index.json",
   );
-  const artifactPath = `.voratiq/verifications/sessions/${verificationId}/programmatic/artifacts/result.json`;
+  const artifactPath = `.voratiq/verify/sessions/${verificationId}/programmatic/artifacts/result.json`;
   await mkdir(
     join(
       repoRoot,
       ".voratiq",
-      "verifications",
+      "verify",
       "sessions",
       verificationId,
       "programmatic",

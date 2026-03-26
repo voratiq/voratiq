@@ -8,15 +8,15 @@ import type {
   VerificationMethodResultRef,
   VerificationRecord,
   VerificationTarget,
-} from "../domains/verifications/model/types.js";
+} from "../domain/verify/model/types.js";
 import {
   programmaticResultArtifactSchema,
   rubricResultArtifactSchema,
-} from "../domains/verifications/model/types.js";
+} from "../domain/verify/model/types.js";
 import {
   readRubricResultPreferred,
   readRubricResultRanking,
-} from "../domains/verifications/rubric-result.js";
+} from "../domain/verify/rubric-result.js";
 import { resolvePath } from "../utils/path.js";
 import { resolveCanonicalAgentId } from "./resolution.js";
 import {

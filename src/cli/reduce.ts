@@ -12,9 +12,9 @@ import { resolveExtraContextFiles } from "../competition/shared/extra-context.js
 import {
   readReductionArtifact,
   type ReductionArtifact,
-} from "../domains/reductions/competition/reduction.js";
-import type { ReductionTarget } from "../domains/reductions/model/types.js";
-import { readReductionRecords } from "../domains/reductions/persistence/adapter.js";
+} from "../domain/reduce/competition/reduction.js";
+import type { ReductionTarget } from "../domain/reduce/model/types.js";
+import { readReductionRecords } from "../domain/reduce/persistence/adapter.js";
 import {
   ensureSandboxDependencies,
   resolveCliContext,
@@ -34,8 +34,8 @@ import {
 import { parsePositiveInteger } from "../utils/validators.js";
 import {
   resolveWorkspacePath,
-  VORATIQ_REDUCTIONS_FILE,
-  VORATIQ_VERIFICATIONS_FILE,
+  VORATIQ_REDUCTION_FILE,
+  VORATIQ_VERIFICATION_FILE,
 } from "../workspace/structure.js";
 import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
@@ -101,7 +101,7 @@ export async function runReduceCommand(
       workspacePaths.reductionsFile ?? resolveReductionIndexPath(root),
     verificationsFilePath:
       workspacePaths.verificationsFile ??
-      resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_FILE),
+      resolveWorkspacePath(root, VORATIQ_VERIFICATION_FILE),
     target,
     agentIds,
     agentOverrideFlag,
@@ -193,10 +193,7 @@ export async function runReduceCommand(
     workspacePath: normalizePathForDisplay(
       relativeToRoot(
         root,
-        resolvePath(
-          root,
-          `.voratiq/reductions/sessions/${execution.reductionId}`,
-        ),
+        resolvePath(root, `.voratiq/reduce/sessions/${execution.reductionId}`),
       ),
     ),
     status: record.status,
@@ -236,8 +233,8 @@ function formatReductionSnippet(reduction: ReductionArtifact): string {
 interface ReduceCommandActionOptions {
   spec?: string;
   run?: string;
-  verification?: string;
-  reduction?: string;
+  verify?: string;
+  reduce?: string;
   agent?: string[];
   profile?: string;
   maxParallel?: number;
@@ -271,14 +268,14 @@ function resolveTargetFromOptions(
     { type: "spec" as const, flag: "--spec", value: options.spec },
     { type: "run" as const, flag: "--run", value: options.run },
     {
-      type: "verification" as const,
-      flag: "--verification",
-      value: options.verification,
+      type: "verify" as const,
+      flag: "--verify",
+      value: options.verify,
     },
     {
-      type: "reduction" as const,
-      flag: "--reduction",
-      value: options.reduction,
+      type: "reduce" as const,
+      flag: "--reduce",
+      value: options.reduce,
     },
   ].filter(
     (entry) => typeof entry.value === "string" && entry.value.length > 0,
@@ -291,7 +288,7 @@ function resolveTargetFromOptions(
         ? "No target flag was provided."
         : `Provided: ${provided}.`;
     command.error(
-      `error: exactly one of --spec, --run, --verification, or --reduction is required (${detail})`,
+      `error: exactly one of --spec, --run, --verify, or --reduce is required (${detail})`,
       { exitCode: 1 },
     );
   }
@@ -299,7 +296,7 @@ function resolveTargetFromOptions(
   const selected = entries[0];
   if (!selected || !selected.value) {
     command.error(
-      "error: exactly one of --spec, --run, --verification, or --reduction is required",
+      "error: exactly one of --spec, --run, --verify, or --reduce is required",
       { exitCode: 1 },
     );
   }
@@ -312,10 +309,8 @@ export function createReduceCommand(): Command {
     .description("Reduce artifact sets into a summarized form")
     .addOption(new Option("--spec <spec-id>", "Spec to reduce"))
     .addOption(new Option("--run <run-id>", "Run to reduce"))
-    .addOption(
-      new Option("--verification <verification-id>", "Verification to reduce"),
-    )
-    .addOption(new Option("--reduction <reduction-id>", "Reduction to reduce"))
+    .addOption(new Option("--verify <verify-id>", "Verification to reduce"))
+    .addOption(new Option("--reduce <reduce-id>", "Reduction to reduce"))
     .addOption(
       new Option(
         "--agent <agent-id>",
@@ -370,7 +365,7 @@ async function readReductionSessionRecord(options: {
 }
 
 function resolveReductionIndexPath(root: string): string {
-  return resolvePath(root, `.voratiq/${VORATIQ_REDUCTIONS_FILE}`);
+  return resolvePath(root, `.voratiq/${VORATIQ_REDUCTION_FILE}`);
 }
 
 function mapTargetLabel(
@@ -381,9 +376,9 @@ function mapTargetLabel(
       return "Spec";
     case "run":
       return "Run";
-    case "verification":
+    case "verify":
       return "Verification";
-    case "reduction":
+    case "reduce":
       return "Reduce";
   }
 }
@@ -391,12 +386,12 @@ function mapTargetLabel(
 function sourcePathForTarget(target: ReductionTarget): string {
   switch (target.type) {
     case "spec":
-      return `.voratiq/specs/sessions/${target.id}`;
+      return `.voratiq/spec/sessions/${target.id}`;
     case "run":
-      return `.voratiq/runs/sessions/${target.id}`;
-    case "verification":
-      return `.voratiq/verifications/sessions/${target.id}`;
-    case "reduction":
-      return `.voratiq/reductions/sessions/${target.id}`;
+      return `.voratiq/run/sessions/${target.id}`;
+    case "verify":
+      return `.voratiq/verify/sessions/${target.id}`;
+    case "reduce":
+      return `.voratiq/reduce/sessions/${target.id}`;
   }
 }

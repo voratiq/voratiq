@@ -18,14 +18,14 @@ import {
 } from "../workspace/setup.js";
 import {
   resolveWorkspacePath,
-  VORATIQ_REDUCTIONS_DIR,
-  VORATIQ_REDUCTIONS_FILE,
-  VORATIQ_RUNS_DIR,
-  VORATIQ_RUNS_FILE,
-  VORATIQ_SPECS_DIR,
-  VORATIQ_SPECS_FILE,
-  VORATIQ_VERIFICATIONS_DIR,
-  VORATIQ_VERIFICATIONS_FILE,
+  VORATIQ_REDUCTION_DIR,
+  VORATIQ_REDUCTION_FILE,
+  VORATIQ_RUN_DIR,
+  VORATIQ_RUN_FILE,
+  VORATIQ_SPEC_DIR,
+  VORATIQ_SPEC_FILE,
+  VORATIQ_VERIFICATION_DIR,
+  VORATIQ_VERIFICATION_FILE,
 } from "../workspace/structure.js";
 import {
   DirtyWorkingTreeError,
@@ -73,11 +73,12 @@ export async function resolveCliContext(
   await assertGitRepository(root);
 
   const workspaceDir = resolveWorkspacePath(root);
+  const initialWorkspaceExists = await pathExists(workspaceDir);
   let workspaceAutoInitialized = false;
   let workspaceAutoRepaired = false;
 
   if (requireWorkspace) {
-    let workspaceMissing = !(await pathExists(workspaceDir));
+    let workspaceMissing = !initialWorkspaceExists;
     if (workspaceAutoInitMode === "when-missing" && workspaceMissing) {
       await executeInitCommand({
         root,
@@ -101,14 +102,14 @@ export async function resolveCliContext(
   const workspacePaths: WorkspacePaths = {
     root,
     workspaceDir,
-    runsDir: resolveWorkspacePath(root, VORATIQ_RUNS_DIR),
-    runsFile: resolveWorkspacePath(root, VORATIQ_RUNS_FILE),
-    reductionsDir: resolveWorkspacePath(root, VORATIQ_REDUCTIONS_DIR),
-    reductionsFile: resolveWorkspacePath(root, VORATIQ_REDUCTIONS_FILE),
-    specsDir: resolveWorkspacePath(root, VORATIQ_SPECS_DIR),
-    specsFile: resolveWorkspacePath(root, VORATIQ_SPECS_FILE),
-    verificationsDir: resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_DIR),
-    verificationsFile: resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_FILE),
+    runsDir: resolveWorkspacePath(root, VORATIQ_RUN_DIR),
+    runsFile: resolveWorkspacePath(root, VORATIQ_RUN_FILE),
+    reductionsDir: resolveWorkspacePath(root, VORATIQ_REDUCTION_DIR),
+    reductionsFile: resolveWorkspacePath(root, VORATIQ_REDUCTION_FILE),
+    specsDir: resolveWorkspacePath(root, VORATIQ_SPEC_DIR),
+    specsFile: resolveWorkspacePath(root, VORATIQ_SPEC_FILE),
+    verificationsDir: resolveWorkspacePath(root, VORATIQ_VERIFICATION_DIR),
+    verificationsFile: resolveWorkspacePath(root, VORATIQ_VERIFICATION_FILE),
   };
 
   return {

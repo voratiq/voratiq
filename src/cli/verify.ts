@@ -7,18 +7,18 @@ import { buildMarkdownPreviewLines } from "../commands/shared/preview.js";
 import { executeVerifyCommand } from "../commands/verify/command.js";
 import type { VerifyTargetSelection } from "../commands/verify/targets.js";
 import { resolveExtraContextFiles } from "../competition/shared/extra-context.js";
-import { isBlindedCandidateAlias } from "../domains/verifications/blinding/aliases.js";
+import { isBlindedCandidateAlias } from "../domain/verify/blinding/aliases.js";
 import {
   type VerificationMethodResultRef,
   type VerificationRecord,
   verificationResultArtifactSchema,
-} from "../domains/verifications/model/types.js";
+} from "../domain/verify/model/types.js";
 import {
   readRubricResultNarrative,
   readRubricResultNextActions,
   readRubricResultPreferred,
   readRubricResultRationale,
-} from "../domains/verifications/rubric-result.js";
+} from "../domain/verify/rubric-result.js";
 import {
   loadVerificationSelectionPolicyOutput,
   type VerificationSelectionPolicyOutput,
@@ -46,9 +46,9 @@ import {
 import { parsePositiveInteger } from "../utils/validators.js";
 import {
   resolveWorkspacePath,
-  VORATIQ_REDUCTIONS_FILE,
-  VORATIQ_VERIFICATIONS_FILE,
-  VORATIQ_VERIFICATIONS_SESSIONS_DIR,
+  VORATIQ_REDUCTION_FILE,
+  VORATIQ_VERIFICATION_FILE,
+  VORATIQ_VERIFICATION_SESSIONS_DIR,
 } from "../workspace/structure.js";
 import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
@@ -119,10 +119,10 @@ export async function runVerifyCommand(
     runsFilePath: workspacePaths.runsFile,
     reductionsFilePath:
       workspacePaths.reductionsFile ??
-      resolveWorkspacePath(root, VORATIQ_REDUCTIONS_FILE),
+      resolveWorkspacePath(root, VORATIQ_REDUCTION_FILE),
     verificationsFilePath:
       workspacePaths.verificationsFile ??
-      resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_FILE),
+      resolveWorkspacePath(root, VORATIQ_VERIFICATION_FILE),
     target,
     agentIds,
     agentOverrideFlag,
@@ -182,7 +182,7 @@ export async function runVerifyCommand(
       root,
       resolveWorkspacePath(
         root,
-        VORATIQ_VERIFICATIONS_SESSIONS_DIR,
+        VORATIQ_VERIFICATION_SESSIONS_DIR,
         execution.verificationId,
       ),
     ),
@@ -202,7 +202,7 @@ export async function runVerifyCommand(
         root,
         resolveWorkspacePath(
           root,
-          VORATIQ_VERIFICATIONS_SESSIONS_DIR,
+          VORATIQ_VERIFICATION_SESSIONS_DIR,
           execution.verificationId,
         ),
       ),

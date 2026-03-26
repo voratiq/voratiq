@@ -4,17 +4,17 @@ import {
   getActiveTerminationStatus,
   RUN_ABORT_WARNING,
   setActiveTerminationStatus,
-} from "../../domains/runs/competition/termination-state.js";
-import type { AgentInvocationRecord } from "../../domains/runs/model/types.js";
+} from "../../domain/run/competition/termination-state.js";
+import type { AgentInvocationRecord } from "../../domain/run/model/types.js";
 import {
   disposeRunRecordBuffer,
   getRunRecordSnapshot,
   rewriteRunRecord,
-} from "../../domains/runs/persistence/adapter.js";
+} from "../../domain/run/persistence/adapter.js";
 import {
   buildOperationLifecycleCompleteFields,
   buildRecordLifecycleCompleteFields,
-} from "../../domains/shared/lifecycle.js";
+} from "../../domain/shared/lifecycle.js";
 import type { RunStatus } from "../../status/index.js";
 import { TERMINABLE_RUN_STATUSES } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";

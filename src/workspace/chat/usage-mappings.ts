@@ -2,7 +2,7 @@ import {
   type ChatUsageProviderId,
   type ExtractedTokenUsage,
   extractedTokenUsageSchemaByProvider,
-} from "../../domains/runs/model/types.js";
+} from "../../domain/run/model/types.js";
 import type { ChatArtifactFormat } from "./types.js";
 
 export interface ProviderUsageFieldMapping {

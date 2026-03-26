@@ -1,18 +1,18 @@
 import { CliError, RunNotFoundCliError } from "../../cli/errors.js";
-import type { ReductionRecord } from "../../domains/reductions/model/types.js";
-import { TERMINAL_REDUCTION_STATUSES } from "../../domains/reductions/model/types.js";
-import { readReductionRecords } from "../../domains/reductions/persistence/adapter.js";
-import { RunRecordNotFoundError } from "../../domains/runs/model/errors.js";
-import type { RunRecord } from "../../domains/runs/model/types.js";
-import { fetchRunsSafely } from "../../domains/runs/persistence/adapter.js";
-import type { SpecRecord } from "../../domains/specs/model/types.js";
-import { TERMINAL_SPEC_STATUSES } from "../../domains/specs/model/types.js";
-import { readSpecRecords } from "../../domains/specs/persistence/adapter.js";
+import type { ReductionRecord } from "../../domain/reduce/model/types.js";
+import { TERMINAL_REDUCTION_STATUSES } from "../../domain/reduce/model/types.js";
+import { readReductionRecords } from "../../domain/reduce/persistence/adapter.js";
+import { RunRecordNotFoundError } from "../../domain/run/model/errors.js";
+import type { RunRecord } from "../../domain/run/model/types.js";
+import { fetchRunsSafely } from "../../domain/run/persistence/adapter.js";
+import type { SpecRecord } from "../../domain/spec/model/types.js";
+import { TERMINAL_SPEC_STATUSES } from "../../domain/spec/model/types.js";
+import { readSpecRecords } from "../../domain/spec/persistence/adapter.js";
 import type {
   ResolvedVerificationTarget,
   VerificationCompetitiveCandidate,
-} from "../../domains/verifications/competition/target.js";
-import { readVerificationRecords } from "../../domains/verifications/persistence/adapter.js";
+} from "../../domain/verify/competition/target.js";
+import { readVerificationRecords } from "../../domain/verify/persistence/adapter.js";
 import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
 
 export type VerifyTargetKind = "spec" | "run" | "reduce";
@@ -67,7 +67,7 @@ async function resolveSpecVerifyTarget(
       `Spec session \`${target.sessionId}\` not found.`,
       [],
       [
-        "Re-run `voratiq spec` or confirm the session id in `.voratiq/specs/index.json`.",
+        "Re-run `voratiq spec` or confirm the session id in `.voratiq/spec/index.json`.",
       ],
     );
   }
@@ -179,7 +179,7 @@ async function resolveReductionVerifyTarget(
       `Reduction session \`${target.sessionId}\` not found.`,
       [],
       [
-        "Re-run `voratiq reduce` or confirm the session id in `.voratiq/reductions/index.json`.",
+        "Re-run `voratiq reduce` or confirm the session id in `.voratiq/reduce/index.json`.",
       ],
     );
   }
@@ -254,7 +254,7 @@ async function resolveReductionBaseRevisionSha(options: {
       `Reduction session \`${reductionRecord.sessionId}\` has a recursive target chain.`,
       [],
       [
-        "Inspect `.voratiq/reductions/index.json` and repair the reduction target metadata.",
+        "Inspect `.voratiq/reduce/index.json` and repair the reduction target metadata.",
       ],
     );
   }
@@ -295,7 +295,7 @@ async function resolveReductionBaseRevisionSha(options: {
       }
       return runRecord.baseRevisionSha;
     }
-    case "verification": {
+    case "verify": {
       const [verificationRecord] = await readVerificationRecords({
         root,
         verificationsFilePath,
@@ -374,7 +374,7 @@ async function resolveReductionBaseRevisionSha(options: {
         `Verification session \`${verificationRecord.sessionId}\` references an unsupported target kind.`,
       );
     }
-    case "reduction": {
+    case "reduce": {
       const [parentReduction] = await readReductionRecords({
         root,
         reductionsFilePath,

@@ -57,14 +57,14 @@ See [Sandbox Configuration](https://github.com/voratiq/voratiq/blob/main/docs/co
 
 ## Everything Is Auditable
 
-Voratiq preserves a complete audit trail for every run under `.voratiq/runs/sessions/<run-id>/`. Each run directory contains the base git revision, agent logs (stdout/stderr), generated diffs, and agent summaries.
+Voratiq preserves a complete audit trail for every run under `.voratiq/run/sessions/<run-id>/`. Each run directory contains the base git revision, agent logs (stdout/stderr), generated diffs, and agent summaries.
 
 Inspect any past run, compare multiple agents' approaches to the same spec, or drill into verification artifacts to understand why a candidate was selected. Nothing is lost or overwritten.
 
 Example run directory:
 
 ```
-.voratiq/runs/sessions/20251105-143022-abc123/
+.voratiq/run/sessions/20251105-143022-abc123/
 ├── record.json             # Run metadata (status, agents, timestamps)
 ├── claude-sonnet-4-5-20250929/
 │   ├── artifacts/          # Harvested outputs

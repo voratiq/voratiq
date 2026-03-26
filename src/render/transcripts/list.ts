@@ -1,4 +1,4 @@
-import type { RunRecord } from "../../domains/runs/model/types.js";
+import type { RunRecord } from "../../domain/run/model/types.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import { renderTable } from "../utils/table.js";
 import { renderTranscript } from "../utils/transcript.js";

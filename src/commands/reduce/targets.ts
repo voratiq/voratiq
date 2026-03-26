@@ -5,16 +5,16 @@ import { RunNotFoundCliError } from "../../cli/errors.js";
 import {
   type ReductionTarget,
   TERMINAL_REDUCTION_STATUSES,
-} from "../../domains/reductions/model/types.js";
-import { readReductionRecords } from "../../domains/reductions/persistence/adapter.js";
-import { buildRunRecordView } from "../../domains/runs/model/enhanced.js";
-import { RunRecordNotFoundError } from "../../domains/runs/model/errors.js";
-import type { RunRecord } from "../../domains/runs/model/types.js";
-import { fetchRunsSafely } from "../../domains/runs/persistence/adapter.js";
-import { TERMINAL_SPEC_STATUSES } from "../../domains/specs/model/types.js";
-import { readSpecRecords } from "../../domains/specs/persistence/adapter.js";
-import { TERMINAL_VERIFICATION_STATUSES } from "../../domains/verifications/model/types.js";
-import { readVerificationRecords } from "../../domains/verifications/persistence/adapter.js";
+} from "../../domain/reduce/model/types.js";
+import { readReductionRecords } from "../../domain/reduce/persistence/adapter.js";
+import { buildRunRecordView } from "../../domain/run/model/enhanced.js";
+import { RunRecordNotFoundError } from "../../domain/run/model/errors.js";
+import type { RunRecord } from "../../domain/run/model/types.js";
+import { fetchRunsSafely } from "../../domain/run/persistence/adapter.js";
+import { TERMINAL_SPEC_STATUSES } from "../../domain/spec/model/types.js";
+import { readSpecRecords } from "../../domain/spec/persistence/adapter.js";
+import { TERMINAL_VERIFICATION_STATUSES } from "../../domain/verify/model/types.js";
+import { readVerificationRecords } from "../../domain/verify/persistence/adapter.js";
 import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
 import { pathExists } from "../../utils/fs.js";
 import {
@@ -45,10 +45,10 @@ export async function assertReductionTargetEligible(
     case "run":
       await assertRunTargetEligible(input);
       return;
-    case "verification":
+    case "verify":
       await assertVerificationTargetEligible(input);
       return;
-    case "reduction":
+    case "reduce":
       await assertReductionTargetEligibleInternal(input);
       return;
   }
@@ -71,7 +71,7 @@ async function assertSpecTargetEligible(
       `Spec session \`${target.id}\` not found.`,
       [],
       [
-        "Re-run `voratiq spec` or confirm the session id in `.voratiq/specs/index.json`.",
+        "Re-run `voratiq spec` or confirm the session id in `.voratiq/spec/index.json`.",
       ],
     );
   }
@@ -217,7 +217,7 @@ async function assertVerificationTargetEligible(
       `Verification session \`${target.id}\` not found.`,
       [],
       [
-        "Re-run `voratiq verify` or confirm the session id in `.voratiq/verifications/index.json`.",
+        "Re-run `voratiq verify` or confirm the session id in `.voratiq/verify/index.json`.",
       ],
     );
   }
@@ -257,7 +257,7 @@ async function assertReductionTargetEligibleInternal(
     throw new CliError(
       `Reduction session \`${target.id}\` not found.`,
       [],
-      ["Confirm the session id in `.voratiq/reductions/index.json`."],
+      ["Confirm the session id in `.voratiq/reduce/index.json`."],
     );
   }
 
@@ -272,7 +272,7 @@ async function assertReductionTargetEligibleInternal(
     throw new CliError(
       `Reduction session \`${target.id}\` not found.`,
       [],
-      ["Confirm the session id in `.voratiq/reductions/index.json`."],
+      ["Confirm the session id in `.voratiq/reduce/index.json`."],
     );
   }
 

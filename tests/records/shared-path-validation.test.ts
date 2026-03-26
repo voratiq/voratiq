@@ -1,7 +1,7 @@
-import { reductionRecordSchema } from "../../src/domains/reductions/model/types.js";
-import { runRecordSchema } from "../../src/domains/runs/model/types.js";
-import { specRecordSchema } from "../../src/domains/specs/model/types.js";
-import { verificationRecordSchema } from "../../src/domains/verifications/model/types.js";
+import { reductionRecordSchema } from "../../src/domain/reduce/model/types.js";
+import { runRecordSchema } from "../../src/domain/run/model/types.js";
+import { specRecordSchema } from "../../src/domain/spec/model/types.js";
+import { verificationRecordSchema } from "../../src/domain/verify/model/types.js";
 
 describe("shared record path validation", () => {
   it("rejects the same invalid repo-relative path across spec, run, verification, and reduction records", () => {

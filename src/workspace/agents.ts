@@ -3,7 +3,7 @@ import { rm } from "node:fs/promises";
 import type { SandboxStageId } from "../agents/runtime/policy.js";
 import type { AgentId } from "../configs/agents/types.js";
 import type { EnvironmentConfig } from "../configs/environment/types.js";
-import { WorkspaceSetupRunError } from "../domains/runs/competition/errors.js";
+import { WorkspaceSetupRunError } from "../domain/run/competition/errors.js";
 import { toErrorMessage } from "../utils/errors.js";
 import { createWorktree } from "../utils/git.js";
 import { resolvePath } from "../utils/path.js";

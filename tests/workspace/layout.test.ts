@@ -73,13 +73,13 @@ describe("workspace layout helpers", () => {
     const paths = resolveRunWorkspacePaths(root, runId);
 
     expect(paths.absolute).toBe(
-      join(root, ".voratiq", "runs", "sessions", runId),
+      join(root, ".voratiq", "run", "sessions", runId),
     );
-    expect(paths.relative).toBe(`.voratiq/runs/sessions/${runId}`);
+    expect(paths.relative).toBe(`.voratiq/run/sessions/${runId}`);
   });
 
   it("builds agent workspace paths with correct structure", () => {
-    const runRoot = join(root, ".voratiq", "runs", "sessions", runId);
+    const runRoot = join(root, ".voratiq", "run", "sessions", runId);
     const paths = buildAgentWorkspacePaths({ root, runId, agentId });
 
     expect(paths.agentRoot).toBe(join(runRoot, agentId));

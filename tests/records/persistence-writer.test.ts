@@ -2,13 +2,13 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { RunRecord } from "../../src/domains/runs/model/types.js";
+import type { RunRecord } from "../../src/domain/run/model/types.js";
 import {
   appendRunRecord,
   disposeRunRecordBuffer,
   flushAllRunRecordBuffers,
   rewriteRunRecord,
-} from "../../src/domains/runs/persistence/adapter.js";
+} from "../../src/domain/run/persistence/adapter.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,

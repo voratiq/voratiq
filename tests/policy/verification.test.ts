@@ -9,12 +9,9 @@ describe("verification policy handoff", () => {
 
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), "voratiq-policy-verification-"));
-    await mkdir(
-      join(root, ".voratiq", "verifications", "sessions", "verify-1"),
-      {
-        recursive: true,
-      },
-    );
+    await mkdir(join(root, ".voratiq", "verify", "sessions", "verify-1"), {
+      recursive: true,
+    });
   });
 
   afterEach(async () => {
@@ -23,9 +20,9 @@ describe("verification policy handoff", () => {
 
   it("loads programmatic and rubric artifacts into an explicit policy input", async () => {
     const programmaticArtifactPath =
-      ".voratiq/verifications/sessions/verify-1/programmatic/artifacts/result.json";
+      ".voratiq/verify/sessions/verify-1/programmatic/artifacts/result.json";
     const rubricArtifactPath =
-      ".voratiq/verifications/sessions/verify-1/reviewer-a/run-review/artifacts/result.json";
+      ".voratiq/verify/sessions/verify-1/reviewer-a/run-review/artifacts/result.json";
 
     await mkdir(dirname(join(root, programmaticArtifactPath)), {
       recursive: true,
@@ -180,7 +177,7 @@ describe("verification policy handoff", () => {
 
   it("rejects blinded rubric artifacts whose selectors do not match the persisted alias map", async () => {
     const rubricArtifactPath =
-      ".voratiq/verifications/sessions/verify-1/reviewer-a/run-review/artifacts/result.json";
+      ".voratiq/verify/sessions/verify-1/reviewer-a/run-review/artifacts/result.json";
 
     await mkdir(dirname(join(root, rubricArtifactPath)), { recursive: true });
     await writeFile(

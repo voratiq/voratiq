@@ -6,19 +6,19 @@ import {
 import type { ChatArtifactFormat } from "./chat/types.js";
 
 export const VORATIQ_DIR = ".voratiq";
-export const VORATIQ_RUNS_DIR = "runs";
-export const VORATIQ_RUNS_FILE = "runs/index.json";
-export const VORATIQ_RUNS_SESSIONS_DIR = "runs/sessions";
-export const VORATIQ_REDUCTIONS_DIR = "reductions";
-export const VORATIQ_REDUCTIONS_FILE = "reductions/index.json";
-export const VORATIQ_REDUCTIONS_SESSIONS_DIR = "reductions/sessions";
-export const VORATIQ_SPECS_DIR = "specs";
-export const VORATIQ_SPECS_FILE = "specs/index.json";
-export const VORATIQ_SPECS_SESSIONS_DIR = "specs/sessions";
-export const VORATIQ_VERIFICATIONS_DIR = "verifications";
-export const VORATIQ_VERIFICATIONS_FILE = "verifications/index.json";
-export const VORATIQ_VERIFICATIONS_SESSIONS_DIR = "verifications/sessions";
-export const VORATIQ_VERIFICATIONS_TEMPLATES_DIR = "verifications/templates";
+export const VORATIQ_RUN_DIR = "run";
+export const VORATIQ_RUN_FILE = "run/index.json";
+export const VORATIQ_RUN_SESSIONS_DIR = "run/sessions";
+export const VORATIQ_REDUCTION_DIR = "reduce";
+export const VORATIQ_REDUCTION_FILE = "reduce/index.json";
+export const VORATIQ_REDUCTION_SESSIONS_DIR = "reduce/sessions";
+export const VORATIQ_SPEC_DIR = "spec";
+export const VORATIQ_SPEC_FILE = "spec/index.json";
+export const VORATIQ_SPEC_SESSIONS_DIR = "spec/sessions";
+export const VORATIQ_VERIFICATION_DIR = "verify";
+export const VORATIQ_VERIFICATION_FILE = "verify/index.json";
+export const VORATIQ_VERIFICATION_SESSIONS_DIR = "verify/sessions";
+export const VORATIQ_VERIFICATION_TEMPLATES_DIR = "verify/templates";
 export const VORATIQ_INDEX_FILENAME = "index.json";
 export const VORATIQ_HISTORY_LOCK_FILENAME = "history.lock";
 export const VORATIQ_SESSIONS_DIRNAME = "sessions";
@@ -114,7 +114,7 @@ function formatAgentSessionScopedPath(
 function formatRunScopedPath(runId: string, ...segments: string[]): string {
   const safeRunId = assertPathSegment("runId", runId);
   const scoped = formatDomainScopedPath(
-    VORATIQ_RUNS_DIR,
+    VORATIQ_RUN_DIR,
     VORATIQ_SESSIONS_DIRNAME,
     safeRunId,
     ...segments,
@@ -143,44 +143,44 @@ export function getDomainHistoryLockPath(domain: string): string {
   return formatDomainScopedPath(domain, VORATIQ_HISTORY_LOCK_FILENAME);
 }
 
-export function getSpecsDirectoryPath(): string {
-  return getDomainDirectoryPath(VORATIQ_SPECS_DIR);
+export function getSpecDirectoryPath(): string {
+  return getDomainDirectoryPath(VORATIQ_SPEC_DIR);
 }
 
-export function getSpecsIndexPath(): string {
-  return getDomainIndexPath(VORATIQ_SPECS_DIR);
+export function getSpecIndexPath(): string {
+  return getDomainIndexPath(VORATIQ_SPEC_DIR);
 }
 
-export function getSpecsHistoryLockPath(): string {
-  return getDomainHistoryLockPath(VORATIQ_SPECS_DIR);
+export function getSpecHistoryLockPath(): string {
+  return getDomainHistoryLockPath(VORATIQ_SPEC_DIR);
 }
 
-export function getSpecsSessionsDirectoryPath(): string {
-  return getDomainSessionsDirectoryPath(VORATIQ_SPECS_DIR);
+export function getSpecSessionsDirectoryPath(): string {
+  return getDomainSessionsDirectoryPath(VORATIQ_SPEC_DIR);
 }
 
-export function getVerificationsDirectoryPath(): string {
-  return getDomainDirectoryPath(VORATIQ_VERIFICATIONS_DIR);
+export function getVerificationDirectoryPath(): string {
+  return getDomainDirectoryPath(VORATIQ_VERIFICATION_DIR);
 }
 
-export function getVerificationsIndexPath(): string {
-  return getDomainIndexPath(VORATIQ_VERIFICATIONS_DIR);
+export function getVerificationIndexPath(): string {
+  return getDomainIndexPath(VORATIQ_VERIFICATION_DIR);
 }
 
-export function getVerificationsSessionsDirectoryPath(): string {
-  return getDomainSessionsDirectoryPath(VORATIQ_VERIFICATIONS_DIR);
+export function getVerificationSessionsDirectoryPath(): string {
+  return getDomainSessionsDirectoryPath(VORATIQ_VERIFICATION_DIR);
 }
 
-export function getReductionsDirectoryPath(): string {
-  return getDomainDirectoryPath(VORATIQ_REDUCTIONS_DIR);
+export function getReductionDirectoryPath(): string {
+  return getDomainDirectoryPath(VORATIQ_REDUCTION_DIR);
 }
 
-export function getReductionsIndexPath(): string {
-  return getDomainIndexPath(VORATIQ_REDUCTIONS_DIR);
+export function getReductionIndexPath(): string {
+  return getDomainIndexPath(VORATIQ_REDUCTION_DIR);
 }
 
-export function getReductionsSessionsDirectoryPath(): string {
-  return getDomainSessionsDirectoryPath(VORATIQ_REDUCTIONS_DIR);
+export function getReductionSessionsDirectoryPath(): string {
+  return getDomainSessionsDirectoryPath(VORATIQ_REDUCTION_DIR);
 }
 
 export function getDomainSessionsDirectoryPath(domain: string): string {
@@ -195,22 +195,22 @@ export function getSessionDirectoryPath(
 }
 
 export function getSpecSessionDirectoryPath(sessionId: string): string {
-  return getSessionDirectoryPath(VORATIQ_SPECS_DIR, sessionId);
+  return getSessionDirectoryPath(VORATIQ_SPEC_DIR, sessionId);
 }
 
 export function getReductionSessionDirectoryPath(sessionId: string): string {
-  return getSessionDirectoryPath(VORATIQ_REDUCTIONS_DIR, sessionId);
+  return getSessionDirectoryPath(VORATIQ_REDUCTION_DIR, sessionId);
 }
 
 export function getVerificationSessionDirectoryPath(sessionId: string): string {
-  return getSessionDirectoryPath(VORATIQ_VERIFICATIONS_DIR, sessionId);
+  return getSessionDirectoryPath(VORATIQ_VERIFICATION_DIR, sessionId);
 }
 
 export function getVerificationSessionArtifactsDirectoryPath(
   sessionId: string,
 ): string {
   return formatSessionScopedPath(
-    VORATIQ_VERIFICATIONS_DIR,
+    VORATIQ_VERIFICATION_DIR,
     sessionId,
     ARTIFACTS_DIRNAME,
   );
@@ -218,7 +218,7 @@ export function getVerificationSessionArtifactsDirectoryPath(
 
 export function getVerificationSessionRecordPath(sessionId: string): string {
   return formatSessionScopedPath(
-    VORATIQ_VERIFICATIONS_DIR,
+    VORATIQ_VERIFICATION_DIR,
     sessionId,
     "record.json",
   );
@@ -228,7 +228,7 @@ export function getVerificationProgrammaticResultPath(
   sessionId: string,
 ): string {
   return formatSessionScopedPath(
-    VORATIQ_VERIFICATIONS_DIR,
+    VORATIQ_VERIFICATION_DIR,
     sessionId,
     "programmatic",
     ARTIFACTS_DIRNAME,
@@ -245,7 +245,7 @@ export function getVerificationRubricResultPath(options: {
   const safeVerifierId = agentIdSchema.parse(verifierId);
   const safeTemplate = assertPathSegment("segment", template);
   return formatAgentSessionScopedPath(
-    VORATIQ_VERIFICATIONS_DIR,
+    VORATIQ_VERIFICATION_DIR,
     sessionId,
     safeVerifierId,
     safeTemplate,
@@ -263,7 +263,7 @@ export function getVerificationRubricExecutionDirectoryPath(options: {
   const safeVerifierId = agentIdSchema.parse(verifierId);
   const safeTemplate = assertPathSegment("segment", template);
   return formatAgentSessionScopedPath(
-    VORATIQ_VERIFICATIONS_DIR,
+    VORATIQ_VERIFICATION_DIR,
     sessionId,
     safeVerifierId,
     safeTemplate,
@@ -282,7 +282,7 @@ export function getSpecAgentSessionDirectoryPath(
   sessionId: string,
   agentId: string,
 ): string {
-  return getAgentSessionDirectoryPath(VORATIQ_SPECS_DIR, sessionId, agentId);
+  return getAgentSessionDirectoryPath(VORATIQ_SPEC_DIR, sessionId, agentId);
 }
 
 export function getAgentSessionManifestPath(
@@ -495,59 +495,51 @@ export function getAgentDirectoryPath(runId: string, agentId: string): string {
 }
 
 export function getAgentManifestPath(runId: string, agentId: string): string {
-  return getAgentSessionManifestPath(VORATIQ_RUNS_DIR, runId, agentId);
+  return getAgentSessionManifestPath(VORATIQ_RUN_DIR, runId, agentId);
 }
 
 export function getAgentRuntimeDirectoryPath(
   runId: string,
   agentId: string,
 ): string {
-  return getAgentSessionRuntimeDirectoryPath(VORATIQ_RUNS_DIR, runId, agentId);
+  return getAgentSessionRuntimeDirectoryPath(VORATIQ_RUN_DIR, runId, agentId);
 }
 
 export function getAgentWorkspaceDirectoryPath(
   runId: string,
   agentId: string,
 ): string {
-  return getAgentSessionWorkspaceDirectoryPath(
-    VORATIQ_RUNS_DIR,
-    runId,
-    agentId,
-  );
+  return getAgentSessionWorkspaceDirectoryPath(VORATIQ_RUN_DIR, runId, agentId);
 }
 
 export function getAgentContextDirectoryPath(
   runId: string,
   agentId: string,
 ): string {
-  return getAgentSessionContextDirectoryPath(VORATIQ_RUNS_DIR, runId, agentId);
+  return getAgentSessionContextDirectoryPath(VORATIQ_RUN_DIR, runId, agentId);
 }
 
 export function getAgentArtifactsDirectoryPath(
   runId: string,
   agentId: string,
 ): string {
-  return getAgentSessionArtifactsDirectoryPath(
-    VORATIQ_RUNS_DIR,
-    runId,
-    agentId,
-  );
+  return getAgentSessionArtifactsDirectoryPath(VORATIQ_RUN_DIR, runId, agentId);
 }
 
 export function getAgentStdoutPath(runId: string, agentId: string): string {
-  return getAgentSessionStdoutPath(VORATIQ_RUNS_DIR, runId, agentId);
+  return getAgentSessionStdoutPath(VORATIQ_RUN_DIR, runId, agentId);
 }
 
 export function getAgentStderrPath(runId: string, agentId: string): string {
-  return getAgentSessionStderrPath(VORATIQ_RUNS_DIR, runId, agentId);
+  return getAgentSessionStderrPath(VORATIQ_RUN_DIR, runId, agentId);
 }
 
 export function getAgentDiffPath(runId: string, agentId: string): string {
-  return getAgentSessionDiffPath(VORATIQ_RUNS_DIR, runId, agentId);
+  return getAgentSessionDiffPath(VORATIQ_RUN_DIR, runId, agentId);
 }
 
 export function getAgentSummaryPath(runId: string, agentId: string): string {
-  return getAgentSessionSummaryPath(VORATIQ_RUNS_DIR, runId, agentId);
+  return getAgentSessionSummaryPath(VORATIQ_RUN_DIR, runId, agentId);
 }
 
 export function getAgentChatArtifactPath(
@@ -556,7 +548,7 @@ export function getAgentChatArtifactPath(
   format: ChatArtifactFormat,
 ): string {
   return getAgentSessionChatArtifactPath(
-    VORATIQ_RUNS_DIR,
+    VORATIQ_RUN_DIR,
     runId,
     agentId,
     format,
@@ -611,19 +603,19 @@ export function getAgentSandboxDirectoryPath(
   runId: string,
   agentId: string,
 ): string {
-  return getAgentSessionSandboxDirectoryPath(VORATIQ_RUNS_DIR, runId, agentId);
+  return getAgentSessionSandboxDirectoryPath(VORATIQ_RUN_DIR, runId, agentId);
 }
 
 export function getAgentSandboxHomePath(
   runId: string,
   agentId: string,
 ): string {
-  return getAgentSessionSandboxHomePath(VORATIQ_RUNS_DIR, runId, agentId);
+  return getAgentSessionSandboxHomePath(VORATIQ_RUN_DIR, runId, agentId);
 }
 
 export function getAgentSandboxSettingsPath(
   runId: string,
   agentId: string,
 ): string {
-  return getAgentSessionSandboxSettingsPath(VORATIQ_RUNS_DIR, runId, agentId);
+  return getAgentSessionSandboxSettingsPath(VORATIQ_RUN_DIR, runId, agentId);
 }

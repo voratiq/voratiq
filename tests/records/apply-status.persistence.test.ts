@@ -12,12 +12,12 @@ import {
 import type {
   RunApplyStatus,
   RunRecord,
-} from "../../src/domains/runs/model/types.js";
+} from "../../src/domain/run/model/types.js";
 import {
   appendRunRecord,
   flushAllRunRecordBuffers,
   rewriteRunRecord,
-} from "../../src/domains/runs/persistence/adapter.js";
+} from "../../src/domain/run/persistence/adapter.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,

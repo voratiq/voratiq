@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { specRecordSchema } from "../../src/domains/specs/model/types.js";
+import { specRecordSchema } from "../../src/domain/spec/model/types.js";
 
 describe("specRecordSchema", () => {
   it("remains backward-compatible with legacy records that predate baseRevisionSha", () => {
@@ -17,8 +17,8 @@ describe("specRecordSchema", () => {
           status: "succeeded",
           startedAt: "2026-01-01T00:00:00.500Z",
           completedAt: "2026-01-01T00:00:02.000Z",
-          outputPath: ".voratiq/specs/spec-title.md",
-          dataPath: ".voratiq/specs/spec-title.json",
+          outputPath: ".voratiq/spec/spec-title.md",
+          dataPath: ".voratiq/spec/spec-title.json",
         },
       ],
       error: null,
@@ -42,8 +42,8 @@ describe("specRecordSchema", () => {
           status: "succeeded",
           startedAt: "2026-01-01T00:00:00.500Z",
           completedAt: "2026-01-01T00:00:02.000Z",
-          outputPath: ".voratiq/specs/spec-title.md",
-          dataPath: ".voratiq/specs/spec-title.json",
+          outputPath: ".voratiq/spec/spec-title.md",
+          dataPath: ".voratiq/spec/spec-title.json",
           tokenUsage: {
             input_tokens: 120,
             cached_input_tokens: 30,

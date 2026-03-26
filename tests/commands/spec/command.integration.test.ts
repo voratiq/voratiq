@@ -9,8 +9,8 @@ import { generateSessionId } from "../../../src/commands/shared/session-id.js";
 import { executeSpecCommand } from "../../../src/commands/spec/command.js";
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
 import { loadEnvironmentConfig } from "../../../src/configs/environment/loader.js";
-import * as specAdapter from "../../../src/domains/specs/competition/adapter.js";
-import { readSpecRecords } from "../../../src/domains/specs/persistence/adapter.js";
+import * as specAdapter from "../../../src/domain/spec/competition/adapter.js";
+import { readSpecRecords } from "../../../src/domain/spec/persistence/adapter.js";
 import { getHeadRevision } from "../../../src/utils/git.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 

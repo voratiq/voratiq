@@ -12,12 +12,12 @@ import {
   type PreparedVerifyCompetitionCandidate,
   type VerifyCompetitionCandidate,
   type VerifyCompetitionExecution,
-} from "../../../src/domains/verifications/competition/adapter.js";
-import type { RubricTemplateContents } from "../../../src/domains/verifications/competition/prompt.js";
-import type { SharedVerificationInputs } from "../../../src/domains/verifications/competition/shared-layout.js";
-import type { ResolvedVerificationTarget } from "../../../src/domains/verifications/competition/target.js";
-import type { VerificationRecordMutators } from "../../../src/domains/verifications/model/mutators.js";
-import type { VerificationRecord } from "../../../src/domains/verifications/model/types.js";
+} from "../../../src/domain/verify/competition/adapter.js";
+import type { RubricTemplateContents } from "../../../src/domain/verify/competition/prompt.js";
+import type { SharedVerificationInputs } from "../../../src/domain/verify/competition/shared-layout.js";
+import type { ResolvedVerificationTarget } from "../../../src/domain/verify/competition/target.js";
+import type { VerificationRecordMutators } from "../../../src/domain/verify/model/mutators.js";
+import type { VerificationRecord } from "../../../src/domain/verify/model/types.js";
 import type { AgentWorkspacePaths } from "../../../src/workspace/layout.js";
 import {
   type AdapterContractScenarioInput,
@@ -40,11 +40,11 @@ const template: RubricTemplateContents = {
 };
 const sharedInputs: SharedVerificationInputs = {
   kind: "reduce",
-  sharedRootAbsolute: "/repo/.voratiq/verifications/sessions/verify-id/.shared",
+  sharedRootAbsolute: "/repo/.voratiq/verify/sessions/verify-id/.shared",
   sharedInputsAbsolute:
-    "/repo/.voratiq/verifications/sessions/verify-id/.shared/inputs",
+    "/repo/.voratiq/verify/sessions/verify-id/.shared/inputs",
   referenceRepoAbsolute:
-    "/repo/.voratiq/verifications/sessions/verify-id/.shared/reference/repo",
+    "/repo/.voratiq/verify/sessions/verify-id/.shared/reference/repo",
   worktreesToRemove: [],
   candidates: [{ alias: "r_aaaaaaaaaa" }],
 };
@@ -179,7 +179,7 @@ function toVerifyCandidate(id: string): VerifyCompetitionCandidate {
 }
 
 function toWorkspacePaths(id: string): AgentWorkspacePaths {
-  const base = `/repo/.voratiq/verifications/sessions/verify-id/${id}`;
+  const base = `/repo/.voratiq/verify/sessions/verify-id/${id}`;
   return {
     agentRoot: base,
     artifactsPath: `${base}/artifacts`,
@@ -213,7 +213,7 @@ function buildResolvedTarget(): ResolvedVerificationTarget {
       createdAt: "2026-01-01T00:00:00.000Z",
       status: "succeeded",
       target: {
-        type: "verification",
+        type: "verify",
         id: "verification-id",
       },
       reducers: [],
@@ -222,7 +222,7 @@ function buildResolvedTarget(): ResolvedVerificationTarget {
 }
 
 function normalizeArtifactPath(id: string): string {
-  return `.voratiq/verifications/sessions/verify-id/${id}/template/artifacts/result.json`;
+  return `.voratiq/verify/sessions/verify-id/${id}/template/artifacts/result.json`;
 }
 
 function buildUnavailableTokenUsageResult(agentId: string) {

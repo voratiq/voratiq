@@ -1,4 +1,4 @@
-import type { AgentInvocationRecord } from "../../domains/runs/model/types.js";
+import type { AgentInvocationRecord } from "../../domain/run/model/types.js";
 import type { RunStatus } from "../../status/index.js";
 
 export interface ApplyResult {

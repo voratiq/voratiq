@@ -2,7 +2,7 @@
 
 Agent ensembles to design, generate, and select the best code for every task.
 
-![`voratiq auto --spec .voratiq/specs/categorical-performance-by-taxonomy.md`](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/run-demo.png)
+![`voratiq auto --spec .voratiq/spec/categorical-performance-by-taxonomy.md`](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/run-demo.png)
 
 No single model wins every task. Run several, keep the best result. [Here's why that works](https://voratiq.com/blog/selection-rather-than-prediction/).
 

@@ -1,7 +1,7 @@
 import {
   type LifecycleExecutionDurationInput,
   resolveLifecycleExecutionDurationMs,
-} from "../../domains/shared/lifecycle.js";
+} from "../../domain/shared/lifecycle.js";
 
 export function resolveRenderLifecycleDurationMs<
   TStatus extends string,

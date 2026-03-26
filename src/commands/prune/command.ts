@@ -4,13 +4,13 @@ import { NonInteractiveShellError } from "../../cli/errors.js";
 import {
   RunRecordNotFoundError,
   RunRecordParseError,
-} from "../../domains/runs/model/errors.js";
-import type { RunRecord } from "../../domains/runs/model/types.js";
+} from "../../domain/run/model/errors.js";
+import type { RunRecord } from "../../domain/run/model/types.js";
 import {
   fetchRunsSafely,
   rewriteRunRecord,
   RUN_RECORD_FILENAME,
-} from "../../domains/runs/persistence/adapter.js";
+} from "../../domain/run/persistence/adapter.js";
 import {
   buildPruneAllConfirmationPreface,
   buildPruneConfirmationPreface,
@@ -34,7 +34,7 @@ import {
   getAgentWorkspaceDirectoryPath,
   getRunDirectoryPath,
   resolveWorkspacePath,
-  VORATIQ_RUNS_SESSIONS_DIR,
+  VORATIQ_RUN_SESSIONS_DIR,
 } from "../../workspace/structure.js";
 import { fetchRunSafely } from "../fetch.js";
 import {
@@ -451,7 +451,7 @@ async function purgeRunDirectoryExceptRecord(options: {
   const { root, runRecord } = options;
   const runDir = resolveWorkspacePath(
     root,
-    VORATIQ_RUNS_SESSIONS_DIR,
+    VORATIQ_RUN_SESSIONS_DIR,
     runRecord.runId,
   );
   if (!(await pathExists(runDir))) {

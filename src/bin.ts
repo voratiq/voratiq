@@ -63,7 +63,7 @@ async function handleSignal(signal: NodeJS.Signals): Promise<void> {
 async function flushPendingHistory(): Promise<void> {
   try {
     const { flushAllRunRecordBuffers } = await import(
-      "./domains/runs/persistence/adapter.js"
+      "./domain/run/persistence/adapter.js"
     );
     await flushAllRunRecordBuffers();
   } catch (error) {
@@ -73,7 +73,7 @@ async function flushPendingHistory(): Promise<void> {
   }
   try {
     const { flushAllVerificationRecordBuffers } = await import(
-      "./domains/verifications/persistence/adapter.js"
+      "./domain/verify/persistence/adapter.js"
     );
     await flushAllVerificationRecordBuffers();
   } catch (error) {
@@ -83,7 +83,7 @@ async function flushPendingHistory(): Promise<void> {
   }
   try {
     const { flushAllSpecRecordBuffers } = await import(
-      "./domains/specs/persistence/adapter.js"
+      "./domain/spec/persistence/adapter.js"
     );
     await flushAllSpecRecordBuffers();
   } catch (error) {
@@ -93,7 +93,7 @@ async function flushPendingHistory(): Promise<void> {
   }
   try {
     const { flushAllReductionRecordBuffers } = await import(
-      "./domains/reductions/persistence/adapter.js"
+      "./domain/reduce/persistence/adapter.js"
     );
     await flushAllReductionRecordBuffers();
   } catch (error) {

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import type {
   ChatUsageProviderId,
   ExtractedTokenUsage,
-} from "../../domains/runs/model/types.js";
+} from "../../domain/run/model/types.js";
 import { isMissing } from "../../utils/fs.js";
 import type {
   TokenUsageResult,

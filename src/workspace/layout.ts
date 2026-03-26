@@ -24,7 +24,7 @@ import {
   SANDBOX_SETTINGS_FILENAME,
   STDERR_FILENAME,
   STDOUT_FILENAME,
-  VORATIQ_RUNS_DIR,
+  VORATIQ_RUN_DIR,
   WORKSPACE_DIRNAME,
 } from "./structure.js";
 
@@ -197,7 +197,7 @@ export function buildAgentWorkspacePaths(options: {
   const { root, runId, agentId } = options;
   return buildAgentSessionWorkspacePaths({
     root,
-    domain: VORATIQ_RUNS_DIR,
+    domain: VORATIQ_RUN_DIR,
     sessionId: runId,
     agentId,
   });

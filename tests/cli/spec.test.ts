@@ -9,7 +9,7 @@ import { CliError } from "../../src/cli/errors.js";
 import { createSpecCommand, runSpecCommand } from "../../src/cli/spec.js";
 import { executeCompetitionWithAdapter } from "../../src/competition/command-adapter.js";
 import { readAgentsConfig } from "../../src/configs/agents/loader.js";
-import { readSpecRecords } from "../../src/domains/specs/persistence/adapter.js";
+import { readSpecRecords } from "../../src/domain/spec/persistence/adapter.js";
 import * as preflight from "../../src/preflight/index.js";
 import { renderCliError } from "../../src/render/utils/errors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
@@ -595,7 +595,7 @@ describe("voratiq spec (CLI)", () => {
     const finalRecord = (
       await readSpecRecords({
         root: repoRoot,
-        specsFilePath: join(repoRoot, ".voratiq", "specs", "index.json"),
+        specsFilePath: join(repoRoot, ".voratiq", "spec", "index.json"),
         limit: 1,
         predicate: (entry) => entry.sessionId === result.sessionId,
       })
@@ -644,7 +644,7 @@ describe("voratiq spec (CLI)", () => {
       }),
     ).rejects.toBeDefined();
 
-    const indexPath = join(repoRoot, ".voratiq", "specs", "index.json");
+    const indexPath = join(repoRoot, ".voratiq", "spec", "index.json");
     const indexPayload = JSON.parse(await readFile(indexPath, "utf8")) as {
       sessions: Array<{ sessionId: string; status: string }>;
     };
@@ -656,7 +656,7 @@ describe("voratiq spec (CLI)", () => {
     const recordPath = join(
       repoRoot,
       ".voratiq",
-      "specs",
+      "spec",
       "sessions",
       sessionId,
       "record.json",
@@ -676,7 +676,7 @@ describe("voratiq spec (CLI)", () => {
     const workspacePath = join(
       repoRoot,
       ".voratiq",
-      "specs",
+      "spec",
       "sessions",
       sessionId,
       "claude-haiku-4-5-20251001",
@@ -775,7 +775,7 @@ describe("voratiq spec (CLI)", () => {
       }),
     );
 
-    const indexPath = join(repoRoot, ".voratiq", "specs", "index.json");
+    const indexPath = join(repoRoot, ".voratiq", "spec", "index.json");
     const indexPayload = JSON.parse(await readFile(indexPath, "utf8")) as {
       sessions: Array<{ sessionId: string; status: string }>;
     };
@@ -787,7 +787,7 @@ describe("voratiq spec (CLI)", () => {
     const recordPath = join(
       repoRoot,
       ".voratiq",
-      "specs",
+      "spec",
       "sessions",
       sessionId,
       "record.json",
@@ -811,16 +811,16 @@ describe("voratiq spec (CLI)", () => {
     expect(record.agents[0]?.outputPath).toBeDefined();
     expect(record.agents[0]?.dataPath).toBeDefined();
     expect(record.agents[0]?.outputPath).toBe(
-      `.voratiq/specs/sessions/${sessionId}/claude-haiku-4-5-20251001/artifacts/${slug}.md`,
+      `.voratiq/spec/sessions/${sessionId}/claude-haiku-4-5-20251001/artifacts/${slug}.md`,
     );
     expect(record.agents[0]?.dataPath).toBe(
-      `.voratiq/specs/sessions/${sessionId}/claude-haiku-4-5-20251001/artifacts/${slug}.json`,
+      `.voratiq/spec/sessions/${sessionId}/claude-haiku-4-5-20251001/artifacts/${slug}.json`,
     );
 
     const artifactPath = join(
       repoRoot,
       ".voratiq",
-      "specs",
+      "spec",
       "sessions",
       sessionId,
       "claude-haiku-4-5-20251001",
@@ -836,7 +836,7 @@ describe("voratiq spec (CLI)", () => {
         join(
           repoRoot,
           ".voratiq",
-          "specs",
+          "spec",
           "sessions",
           sessionId,
           "claude-haiku-4-5-20251001",
@@ -850,7 +850,7 @@ describe("voratiq spec (CLI)", () => {
     const workspacePath = join(
       repoRoot,
       ".voratiq",
-      "specs",
+      "spec",
       "sessions",
       sessionId,
       "claude-haiku-4-5-20251001",

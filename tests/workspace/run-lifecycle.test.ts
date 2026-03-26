@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { jest } from "@jest/globals";
 
-import { RunDirectoryExistsError } from "../../src/domains/runs/competition/errors.js";
+import { RunDirectoryExistsError } from "../../src/domain/run/competition/errors.js";
 import { cleanupRunWorkspace } from "../../src/workspace/cleanup.js";
 import { WorkspaceSetupError } from "../../src/workspace/errors.js";
 import {
@@ -42,14 +42,14 @@ describe("prepareRunWorkspace", () => {
     });
 
     expect(runWorkspace.absolute).toBe(
-      join(root, ".voratiq", "runs", "sessions", "2025-11-10-test"),
+      join(root, ".voratiq", "run", "sessions", "2025-11-10-test"),
     );
     await expect(
       fs.access(
         join(
           root,
           ".voratiq",
-          "runs",
+          "run",
           "sessions",
           "2025-11-10-test",
           "prompt.txt",
@@ -60,7 +60,7 @@ describe("prepareRunWorkspace", () => {
 
   it("throws when the run directory already exists", async () => {
     const root = await createTempRoot("voratiq-run-");
-    const runDir = join(root, ".voratiq", "runs", "sessions", "existing-run");
+    const runDir = join(root, ".voratiq", "run", "sessions", "existing-run");
     await fs.mkdir(runDir, { recursive: true });
 
     await expect(

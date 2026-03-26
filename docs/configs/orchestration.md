@@ -93,13 +93,13 @@ Add profiles to switch between different agent sets without editing stage lists 
 Without `--profile`, Voratiq uses `profiles.default`:
 
 ```bash
-voratiq run --spec .voratiq/specs/task.md
+voratiq run --spec .voratiq/spec/task.md
 ```
 
 With `--profile`, Voratiq uses the named profile:
 
 ```bash
-voratiq run --spec .voratiq/specs/task.md --profile expanded
+voratiq run --spec .voratiq/spec/task.md --profile expanded
 ```
 
 ## Validation

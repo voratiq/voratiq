@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import { getActiveTerminationStatus } from "../../src/domains/runs/competition/termination-state.js";
-import { createAgentRecordMutators } from "../../src/domains/runs/model/mutators.js";
-import type { RunRecord } from "../../src/domains/runs/model/types.js";
-import { rewriteRunRecord } from "../../src/domains/runs/persistence/adapter.js";
+import { getActiveTerminationStatus } from "../../src/domain/run/competition/termination-state.js";
+import { createAgentRecordMutators } from "../../src/domain/run/model/mutators.js";
+import type { RunRecord } from "../../src/domain/run/model/types.js";
+import { rewriteRunRecord } from "../../src/domain/run/persistence/adapter.js";
 
-jest.mock("../../src/domains/runs/persistence/adapter.js", () => ({
+jest.mock("../../src/domain/run/persistence/adapter.js", () => ({
   rewriteRunRecord: jest.fn(),
 }));
 
-jest.mock("../../src/domains/runs/competition/termination-state.js", () => ({
+jest.mock("../../src/domain/run/competition/termination-state.js", () => ({
   getActiveTerminationStatus: jest.fn(),
   RUN_ABORT_WARNING: "Run aborted before agent completed.",
 }));
@@ -51,7 +51,7 @@ describe("createAgentRecordMutators", () => {
 
     const mutators = createAgentRecordMutators({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId,
     });
 
@@ -93,7 +93,7 @@ describe("createAgentRecordMutators", () => {
 
     const mutators = createAgentRecordMutators({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId,
     });
 
@@ -158,7 +158,7 @@ describe("createAgentRecordMutators", () => {
 
     const mutators = createAgentRecordMutators({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId,
     });
 
@@ -201,7 +201,7 @@ describe("createAgentRecordMutators", () => {
 
     const mutators = createAgentRecordMutators({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId,
     });
 
@@ -239,7 +239,7 @@ describe("createAgentRecordMutators", () => {
 
     const mutators = createAgentRecordMutators({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId,
     });
 

@@ -20,27 +20,24 @@ import {
   VERIFY_ABORT_DETAIL,
 } from "../../../src/commands/verify/lifecycle.js";
 import { createTeardownController } from "../../../src/competition/shared/teardown.js";
-import { writeVerificationArtifact } from "../../../src/domains/verifications/competition/artifacts.js";
-import type { VerificationRecord } from "../../../src/domains/verifications/model/types.js";
+import { writeVerificationArtifact } from "../../../src/domain/verify/competition/artifacts.js";
+import type { VerificationRecord } from "../../../src/domain/verify/model/types.js";
 import {
   flushVerificationRecordBuffer,
   readVerificationRecords,
   rewriteVerificationRecord,
-} from "../../../src/domains/verifications/persistence/adapter.js";
+} from "../../../src/domain/verify/persistence/adapter.js";
 import { pathExists } from "../../../src/utils/fs.js";
 
-jest.mock("../../../src/domains/verifications/persistence/adapter.js", () => ({
+jest.mock("../../../src/domain/verify/persistence/adapter.js", () => ({
   readVerificationRecords: jest.fn(),
   rewriteVerificationRecord: jest.fn(),
   flushVerificationRecordBuffer: jest.fn(),
 }));
 
-jest.mock(
-  "../../../src/domains/verifications/competition/artifacts.js",
-  () => ({
-    writeVerificationArtifact: jest.fn(),
-  }),
-);
+jest.mock("../../../src/domain/verify/competition/artifacts.js", () => ({
+  writeVerificationArtifact: jest.fn(),
+}));
 
 jest.mock("../../../src/agents/runtime/registry.js", () => ({
   teardownSessionAuth: jest.fn(),
@@ -85,7 +82,7 @@ describe("verify lifecycle", () => {
     });
     registerActiveVerification({
       root: "/repo",
-      verificationsFilePath: "/repo/.voratiq/verifications/index.json",
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
       verificationId: VERIFICATION_ID,
       teardown,
     });
@@ -123,7 +120,7 @@ describe("verify lifecycle", () => {
           scope: { kind: "run" },
           status: "succeeded",
           artifactPath:
-            ".voratiq/verifications/sessions/verify-123/verifier-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/verifier-b/run-review/artifacts/result.json",
           startedAt: "2026-01-01T00:00:07.000Z",
           completedAt: "2026-01-01T00:00:30.000Z",
           error: null,
@@ -149,7 +146,7 @@ describe("verify lifecycle", () => {
     expect(writeVerificationArtifactMock).toHaveBeenCalledTimes(2);
     expect(rewriteVerificationRecordMock).toHaveBeenCalledTimes(1);
     expect(flushVerificationRecordBufferMock).toHaveBeenCalledWith({
-      verificationsFilePath: "/repo/.voratiq/verifications/index.json",
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
       sessionId: VERIFICATION_ID,
     });
     expect(teardownSessionAuthMock).toHaveBeenCalledWith(VERIFICATION_ID);
@@ -163,7 +160,7 @@ describe("verify lifecycle", () => {
           method: "programmatic",
           status: "aborted",
           artifactPath:
-            ".voratiq/verifications/sessions/verify-123/programmatic/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/programmatic/artifacts/result.json",
           error: VERIFY_ABORT_DETAIL,
           completedAt: expect.any(String),
         }),
@@ -172,7 +169,7 @@ describe("verify lifecycle", () => {
           verifierId: "verifier-a",
           status: "aborted",
           artifactPath:
-            ".voratiq/verifications/sessions/verify-123/verifier-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/verifier-a/run-review/artifacts/result.json",
           error: VERIFY_ABORT_DETAIL,
           completedAt: expect.any(String),
         }),
@@ -202,7 +199,7 @@ describe("verify lifecycle", () => {
     const agentRoot = join(
       root,
       ".voratiq",
-      "verifications",
+      "verify",
       "sessions",
       VERIFICATION_ID,
       "verifier",
@@ -231,12 +228,7 @@ describe("verify lifecycle", () => {
 
     registerActiveVerification({
       root,
-      verificationsFilePath: join(
-        root,
-        ".voratiq",
-        "verifications",
-        "index.json",
-      ),
+      verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
       verificationId: VERIFICATION_ID,
       teardown,
     });
@@ -262,7 +254,7 @@ describe("verify lifecycle", () => {
 
     registerActiveVerification({
       root: "/repo",
-      verificationsFilePath: "/repo/.voratiq/verifications/index.json",
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
       verificationId: VERIFICATION_ID,
       teardown,
     });

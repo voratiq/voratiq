@@ -3,7 +3,7 @@ import type { SandboxRuntimeConfig } from "@voratiq/sandbox-runtime";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
 import type { DenialBackoffConfig } from "../../configs/sandbox/types.js";
-import type { WatchdogMetadata } from "../../domains/runs/model/types.js";
+import type { WatchdogMetadata } from "../../domain/run/model/types.js";
 import type { SandboxStageId } from "./policy.js";
 import type { SandboxFailFastInfo } from "./sandbox.js";
 import type { WatchdogTrigger } from "./watchdog.js";

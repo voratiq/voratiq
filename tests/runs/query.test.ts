@@ -1,21 +1,21 @@
 import {
   RunRecordNotFoundError,
   RunRecordParseError,
-} from "../../src/domains/runs/model/errors.js";
+} from "../../src/domain/run/model/errors.js";
 import type {
   AgentInvocationRecord,
   RunRecord,
-} from "../../src/domains/runs/model/types.js";
+} from "../../src/domain/run/model/types.js";
 import type {
   ReadRunRecordsOptions,
   RunRecordWarning,
-} from "../../src/domains/runs/persistence/adapter.js";
+} from "../../src/domain/run/persistence/adapter.js";
 import {
   buildRunPredicate,
   fetchRuns,
   fetchRunsSafely,
   type RunQueryFilters,
-} from "../../src/domains/runs/persistence/adapter.js";
+} from "../../src/domain/run/persistence/adapter.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,
@@ -190,8 +190,8 @@ describe("fetchRuns", () => {
     const warning: RunRecordWarning = {
       kind: "parse-error",
       runId: "run-2",
-      recordPath: "/root/.voratiq/runs/sessions/run-2/record.json",
-      displayPath: ".voratiq/runs/sessions/run-2/record.json",
+      recordPath: "/root/.voratiq/run/sessions/run-2/record.json",
+      displayPath: ".voratiq/run/sessions/run-2/record.json",
       details: "invalid json",
     };
     mockedReadRunRecords.mockImplementation((options) => {
@@ -207,16 +207,14 @@ describe("fetchRuns", () => {
 
     const result = await fetchRuns({
       root: "/root",
-      runsFilePath: "/root/.voratiq/runs/index.json",
+      runsFilePath: "/root/.voratiq/run/index.json",
       limit: 1,
     });
 
     expect(mockedReadRunRecords).toHaveBeenCalledTimes(1);
     const [firstCallOptions] = mockedReadRunRecords.mock.calls[0];
     expect(firstCallOptions.root).toBe("/root");
-    expect(firstCallOptions.runsFilePath).toBe(
-      "/root/.voratiq/runs/index.json",
-    );
+    expect(firstCallOptions.runsFilePath).toBe("/root/.voratiq/run/index.json");
     expect(firstCallOptions.limit).toBe(1);
     expect(typeof firstCallOptions.predicate).toBe("function");
     expect(firstCallOptions.onWarning).toBeDefined();
@@ -238,7 +236,7 @@ describe("fetchRunsSafely", () => {
 
     const result = await fetchRunsSafely({
       root: "/root",
-      runsFilePath: "/root/.voratiq/runs/index.json",
+      runsFilePath: "/root/.voratiq/run/index.json",
       runId: "run-123",
     });
 
@@ -246,7 +244,7 @@ describe("fetchRunsSafely", () => {
     const [callArgs] = mockedReadRunRecords.mock.calls;
     const [callOptions] = callArgs;
     expect(callOptions.root).toBe("/root");
-    expect(callOptions.runsFilePath).toBe("/root/.voratiq/runs/index.json");
+    expect(callOptions.runsFilePath).toBe("/root/.voratiq/run/index.json");
     expect(callOptions.limit).toBeUndefined();
     expect(typeof callOptions.predicate).toBe("function");
     expect(callOptions.onWarning).toBeDefined();
@@ -258,7 +256,7 @@ describe("fetchRunsSafely", () => {
     await expect(
       fetchRunsSafely({
         root: "/root",
-        runsFilePath: "/root/.voratiq/runs/index.json",
+        runsFilePath: "/root/.voratiq/run/index.json",
         runId: "run-404",
       }),
     ).rejects.toThrow(RunRecordNotFoundError);
@@ -273,7 +271,7 @@ describe("fetchRunsSafely", () => {
 
     const result = await fetchRunsSafely({
       root: "/root",
-      runsFilePath: "/root/.voratiq/runs/index.json",
+      runsFilePath: "/root/.voratiq/run/index.json",
       runId: "deleted-run",
       filters: { includeDeleted: true },
     });
@@ -286,8 +284,8 @@ describe("fetchRunsSafely", () => {
       options.onWarning?.({
         kind: "parse-error",
         runId: "run-parse",
-        recordPath: "/root/.voratiq/runs/sessions/run-parse/record.json",
-        displayPath: ".voratiq/runs/sessions/run-parse/record.json",
+        recordPath: "/root/.voratiq/run/sessions/run-parse/record.json",
+        displayPath: ".voratiq/run/sessions/run-parse/record.json",
         details: "bad json",
       });
       return Promise.resolve([]);
@@ -296,7 +294,7 @@ describe("fetchRunsSafely", () => {
     await expect(
       fetchRunsSafely({
         root: "/root",
-        runsFilePath: "/root/.voratiq/runs/index.json",
+        runsFilePath: "/root/.voratiq/run/index.json",
         runId: "run-parse",
       }),
     ).rejects.toThrow(RunRecordParseError);

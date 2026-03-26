@@ -81,13 +81,13 @@ voratiq init [options]
 Creates:
 
 - `.voratiq/` directory
-- `specs/`, `runs/`, `verifications/`, and `reductions/` directories
+- `spec/`, `run/`, `verify/`, and `reduce/` directories
 - `agents.yaml` with the full supported agent catalog (binary paths filled for CLIs found on `$PATH`)
 - `orchestration.yaml` with stage-to-agent assignments based on the selected preset
 - `environment.yaml` with environment settings
 - `verification.yaml` with verification settings
 - `sandbox.yaml` with sandbox policies
-- `index.json` files under `specs/`, `runs/`, `verifications/`, and `reductions/`
+- `index.json` files under `spec/`, `run/`, `verify/`, and `reduce/`
 
 If `.voratiq/` already exists, `voratiq init` fills any missing files and directories.
 
@@ -125,7 +125,7 @@ voratiq spec --description <text> [options]
 - `--agent <agent-id>`: Agent to draft the spec (uses orchestration config if omitted)
 - `--profile <name>`: Orchestration profile (default: `default`)
 - `--title <text>`: Spec title; agent infers if omitted
-- `--output <path>`: Output path (default: `.voratiq/specs/<slug>.md`)
+- `--output <path>`: Output path (default: `.voratiq/spec/<slug>.md`)
 
 ### Behavior
 
@@ -182,12 +182,12 @@ Verification (programmatic checks + rubric verifiers) runs separately via `vorat
 ### Examples
 
 ```bash
-voratiq run --spec .voratiq/specs/fix-auth-bug.md
+voratiq run --spec .voratiq/spec/fix-auth-bug.md
 ```
 
 ```bash
 # Isolate changes on a branch
-voratiq run --spec .voratiq/specs/refactor.md --branch
+voratiq run --spec .voratiq/spec/refactor.md --branch
 ```
 
 ### Errors
@@ -206,15 +206,15 @@ Reduce artifact sets into a summarized form.
 ### Usage
 
 ```bash
-voratiq reduce (--spec <spec-id> | --run <run-id> | --verification <verification-id> | --reduction <reduction-id>) [options]
+voratiq reduce (--spec <spec-id> | --run <run-id> | --verify <verify-id> | --reduce <reduce-id>) [options]
 ```
 
 ### Options
 
 - `--spec <spec-id>`: Spec to reduce
 - `--run <run-id>`: Run to reduce
-- `--verification <verification-id>`: Verification to reduce
-- `--reduction <reduction-id>`: Reduction to reduce
+- `--verify <verify-id>`: Verification to reduce
+- `--reduce <reduce-id>`: Reduction to reduce
 - `--agent <agent-id>`: Set reducers directly (repeatable; order preserved)
 - `--profile <name>`: Orchestration profile (default: `default`)
 - `--max-parallel <count>`: Max concurrent reducers (default: all)
@@ -222,7 +222,7 @@ voratiq reduce (--spec <spec-id> | --run <run-id> | --verification <verification
 
 ### Behavior
 
-Reducers read staged artifacts and write `reduction.md` and `reduction.json`. Artifacts are saved under `.voratiq/reductions/`.
+Reducers read staged artifacts and write `reduction.md` and `reduction.json`. Artifacts are saved under `.voratiq/reduce/`.
 
 ### Examples
 
@@ -252,7 +252,7 @@ voratiq verify (--spec <spec-id> | --run <run-id> | --reduce <reduce-id>) [optio
 
 ### Behavior
 
-Verification is blinded when comparing candidates — verifiers see randomized candidate ids, not agent names. Artifacts are saved under `.voratiq/verifications/`.
+Verification is blinded when comparing candidates — verifiers see randomized candidate ids, not agent names. Artifacts are saved under `.voratiq/verify/`.
 
 ### Examples
 
@@ -294,7 +294,7 @@ voratiq apply --run <run-id> --agent <agent-id> [options]
 ### Behavior
 
 1. Validates git working tree is clean
-2. Loads the agent's diff from `.voratiq/runs/`
+2. Loads the agent's diff from `.voratiq/run/`
 3. Verifies `HEAD` matches the run's base revision
 4. Executes `git apply <diff.patch>`
 
@@ -345,7 +345,7 @@ voratiq list
 
 ```bash
 # Filter by spec
-voratiq list --spec .voratiq/specs/fix-auth-bug.md
+voratiq list --spec .voratiq/spec/fix-auth-bug.md
 ```
 
 ### Errors
