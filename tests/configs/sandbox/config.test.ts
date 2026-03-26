@@ -59,10 +59,10 @@ providers:
 
     const gemini = config.providers.gemini;
     expect(gemini.network.allowedDomains).toEqual([
-      "oauth2.googleapis.com",
       "cloudcode-pa.googleapis.com",
-      "play.googleapis.com",
       "generativelanguage.googleapis.com",
+      "oauth2.googleapis.com",
+      "play.googleapis.com",
     ]);
   });
 

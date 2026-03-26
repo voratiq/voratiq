@@ -42,10 +42,10 @@ export const DEFAULT_SANDBOX_PROVIDERS: readonly SandboxProviderDefault[] = [
     id: "gemini",
     network: {
       allowedDomains: [
-        "oauth2.googleapis.com",
         "cloudcode-pa.googleapis.com",
-        "play.googleapis.com",
         "generativelanguage.googleapis.com",
+        "oauth2.googleapis.com",
+        "play.googleapis.com",
       ],
       deniedDomains: [],
       allowLocalBinding: false,
