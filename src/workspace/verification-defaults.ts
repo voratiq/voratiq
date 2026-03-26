@@ -614,7 +614,7 @@ What matters:
 - remove noise without dropping durable signal
 - surface unresolved uncertainty honestly
 - preserve the decisions, caveats, and next-step guidance a later operator would actually need
-- produce guidance that is actually useful for later \`spec\`, \`run\`, \`verify\`, or \`reduce\` work
+- produce guidance that is actually useful for later \`spec\`, \`run\`, \`reduce\`, or \`verify\` work
 
 What does not matter:
 

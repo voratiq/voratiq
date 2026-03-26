@@ -28,9 +28,9 @@ describe("resolveReductionCompetitors", () => {
         "      agents: []",
         "    run:",
         "      agents: []",
-        "    verify:",
-        "      agents: []",
         "    reduce:",
+        "      agents: []",
+        "    verify:",
         "      agents: []",
         "",
       ]);
@@ -66,23 +66,25 @@ describe("resolveReductionCompetitors", () => {
         "      agents: []",
         "    run:",
         "      agents: []",
-        "    verify:",
-        "      agents: []",
+
         "    reduce:",
         "      agents:",
         "        - id: alpha",
+        "    verify:",
+        "      agents: []",
         "  quality:",
         "    spec:",
         "      agents: []",
         "    run:",
         "      agents: []",
-        "    verify:",
-        "      agents: []",
+
         "    reduce:",
         "      agents:",
         "        - id: gamma",
         "        - id: beta",
         "        - id: alpha",
+        "    verify:",
+        "      agents: []",
         "",
       ]);
 
@@ -109,11 +111,12 @@ describe("resolveReductionCompetitors", () => {
         "      agents: []",
         "    run:",
         "      agents: []",
-        "    verify:",
-        "      agents: []",
+
         "    reduce:",
         "      agents:",
         "        - id: alpha",
+        "    verify:",
+        "      agents: []",
         "",
       ]);
 

@@ -53,9 +53,9 @@ describe("resolveStageCompetitors", () => {
         "      agents: []",
         "    run:",
         "      agents: []",
-        "    verify:",
-        "      agents: []",
         "    reduce:",
+        "      agents: []",
+        "    verify:",
         "      agents: []",
         "",
       ]);
@@ -99,10 +99,11 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: alpha",
-        "    verify:",
+
+        "    reduce:",
         "      agents:",
         "        - id: alpha",
-        "    reduce:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "  quality:",
@@ -113,12 +114,13 @@ describe("resolveStageCompetitors", () => {
         "        - id: gamma",
         "        - id: alpha",
         "        - id: beta",
-        "    verify:",
-        "      agents:",
-        "        - id: alpha",
+
         "    reduce:",
         "      agents:",
         "        - id: beta",
+        "    verify:",
+        "      agents:",
+        "        - id: alpha",
         "",
       ]);
 
@@ -148,10 +150,11 @@ describe("resolveStageCompetitors", () => {
         "      agents:",
         "        - id: beta",
         "        - id: alpha",
-        "    verify:",
+
+        "    reduce:",
         "      agents:",
         "        - id: alpha",
-        "    reduce:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "  quality:",
@@ -160,12 +163,13 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: gamma",
-        "    verify:",
-        "      agents:",
-        "        - id: alpha",
+
         "    reduce:",
         "      agents:",
         "        - id: gamma",
+        "    verify:",
+        "      agents:",
+        "        - id: alpha",
         "",
       ]);
 
@@ -193,10 +197,11 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: alpha",
-        "    verify:",
+
+        "    reduce:",
         "      agents:",
         "        - id: alpha",
-        "    reduce:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "  quality:",
@@ -205,12 +210,13 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: beta",
-        "    verify:",
-        "      agents:",
-        "        - id: alpha",
+
         "    reduce:",
         "      agents:",
         "        - id: beta",
+        "    verify:",
+        "      agents:",
+        "        - id: alpha",
         "",
       ]);
 
@@ -241,10 +247,11 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: alpha",
-        "    verify:",
+
+        "    reduce:",
         "      agents:",
         "        - id: alpha",
-        "    reduce:",
+        "    verify:",
         "      agents:",
         "        - id: alpha",
         "  quality:",
@@ -253,12 +260,13 @@ describe("resolveStageCompetitors", () => {
         "    run:",
         "      agents:",
         "        - id: beta",
-        "    verify:",
-        "      agents:",
-        "        - id: alpha",
+
         "    reduce:",
         "      agents:",
         "        - id: beta",
+        "    verify:",
+        "      agents:",
+        "        - id: alpha",
         "",
       ]);
 
@@ -300,12 +308,13 @@ describe("resolveStageCompetitors", () => {
         "      agents: []",
         "    run:",
         "      agents: []",
-        "    verify:",
-        "      agents: []",
+
         "    reduce:",
         "      agents:",
         "        - id: gamma",
         "        - id: alpha",
+        "    verify:",
+        "      agents: []",
         "",
       ]);
 

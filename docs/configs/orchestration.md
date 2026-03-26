@@ -8,7 +8,7 @@ Control which agents run at each stage.
 
 ## Overview
 
-Voratiq uses agents to draft specifications (`spec`), execute tasks (`run`), verify results (`verify`), and reduce completed sessions (`reduce`). Orchestration profiles determine which agents from the [agent catalog](./agents.md) participate in each. `voratiq init` seeds `profiles.default` based on the preset you choose.
+Voratiq uses agents to draft specifications (`spec`), execute tasks (`run`), reduce completed sessions (`reduce`), and verify results (`verify`). Orchestration profiles determine which agents from the [agent catalog](./agents.md) participate in each. `voratiq init` seeds `profiles.default` based on the preset you choose.
 
 ## Schema
 
@@ -23,12 +23,12 @@ Profile name rules:
 - max length: `64`
 - must be unique within `profiles`
 
-Each profile has four stage blocks: `spec`, `run`, `verify`, and `reduce`. Each stage block has:
+Each profile has four stage blocks: `spec`, `run`, `reduce`, and `verify`. Each stage block has:
 
 - `agents` (required) - array of agent references.
 - `agents[].id` (required) - an agent id from `agents.yaml`.
 
-`spec` requires exactly one agent at runtime unless overridden with `--agent`. `run`, `verify`, and `reduce` accept multiple agents.
+`spec` requires exactly one agent at runtime unless overridden with `--agent`. `run`, `reduce`, and `verify` accept multiple agents.
 
 ## Example
 
@@ -43,10 +43,10 @@ profiles:
         - id: claude-opus-4-6
         - id: gpt-5-3-codex-high
         - id: gemini-2-5-pro
-    verify:
+    reduce:
       agents:
         - id: gpt-5-3-codex-high
-    reduce:
+    verify:
       agents:
         - id: gpt-5-3-codex-high
 
@@ -63,10 +63,10 @@ profiles:
         - id: gpt-5-3-codex-xhigh
         - id: gemini-2-5-pro
         - id: gemini-3-pro-preview
-    verify:
+    reduce:
       agents:
         - id: gpt-5-3-codex-high
-    reduce:
+    verify:
       agents:
         - id: gpt-5-3-codex-high
 
@@ -78,10 +78,10 @@ profiles:
       agents:
         - id: claude-haiku-4-5-20251001
         - id: gpt-5-1-codex-mini
-    verify:
+    reduce:
       agents:
         - id: gpt-5-1-codex-mini
-    reduce:
+    verify:
       agents:
         - id: gpt-5-1-codex-mini
 ```

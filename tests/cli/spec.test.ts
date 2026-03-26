@@ -916,10 +916,10 @@ async function writeOrchestrationConfig(
   const lines = ["profiles:"];
   for (const [profileName, profileStages] of Object.entries(profiles)) {
     lines.push(`  ${profileName}:`);
-    appendStage(lines, "run", profileStages.runAgentIds ?? []);
-    appendStage(lines, "verify", profileStages.reviewAgentIds ?? []);
     appendStage(lines, "spec", profileStages.specAgentIds ?? []);
+    appendStage(lines, "run", profileStages.runAgentIds ?? []);
     appendStage(lines, "reduce", profileStages.reduceAgentIds ?? []);
+    appendStage(lines, "verify", profileStages.reviewAgentIds ?? []);
   }
   lines.push("");
 
@@ -932,7 +932,7 @@ async function writeOrchestrationConfig(
 
 function appendStage(
   lines: string[],
-  stageId: "run" | "verify" | "spec" | "reduce",
+  stageId: "spec" | "run" | "reduce" | "verify",
   agentIds: readonly string[],
 ): void {
   lines.push(`    ${stageId}:`);

@@ -55,10 +55,10 @@ describe("orchestration bootstrap generator", () => {
         "      agents:",
         "        - id: zeta",
         "        - id: alpha",
-        "    verify:",
+        "    reduce:",
         "      agents:",
         "        - id: zeta",
-        "    reduce:",
+        "    verify:",
         "      agents:",
         "        - id: zeta",
         "",
@@ -90,9 +90,9 @@ describe("orchestration bootstrap generator", () => {
         "      agents: []",
         "    run:",
         "      agents: []",
-        "    verify:",
-        "      agents: []",
         "    reduce:",
+        "      agents: []",
+        "    verify:",
         "      agents: []",
         "",
       ].join("\n"),
@@ -191,7 +191,7 @@ describe("orchestration bootstrap generator", () => {
     const lines = yaml.split("\n");
 
     // Both agents in all stages
-    for (const stage of ["spec", "run", "verify", "reduce"]) {
+    for (const stage of ["spec", "run", "reduce", "verify"]) {
       const stageStart = lines.indexOf(`    ${stage}:`);
       expect(stageStart).toBeGreaterThan(-1);
       const agentsLine = lines[stageStart + 1];
