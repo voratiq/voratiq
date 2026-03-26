@@ -1146,13 +1146,13 @@ async function writeOrchestrationConfig(
     appendOrchestrationStage(lines, "run", profileStages.runAgentIds ?? []);
     appendOrchestrationStage(
       lines,
-      "verify",
-      profileStages.reviewAgentIds ?? [],
+      "reduce",
+      profileStages.reduceAgentIds ?? [],
     );
     appendOrchestrationStage(
       lines,
-      "reduce",
-      profileStages.reduceAgentIds ?? [],
+      "verify",
+      profileStages.reviewAgentIds ?? [],
     );
   }
   lines.push("");
@@ -1166,7 +1166,7 @@ async function writeOrchestrationConfig(
 
 function appendOrchestrationStage(
   lines: string[],
-  stageId: "run" | "verify" | "spec" | "reduce",
+  stageId: "spec" | "run" | "reduce" | "verify",
   agentIds: readonly string[],
 ): void {
   lines.push(`    ${stageId}:`);

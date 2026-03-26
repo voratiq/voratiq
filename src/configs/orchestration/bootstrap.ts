@@ -8,8 +8,8 @@ import type { AgentConfigEntry, AgentsConfig } from "../agents/types.js";
 const ORCHESTRATION_BOOTSTRAP_STAGE_IDS = [
   "spec",
   "run",
-  "verify",
   "reduce",
+  "verify",
 ] as const;
 
 export interface ResolvedPresetAgent {

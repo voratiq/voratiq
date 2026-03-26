@@ -48,7 +48,7 @@ export function buildReducePrompt(options: BuildReducePromptOptions): string {
     "5) Write `reduction.md` and `reduction.json` in the workspace root.",
     "",
     "Goal:",
-    "- Produce carry-forward context for a later `spec`, `run`, `verify`, or `reduce` invocation.",
+    "- Produce carry-forward context for a later `spec`, `run`, `reduce`, or `verify` invocation.",
     "- Focus on synthesis, not ranking or selecting a single best artifact.",
     "- Optimize for next-step utility, not audit completeness.",
     "- If something is uncertain, say so explicitly.",
