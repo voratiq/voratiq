@@ -11,7 +11,7 @@ export function isSandboxRuntimeSupported(): boolean {
 // Skip sandbox tests when running from inside a workspace - spawning sandboxes is
 // structurally impossible from within a sandboxed environment.
 const cwd = process.cwd().replace(/\\/g, "/");
-const runningInWorkspace = cwd.includes("/.voratiq/runs/");
+const runningInWorkspace = cwd.includes("/.voratiq/run/");
 
 const sandboxSuiteEnabled = isSandboxRuntimeSupported() && !runningInWorkspace;
 

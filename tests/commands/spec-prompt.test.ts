@@ -1,4 +1,4 @@
-import { buildSpecPrompt } from "../../src/domains/specs/competition/prompt.js";
+import { buildSpecPrompt } from "../../src/domain/spec/competition/prompt.js";
 
 describe("buildSpecPrompt", () => {
   it("includes task framing, spec structure, and authoring guidance", () => {
@@ -7,7 +7,7 @@ describe("buildSpecPrompt", () => {
       markdownOutputPath: "spec.md",
       dataOutputPath: "spec.json",
       repoRootPath: "/repo",
-      workspacePath: "/repo/.voratiq/specs/sessions/123/workspace",
+      workspacePath: "/repo/.voratiq/spec/sessions/123/workspace",
     });
 
     // Task framing
@@ -36,12 +36,12 @@ describe("buildSpecPrompt", () => {
       markdownOutputPath: "spec.md",
       dataOutputPath: "spec.json",
       repoRootPath: "/repo",
-      workspacePath: "/repo/.voratiq/specs/sessions/123/workspace",
+      workspacePath: "/repo/.voratiq/spec/sessions/123/workspace",
     });
 
     expect(prompt).toContain("- Read access: `/repo`.");
     expect(prompt).toContain(
-      "- Write access: `/repo/.voratiq/specs/sessions/123/workspace`.",
+      "- Write access: `/repo/.voratiq/spec/sessions/123/workspace`.",
     );
     expect(prompt).toContain(
       "You are running headlessly. Do not pause for user interaction.",
@@ -57,7 +57,7 @@ describe("buildSpecPrompt", () => {
       markdownOutputPath: "spec.md",
       dataOutputPath: "spec.json",
       repoRootPath: "/repo",
-      workspacePath: "/repo/.voratiq/specs/sessions/123/workspace",
+      workspacePath: "/repo/.voratiq/spec/sessions/123/workspace",
     });
 
     expect(prompt).toContain(
@@ -80,7 +80,7 @@ describe("buildSpecPrompt", () => {
       markdownOutputPath: "spec.md",
       dataOutputPath: "spec.json",
       repoRootPath: "/repo",
-      workspacePath: "/repo/.voratiq/specs/sessions/123/workspace",
+      workspacePath: "/repo/.voratiq/spec/sessions/123/workspace",
     });
 
     expect(prompt).toContain("Title: Onboarding Improvements");
@@ -92,7 +92,7 @@ describe("buildSpecPrompt", () => {
       markdownOutputPath: "spec.md",
       dataOutputPath: "spec.json",
       repoRootPath: "/repo",
-      workspacePath: "/repo/.voratiq/specs/sessions/123/workspace",
+      workspacePath: "/repo/.voratiq/spec/sessions/123/workspace",
     });
 
     const descriptionIndex = prompt.indexOf("User description:");
@@ -106,7 +106,7 @@ describe("buildSpecPrompt", () => {
       markdownOutputPath: "spec.md",
       dataOutputPath: "spec.json",
       repoRootPath: "/repo",
-      workspacePath: "/repo/.voratiq/specs/sessions/123/workspace",
+      workspacePath: "/repo/.voratiq/spec/sessions/123/workspace",
       extraContextFiles: [
         {
           absolutePath: "/repo/notes/a.md",

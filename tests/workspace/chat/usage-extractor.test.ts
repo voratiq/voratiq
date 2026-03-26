@@ -5,7 +5,7 @@ import {
   CHAT_USAGE_PROVIDER_IDS,
   extractedTokenUsageSchema,
   extractedTokenUsageSchemaByProvider,
-} from "../../../src/domains/runs/model/types.js";
+} from "../../../src/domain/run/model/types.js";
 import type { TokenUsageResult } from "../../../src/workspace/chat/token-usage-result.js";
 import { extractChatUsageFromArtifact } from "../../../src/workspace/chat/usage-extractor.js";
 import {

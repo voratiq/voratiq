@@ -17,7 +17,7 @@ describe("test hook opt-in: run records persistence", () => {
   });
 
   it("does not register hooks until tests opt in", async () => {
-    await import("../../src/domains/runs/persistence/adapter.js");
+    await import("../../src/domain/run/persistence/adapter.js");
     expect(
       (globalThis as HookRegistry)[RUN_RECORDS_TEST_HOOKS],
     ).toBeUndefined();
@@ -25,7 +25,7 @@ describe("test hook opt-in: run records persistence", () => {
 
   it("requires enabling the shared test hook guard before registration", async () => {
     const persistence = await import(
-      "../../src/domains/runs/persistence/adapter.js"
+      "../../src/domain/run/persistence/adapter.js"
     );
     expect(() => persistence.enableRunRecordsTestHooks()).toThrow(
       /enableTestHookRegistration/,
@@ -34,7 +34,7 @@ describe("test hook opt-in: run records persistence", () => {
 
   it("registers hooks once tests explicitly opt in", async () => {
     const persistence = await import(
-      "../../src/domains/runs/persistence/adapter.js"
+      "../../src/domain/run/persistence/adapter.js"
     );
     const testHooks = await import("../../src/testing/test-hooks.js");
     testHooks.enableTestHookRegistration();

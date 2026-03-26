@@ -4,7 +4,7 @@ import {
   buildUnavailableTokenUsageResult,
   reconstructTokenUsageResult,
   resolveTokenUsage,
-} from "../../../src/domains/shared/token-usage.js";
+} from "../../../src/domain/shared/token-usage.js";
 
 describe("token usage shared helpers", () => {
   it("builds the default unavailable result and preserves metadata", () => {

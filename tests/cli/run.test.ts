@@ -15,10 +15,10 @@ import * as authRuntime from "../../src/auth/runtime.js";
 import { createRunCommand, runRunCommand } from "../../src/cli/run.js";
 import { executeRunCommand } from "../../src/commands/run/command.js";
 import * as commandAdapter from "../../src/competition/command-adapter.js";
-import * as runAgentPreparationModule from "../../src/domains/runs/competition/agent-preparation.js";
-import { buildRunRecordEnhanced } from "../../src/domains/runs/model/enhanced.js";
-import type { RunRecord } from "../../src/domains/runs/model/types.js";
-import * as persistence from "../../src/domains/runs/persistence/adapter.js";
+import * as runAgentPreparationModule from "../../src/domain/run/competition/agent-preparation.js";
+import { buildRunRecordEnhanced } from "../../src/domain/run/model/enhanced.js";
+import type { RunRecord } from "../../src/domain/run/model/types.js";
+import * as persistence from "../../src/domain/run/persistence/adapter.js";
 import { DirtyWorkingTreeError } from "../../src/preflight/errors.js";
 import { HintedError } from "../../src/utils/errors.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
@@ -35,7 +35,7 @@ const ANSI_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 // Skip agent-spawning integration tests in nested agent workspaces to break recursive eval loops.
 // Agent spawning is structurally impossible from within a sandboxed environment.
 const cwd = process.cwd().replace(/\\/g, "/");
-const runningInWorkspace = cwd.includes("/.voratiq/runs/");
+const runningInWorkspace = cwd.includes("/.voratiq/run/");
 const suite =
   runningInWorkspace || !isSandboxRuntimeSupported() ? describe.skip : describe;
 const RUN_INTEGRATION_TIMEOUT_MS = 60_000;
@@ -258,14 +258,14 @@ suite("voratiq run (integration)", () => {
       await mkdir(join(repoRoot, "specs"), { recursive: true });
       await writeFile(specPath, "# Repair notice run spec\n", "utf8");
 
-      await rm(join(repoRoot, ".voratiq", "reductions"), {
+      await rm(join(repoRoot, ".voratiq", "reduce"), {
         recursive: true,
         force: true,
       });
       await rm(join(repoRoot, ".voratiq", "reviews", "index.json"), {
         force: true,
       });
-      await rm(join(repoRoot, ".voratiq", "specs", "sessions"), {
+      await rm(join(repoRoot, ".voratiq", "spec", "sessions"), {
         recursive: true,
         force: true,
       });
@@ -315,7 +315,7 @@ suite("voratiq run (integration)", () => {
 
       const runReport = await executeRunCommand({
         root: repoRoot,
-        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
         specAbsolutePath: specPath,
         specDisplayPath: relative(repoRoot, specPath),
       });
@@ -337,7 +337,7 @@ suite("voratiq run (integration)", () => {
         expect(agent.diffAttempted).toBe(true);
         expect(agent.diffCaptured).toBe(true);
         expect(agent.baseDirectory).toBe(
-          `.voratiq/runs/sessions/${runReport.runId}/${agent.agentId}`,
+          `.voratiq/run/sessions/${runReport.runId}/${agent.agentId}`,
         );
 
         await expect(readFile(stdoutPath, "utf8")).resolves.toContain("stdout");
@@ -346,7 +346,7 @@ suite("voratiq run (integration)", () => {
         const workspaceArtifact = join(
           repoRoot,
           ".voratiq",
-          "runs",
+          "run",
           "sessions",
           runReport.runId,
           agent.agentId,
@@ -357,7 +357,7 @@ suite("voratiq run (integration)", () => {
         expect(artifactContent).toContain("Implement the following task:");
       }
 
-      const indexPath = join(repoRoot, ".voratiq", "runs", "index.json");
+      const indexPath = join(repoRoot, ".voratiq", "run", "index.json");
       const indexPayload = JSON.parse(
         await readFile(indexPath, "utf8"),
       ) as RunIndexPayload;
@@ -369,7 +369,7 @@ suite("voratiq run (integration)", () => {
       const recordPath = join(
         repoRoot,
         ".voratiq",
-        "runs",
+        "run",
         "sessions",
         runReport.runId,
         "record.json",
@@ -384,7 +384,7 @@ suite("voratiq run (integration)", () => {
       const legacyPromptPath = join(
         repoRoot,
         ".voratiq",
-        "runs",
+        "run",
         "sessions",
         runReport.runId,
         "prompt.txt",
@@ -409,7 +409,7 @@ suite("voratiq run (integration)", () => {
     try {
       const report = await executeRunCommand({
         root: repoRoot,
-        runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+        runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
         specAbsolutePath: specPath,
         specDisplayPath: relative(repoRoot, specPath),
       });
@@ -512,16 +512,16 @@ suite("voratiq run (integration)", () => {
     );
     expect(dirtyError.detailLines.join("\n")).toContain("README.md");
 
-    const runDirectories = await readdir(join(repoRoot, ".voratiq", "runs"));
+    const runDirectories = await readdir(join(repoRoot, ".voratiq", "run"));
     expect(runDirectories).toContain("sessions");
     expect(runDirectories).toContain("index.json");
     const sessionEntries = await readdir(
-      join(repoRoot, ".voratiq", "runs", "sessions"),
+      join(repoRoot, ".voratiq", "run", "sessions"),
     );
     expect(sessionEntries).toHaveLength(0);
 
     const runsLog = await readFile(
-      join(repoRoot, ".voratiq", "runs", "index.json"),
+      join(repoRoot, ".voratiq", "run", "index.json"),
       "utf8",
     );
     const indexPayload = JSON.parse(runsLog) as RunIndexPayload;
@@ -960,7 +960,7 @@ suite("voratiq run (integration)", () => {
       expect(codexIndex).toBeGreaterThan(claudeIndex);
       expect(geminiIndex).toBeGreaterThan(codexIndex);
 
-      const indexPath = join(repoRoot, ".voratiq", "runs", "index.json");
+      const indexPath = join(repoRoot, ".voratiq", "run", "index.json");
       const indexPayload = JSON.parse(
         await readFile(indexPath, "utf8"),
       ) as RunIndexPayload;
@@ -975,7 +975,7 @@ suite("voratiq run (integration)", () => {
       const recordPath = join(
         repoRoot,
         ".voratiq",
-        "runs",
+        "run",
         "sessions",
         recordId,
         "record.json",
@@ -1004,7 +1004,7 @@ suite("voratiq run (integration)", () => {
 
     const runReport = await executeRunCommand({
       root: repoRoot,
-      runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+      runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
       specAbsolutePath: specPath,
       specDisplayPath: relative(repoRoot, specPath),
     });
@@ -1033,7 +1033,7 @@ suite("voratiq run (integration)", () => {
 
     const runReport = await executeRunCommand({
       root: repoRoot,
-      runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+      runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
       specAbsolutePath: specPath,
       specDisplayPath: relative(repoRoot, specPath),
     });
@@ -1062,7 +1062,7 @@ suite("voratiq run (integration)", () => {
 
     const runReport = await executeRunCommand({
       root: repoRoot,
-      runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+      runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
       specAbsolutePath: specPath,
       specDisplayPath: relative(repoRoot, specPath),
     });
@@ -1088,7 +1088,7 @@ suite("voratiq run (integration)", () => {
 
     const runReport = await executeRunCommand({
       root: repoRoot,
-      runsFilePath: join(repoRoot, ".voratiq", "runs", "index.json"),
+      runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
       specAbsolutePath: specPath,
       specDisplayPath: relative(repoRoot, specPath),
     });

@@ -3,13 +3,13 @@ import { randomUUID } from "node:crypto";
 import {
   buildRunRecordEnhanced,
   type RunRecordEnhanced,
-} from "../../../src/domains/runs/model/enhanced.js";
+} from "../../../src/domain/run/model/enhanced.js";
 import type {
   AgentArtifactState,
   AgentInvocationRecord,
   RunRecord,
   RunReport,
-} from "../../../src/domains/runs/model/types.js";
+} from "../../../src/domain/run/model/types.js";
 
 const DEFAULT_AGENT_ID = "agent-1";
 const DEFAULT_MODEL = "model-v1";

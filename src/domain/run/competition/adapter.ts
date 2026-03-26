@@ -1,0 +1,100 @@
+import type {
+  CompetitionCommandAdapter,
+  CompetitionPreparationResult,
+} from "../../../competition/command-adapter.js";
+import type { ResolvedExtraContextFile } from "../../../competition/shared/extra-context.js";
+import type { AgentDefinition } from "../../../configs/agents/types.js";
+import type { EnvironmentConfig } from "../../../configs/environment/types.js";
+import { prepareAgents } from "../../../domain/run/competition/agent-preparation.js";
+import { runPreparedAgent } from "../../../domain/run/competition/agents/lifecycle.js";
+import type { PreparedAgentExecution } from "../../../domain/run/competition/agents/types.js";
+import type { AgentExecutionResult } from "../../../domain/run/competition/reports.js";
+import type { AgentRecordMutators } from "../../../domain/run/model/mutators.js";
+
+export interface CreateRunCompetitionAdapterInput {
+  readonly baseRevisionSha: string;
+  readonly runId: string;
+  readonly root: string;
+  readonly specContent: string;
+  readonly extraContextFiles?: readonly ResolvedExtraContextFile[];
+  readonly mutators: AgentRecordMutators;
+  readonly environment: EnvironmentConfig;
+}
+
+interface RunCompetitionAdapterDependencies {
+  readonly prepareCandidates: (options: {
+    agents: readonly AgentDefinition[];
+    baseRevisionSha: string;
+    runId: string;
+    root: string;
+    specContent: string;
+    extraContextFiles: readonly ResolvedExtraContextFile[];
+    environment: EnvironmentConfig;
+  }) => Promise<
+    CompetitionPreparationResult<PreparedAgentExecution, AgentExecutionResult>
+  >;
+  readonly executePrepared: (
+    execution: PreparedAgentExecution,
+  ) => Promise<AgentExecutionResult>;
+}
+
+export function createRunCompetitionAdapter(
+  input: CreateRunCompetitionAdapterInput,
+  dependencies: Partial<RunCompetitionAdapterDependencies> = {},
+): CompetitionCommandAdapter<
+  AgentDefinition,
+  PreparedAgentExecution,
+  AgentExecutionResult
+> {
+  const {
+    baseRevisionSha,
+    runId,
+    root,
+    specContent,
+    extraContextFiles = [],
+    mutators,
+    environment,
+  } = input;
+  const prepareCandidates =
+    dependencies.prepareCandidates ??
+    (async (options) => await prepareAgents(options));
+  const executePrepared =
+    dependencies.executePrepared ??
+    (async (execution) => await runPreparedAgent(execution));
+
+  return {
+    queueCandidate: async (candidate) => {
+      await mutators.recordAgentQueued(candidate);
+    },
+    prepareCandidates: async (agents) =>
+      await prepareCandidates({
+        agents,
+        baseRevisionSha,
+        runId,
+        root,
+        specContent,
+        extraContextFiles,
+        environment,
+      }),
+    onPreparationFailure: async (failure) => {
+      await mutators.recordAgentSnapshot(failure.record);
+    },
+    onCandidatePrepared: (execution) => {
+      execution.progress = {
+        onRunning: mutators.recordAgentSnapshot,
+        onCompleted: async (result) => {
+          await mutators.recordAgentSnapshot(result.record);
+        },
+      };
+    },
+    executeCandidate: async (execution) => await executePrepared(execution),
+    sortResults: compareExecutionsByAgentId,
+  };
+}
+
+function compareExecutionsByAgentId(
+  left: AgentExecutionResult,
+  right: AgentExecutionResult,
+): number {
+  return left.record.agentId.localeCompare(right.record.agentId);
+}

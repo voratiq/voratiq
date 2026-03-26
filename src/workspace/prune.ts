@@ -1,6 +1,6 @@
 import { rm } from "node:fs/promises";
 
-import type { RunRecord } from "../domains/runs/model/types.js";
+import type { RunRecord } from "../domain/run/model/types.js";
 import { formatErrorMessage } from "../utils/output.js";
 import { relativeToRoot } from "../utils/path.js";
 import { WorkspaceSetupError } from "./errors.js";

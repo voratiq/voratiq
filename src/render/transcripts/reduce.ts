@@ -1,4 +1,4 @@
-import type { ExtractedTokenUsage } from "../../domains/runs/model/types.js";
+import type { ExtractedTokenUsage } from "../../domain/run/model/types.js";
 import { getAgentStatusStyle, getRunStatusStyle } from "../../status/colors.js";
 import { TERMINAL_REDUCTION_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";

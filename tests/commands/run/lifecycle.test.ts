@@ -20,16 +20,16 @@ import {
   terminateActiveRun,
 } from "../../../src/commands/run/lifecycle.js";
 import { createTeardownController } from "../../../src/competition/shared/teardown.js";
-import type { RunRecord } from "../../../src/domains/runs/model/types.js";
+import type { RunRecord } from "../../../src/domain/run/model/types.js";
 import {
   disposeRunRecordBuffer,
   getRunRecordSnapshot,
   rewriteRunRecord,
-} from "../../../src/domains/runs/persistence/adapter.js";
+} from "../../../src/domain/run/persistence/adapter.js";
 import { pathExists } from "../../../src/utils/fs.js";
 import { preserveProviderChatTranscripts } from "../../../src/workspace/chat/artifacts.js";
 
-jest.mock("../../../src/domains/runs/persistence/adapter.js", () => ({
+jest.mock("../../../src/domain/run/persistence/adapter.js", () => ({
   rewriteRunRecord: jest.fn(),
   getRunRecordSnapshot: jest.fn(),
   disposeRunRecordBuffer: jest.fn(),
@@ -75,7 +75,7 @@ describe("terminateActiveRun", () => {
   it("rewrites queued and running agents to aborted snapshots", async () => {
     registerActiveRun({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId: RUN_ID,
       agents: [],
     });
@@ -177,7 +177,7 @@ describe("terminateActiveRun", () => {
     });
     registerActiveRun({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId: RUN_ID,
       teardown,
       agents: [],
@@ -244,10 +244,10 @@ describe("terminateActiveRun", () => {
   });
 
   it("preserves chat logs for running agents before rewriting abort status", async () => {
-    const agentRoot = "/repo/.voratiq/runs/sessions/run-123/agents/alpha";
+    const agentRoot = "/repo/.voratiq/run/sessions/run-123/agents/alpha";
     registerActiveRun({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId: RUN_ID,
       agents: [
         {
@@ -318,10 +318,10 @@ describe("terminateActiveRun", () => {
         return Promise.resolve();
       },
     });
-    const agentRoot = "/repo/.voratiq/runs/sessions/run-123/agents/alpha";
+    const agentRoot = "/repo/.voratiq/run/sessions/run-123/agents/alpha";
     registerActiveRun({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId: RUN_ID,
       teardown,
       agents: [
@@ -333,7 +333,7 @@ describe("terminateActiveRun", () => {
         {
           agentId: "beta",
           providerId: "gpt",
-          agentRoot: "/repo/.voratiq/runs/sessions/run-123/agents/beta",
+          agentRoot: "/repo/.voratiq/run/sessions/run-123/agents/beta",
         },
       ],
     });
@@ -400,14 +400,14 @@ describe("terminateActiveRun", () => {
     });
     registerActiveRun({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId: RUN_ID,
       teardown,
       agents: [
         {
           agentId: "alpha",
           providerId: "claude",
-          agentRoot: "/repo/.voratiq/runs/sessions/run-123/agents/alpha",
+          agentRoot: "/repo/.voratiq/run/sessions/run-123/agents/alpha",
         },
       ],
     });
@@ -452,7 +452,7 @@ describe("terminateActiveRun", () => {
     });
     registerActiveRun({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId: RUN_ID,
       teardown,
       agents: [],
@@ -477,7 +477,7 @@ describe("terminateActiveRun", () => {
   it("logs and surfaces disposal failures after finalizing run history", async () => {
     registerActiveRun({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId: RUN_ID,
       agents: [],
     });
@@ -567,7 +567,7 @@ describe("terminateActiveRun", () => {
 
     registerActiveRun({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId: RUN_ID,
       teardown,
       agents: [],

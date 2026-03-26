@@ -9,8 +9,8 @@ import type {
   AutoApplyStatus,
   AutoTerminalStatus,
   RunAutoOutcome,
-} from "../domains/runs/model/types.js";
-import { rewriteRunRecord } from "../domains/runs/persistence/adapter.js";
+} from "../domain/run/model/types.js";
+import { rewriteRunRecord } from "../domain/run/persistence/adapter.js";
 import { resolveCliContext } from "../preflight/index.js";
 import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
 import { renderCliError } from "../render/utils/errors.js";

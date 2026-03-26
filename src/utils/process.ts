@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import type { Writable } from "node:stream";
 
-import { RunProcessStreamError } from "../domains/runs/competition/errors.js";
+import { RunProcessStreamError } from "../domain/run/competition/errors.js";
 import { composeRestrictedEnvironment } from "./env.js";
 
 export interface StreamTarget {

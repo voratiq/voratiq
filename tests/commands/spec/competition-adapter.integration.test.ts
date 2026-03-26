@@ -9,7 +9,7 @@ import { executeCompetitionWithAdapter } from "../../../src/competition/command-
 import {
   createSpecCompetitionAdapter,
   type SpecCompetitionCandidate,
-} from "../../../src/domains/specs/competition/adapter.js";
+} from "../../../src/domain/spec/competition/adapter.js";
 import { extractChatUsageFromArtifact } from "../../../src/workspace/chat/usage-extractor.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
@@ -298,9 +298,9 @@ describe("spec competition adapter native token usage integration", () => {
         agentId: "spec-agent",
         status: "succeeded",
         outputPath:
-          ".voratiq/specs/sessions/spec-title-slug/spec-agent/artifacts/generated-truth-title.md",
+          ".voratiq/spec/sessions/spec-title-slug/spec-agent/artifacts/generated-truth-title.md",
         dataPath:
-          ".voratiq/specs/sessions/spec-title-slug/spec-agent/artifacts/generated-truth-title.json",
+          ".voratiq/spec/sessions/spec-title-slug/spec-agent/artifacts/generated-truth-title.json",
       }),
     ]);
   });

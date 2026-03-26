@@ -17,10 +17,10 @@ import {
   VORATIQ_ENVIRONMENT_FILE,
   VORATIQ_HISTORY_LOCK_FILENAME,
   VORATIQ_ORCHESTRATION_FILE,
-  VORATIQ_RUNS_DIR,
-  VORATIQ_RUNS_FILE,
+  VORATIQ_RUN_DIR,
+  VORATIQ_RUN_FILE,
   VORATIQ_SANDBOX_FILE,
-  VORATIQ_VERIFICATIONS_DIR,
+  VORATIQ_VERIFICATION_DIR,
 } from "../../../src/workspace/structure.js";
 import { clearSandboxConfigurationCache } from "../../support/hooks/sandbox-loader.js";
 
@@ -59,13 +59,13 @@ describe("sandbox", () => {
         resolveWorkspacePath(root, VORATIQ_ENVIRONMENT_FILE),
         resolveWorkspacePath(root, VORATIQ_ORCHESTRATION_FILE),
         resolveWorkspacePath(root, VORATIQ_SANDBOX_FILE),
-        resolveWorkspacePath(root, VORATIQ_RUNS_FILE),
+        resolveWorkspacePath(root, VORATIQ_RUN_FILE),
         resolveWorkspacePath(
           root,
-          VORATIQ_RUNS_DIR,
+          VORATIQ_RUN_DIR,
           VORATIQ_HISTORY_LOCK_FILENAME,
         ),
-        resolveWorkspacePath(root, VORATIQ_VERIFICATIONS_DIR),
+        resolveWorkspacePath(root, VORATIQ_VERIFICATION_DIR),
       ];
     }
 

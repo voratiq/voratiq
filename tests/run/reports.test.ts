@@ -1,11 +1,11 @@
 import {
   toAgentReport,
   toRunReport,
-} from "../../src/domains/runs/competition/reports.js";
+} from "../../src/domain/run/competition/reports.js";
 import type {
   AgentInvocationRecord,
   AgentReport,
-} from "../../src/domains/runs/model/types.js";
+} from "../../src/domain/run/model/types.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,
@@ -93,12 +93,12 @@ describe("report mapping helpers", () => {
         modelId: "gpt-5",
       },
       runtimeManifestPath:
-        ".voratiq/runs/sessions/bad/codex/runtime/manifest.json",
-      baseDirectory: ".voratiq/runs/sessions/bad/codex",
+        ".voratiq/run/sessions/bad/codex/runtime/manifest.json",
+      baseDirectory: ".voratiq/run/sessions/bad/codex",
       diffStatistics: undefined,
       assets: {
-        stdoutPath: ".voratiq/runs/sessions/bad/codex/artifacts/stdout.log",
-        stderrPath: ".voratiq/runs/sessions/bad/codex/artifacts/stderr.log",
+        stdoutPath: ".voratiq/run/sessions/bad/codex/artifacts/stdout.log",
+        stderrPath: ".voratiq/run/sessions/bad/codex/artifacts/stderr.log",
       },
       error: "Agent failed to modify the workspace",
       diffAttempted: false,

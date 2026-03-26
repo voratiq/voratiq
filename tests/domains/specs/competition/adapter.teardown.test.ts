@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "@jest/globals";
 
-import { createSpecCompetitionAdapter } from "../../../../src/domains/specs/competition/adapter.js";
+import { createSpecCompetitionAdapter } from "../../../../src/domain/spec/competition/adapter.js";
 import { pathExists } from "../../../../src/utils/fs.js";
 
 describe("spec competition teardown", () => {

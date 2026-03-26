@@ -1,10 +1,10 @@
 import { executeApplyCommand } from "../../../src/commands/apply/command.js";
 import { ApplyPatchApplicationError } from "../../../src/commands/apply/errors.js";
-import type { RunRecord } from "../../../src/domains/runs/model/types.js";
+import type { RunRecord } from "../../../src/domain/run/model/types.js";
 import {
   fetchRunsSafely,
   rewriteRunRecord,
-} from "../../../src/domains/runs/persistence/adapter.js";
+} from "../../../src/domain/run/persistence/adapter.js";
 import { ensureFileExists } from "../../../src/utils/fs.js";
 import { getHeadRevision, runGitCommand } from "../../../src/utils/git.js";
 import {
@@ -12,10 +12,10 @@ import {
   createRunRecord,
 } from "../../support/factories/run-records.js";
 
-jest.mock("../../../src/domains/runs/persistence/adapter.js", () => {
+jest.mock("../../../src/domain/run/persistence/adapter.js", () => {
   const actual = jest.requireActual<
-    typeof import("../../../src/domains/runs/persistence/adapter.js")
-  >("../../../src/domains/runs/persistence/adapter.js");
+    typeof import("../../../src/domain/run/persistence/adapter.js")
+  >("../../../src/domain/run/persistence/adapter.js");
   return {
     ...actual,
     fetchRunsSafely: jest.fn(),
@@ -105,7 +105,7 @@ describe("executeApplyCommand applyStatus integration (mocked)", () => {
 
     await executeApplyCommand({
       root: "/repo",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
       runId: "run-apply",
       agentId: "agent-1",
       ignoreBaseMismatch: false,
@@ -130,7 +130,7 @@ describe("executeApplyCommand applyStatus integration (mocked)", () => {
     await expect(
       executeApplyCommand({
         root: "/repo",
-        runsFilePath: "/repo/.voratiq/runs/index.json",
+        runsFilePath: "/repo/.voratiq/run/index.json",
         runId: "run-apply",
         agentId: "agent-1",
         ignoreBaseMismatch: false,

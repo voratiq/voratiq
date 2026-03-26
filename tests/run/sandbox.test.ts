@@ -19,7 +19,7 @@ import {
   runAgentProcess,
 } from "../../src/agents/runtime/launcher.js";
 import type { AgentId } from "../../src/configs/agents/types.js";
-import { buildRunAgentWorkspacePaths } from "../../src/domains/runs/competition/agents/workspace.js";
+import { buildRunAgentWorkspacePaths } from "../../src/domain/run/competition/agents/workspace.js";
 import {
   buildAgentWorkspacePaths,
   scaffoldAgentWorkspace,

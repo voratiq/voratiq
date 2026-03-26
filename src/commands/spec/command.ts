@@ -5,22 +5,22 @@ import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import {
   buildLifecycleStartFields,
   buildOperationLifecycleCompleteFields,
-} from "../../domains/shared/lifecycle.js";
+} from "../../domain/shared/lifecycle.js";
 import {
   createSpecCompetitionAdapter,
   type SpecCompetitionExecution,
-} from "../../domains/specs/competition/adapter.js";
+} from "../../domain/spec/competition/adapter.js";
 import {
   deriveSpecStatusFromAgents,
   type SpecAgentEntry,
   type SpecRecord,
-} from "../../domains/specs/model/types.js";
+} from "../../domain/spec/model/types.js";
 import {
   appendSpecRecord,
   finalizeSpecRecord,
   flushSpecRecordBuffer,
   rewriteSpecRecord,
-} from "../../domains/specs/persistence/adapter.js";
+} from "../../domain/spec/persistence/adapter.js";
 import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import type { SpecProgressRenderer } from "../../render/transcripts/spec.js";
 import { toErrorMessage } from "../../utils/errors.js";
@@ -131,7 +131,7 @@ export async function executeSpecCommand(
     sessionId,
     createdAt,
     startedAt,
-    workspacePath: `.voratiq/specs/sessions/${sessionId}`,
+    workspacePath: `.voratiq/spec/sessions/${sessionId}`,
     status: "running",
   });
 

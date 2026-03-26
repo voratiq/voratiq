@@ -53,7 +53,7 @@ async function setupVerifySandboxProbe(options: {
     const agentRoot = join(
       root,
       ".voratiq",
-      "verifications",
+      "verify",
       "sessions",
       "verify-1",
       "verifier-a",
@@ -66,7 +66,7 @@ async function setupVerifySandboxProbe(options: {
     const sharedInputs = join(
       root,
       ".voratiq",
-      "verifications",
+      "verify",
       "sessions",
       "verify-1",
       ".shared",
@@ -75,7 +75,7 @@ async function setupVerifySandboxProbe(options: {
     const referenceRepo = join(
       root,
       ".voratiq",
-      "verifications",
+      "verify",
       "sessions",
       "verify-1",
       ".shared",

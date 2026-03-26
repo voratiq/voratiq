@@ -8,12 +8,12 @@ import { resolveReductionCompetitors } from "../../../src/commands/shared/resolv
 import { generateSessionId } from "../../../src/commands/shared/session-id.js";
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
 import { loadEnvironmentConfig } from "../../../src/configs/environment/loader.js";
-import * as reduceAdapter from "../../../src/domains/reductions/competition/adapter.js";
-import type { ReductionRecord } from "../../../src/domains/reductions/model/types.js";
+import * as reduceAdapter from "../../../src/domain/reduce/competition/adapter.js";
+import type { ReductionRecord } from "../../../src/domain/reduce/model/types.js";
 import {
   flushReductionRecordBuffer,
   readReductionRecords,
-} from "../../../src/domains/reductions/persistence/adapter.js";
+} from "../../../src/domain/reduce/persistence/adapter.js";
 import type { ReduceProgressRenderer } from "../../../src/render/transcripts/reduce.js";
 
 jest.mock("../../../src/competition/command-adapter.js", () => ({
@@ -43,7 +43,7 @@ jest.mock("../../../src/commands/reduce/targets.js", () => ({
   assertReductionTargetEligible: jest.fn(),
 }));
 
-jest.mock("../../../src/domains/reductions/persistence/adapter.js", () => ({
+jest.mock("../../../src/domain/reduce/persistence/adapter.js", () => ({
   flushReductionRecordBuffer: jest.fn(),
   readReductionRecords: jest.fn(),
 }));
@@ -107,25 +107,25 @@ describe("executeReduceCommand integration", () => {
       {
         agentId: "gamma",
         outputPath:
-          ".voratiq/reductions/sessions/reduce-123/gamma/artifacts/reduction.md",
+          ".voratiq/reduce/sessions/reduce-123/gamma/artifacts/reduction.md",
         dataPath:
-          ".voratiq/reductions/sessions/reduce-123/gamma/artifacts/reduction.json",
+          ".voratiq/reduce/sessions/reduce-123/gamma/artifacts/reduction.json",
         status: "succeeded",
       },
       {
         agentId: "alpha",
         outputPath:
-          ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.md",
+          ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.md",
         dataPath:
-          ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.json",
+          ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.json",
         status: "succeeded",
       },
       {
         agentId: "beta",
         outputPath:
-          ".voratiq/reductions/sessions/reduce-123/beta/artifacts/reduction.md",
+          ".voratiq/reduce/sessions/reduce-123/beta/artifacts/reduction.md",
         dataPath:
-          ".voratiq/reductions/sessions/reduce-123/beta/artifacts/reduction.json",
+          ".voratiq/reduce/sessions/reduce-123/beta/artifacts/reduction.json",
         status: "failed",
         error: "reducer failed",
       },
@@ -143,9 +143,9 @@ describe("executeReduceCommand integration", () => {
             agentId: "gamma",
             status: "succeeded",
             outputPath:
-              ".voratiq/reductions/sessions/reduce-123/gamma/artifacts/reduction.md",
+              ".voratiq/reduce/sessions/reduce-123/gamma/artifacts/reduction.md",
             dataPath:
-              ".voratiq/reductions/sessions/reduce-123/gamma/artifacts/reduction.json",
+              ".voratiq/reduce/sessions/reduce-123/gamma/artifacts/reduction.json",
           },
         ],
         error: null,
@@ -155,10 +155,10 @@ describe("executeReduceCommand integration", () => {
 
     const result = await executeReduceCommand({
       root: "/repo",
-      specsFilePath: "/repo/.voratiq/specs/index.json",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
-      reductionsFilePath: "/repo/.voratiq/reductions/index.json",
-      verificationsFilePath: "/repo/.voratiq/verifications/index.json",
+      specsFilePath: "/repo/.voratiq/spec/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
+      reductionsFilePath: "/repo/.voratiq/reduce/index.json",
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
       target: { type: "run", id: "run-123" },
       maxParallel: 10,
     });
@@ -214,9 +214,9 @@ describe("executeReduceCommand integration", () => {
       {
         agentId: "alpha",
         outputPath:
-          ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.md",
+          ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.md",
         dataPath:
-          ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.json",
+          ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.json",
         status: "succeeded",
       },
     ]);
@@ -233,9 +233,9 @@ describe("executeReduceCommand integration", () => {
             agentId: "alpha",
             status: "succeeded",
             outputPath:
-              ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.md",
+              ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.md",
             dataPath:
-              ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.json",
+              ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.json",
           },
         ],
         error: null,
@@ -252,10 +252,10 @@ describe("executeReduceCommand integration", () => {
 
     await executeReduceCommand({
       root: "/repo",
-      specsFilePath: "/repo/.voratiq/specs/index.json",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
-      reductionsFilePath: "/repo/.voratiq/reductions/index.json",
-      verificationsFilePath: "/repo/.voratiq/verifications/index.json",
+      specsFilePath: "/repo/.voratiq/spec/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
+      reductionsFilePath: "/repo/.voratiq/reduce/index.json",
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
       target: { type: "spec", id: "spec-123" },
       extraContextFiles,
     });
@@ -289,9 +289,9 @@ describe("executeReduceCommand integration", () => {
       {
         agentId: "alpha",
         outputPath:
-          ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.md",
+          ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.md",
         dataPath:
-          ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.json",
+          ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.json",
         status: "succeeded",
       },
     ]);
@@ -308,9 +308,9 @@ describe("executeReduceCommand integration", () => {
             agentId: "alpha",
             status: "succeeded",
             outputPath:
-              ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.md",
+              ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.md",
             dataPath:
-              ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.json",
+              ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.json",
           },
         ],
         error: null,
@@ -326,10 +326,10 @@ describe("executeReduceCommand integration", () => {
 
     await executeReduceCommand({
       root: "/repo",
-      specsFilePath: "/repo/.voratiq/specs/index.json",
-      runsFilePath: "/repo/.voratiq/runs/index.json",
-      reductionsFilePath: "/repo/.voratiq/reductions/index.json",
-      verificationsFilePath: "/repo/.voratiq/verifications/index.json",
+      specsFilePath: "/repo/.voratiq/spec/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
+      reductionsFilePath: "/repo/.voratiq/reduce/index.json",
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
       target: { type: "run", id: "run-123" },
       renderer,
     });
@@ -338,8 +338,8 @@ describe("executeReduceCommand integration", () => {
       reductionId: "reduce-123",
       createdAt: expect.any(String),
       sourceLabel: "Run",
-      sourcePath: ".voratiq/runs/sessions/run-123",
-      workspacePath: ".voratiq/reductions/sessions/reduce-123",
+      sourcePath: ".voratiq/run/sessions/run-123",
+      workspacePath: ".voratiq/reduce/sessions/reduce-123",
       status: "running",
     });
     expect(renderer.complete.mock.calls[0]).toEqual([
@@ -382,10 +382,10 @@ describe("executeReduceCommand integration", () => {
     try {
       await executeReduceCommand({
         root: "/repo",
-        specsFilePath: "/repo/.voratiq/specs/index.json",
-        runsFilePath: "/repo/.voratiq/runs/index.json",
-        reductionsFilePath: "/repo/.voratiq/reductions/index.json",
-        verificationsFilePath: "/repo/.voratiq/verifications/index.json",
+        specsFilePath: "/repo/.voratiq/spec/index.json",
+        runsFilePath: "/repo/.voratiq/run/index.json",
+        reductionsFilePath: "/repo/.voratiq/reduce/index.json",
+        verificationsFilePath: "/repo/.voratiq/verify/index.json",
         target: { type: "run", id: "run-123" },
       });
     } catch (error) {

@@ -7,15 +7,15 @@ import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import {
   createReduceCompetitionAdapter,
   type ReductionCompetitionExecution,
-} from "../../domains/reductions/competition/adapter.js";
+} from "../../domain/reduce/competition/adapter.js";
 import type {
   ReductionRecord,
   ReductionTarget,
-} from "../../domains/reductions/model/types.js";
+} from "../../domain/reduce/model/types.js";
 import {
   flushReductionRecordBuffer,
   readReductionRecords,
-} from "../../domains/reductions/persistence/adapter.js";
+} from "../../domain/reduce/persistence/adapter.js";
 import type { ReduceProgressRenderer } from "../../render/transcripts/reduce.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
@@ -99,7 +99,7 @@ export async function executeReduceCommand(
     createdAt,
     sourceLabel: mapReduceSourceLabel(target.type),
     sourcePath: mapReduceSourcePath(target),
-    workspacePath: `.voratiq/reductions/sessions/${reductionId}`,
+    workspacePath: `.voratiq/reduce/sessions/${reductionId}`,
     status: "running",
   });
 
@@ -181,9 +181,9 @@ function mapReduceSourceLabel(
       return "Spec";
     case "run":
       return "Run";
-    case "verification":
+    case "verify":
       return "Verification";
-    case "reduction":
+    case "reduce":
       return "Reduce";
   }
 }
@@ -191,13 +191,13 @@ function mapReduceSourceLabel(
 function mapReduceSourcePath(target: ReductionTarget): string {
   switch (target.type) {
     case "spec":
-      return `.voratiq/specs/sessions/${target.id}`;
+      return `.voratiq/spec/sessions/${target.id}`;
     case "run":
-      return `.voratiq/runs/sessions/${target.id}`;
-    case "verification":
-      return `.voratiq/verifications/sessions/${target.id}`;
-    case "reduction":
-      return `.voratiq/reductions/sessions/${target.id}`;
+      return `.voratiq/run/sessions/${target.id}`;
+    case "verify":
+      return `.voratiq/verify/sessions/${target.id}`;
+    case "reduce":
+      return `.voratiq/reduce/sessions/${target.id}`;
   }
 }
 

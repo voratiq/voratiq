@@ -22,21 +22,21 @@ import {
   VORATIQ_AGENTS_FILE,
   VORATIQ_ENVIRONMENT_FILE,
   VORATIQ_ORCHESTRATION_FILE,
-  VORATIQ_REDUCTIONS_DIR,
-  VORATIQ_REDUCTIONS_FILE,
-  VORATIQ_REDUCTIONS_SESSIONS_DIR,
-  VORATIQ_RUNS_DIR,
-  VORATIQ_RUNS_FILE,
-  VORATIQ_RUNS_SESSIONS_DIR,
+  VORATIQ_REDUCTION_DIR,
+  VORATIQ_REDUCTION_FILE,
+  VORATIQ_REDUCTION_SESSIONS_DIR,
+  VORATIQ_RUN_DIR,
+  VORATIQ_RUN_FILE,
+  VORATIQ_RUN_SESSIONS_DIR,
   VORATIQ_SANDBOX_FILE,
-  VORATIQ_SPECS_DIR,
-  VORATIQ_SPECS_FILE,
-  VORATIQ_SPECS_SESSIONS_DIR,
+  VORATIQ_SPEC_DIR,
+  VORATIQ_SPEC_FILE,
+  VORATIQ_SPEC_SESSIONS_DIR,
   VORATIQ_VERIFICATION_CONFIG_FILE,
-  VORATIQ_VERIFICATIONS_DIR,
-  VORATIQ_VERIFICATIONS_FILE,
-  VORATIQ_VERIFICATIONS_SESSIONS_DIR,
-  VORATIQ_VERIFICATIONS_TEMPLATES_DIR,
+  VORATIQ_VERIFICATION_DIR,
+  VORATIQ_VERIFICATION_FILE,
+  VORATIQ_VERIFICATION_SESSIONS_DIR,
+  VORATIQ_VERIFICATION_TEMPLATES_DIR,
 } from "./structure.js";
 import {
   buildDefaultAgentsTemplate,
@@ -74,7 +74,7 @@ async function seedVerificationSurface(
 
   const templatesRoot = resolveWorkspacePath(
     root,
-    VORATIQ_VERIFICATIONS_TEMPLATES_DIR,
+    VORATIQ_VERIFICATION_TEMPLATES_DIR,
   );
   if (!(await pathExists(templatesRoot))) {
     await mkdir(templatesRoot, { recursive: true });
@@ -132,27 +132,27 @@ export interface RepairWorkspaceStructureResult {
 const DOMAIN_STRUCTURE_DEFINITIONS: readonly WorkspaceDomainStructureDefinition[] =
   [
     {
-      directorySegment: VORATIQ_RUNS_DIR,
-      sessionsSegment: VORATIQ_RUNS_SESSIONS_DIR,
-      indexSegment: VORATIQ_RUNS_FILE,
+      directorySegment: VORATIQ_RUN_DIR,
+      sessionsSegment: VORATIQ_RUN_SESSIONS_DIR,
+      indexSegment: VORATIQ_RUN_FILE,
       indexVersion: 2,
     },
     {
-      directorySegment: VORATIQ_REDUCTIONS_DIR,
-      sessionsSegment: VORATIQ_REDUCTIONS_SESSIONS_DIR,
-      indexSegment: VORATIQ_REDUCTIONS_FILE,
+      directorySegment: VORATIQ_REDUCTION_DIR,
+      sessionsSegment: VORATIQ_REDUCTION_SESSIONS_DIR,
+      indexSegment: VORATIQ_REDUCTION_FILE,
       indexVersion: 1,
     },
     {
-      directorySegment: VORATIQ_SPECS_DIR,
-      sessionsSegment: VORATIQ_SPECS_SESSIONS_DIR,
-      indexSegment: VORATIQ_SPECS_FILE,
+      directorySegment: VORATIQ_SPEC_DIR,
+      sessionsSegment: VORATIQ_SPEC_SESSIONS_DIR,
+      indexSegment: VORATIQ_SPEC_FILE,
       indexVersion: 1,
     },
     {
-      directorySegment: VORATIQ_VERIFICATIONS_DIR,
-      sessionsSegment: VORATIQ_VERIFICATIONS_SESSIONS_DIR,
-      indexSegment: VORATIQ_VERIFICATIONS_FILE,
+      directorySegment: VORATIQ_VERIFICATION_DIR,
+      sessionsSegment: VORATIQ_VERIFICATION_SESSIONS_DIR,
+      indexSegment: VORATIQ_VERIFICATION_FILE,
       indexVersion: 1,
     },
   ];

@@ -1,7 +1,7 @@
 import type {
   AutoApplyStatus,
   AutoTerminalStatus,
-} from "../../domains/runs/model/types.js";
+} from "../../domain/run/model/types.js";
 import type {
   SelectionDecision,
   UnresolvedSelectionDecision,

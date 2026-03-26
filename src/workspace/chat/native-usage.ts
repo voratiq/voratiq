@@ -1,4 +1,4 @@
-import type { ChatUsageProviderId } from "../../domains/runs/model/types.js";
+import type { ChatUsageProviderId } from "../../domain/run/model/types.js";
 import { resolvePath } from "../../utils/path.js";
 import { getAgentSessionChatArtifactPath } from "../structure.js";
 import type { TokenUsageResult } from "./token-usage-result.js";

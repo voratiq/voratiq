@@ -1,6 +1,6 @@
-import type { RunRecordInitResult } from "../../domains/runs/competition/phases.js";
-import type { RunRecord } from "../../domains/runs/model/types.js";
-import { appendRunRecord } from "../../domains/runs/persistence/adapter.js";
+import type { RunRecordInitResult } from "../../domain/run/competition/phases.js";
+import type { RunRecord } from "../../domain/run/model/types.js";
+import { appendRunRecord } from "../../domain/run/persistence/adapter.js";
 import { normalizePathForDisplay } from "../../utils/path.js";
 import { cleanupRunWorkspace } from "../../workspace/cleanup.js";
 

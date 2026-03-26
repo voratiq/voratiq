@@ -2,7 +2,7 @@ import {
   AgentProcessError,
   GitOperationError,
   WorkspaceSetupRunError,
-} from "../../src/domains/runs/competition/errors.js";
+} from "../../src/domain/run/competition/errors.js";
 
 describe("run errors", () => {
   it("formats workspace setup errors", () => {

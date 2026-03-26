@@ -21,9 +21,9 @@ import {
 } from "@jest/globals";
 
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
-import { collectAgentArtifacts } from "../../../src/domains/runs/competition/agents/artifacts.js";
-import type { RunAgentWorkspacePaths } from "../../../src/domains/runs/competition/agents/workspace.js";
-import { WORKSPACE_SUMMARY_FILENAME } from "../../../src/domains/runs/competition/agents/workspace.js";
+import { collectAgentArtifacts } from "../../../src/domain/run/competition/agents/artifacts.js";
+import type { RunAgentWorkspacePaths } from "../../../src/domain/run/competition/agents/workspace.js";
+import { WORKSPACE_SUMMARY_FILENAME } from "../../../src/domain/run/competition/agents/workspace.js";
 import { pathExists } from "../../../src/utils/fs.js";
 import {
   gitAddAll,

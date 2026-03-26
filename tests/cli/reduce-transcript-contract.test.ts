@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { checkPlatformSupport } from "../../src/agents/runtime/sandbox.js";
 import { runReduceCommand } from "../../src/cli/reduce.js";
 import { executeReduceCommand } from "../../src/commands/reduce/command.js";
-import { readReductionRecords } from "../../src/domains/reductions/persistence/adapter.js";
+import { readReductionRecords } from "../../src/domain/reduce/persistence/adapter.js";
 import {
   ensureSandboxDependencies,
   resolveCliContext,
@@ -28,7 +28,7 @@ jest.mock("../../src/commands/reduce/command.js", () => ({
   executeReduceCommand: jest.fn(),
 }));
 
-jest.mock("../../src/domains/reductions/persistence/adapter.js", () => ({
+jest.mock("../../src/domain/reduce/persistence/adapter.js", () => ({
   readReductionRecords: jest.fn(),
 }));
 
@@ -56,14 +56,14 @@ describe("reduce transcript contract", () => {
       workspacePaths: {
         root: "/repo",
         workspaceDir: "/repo/.voratiq",
-        runsDir: "/repo/.voratiq/runs",
-        runsFile: "/repo/.voratiq/runs/index.json",
-        reductionsDir: "/repo/.voratiq/reductions",
-        reductionsFile: "/repo/.voratiq/reductions/index.json",
-        specsDir: "/repo/.voratiq/specs",
-        specsFile: "/repo/.voratiq/specs/index.json",
-        verificationsDir: "/repo/.voratiq/verifications",
-        verificationsFile: "/repo/.voratiq/verifications/index.json",
+        runsDir: "/repo/.voratiq/run",
+        runsFile: "/repo/.voratiq/run/index.json",
+        reductionsDir: "/repo/.voratiq/reduce",
+        reductionsFile: "/repo/.voratiq/reduce/index.json",
+        specsDir: "/repo/.voratiq/spec",
+        specsFile: "/repo/.voratiq/spec/index.json",
+        verificationsDir: "/repo/.voratiq/verify",
+        verificationsFile: "/repo/.voratiq/verify/index.json",
       },
     });
   });
@@ -88,9 +88,9 @@ describe("reduce transcript contract", () => {
             agentId: "alpha",
             status: "succeeded",
             outputPath:
-              ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.md",
+              ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.md",
             dataPath:
-              ".voratiq/reductions/sessions/reduce-123/alpha/artifacts/reduction.json",
+              ".voratiq/reduce/sessions/reduce-123/alpha/artifacts/reduction.json",
             startedAt: "2026-01-01T00:00:00.000Z",
             completedAt: "2026-01-01T00:00:02.000Z",
             error: null,
@@ -99,9 +99,9 @@ describe("reduce transcript contract", () => {
             agentId: "beta",
             status: "succeeded",
             outputPath:
-              ".voratiq/reductions/sessions/reduce-123/beta/artifacts/reduction.md",
+              ".voratiq/reduce/sessions/reduce-123/beta/artifacts/reduction.md",
             dataPath:
-              ".voratiq/reductions/sessions/reduce-123/beta/artifacts/reduction.json",
+              ".voratiq/reduce/sessions/reduce-123/beta/artifacts/reduction.json",
             startedAt: "2026-01-01T00:00:00.000Z",
             completedAt: "2026-01-01T00:00:03.000Z",
             error: null,
@@ -110,9 +110,9 @@ describe("reduce transcript contract", () => {
             agentId: "gamma",
             status: "failed",
             outputPath:
-              ".voratiq/reductions/sessions/reduce-123/gamma/artifacts/reduction.md",
+              ".voratiq/reduce/sessions/reduce-123/gamma/artifacts/reduction.md",
             dataPath:
-              ".voratiq/reductions/sessions/reduce-123/gamma/artifacts/reduction.json",
+              ".voratiq/reduce/sessions/reduce-123/gamma/artifacts/reduction.json",
             startedAt: "2026-01-01T00:00:00.000Z",
             completedAt: "2026-01-01T00:00:04.000Z",
             error: "reducer failed",
@@ -148,7 +148,7 @@ describe("reduce transcript contract", () => {
   it("does not emit a continuation hint for verification targets either", async () => {
     executeReduceCommandMock.mockResolvedValue({
       reductionId: "reduce-789",
-      target: { type: "verification", id: "verify-123" },
+      target: { type: "verify", id: "verify-123" },
       reducerAgentIds: ["alpha"],
       reductions: [],
     } as unknown as Awaited<ReturnType<typeof executeReduceCommand>>);
@@ -156,7 +156,7 @@ describe("reduce transcript contract", () => {
     readReductionRecordsMock.mockResolvedValue([
       {
         sessionId: "reduce-789",
-        target: { type: "verification", id: "verify-123" },
+        target: { type: "verify", id: "verify-123" },
         createdAt: "2026-01-01T00:00:00.000Z",
         completedAt: "2026-01-01T00:00:10.000Z",
         status: "succeeded",
@@ -165,9 +165,9 @@ describe("reduce transcript contract", () => {
             agentId: "alpha",
             status: "succeeded",
             outputPath:
-              ".voratiq/reductions/sessions/reduce-789/alpha/artifacts/reduction.md",
+              ".voratiq/reduce/sessions/reduce-789/alpha/artifacts/reduction.md",
             dataPath:
-              ".voratiq/reductions/sessions/reduce-789/alpha/artifacts/reduction.json",
+              ".voratiq/reduce/sessions/reduce-789/alpha/artifacts/reduction.json",
             startedAt: "2026-01-01T00:00:00.000Z",
             completedAt: "2026-01-01T00:00:02.000Z",
             error: null,
@@ -181,7 +181,7 @@ describe("reduce transcript contract", () => {
       "## Reduction\n**Sources**: x\n**Summary**: ok\n",
     );
     const result = await runReduceCommand({
-      target: { type: "verification", id: "verify-123" },
+      target: { type: "verify", id: "verify-123" },
       stdout: { write: () => true, isTTY: false },
       writeOutput: () => undefined,
     });
@@ -194,7 +194,7 @@ describe("reduce transcript contract", () => {
   it("does not emit reuse hints on full failure", async () => {
     executeReduceCommandMock.mockResolvedValue({
       reductionId: "reduce-456",
-      target: { type: "verification", id: "verify-123" },
+      target: { type: "verify", id: "verify-123" },
       reducerAgentIds: ["alpha", "beta"],
       reductions: [],
     } as unknown as Awaited<ReturnType<typeof executeReduceCommand>>);
@@ -202,7 +202,7 @@ describe("reduce transcript contract", () => {
     readReductionRecordsMock.mockResolvedValue([
       {
         sessionId: "reduce-456",
-        target: { type: "verification", id: "verify-123" },
+        target: { type: "verify", id: "verify-123" },
         createdAt: "2026-01-01T00:00:00.000Z",
         completedAt: "2026-01-01T00:00:10.000Z",
         status: "failed",
@@ -211,9 +211,9 @@ describe("reduce transcript contract", () => {
             agentId: "alpha",
             status: "failed",
             outputPath:
-              ".voratiq/reductions/sessions/reduce-456/alpha/artifacts/reduction.md",
+              ".voratiq/reduce/sessions/reduce-456/alpha/artifacts/reduction.md",
             dataPath:
-              ".voratiq/reductions/sessions/reduce-456/alpha/artifacts/reduction.json",
+              ".voratiq/reduce/sessions/reduce-456/alpha/artifacts/reduction.json",
             completedAt: "2026-01-01T00:00:02.000Z",
             error: "boom",
           },
@@ -221,9 +221,9 @@ describe("reduce transcript contract", () => {
             agentId: "beta",
             status: "failed",
             outputPath:
-              ".voratiq/reductions/sessions/reduce-456/beta/artifacts/reduction.md",
+              ".voratiq/reduce/sessions/reduce-456/beta/artifacts/reduction.md",
             dataPath:
-              ".voratiq/reductions/sessions/reduce-456/beta/artifacts/reduction.json",
+              ".voratiq/reduce/sessions/reduce-456/beta/artifacts/reduction.json",
             completedAt: "2026-01-01T00:00:03.000Z",
             error: "boom",
           },
@@ -233,7 +233,7 @@ describe("reduce transcript contract", () => {
     ]);
 
     const result = await runReduceCommand({
-      target: { type: "verification", id: "verify-123" },
+      target: { type: "verify", id: "verify-123" },
       stdout: { write: () => true, isTTY: true },
       writeOutput: () => undefined,
     });

@@ -65,19 +65,22 @@ describe("workspace bootstrap", () => {
     expect(createdDirs).toEqual(
       expect.arrayContaining([
         normalizeForAssertion(".voratiq"),
-        normalizeForAssertion(join(".voratiq", "runs")),
-        normalizeForAssertion(join(".voratiq", "reductions")),
-        normalizeForAssertion(join(".voratiq", "verifications")),
-        normalizeForAssertion(join(".voratiq", "runs", "sessions")),
-        normalizeForAssertion(join(".voratiq", "reductions", "sessions")),
-        normalizeForAssertion(join(".voratiq", "verifications", "sessions")),
+        normalizeForAssertion(join(".voratiq", "run")),
+        normalizeForAssertion(join(".voratiq", "reduce")),
+        normalizeForAssertion(join(".voratiq", "spec")),
+        normalizeForAssertion(join(".voratiq", "verify")),
+        normalizeForAssertion(join(".voratiq", "run", "sessions")),
+        normalizeForAssertion(join(".voratiq", "reduce", "sessions")),
+        normalizeForAssertion(join(".voratiq", "spec", "sessions")),
+        normalizeForAssertion(join(".voratiq", "verify", "sessions")),
       ]),
     );
     expect(createdFiles).toEqual(
       expect.arrayContaining([
-        normalizeForAssertion(join(".voratiq", "runs", "index.json")),
-        normalizeForAssertion(join(".voratiq", "reductions", "index.json")),
-        normalizeForAssertion(join(".voratiq", "verifications", "index.json")),
+        normalizeForAssertion(join(".voratiq", "run", "index.json")),
+        normalizeForAssertion(join(".voratiq", "reduce", "index.json")),
+        normalizeForAssertion(join(".voratiq", "spec", "index.json")),
+        normalizeForAssertion(join(".voratiq", "verify", "index.json")),
         normalizeForAssertion(join(".voratiq", "agents.yaml")),
         normalizeForAssertion(join(".voratiq", "verification.yaml")),
         normalizeForAssertion(join(".voratiq", "environment.yaml")),
@@ -91,7 +94,7 @@ describe("workspace bootstrap", () => {
 
   it("fails validation when the run index is missing", async () => {
     await createWorkspace(repoRoot);
-    const runsPath = resolveWorkspacePath(repoRoot, "runs", "index.json");
+    const runsPath = resolveWorkspacePath(repoRoot, "run", "index.json");
     await rm(runsPath, { force: true });
 
     await expect(validateWorkspace(repoRoot)).rejects.toBeInstanceOf(
@@ -103,7 +106,7 @@ describe("workspace bootstrap", () => {
     await createWorkspace(repoRoot);
     const reductionsPath = resolveWorkspacePath(
       repoRoot,
-      "reductions",
+      "reduce",
       "index.json",
     );
     await rm(reductionsPath, { force: true });
@@ -117,7 +120,7 @@ describe("workspace bootstrap", () => {
     await createWorkspace(repoRoot);
     const verificationsPath = resolveWorkspacePath(
       repoRoot,
-      "verifications",
+      "verify",
       "index.json",
     );
     await rm(verificationsPath, { force: true });
@@ -172,7 +175,7 @@ describe("workspace bootstrap", () => {
 
   it("fails validation when a workspace directory path is a file", async () => {
     await createWorkspace(repoRoot);
-    const runsPath = resolveWorkspacePath(repoRoot, "runs");
+    const runsPath = resolveWorkspacePath(repoRoot, "run");
     await rm(runsPath, { recursive: true, force: true });
     await writeFile(runsPath, "");
 
@@ -194,7 +197,7 @@ describe("workspace bootstrap", () => {
 
   it("fails validation when an index payload is malformed", async () => {
     await createWorkspace(repoRoot);
-    const runsPath = resolveWorkspacePath(repoRoot, "runs", "index.json");
+    const runsPath = resolveWorkspacePath(repoRoot, "run", "index.json");
     await writeFile(runsPath, '{"version":2,', "utf8");
 
     await expect(validateWorkspace(repoRoot)).rejects.toBeInstanceOf(

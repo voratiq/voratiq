@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 
 import { resolveVerifyTarget } from "../../../src/commands/verify/targets.js";
-import { appendRunRecord } from "../../../src/domains/runs/persistence/adapter.js";
+import { appendRunRecord } from "../../../src/domain/run/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 import {
   createAgentInvocationRecord,
@@ -45,13 +45,8 @@ describe("resolveVerifyTarget (run target)", () => {
         root,
         specsFilePath: join(root, ".voratiq", "specs", "index.json"),
         runsFilePath,
-        reductionsFilePath: join(root, ".voratiq", "reductions", "index.json"),
-        verificationsFilePath: join(
-          root,
-          ".voratiq",
-          "verifications",
-          "index.json",
-        ),
+        reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
+        verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
         target: {
           kind: "run",
           sessionId: runId,

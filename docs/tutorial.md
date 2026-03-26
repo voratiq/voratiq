@@ -57,7 +57,7 @@ Command:
 voratiq spec \
   --description "Add a --branch flag to voratiq run that checks out (or creates) a git branch named after the spec filename before the run starts. Branch name comes from the spec basename without extension (e.g., specs/separate-verification-outcomes.md -> separate-verification-outcomes, specs/foo/bar.md -> bar). If the worktree is dirty, abort before creating any run record. If checkout/create fails, abort fast with the git error. If the branch exists, switch to it; otherwise create from HEAD. Do this as early as possible in the run lifecycle. Do not change CLI output on success. apply --commit remains unchanged and branch-agnostic. Add tests for branch name derivation, branch create vs checkout, dirty worktree fast-fail, and checkout failure." \
   --agent claude-opus-4-5-20251101 \
-  --output .voratiq/specs/add-run-branch.md
+  --output .voratiq/spec/add-run-branch.md
 ```
 
 Output:
@@ -65,10 +65,10 @@ Output:
 ```
 Generating specification…
 
-Spec saved: .voratiq/specs/add-run-branch.md
+Spec saved: .voratiq/spec/add-run-branch.md
 
 To begin a run:
-  voratiq run --spec .voratiq/specs/add-run-branch.md
+  voratiq run --spec .voratiq/spec/add-run-branch.md
 ```
 
 One note: avoid backticks in `--description` unless you escape them. Bash interprets them as command substitution.
@@ -80,7 +80,7 @@ One note: avoid backticks in `--description` unless you escape them. Bash interp
 Command:
 
 ```bash
-voratiq run --spec .voratiq/specs/add-run-branch.md
+voratiq run --spec .voratiq/spec/add-run-branch.md
 ```
 
 Output:
@@ -90,8 +90,8 @@ Output:
 
 Elapsed        12m 11s
 Created        2026-01-13 15:55 PST
-Spec           .voratiq/specs/add-run-branch.md
-Workspace      .voratiq/runs/sessions/20260113-235501-hhkox
+Spec           .voratiq/spec/add-run-branch.md
+Workspace      .voratiq/run/sessions/20260113-235501-hhkox
 Base Revision  29163b77
 
 AGENT                       STATUS     DURATION  CHANGES
@@ -134,7 +134,7 @@ Verifying…
 Elapsed    3m 13s
 Created    2026-02-21 15:30 PST
 Target     Run 20260113-235501-hhkox
-Workspace  .voratiq/verifications/sessions/20260221-233012-txwtd
+Workspace  .voratiq/verify/sessions/20260221-233012-txwtd
 
 AGENT            VERIFIER         STATUS     DURATION
 gpt-5-2-codex    run-verification  SUCCEEDED  3m 13s
@@ -151,7 +151,7 @@ Verifier: gpt-5-2-codex
 voratiq apply --run 20260113-235501-hhkox --agent claude-opus-4-5-20251101
 ```
 
-Verification: .voratiq/verifications/sessions/20260221-233012-txwtd/gpt-5-2-codex/run-verification/result.json
+Verification: .voratiq/verify/sessions/20260221-233012-txwtd/gpt-5-2-codex/run-verification/result.json
 
 ---
 
@@ -177,15 +177,15 @@ Output:
 20260113-235501-hhkox SUCCEEDED
 
 Created        2026-01-13 15:55 PST
-Spec           .voratiq/specs/add-run-branch.md
-Workspace      .voratiq/runs/sessions/20260113-235501-hhkox
+Spec           .voratiq/spec/add-run-branch.md
+Workspace      .voratiq/run/sessions/20260113-235501-hhkox
 Base Revision  29163b77
 
   claude-opus-4-5-20251101 SUCCEEDED
 
   Duration  5m 6s
   Changes   4 files changed, 265 insertions(+), 1 deletion(-)
-  Root      .voratiq/runs/sessions/20260113-235501-hhkox/claude-opus-4-5-20251101
+  Root      .voratiq/run/sessions/20260113-235501-hhkox/claude-opus-4-5-20251101
 
   RUNTIME   PATH
   manifest  runtime/manifest.json

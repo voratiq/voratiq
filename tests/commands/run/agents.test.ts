@@ -15,13 +15,13 @@ import { runSandboxedAgent } from "../../../src/agents/runtime/harness.js";
 import { runPreparedWithLimit } from "../../../src/competition/core.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../src/configs/environment/types.js";
-import { runPreparedAgent } from "../../../src/domains/runs/competition/agents/lifecycle.js";
-import { runPostProcessingAndCollectArtifacts } from "../../../src/domains/runs/competition/agents/post-processing.js";
-import { AgentRunContext } from "../../../src/domains/runs/competition/agents/run-context.js";
-import type { PreparedAgentExecution } from "../../../src/domains/runs/competition/agents/types.js";
-import { buildRunAgentWorkspacePaths } from "../../../src/domains/runs/competition/agents/workspace.js";
-import type { AgentExecutionResult } from "../../../src/domains/runs/competition/reports.js";
-import type { AgentInvocationRecord } from "../../../src/domains/runs/model/types.js";
+import { runPreparedAgent } from "../../../src/domain/run/competition/agents/lifecycle.js";
+import { runPostProcessingAndCollectArtifacts } from "../../../src/domain/run/competition/agents/post-processing.js";
+import { AgentRunContext } from "../../../src/domain/run/competition/agents/run-context.js";
+import type { PreparedAgentExecution } from "../../../src/domain/run/competition/agents/types.js";
+import { buildRunAgentWorkspacePaths } from "../../../src/domain/run/competition/agents/workspace.js";
+import type { AgentExecutionResult } from "../../../src/domain/run/competition/reports.js";
+import type { AgentInvocationRecord } from "../../../src/domain/run/model/types.js";
 import { extractProviderNativeTokenUsageForSession } from "../../../src/workspace/chat/native-usage.js";
 import { buildAgentWorkspacePaths } from "../../../src/workspace/layout.js";
 
@@ -30,7 +30,7 @@ jest.mock("../../../src/agents/runtime/harness.js", () => ({
 }));
 
 jest.mock(
-  "../../../src/domains/runs/competition/agents/post-processing.js",
+  "../../../src/domain/run/competition/agents/post-processing.js",
   () => ({
     runPostProcessingAndCollectArtifacts: jest.fn(),
   }),
@@ -271,7 +271,7 @@ describe("executeAgentLifecycle integration", () => {
 
     expect(extractProviderNativeTokenUsageForSessionMock).toHaveBeenCalledWith({
       root: execution.root,
-      domain: "runs",
+      domain: "run",
       sessionId: execution.runId,
       agentId: execution.agent.id,
       provider: "codex",
@@ -331,7 +331,7 @@ describe("executeAgentLifecycle integration", () => {
     expect(runPostProcessingAndCollectArtifactsMock).not.toHaveBeenCalled();
     expect(extractProviderNativeTokenUsageForSessionMock).toHaveBeenCalledWith({
       root: execution.root,
-      domain: "runs",
+      domain: "run",
       sessionId: execution.runId,
       agentId: execution.agent.id,
       provider: "claude",

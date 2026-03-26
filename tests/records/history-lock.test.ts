@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 
-import { HISTORY_LOCK_STALE_GRACE_MS } from "../../src/domains/runs/persistence/adapter.js";
+import { HISTORY_LOCK_STALE_GRACE_MS } from "../../src/domain/run/persistence/adapter.js";
 import { SessionHistoryLockTimeoutError } from "../../src/persistence/errors.js";
 import {
   createHistoryLockMetadata,

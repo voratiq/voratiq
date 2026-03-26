@@ -16,7 +16,7 @@ export class ApplyRunMetadataCorruptedError extends ApplyError {
     super(
       "Run history is corrupted.",
       [detail],
-      ["Check `runs/index.json` and the affected session directory."],
+      ["Check `run/index.json` and the affected session directory."],
     );
     this.name = "ApplyRunMetadataCorruptedError";
   }

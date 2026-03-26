@@ -13,21 +13,21 @@ import {
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import type { ResolvedExtraContextFile } from "../../../src/competition/shared/extra-context.js";
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
-import { executeAgents } from "../../../src/domains/runs/competition/agent-execution.js";
-import type { AgentExecutionPhaseResult } from "../../../src/domains/runs/competition/phases.js";
-import { toRunReport } from "../../../src/domains/runs/competition/reports.js";
-import { generateRunId } from "../../../src/domains/runs/model/id.js";
+import { executeAgents } from "../../../src/domain/run/competition/agent-execution.js";
+import type { AgentExecutionPhaseResult } from "../../../src/domain/run/competition/phases.js";
+import { toRunReport } from "../../../src/domain/run/competition/reports.js";
+import { generateRunId } from "../../../src/domain/run/model/id.js";
 import {
   type AgentRecordMutators,
   createAgentRecordMutators,
-} from "../../../src/domains/runs/model/mutators.js";
+} from "../../../src/domain/run/model/mutators.js";
 import type {
   AgentInvocationRecord,
   AgentReport,
   RunRecord,
   RunReport,
-} from "../../../src/domains/runs/model/types.js";
-import { rewriteRunRecord } from "../../../src/domains/runs/persistence/adapter.js";
+} from "../../../src/domain/run/model/types.js";
+import { rewriteRunRecord } from "../../../src/domain/run/persistence/adapter.js";
 import { prepareRunWorkspace } from "../../../src/workspace/run.js";
 
 jest.mock("../../../src/commands/run/validation.js", () => ({
@@ -42,20 +42,20 @@ jest.mock("../../../src/commands/run/record-init.js", () => ({
   initializeRunRecord: jest.fn(),
 }));
 
-jest.mock("../../../src/domains/runs/model/mutators.js", () => ({
+jest.mock("../../../src/domain/run/model/mutators.js", () => ({
   createAgentRecordMutators: jest.fn(),
 }));
 
-jest.mock("../../../src/domains/runs/competition/agent-execution.js", () => ({
+jest.mock("../../../src/domain/run/competition/agent-execution.js", () => ({
   executeAgents: jest.fn(),
 }));
 
-jest.mock("../../../src/domains/runs/persistence/adapter.js", () => ({
+jest.mock("../../../src/domain/run/persistence/adapter.js", () => ({
   rewriteRunRecord: jest.fn(),
   flushRunRecordBuffer: jest.fn(),
 }));
 
-jest.mock("../../../src/domains/runs/competition/reports.js", () => ({
+jest.mock("../../../src/domain/run/competition/reports.js", () => ({
   toRunReport: jest.fn(),
 }));
 
@@ -68,7 +68,7 @@ jest.mock("../../../src/commands/shared/resolve-stage-competitors.js", () => ({
   resolveStageCompetitors: jest.fn(),
 }));
 
-jest.mock("../../../src/domains/runs/model/id.js", () => ({
+jest.mock("../../../src/domain/run/model/id.js", () => ({
   generateRunId: jest.fn(),
 }));
 
@@ -134,7 +134,7 @@ describe("executeRunCommand integration", () => {
 
     const runWorkspace = {
       absolute: "/tmp/run-workspace",
-      relative: ".voratiq/runs/sessions/run-xyz",
+      relative: ".voratiq/run/sessions/run-xyz",
     };
     prepareRunWorkspaceMock.mockResolvedValue({
       runWorkspace,
@@ -245,7 +245,7 @@ describe("executeRunCommand integration", () => {
           {
             agentId: "alpha",
             providerId: "claude",
-            agentRoot: "/repo/.voratiq/runs/sessions/run-xyz/alpha",
+            agentRoot: "/repo/.voratiq/run/sessions/run-xyz/alpha",
           },
         ],
       }),
@@ -313,7 +313,7 @@ describe("executeRunCommand integration", () => {
     prepareRunWorkspaceMock.mockResolvedValue({
       runWorkspace: {
         absolute: "/tmp/run-workspace",
-        relative: ".voratiq/runs/sessions/run-mixed",
+        relative: ".voratiq/run/sessions/run-mixed",
       },
     });
 
@@ -471,7 +471,7 @@ describe("executeRunCommand integration", () => {
     prepareRunWorkspaceMock.mockResolvedValue({
       runWorkspace: {
         absolute: "/tmp/run-workspace",
-        relative: ".voratiq/runs/sessions/run-no-success",
+        relative: ".voratiq/run/sessions/run-no-success",
       },
     });
 
@@ -602,7 +602,7 @@ describe("executeRunCommand integration", () => {
 
     const runWorkspace = {
       absolute: "/tmp/run-workspace",
-      relative: ".voratiq/runs/sessions/run-aborted",
+      relative: ".voratiq/run/sessions/run-aborted",
     };
     prepareRunWorkspaceMock.mockResolvedValue({
       runWorkspace,
@@ -743,7 +743,7 @@ describe("executeRunCommand integration", () => {
     prepareRunWorkspaceMock.mockResolvedValue({
       runWorkspace: {
         absolute: "/tmp/run-workspace",
-        relative: ".voratiq/runs/sessions/run-orchestration-error",
+        relative: ".voratiq/run/sessions/run-orchestration-error",
       },
     });
     const initialRecord: RunRecord = {
@@ -806,7 +806,7 @@ describe("executeRunCommand integration", () => {
     prepareRunWorkspaceMock.mockResolvedValue({
       runWorkspace: {
         absolute: "/tmp/run-workspace",
-        relative: ".voratiq/runs/sessions/run-fail",
+        relative: ".voratiq/run/sessions/run-fail",
       },
     });
     initializeRunRecordMock.mockResolvedValue({
@@ -862,7 +862,7 @@ describe("executeRunCommand integration", () => {
     prepareRunWorkspaceMock.mockResolvedValue({
       runWorkspace: {
         absolute: "/tmp/run-workspace",
-        relative: ".voratiq/runs/sessions/run-xyz",
+        relative: ".voratiq/run/sessions/run-xyz",
       },
     });
 

@@ -7,12 +7,12 @@ import {
 } from "../../../src/agents/runtime/policy.js";
 
 const ROOT = "/repo";
-const WORKSPACE = "/repo/.voratiq/runs/sessions/run-123/codex/workspace";
-const SANDBOX_HOME = "/repo/.voratiq/runs/sessions/run-123/codex/sandbox/home";
-const RUNTIME_PATH = "/repo/.voratiq/runs/sessions/run-123/codex/runtime";
-const ARTIFACTS_PATH = "/repo/.voratiq/runs/sessions/run-123/codex/artifacts";
+const WORKSPACE = "/repo/.voratiq/run/sessions/run-123/codex/workspace";
+const SANDBOX_HOME = "/repo/.voratiq/run/sessions/run-123/codex/sandbox/home";
+const RUNTIME_PATH = "/repo/.voratiq/run/sessions/run-123/codex/runtime";
+const ARTIFACTS_PATH = "/repo/.voratiq/run/sessions/run-123/codex/artifacts";
 const SETTINGS_PATH =
-  "/repo/.voratiq/runs/sessions/run-123/codex/runtime/sandbox.json";
+  "/repo/.voratiq/run/sessions/run-123/codex/runtime/sandbox.json";
 
 describe("sandbox policy normalization", () => {
   it("collapses parent+child deny entries per list", () => {
@@ -21,19 +21,19 @@ describe("sandbox policy normalization", () => {
       filesystem: {
         allowWrite: [],
         denyRead: [
-          "/repo/.voratiq/runs",
-          "/repo/.voratiq/runs/sessions/run-123",
-          "/repo/.voratiq/runs",
+          "/repo/.voratiq/run",
+          "/repo/.voratiq/run/sessions/run-123",
+          "/repo/.voratiq/run",
         ],
         denyWrite: [
-          "/repo/.voratiq/runs",
-          "/repo/.voratiq/runs/sessions/run-123/codex",
+          "/repo/.voratiq/run",
+          "/repo/.voratiq/run/sessions/run-123/codex",
         ],
       },
     });
 
-    expect(normalized.denyRead).toEqual(["/repo/.voratiq/runs"]);
-    expect(normalized.denyWrite).toEqual(["/repo/.voratiq/runs"]);
+    expect(normalized.denyRead).toEqual(["/repo/.voratiq/run"]);
+    expect(normalized.denyWrite).toEqual(["/repo/.voratiq/run"]);
   });
 
   it("keeps boundary-safe siblings (/a/b does not collapse /a/bb)", () => {
@@ -53,15 +53,15 @@ describe("sandbox policy normalization", () => {
     const normalized = normalizeFilesystemPolicy({
       workspacePath: WORKSPACE,
       filesystem: {
-        allowWrite: ["/repo/.voratiq/runs", "/repo/.voratiq/runs"],
-        denyRead: ["/repo/.voratiq/runs", "/repo/.voratiq/runs/sessions"],
-        denyWrite: ["/repo/.voratiq/runs", "/repo/.voratiq/runs/sessions"],
+        allowWrite: ["/repo/.voratiq/run", "/repo/.voratiq/run"],
+        denyRead: ["/repo/.voratiq/run", "/repo/.voratiq/run/sessions"],
+        denyWrite: ["/repo/.voratiq/run", "/repo/.voratiq/run/sessions"],
       },
     });
 
-    expect(normalized.allowWrite).toEqual(["/repo/.voratiq/runs"]);
-    expect(normalized.denyRead).toEqual(["/repo/.voratiq/runs"]);
-    expect(normalized.denyWrite).toEqual(["/repo/.voratiq/runs"]);
+    expect(normalized.allowWrite).toEqual(["/repo/.voratiq/run"]);
+    expect(normalized.denyRead).toEqual(["/repo/.voratiq/run"]);
+    expect(normalized.denyWrite).toEqual(["/repo/.voratiq/run"]);
   });
 
   it("normalizes relative inputs to absolute canonical paths", () => {
@@ -93,11 +93,8 @@ describe("sandbox policy normalization", () => {
       workspacePath: WORKSPACE,
       filesystem: {
         allowWrite: ["./b", "./a", "./a"],
-        denyRead: ["/repo/.voratiq/runs", "/repo/.voratiq/runs/sessions/run-1"],
-        denyWrite: [
-          "/repo/.voratiq/runs/sessions/run-1",
-          "/repo/.voratiq/runs",
-        ],
+        denyRead: ["/repo/.voratiq/run", "/repo/.voratiq/run/sessions/run-1"],
+        denyWrite: ["/repo/.voratiq/run/sessions/run-1", "/repo/.voratiq/run"],
       },
     });
     const twice = normalizeFilesystemPolicy({
@@ -172,17 +169,17 @@ describe("shared sandbox builder", () => {
     expect(runPolicy.filesystem.denyWrite).toEqual(
       expect.arrayContaining([
         "/repo/.git",
-        "/repo/.voratiq/runs/index.json",
-        "/repo/.voratiq/runs/history.lock",
-        "/repo/.voratiq/verifications",
+        "/repo/.voratiq/run/index.json",
+        "/repo/.voratiq/run/history.lock",
+        "/repo/.voratiq/verify",
       ]),
     );
 
     expect(specPolicy.filesystem.denyWrite).toEqual(
       expect.arrayContaining([
-        "/repo/.voratiq/runs",
-        "/repo/.voratiq/verifications",
-        "/repo/.voratiq/reductions",
+        "/repo/.voratiq/run",
+        "/repo/.voratiq/verify",
+        "/repo/.voratiq/reduce",
       ]),
     );
     expect(specPolicy.filesystem.denyRead).toEqual(
@@ -191,9 +188,9 @@ describe("shared sandbox builder", () => {
 
     expect(verifyPolicy.filesystem.denyWrite).toEqual(
       expect.arrayContaining([
-        "/repo/.voratiq/runs",
-        "/repo/.voratiq/specs",
-        "/repo/.voratiq/reductions",
+        "/repo/.voratiq/run",
+        "/repo/.voratiq/spec",
+        "/repo/.voratiq/reduce",
       ]),
     );
     expect(verifyPolicy.filesystem.denyRead).toEqual(
@@ -204,17 +201,17 @@ describe("shared sandbox builder", () => {
 
   it("collapses stage overlay child denies when baseline already denies parent", () => {
     const policy = build("verify", {
-      stageDenyWritePaths: ["/repo/.voratiq/runs/sessions/run-123"],
-      stageDenyReadPaths: ["/repo/.voratiq/runs/sessions/run-123"],
+      stageDenyWritePaths: ["/repo/.voratiq/run/sessions/run-123"],
+      stageDenyReadPaths: ["/repo/.voratiq/run/sessions/run-123"],
     });
 
-    expect(policy.filesystem.denyWrite).toContain("/repo/.voratiq/runs");
-    expect(policy.filesystem.denyRead).toContain("/repo/.voratiq/runs");
+    expect(policy.filesystem.denyWrite).toContain("/repo/.voratiq/run");
+    expect(policy.filesystem.denyRead).toContain("/repo/.voratiq/run");
     expect(policy.filesystem.denyWrite).not.toContain(
-      "/repo/.voratiq/runs/sessions/run-123",
+      "/repo/.voratiq/run/sessions/run-123",
     );
     expect(policy.filesystem.denyRead).not.toContain(
-      "/repo/.voratiq/runs/sessions/run-123",
+      "/repo/.voratiq/run/sessions/run-123",
     );
   });
 });

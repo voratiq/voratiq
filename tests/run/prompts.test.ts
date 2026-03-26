@@ -1,10 +1,10 @@
-import { buildRunPrompt } from "../../src/domains/runs/competition/prompt.js";
+import { buildRunPrompt } from "../../src/domain/run/competition/prompt.js";
 
 describe("buildRunPrompt", () => {
   it("includes spec metadata, constraints, and workspace boundary instructions", () => {
     const prompt = buildRunPrompt({
       specContent: "# Example\nDo the work.",
-      workspacePath: "/repo/.voratiq/runs/sessions/run-123/agent-123/workspace",
+      workspacePath: "/repo/.voratiq/run/sessions/run-123/agent-123/workspace",
     });
 
     expect(prompt).toContain("Implement the following task:");
@@ -22,10 +22,10 @@ describe("buildRunPrompt", () => {
       "- You are sandboxed. If an operation is blocked, skip it and continue.",
     );
     expect(prompt).toContain(
-      "- Read access: `/repo/.voratiq/runs/sessions/run-123/agent-123/workspace`.",
+      "- Read access: `/repo/.voratiq/run/sessions/run-123/agent-123/workspace`.",
     );
     expect(prompt).toContain(
-      "- Write access: `/repo/.voratiq/runs/sessions/run-123/agent-123/workspace`.",
+      "- Write access: `/repo/.voratiq/run/sessions/run-123/agent-123/workspace`.",
     );
   });
 });

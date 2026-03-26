@@ -15,7 +15,7 @@ export class RunMetadataMissingError extends PruneError {
   constructor(public readonly runId: string) {
     super(
       `Run metadata for \`${runId}\` is missing.`,
-      [`Expected \`record.json\` under \`runs/sessions/${runId}/\`.`],
+      [`Expected \`record.json\` under \`run/sessions/${runId}/\`.`],
       ["Re-run the spec to regenerate this run before pruning."],
     );
     this.name = "RunMetadataMissingError";

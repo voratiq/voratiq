@@ -11,7 +11,7 @@ import { resolveReductionCompetitors } from "../../../src/commands/shared/resolv
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import { executeSpecCommand } from "../../../src/commands/spec/command.js";
 import { resolveExtraContextFiles } from "../../../src/competition/shared/extra-context.js";
-import { appendSpecRecord } from "../../../src/domains/specs/persistence/adapter.js";
+import { appendSpecRecord } from "../../../src/domain/spec/persistence/adapter.js";
 import { getHeadRevision } from "../../../src/utils/git.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
@@ -54,16 +54,16 @@ describe("end-to-end extra-context reuse loop", () => {
       getHeadRevisionMock.mockResolvedValue("spec-base-sha");
 
       const seedSpecId = "spec-seed";
-      const seedSpecPath = ".voratiq/specs/seed.md";
-      const seedSpecDataPath = ".voratiq/specs/seed.json";
-      await mkdir(join(root, ".voratiq", "specs"), { recursive: true });
+      const seedSpecPath = ".voratiq/spec/seed.md";
+      const seedSpecDataPath = ".voratiq/spec/seed.json";
+      await mkdir(join(root, ".voratiq", "spec"), { recursive: true });
       await writeFile(
-        join(root, ".voratiq", "specs", "seed.md"),
+        join(root, ".voratiq", "spec", "seed.md"),
         "# Seed\n",
         "utf8",
       );
       await writeFile(
-        join(root, ".voratiq", "specs", "seed.json"),
+        join(root, ".voratiq", "spec", "seed.json"),
         JSON.stringify(
           {
             title: "Seed",
@@ -80,7 +80,7 @@ describe("end-to-end extra-context reuse loop", () => {
       );
       await appendSpecRecord({
         root,
-        specsFilePath: join(root, ".voratiq", "specs", "index.json"),
+        specsFilePath: join(root, ".voratiq", "spec", "index.json"),
         record: {
           sessionId: seedSpecId,
           createdAt: "2026-01-01T00:00:00.000Z",
@@ -235,15 +235,10 @@ describe("end-to-end extra-context reuse loop", () => {
 
       const reductionResult = await executeReduceCommand({
         root,
-        specsFilePath: join(root, ".voratiq", "specs", "index.json"),
-        runsFilePath: join(root, ".voratiq", "runs", "index.json"),
-        reductionsFilePath: join(root, ".voratiq", "reductions", "index.json"),
-        verificationsFilePath: join(
-          root,
-          ".voratiq",
-          "verifications",
-          "index.json",
-        ),
+        specsFilePath: join(root, ".voratiq", "spec", "index.json"),
+        runsFilePath: join(root, ".voratiq", "run", "index.json"),
+        reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
+        verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
         target: { type: "spec", id: seedSpecId },
         agentIds: ["alpha"],
       });
@@ -261,7 +256,7 @@ describe("end-to-end extra-context reuse loop", () => {
 
       const specResult = await executeSpecCommand({
         root,
-        specsFilePath: join(root, ".voratiq", "specs", "index.json"),
+        specsFilePath: join(root, ".voratiq", "spec", "index.json"),
         description: "Generate a new spec using prior reduction",
         agentIds: ["alpha"],
         extraContextFiles,

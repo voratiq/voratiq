@@ -16,12 +16,12 @@ import {
   type AgentInvocationEnhanced,
   buildRunRecordEnhanced,
   type RunRecordEnhanced,
-} from "../../src/domains/runs/model/enhanced.js";
+} from "../../src/domain/run/model/enhanced.js";
 import type {
   AgentReport,
   RunRecord,
   RunReport,
-} from "../../src/domains/runs/model/types.js";
+} from "../../src/domain/run/model/types.js";
 import { pathExists } from "../../src/utils/fs.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
 import {
@@ -37,7 +37,7 @@ import {
 // Skip agent-spawning integration tests in nested agent workspaces to break recursive eval loops.
 // Agent spawning is structurally impossible from within a sandboxed environment.
 const cwd = process.cwd().replace(/\\/g, "/");
-const runningInWorkspace = cwd.includes("/.voratiq/runs/");
+const runningInWorkspace = cwd.includes("/.voratiq/run/");
 const suite = runningInWorkspace ? describe.skip : describe;
 const AGENT_TEST_TIMEOUT_MS = 30_000;
 
@@ -120,7 +120,7 @@ suite("agent integrations", () => {
           "--dangerously-skip-permissions",
         ]);
         expect(executionSnapshot.argv).toContain("-p");
-        const expectedSandboxPrefix = `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox`;
+        const expectedSandboxPrefix = `.voratiq/run/sessions/${runReport.runId}/${scenario.agentId}/sandbox`;
         expect(executionSnapshot.env.CLAUDE_CONFIG_DIR).toContain(
           expectedSandboxPrefix,
         );
@@ -158,7 +158,7 @@ suite("agent integrations", () => {
         await expect(access(stagedSandbox)).rejects.toThrow();
         const claudeSecretPath = join(
           repoRoot,
-          `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox/.claude/.credentials.json`,
+          `.voratiq/run/sessions/${runReport.runId}/${scenario.agentId}/sandbox/.claude/.credentials.json`,
         );
         await expectNoRegularSecrets(claudeSecretPath);
       },
@@ -174,13 +174,13 @@ suite("agent integrations", () => {
       extraArgs: ["--config", "model_reasoning_effort=high"],
       assertScenario: async ({ executionSnapshot, runReport, scenario }) => {
         expect(executionSnapshot.env.CODEX_HOME).toContain(
-          `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox/.codex`,
+          `.voratiq/run/sessions/${runReport.runId}/${scenario.agentId}/sandbox/.codex`,
         );
         expect(executionSnapshot.env.HOME).toContain(
-          `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox`,
+          `.voratiq/run/sessions/${runReport.runId}/${scenario.agentId}/sandbox`,
         );
         expect(executionSnapshot.env.TMPDIR).toContain(
-          `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox/tmp`,
+          `.voratiq/run/sessions/${runReport.runId}/${scenario.agentId}/sandbox/tmp`,
         );
         expect(executionSnapshot.env.TEMP).toBe(executionSnapshot.env.TMPDIR);
         expect(executionSnapshot.env.TMP).toBe(executionSnapshot.env.TMPDIR);
@@ -190,7 +190,7 @@ suite("agent integrations", () => {
         await expect(access(stagedSandbox)).rejects.toThrow();
         const codexSecretPath = join(
           repoRoot,
-          `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox/.codex/auth.json`,
+          `.voratiq/run/sessions/${runReport.runId}/${scenario.agentId}/sandbox/.codex/auth.json`,
         );
         await expectNoRegularSecrets(codexSecretPath);
       },
@@ -211,10 +211,10 @@ suite("agent integrations", () => {
       }) => {
         const homeEnv = executionSnapshot.env.HOME;
         expect(homeEnv).toContain(
-          `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox`,
+          `.voratiq/run/sessions/${runReport.runId}/${scenario.agentId}/sandbox`,
         );
         expect(executionSnapshot.env.TMPDIR).toContain(
-          `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox/tmp`,
+          `.voratiq/run/sessions/${runReport.runId}/${scenario.agentId}/sandbox/tmp`,
         );
         expect(executionSnapshot.env.TEMP).toBe(executionSnapshot.env.TMPDIR);
         expect(executionSnapshot.env.TMP).toBe(executionSnapshot.env.TMPDIR);
@@ -222,7 +222,7 @@ suite("agent integrations", () => {
 
         const stagedGeminiDir = join(
           repoRoot,
-          `.voratiq/runs/sessions/${runReport.runId}/${scenario.agentId}/sandbox/.gemini`,
+          `.voratiq/run/sessions/${runReport.runId}/${scenario.agentId}/sandbox/.gemini`,
         );
         await expect(pathExists(stagedGeminiDir)).resolves.toBe(false);
         await expect(access(stagedGeminiDir)).rejects.toThrow();
@@ -284,7 +284,7 @@ suite("agent integrations", () => {
     }
     assertAgentReportStructure(agentReport, runReport.runId);
 
-    const indexPath = join(repoRoot, ".voratiq", "runs", "index.json");
+    const indexPath = join(repoRoot, ".voratiq", "run", "index.json");
     const indexPayload = JSON.parse(await readFile(indexPath, "utf8")) as {
       sessions: Array<Pick<RunRecord, "runId" | "createdAt" | "status">>;
     };
@@ -299,7 +299,7 @@ suite("agent integrations", () => {
     const recordPath = join(
       repoRoot,
       ".voratiq",
-      "runs",
+      "run",
       "sessions",
       runReport.runId,
       "record.json",
@@ -365,7 +365,7 @@ suite("agent integrations", () => {
     );
     expect(agentReport.assets.summaryPath).toBeDefined();
     expect(agentReport.baseDirectory).toBe(
-      `.voratiq/runs/sessions/${runId}/${agentReport.agentId}`,
+      `.voratiq/run/sessions/${runId}/${agentReport.agentId}`,
     );
   }
 

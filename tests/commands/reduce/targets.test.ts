@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 
 import { assertReductionTargetEligible } from "../../../src/commands/reduce/targets.js";
-import { appendRunRecord } from "../../../src/domains/runs/persistence/adapter.js";
+import { appendRunRecord } from "../../../src/domain/run/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 import {
   createAgentInvocationRecord,
@@ -32,7 +32,7 @@ describe("assertReductionTargetEligible (run target)", () => {
         includeSummary: true,
       });
 
-      const runsFilePath = join(root, ".voratiq", "runs", "index.json");
+      const runsFilePath = join(root, ".voratiq", "run", "index.json");
       await appendRunRecord({
         root,
         runsFilePath,
@@ -59,20 +59,10 @@ describe("assertReductionTargetEligible (run target)", () => {
       await expect(
         assertReductionTargetEligible({
           root,
-          specsFilePath: join(root, ".voratiq", "specs", "index.json"),
+          specsFilePath: join(root, ".voratiq", "spec", "index.json"),
           runsFilePath,
-          reductionsFilePath: join(
-            root,
-            ".voratiq",
-            "reductions",
-            "index.json",
-          ),
-          verificationsFilePath: join(
-            root,
-            ".voratiq",
-            "verifications",
-            "index.json",
-          ),
+          reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
+          verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
           target: { type: "run", id: runId },
         }),
       ).resolves.toBeUndefined();
@@ -102,7 +92,7 @@ describe("assertReductionTargetEligible (run target)", () => {
         includeSummary: true,
       });
 
-      const runsFilePath = join(root, ".voratiq", "runs", "index.json");
+      const runsFilePath = join(root, ".voratiq", "run", "index.json");
       await appendRunRecord({
         root,
         runsFilePath,
@@ -129,20 +119,10 @@ describe("assertReductionTargetEligible (run target)", () => {
       await expect(
         assertReductionTargetEligible({
           root,
-          specsFilePath: join(root, ".voratiq", "specs", "index.json"),
+          specsFilePath: join(root, ".voratiq", "spec", "index.json"),
           runsFilePath,
-          reductionsFilePath: join(
-            root,
-            ".voratiq",
-            "reductions",
-            "index.json",
-          ),
-          verificationsFilePath: join(
-            root,
-            ".voratiq",
-            "verifications",
-            "index.json",
-          ),
+          reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
+          verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
           target: { type: "run", id: runId },
         }),
       ).rejects.toThrow(/missing required artifacts/iu);
@@ -170,7 +150,7 @@ async function seedRunArtifacts(options: {
   const artifactsDir = join(
     root,
     ".voratiq",
-    "runs",
+    "run",
     "sessions",
     runId,
     agentId,

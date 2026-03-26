@@ -13,7 +13,7 @@ Two methods:
 - **Programmatic** (run only): shell commands — tests, linters, build checks — that gauge correctness and style automatically.
 - **Rubric**: verifier agents score candidates against a structured rubric.
 
-Results are saved under `.voratiq/verifications/`.
+Results are saved under `.voratiq/verify/`.
 
 ## Schema
 
@@ -51,7 +51,7 @@ reduce:
 
 ## Templates
 
-Rubric templates live under `.voratiq/verifications/templates/<name>/`:
+Rubric templates live under `.voratiq/verify/templates/<name>/`:
 
 - `prompt.md` — instructions for the verifier
 - `rubric.md` — scoring criteria

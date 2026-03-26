@@ -17,8 +17,8 @@ import {
   NoAgentsEnabledError,
   type PreflightIssue,
   RunPreflightError,
-} from "../../domains/runs/competition/errors.js";
-import { RunOptionValidationError } from "../../domains/runs/model/errors.js";
+} from "../../domain/run/competition/errors.js";
+import { RunOptionValidationError } from "../../domain/run/model/errors.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { WorkspaceMissingEntryError } from "../../workspace/errors.js";

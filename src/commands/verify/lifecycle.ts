@@ -3,17 +3,17 @@ import { runTeardown } from "../../competition/shared/teardown.js";
 import {
   buildOperationLifecycleCompleteFields,
   buildRecordLifecycleCompleteFields,
-} from "../../domains/shared/lifecycle.js";
-import { writeVerificationArtifact } from "../../domains/verifications/competition/artifacts.js";
+} from "../../domain/shared/lifecycle.js";
+import { writeVerificationArtifact } from "../../domain/verify/competition/artifacts.js";
 import type {
   VerificationMethodResultRef,
   VerificationRecord,
-} from "../../domains/verifications/model/types.js";
+} from "../../domain/verify/model/types.js";
 import {
   flushVerificationRecordBuffer,
   readVerificationRecords,
   rewriteVerificationRecord,
-} from "../../domains/verifications/persistence/adapter.js";
+} from "../../domain/verify/persistence/adapter.js";
 import type { VerificationStatus } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import {

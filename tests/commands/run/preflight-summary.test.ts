@@ -17,7 +17,7 @@ import {
   type AgentCatalogDiagnostics,
   loadAgentCatalogDiagnostics,
 } from "../../../src/configs/agents/loader.js";
-import { RunPreflightError } from "../../../src/domains/runs/competition/errors.js";
+import { RunPreflightError } from "../../../src/domain/run/competition/errors.js";
 import { getHeadRevision } from "../../../src/utils/git.js";
 jest.mock("../../../src/agents/runtime/auth.js", () => ({
   verifyAgentProviders: jest.fn(),
