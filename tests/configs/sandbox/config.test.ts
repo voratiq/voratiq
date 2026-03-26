@@ -53,6 +53,7 @@ providers:
     expect(claude.network.allowedDomains).toEqual([
       "api.anthropic.com",
       "console.anthropic.com",
+      "mcp-proxy.anthropic.com",
       "platform.claude.com",
     ]);
 
@@ -191,6 +192,7 @@ providers:
     expect(agentNetwork.allowedDomains).toEqual([
       "api.anthropic.com",
       "console.anthropic.com",
+      "mcp-proxy.anthropic.com",
       "platform.claude.com",
       "allowed.example.com",
     ]);

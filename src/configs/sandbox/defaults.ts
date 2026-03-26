@@ -18,6 +18,7 @@ export const DEFAULT_SANDBOX_PROVIDERS: readonly SandboxProviderDefault[] = [
       allowedDomains: [
         "api.anthropic.com",
         "console.anthropic.com",
+        "mcp-proxy.anthropic.com",
         "platform.claude.com",
       ],
       deniedDomains: [],
