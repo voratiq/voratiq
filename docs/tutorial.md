@@ -136,8 +136,8 @@ Created    2026-02-21 15:30 PST
 Target     Run 20260113-235501-hhkox
 Workspace  .voratiq/verifications/sessions/20260221-233012-txwtd
 
-VERIFIER           AGENT            STATUS     DURATION
-run-verification   gpt-5-2-codex    SUCCEEDED  3m 13s
+AGENT            VERIFIER         STATUS     DURATION
+gpt-5-2-codex    run-verification  SUCCEEDED  3m 13s
 
 ---
 

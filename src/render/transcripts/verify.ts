@@ -184,12 +184,12 @@ function buildVerifyMethodTable<
   return renderTable({
     columns: [
       {
-        header: "VERIFIER",
-        accessor: (row) => row.verifierLabel,
-      },
-      {
         header: "AGENT",
         accessor: (row) => row.agentLabel ?? DASH,
+      },
+      {
+        header: "VERIFIER",
+        accessor: (row) => row.verifierLabel,
       },
       {
         header: "STATUS",
