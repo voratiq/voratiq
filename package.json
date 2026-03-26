@@ -50,8 +50,8 @@
     "build": "tsc && node scripts/build-run-agent-shim.mjs",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc -p tsconfig.typecheck.json",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "prettier --cache --write .",
+    "format:check": "prettier --cache --check .",
     "test": "./scripts/run-tests.sh",
     "test:sandbox": "./scripts/run-tests.sh --sandbox-only",
     "check": "npm run lint && npm run typecheck && npm run format:check && npm run build && npm test"
