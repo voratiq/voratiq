@@ -3,13 +3,19 @@
   "version": "0.1.0-beta.17",
   "description": "Agent ensembles to design, generate, and select the best code for every task.",
   "keywords": [
-    "ai",
+    "agent-ensembles",
+    "agent-orchestration",
+    "ai-coding",
+    "claude-code",
     "cli",
-    "multi-agent",
-    "spec-driven",
     "code-generation",
-    "verification",
-    "sandboxing"
+    "codex",
+    "evals",
+    "gemini",
+    "multi-agent",
+    "sandboxing",
+    "spec-driven-development",
+    "verification"
   ],
   "homepage": "https://github.com/voratiq/voratiq#readme",
   "bugs": {
