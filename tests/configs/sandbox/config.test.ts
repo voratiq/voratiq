@@ -53,15 +53,16 @@ providers:
     expect(claude.network.allowedDomains).toEqual([
       "api.anthropic.com",
       "console.anthropic.com",
+      "mcp-proxy.anthropic.com",
       "platform.claude.com",
     ]);
 
     const gemini = config.providers.gemini;
     expect(gemini.network.allowedDomains).toEqual([
-      "oauth2.googleapis.com",
       "cloudcode-pa.googleapis.com",
-      "play.googleapis.com",
       "generativelanguage.googleapis.com",
+      "oauth2.googleapis.com",
+      "play.googleapis.com",
     ]);
   });
 
@@ -191,6 +192,7 @@ providers:
     expect(agentNetwork.allowedDomains).toEqual([
       "api.anthropic.com",
       "console.anthropic.com",
+      "mcp-proxy.anthropic.com",
       "platform.claude.com",
       "allowed.example.com",
     ]);

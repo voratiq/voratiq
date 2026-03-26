@@ -157,6 +157,7 @@ describe("sandbox", () => {
           "allowed.example.com",
           "api.anthropic.com",
           "console.anthropic.com",
+          "mcp-proxy.anthropic.com",
           "platform.claude.com",
         ]);
         expect(settings.network.deniedDomains).toEqual(["blocked.example.com"]);
@@ -215,6 +216,7 @@ describe("sandbox", () => {
           "allowed.example.com",
           "api.anthropic.com",
           "console.anthropic.com",
+          "mcp-proxy.anthropic.com",
           "platform.claude.com",
         ]);
         expect(settings.network.allowAllUnixSockets).toBe(true);
