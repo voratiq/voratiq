@@ -224,7 +224,7 @@ describe("verify live progress renderer", () => {
 
     let frame = normalizeFrame(tty.snapshot());
     expect(frame).toContain("Elapsed    3s");
-    expect(frame).toMatch(/programmatic\s+—\s+RUNNING\s+—/u);
+    expect(frame).toMatch(/—\s+programmatic\s+RUNNING\s+—/u);
 
     currentTime = Date.parse("2026-01-01T00:00:07.000Z");
     renderer.update({
@@ -235,7 +235,7 @@ describe("verify live progress renderer", () => {
 
     frame = normalizeFrame(tty.snapshot());
     expect(frame).toContain("Elapsed    7s");
-    expect(frame).toMatch(/programmatic\s+—\s+RUNNING\s+—/u);
+    expect(frame).toMatch(/—\s+programmatic\s+RUNNING\s+—/u);
   });
 
   it("renders the programmatic verifier label as plain text in TTY summaries", () => {
