@@ -233,6 +233,77 @@ describe("spec competition adapter native token usage integration", () => {
     ]);
     expect(results[0]?.tokenUsage).toBeUndefined();
   });
+
+  it("derives final artifact filenames from spec.json title instead of the prompt hint title", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-spec-title-slug-"));
+    tempRoots.push(root);
+    await createWorkspace(root);
+
+    runSandboxedAgentMock.mockImplementation(async (input) => {
+      await writeFile(
+        join(input.paths.workspacePath, "spec.md"),
+        "# Prompt Hint Title\n",
+        "utf8",
+      );
+      await writeFile(
+        join(input.paths.workspacePath, "spec.json"),
+        JSON.stringify(
+          {
+            title: "Generated Truth Title",
+            objective: "Define the spec outcome.",
+            scope: ["Describe the requested work."],
+            acceptanceCriteria: ["Do the thing."],
+            constraints: ["Stay within repo context."],
+            exitSignal: "The spec is ready to execute.",
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+      return {
+        exitCode: 0,
+        signal: null,
+        sandboxSettings: minimalSandboxSettings(),
+        manifestEnv: {},
+      };
+    });
+
+    const adapter = createSpecCompetitionAdapter({
+      root,
+      sessionId: "spec-title-slug",
+      description: "Generate a spec",
+      specTitle: "Prompt Hint Title",
+      environment: {},
+    });
+
+    const candidates: SpecCompetitionCandidate[] = [
+      {
+        id: "spec-agent",
+        provider: "codex",
+        model: "gpt-5",
+        binary: "node",
+        argv: [],
+      },
+    ];
+
+    const results = await executeCompetitionWithAdapter({
+      candidates,
+      maxParallel: 1,
+      adapter,
+    });
+
+    expect(results).toEqual([
+      expect.objectContaining({
+        agentId: "spec-agent",
+        status: "succeeded",
+        outputPath:
+          ".voratiq/specs/sessions/spec-title-slug/spec-agent/artifacts/generated-truth-title.md",
+        dataPath:
+          ".voratiq/specs/sessions/spec-title-slug/spec-agent/artifacts/generated-truth-title.json",
+      }),
+    ]);
+  });
 });
 
 function minimalSandboxSettings(): {

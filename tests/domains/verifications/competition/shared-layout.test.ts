@@ -25,7 +25,7 @@ describe("prepareSharedVerificationInputs", () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-verify-shared-layout-"));
     const verificationId = "verify-failed-prep";
     const missingSpecOutputPath =
-      ".voratiq/specs/sessions/spec-123/agent/artifacts/spec.md";
+      ".voratiq/specs/sessions/spec-123/agent/artifacts/payment-flow.md";
 
     try {
       await writeFile(
@@ -57,7 +57,7 @@ describe("prepareSharedVerificationInputs", () => {
                   completedAt: "2026-01-01T00:01:00.000Z",
                   outputPath: missingSpecOutputPath,
                   dataPath:
-                    ".voratiq/specs/sessions/spec-123/agent/artifacts/spec.json",
+                    ".voratiq/specs/sessions/spec-123/agent/artifacts/payment-flow.json",
                 },
               ],
             },
@@ -400,9 +400,13 @@ describe("prepareSharedVerificationInputs", () => {
         "utf8",
       );
       await mkdir(specArtifactsDir, { recursive: true });
-      await writeFile(join(specArtifactsDir, "spec.md"), "# spec\n", "utf8");
       await writeFile(
-        join(specArtifactsDir, "spec.json"),
+        join(specArtifactsDir, "payment-flow.md"),
+        "# spec\n",
+        "utf8",
+      );
+      await writeFile(
+        join(specArtifactsDir, "payment-flow.json"),
         '{"title":"Spec"}\n',
         "utf8",
       );
@@ -437,9 +441,9 @@ describe("prepareSharedVerificationInputs", () => {
                 startedAt: "2026-01-01T00:00:00.000Z",
                 completedAt: "2026-01-01T00:01:00.000Z",
                 outputPath:
-                  ".voratiq/specs/sessions/spec-123/agent-spec/artifacts/spec.md",
+                  ".voratiq/specs/sessions/spec-123/agent-spec/artifacts/payment-flow.md",
                 dataPath:
-                  ".voratiq/specs/sessions/spec-123/agent-spec/artifacts/spec.json",
+                  ".voratiq/specs/sessions/spec-123/agent-spec/artifacts/payment-flow.json",
               },
             ],
           },
