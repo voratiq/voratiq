@@ -56,8 +56,7 @@ Command:
 ```bash
 voratiq spec \
   --description "Add a --branch flag to voratiq run that checks out (or creates) a git branch named after the spec filename before the run starts. Branch name comes from the spec basename without extension (e.g., specs/separate-verification-outcomes.md -> separate-verification-outcomes, specs/foo/bar.md -> bar). If the worktree is dirty, abort before creating any run record. If checkout/create fails, abort fast with the git error. If the branch exists, switch to it; otherwise create from HEAD. Do this as early as possible in the run lifecycle. Do not change CLI output on success. apply --commit remains unchanged and branch-agnostic. Add tests for branch name derivation, branch create vs checkout, dirty worktree fast-fail, and checkout failure." \
-  --agent claude-opus-4-5-20251101 \
-  --output .voratiq/spec/add-run-branch.md
+  --agent claude-opus-4-5-20251101
 ```
 
 Output:
