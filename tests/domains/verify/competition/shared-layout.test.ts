@@ -2,12 +2,14 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+import type { EnvironmentConfig } from "../../../../src/configs/environment/types.js";
 import { prepareSharedVerificationInputs } from "../../../../src/domain/verify/competition/shared-layout.js";
 import type { ResolvedVerificationTarget } from "../../../../src/domain/verify/competition/target.js";
 import { pathExists } from "../../../../src/utils/fs.js";
 import { removeWorktree } from "../../../../src/utils/git.js";
+import { ensureWorkspaceDependencies } from "../../../../src/workspace/dependencies.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,
@@ -18,9 +20,20 @@ jest.mock("../../../../src/utils/git.js", () => ({
   createDetachedWorktree: jest.fn(() => Promise.resolve()),
 }));
 
+jest.mock("../../../../src/workspace/dependencies.js", () => ({
+  ensureWorkspaceDependencies: jest.fn(() => Promise.resolve()),
+}));
+
 const removeWorktreeMock = jest.mocked(removeWorktree);
+const ensureWorkspaceDependenciesMock = jest.mocked(
+  ensureWorkspaceDependencies,
+);
 
 describe("prepareSharedVerificationInputs", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it("removes shared inputs root when preparation fails after setup", async () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-verify-shared-layout-"));
     const verificationId = "verify-failed-prep";
@@ -38,6 +51,7 @@ describe("prepareSharedVerificationInputs", () => {
         prepareSharedVerificationInputs({
           root,
           verificationId,
+          environment: {},
           resolvedTarget: {
             baseRevisionSha: "base-sha",
             competitiveCandidates: [],
@@ -79,6 +93,11 @@ describe("prepareSharedVerificationInputs", () => {
         "repo",
       );
 
+      expect(ensureWorkspaceDependenciesMock).toHaveBeenCalledWith({
+        root,
+        workspacePath: referenceRepoAbsolute,
+        environment: {},
+      });
       await expect(pathExists(sharedRootAbsolute)).resolves.toBe(false);
       expect(removeWorktreeMock).toHaveBeenCalledWith({
         root,
@@ -124,6 +143,7 @@ describe("prepareSharedVerificationInputs", () => {
       const result = await prepareSharedVerificationInputs({
         root,
         verificationId,
+        environment: {},
         resolvedTarget: {
           baseRevisionSha: "base-sha",
           competitiveCandidates: [
@@ -256,6 +276,7 @@ describe("prepareSharedVerificationInputs", () => {
       const result = await prepareSharedVerificationInputs({
         root,
         verificationId,
+        environment: {},
         resolvedTarget: {
           baseRevisionSha: "base-sha",
           competitiveCandidates: [
@@ -339,6 +360,7 @@ describe("prepareSharedVerificationInputs", () => {
         prepareSharedVerificationInputs({
           root,
           verificationId,
+          environment: {},
           resolvedTarget: {
             baseRevisionSha: "base-sha",
             competitiveCandidates: [
@@ -417,6 +439,7 @@ describe("prepareSharedVerificationInputs", () => {
       const result = await prepareSharedVerificationInputs({
         root,
         verificationId,
+        environment: {},
         resolvedTarget: {
           baseRevisionSha: "base-sha",
           competitiveCandidates: [
@@ -533,6 +556,7 @@ describe("prepareSharedVerificationInputs", () => {
       const result = await prepareSharedVerificationInputs({
         root,
         verificationId,
+        environment: {},
         resolvedTarget: {
           baseRevisionSha: "base-sha",
           competitiveCandidates: [
@@ -604,6 +628,72 @@ describe("prepareSharedVerificationInputs", () => {
           ),
         ),
       ).resolves.toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("hydrates dependency roots for the shared reference repo", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "voratiq-verify-shared-dependencies-"),
+    );
+    const verificationId = "verify-shared-deps";
+    const runId = "run-shared-deps";
+    const agentId = "agent-1";
+    const specPath = "specs/run-shared-deps.md";
+    const environment: EnvironmentConfig = {
+      node: {
+        dependencyRoots: ["node_modules"],
+      },
+    };
+
+    try {
+      await writeFile(
+        join(root, ".git"),
+        "gitdir: ./.git/worktrees/test\n",
+        "utf8",
+      );
+      await mkdir(join(root, "specs"), { recursive: true });
+      await writeFile(join(root, specPath), "# spec\n", "utf8");
+      await mkdir(join(root, "node_modules"), { recursive: true });
+
+      const result = await prepareSharedVerificationInputs({
+        root,
+        verificationId,
+        environment,
+        resolvedTarget: {
+          baseRevisionSha: "base-sha",
+          competitiveCandidates: [
+            {
+              canonicalId: agentId,
+              forbiddenIdentityTokens: [agentId],
+            },
+          ],
+          target: {
+            kind: "run",
+            sessionId: runId,
+            candidateIds: [agentId],
+          },
+          runRecord: createRunRecord({
+            runId,
+            status: "pruned",
+            deletedAt: new Date().toISOString(),
+            spec: { path: specPath },
+            agents: [
+              createAgentInvocationRecord({
+                agentId,
+                artifacts: {},
+              }),
+            ],
+          }),
+        } as ResolvedVerificationTarget,
+      });
+
+      expect(ensureWorkspaceDependenciesMock).toHaveBeenCalledWith({
+        root,
+        workspacePath: result.referenceRepoAbsolute,
+        environment,
+      });
     } finally {
       await rm(root, { recursive: true, force: true });
     }

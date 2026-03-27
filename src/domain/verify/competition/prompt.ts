@@ -2,7 +2,11 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import type { ResolvedExtraContextFile } from "../../../competition/shared/extra-context.js";
-import { buildWorkspaceArtifactRequirements } from "../../../competition/shared/prompt-helpers.js";
+import {
+  appendConstraints,
+  appendOutputRequirements,
+  buildWorkspaceArtifactRequirements,
+} from "../../../competition/shared/prompt-helpers.js";
 import { toExtraContextContextSubpath } from "../../../extra-context/contract.js";
 import { VORATIQ_VERIFICATION_DIR } from "../../../workspace/structure.js";
 import type { VerificationTarget } from "../model/types.js";
@@ -102,16 +106,18 @@ export function buildRubricPrompt(options: {
     "```",
   );
 
-  lines.push(
-    "",
-    "Output requirements:",
-    ...buildWorkspaceArtifactRequirements([
+  appendConstraints(lines);
+  appendOutputRequirements(
+    lines,
+    buildWorkspaceArtifactRequirements([
       {
         instruction: "Save the structured rubric result as JSON",
         path: "result.json",
       },
     ]),
-    "- Do not write files outside the workspace.",
+  );
+
+  lines.push(
     "",
     "Target metadata:",
     `- kind: ${target.kind}`,

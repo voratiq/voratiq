@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readlink, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -201,6 +201,122 @@ describe("executeAndPersistRubricMethods", () => {
         extraContextFiles: [],
         maxParallel: 1,
         teardown: createTeardownController("rubric test"),
+        mutators: createMutators(),
+      });
+
+      expect(methods).toEqual([
+        expect.objectContaining({
+          method: "rubric",
+          verifierId: verifierAgent.id,
+          template: "run-review",
+          status: "succeeded",
+        }),
+      ]);
+      expect(runSandboxedAgentMock).toHaveBeenCalledTimes(1);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("hydrates verifier workspaces from environment without installing dependencies", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-verify-rubric-deps-"));
+    const runId = "run-deps";
+    const candidateId = "agent-1";
+    const blindedAlias = "v_aaaaaaaaaa";
+    const specPath = "specs/run-deps.md";
+
+    try {
+      await writeFile(
+        join(root, ".git"),
+        "gitdir: ./.git/worktrees/test\n",
+        "utf8",
+      );
+      await mkdir(join(root, "specs"), { recursive: true });
+      await writeFile(join(root, specPath), "# spec\n", "utf8");
+      await mkdir(join(root, "node_modules"), { recursive: true });
+
+      const templateDir = join(
+        root,
+        ".voratiq",
+        "verify",
+        "templates",
+        "run-review",
+      );
+      await mkdir(templateDir, { recursive: true });
+      await writeFile(join(templateDir, "prompt.md"), "Evaluate outcomes.\n");
+      await writeFile(
+        join(templateDir, "rubric.md"),
+        "Prefer the best diff.\n",
+      );
+      await writeFile(join(templateDir, "schema.yaml"), "type: object\n");
+
+      const artifactsDir = join(
+        root,
+        ".voratiq",
+        "run",
+        "sessions",
+        runId,
+        candidateId,
+        "artifacts",
+      );
+      await mkdir(artifactsDir, { recursive: true });
+      await writeFile(join(artifactsDir, "diff.patch"), "diff --git\n", "utf8");
+
+      runSandboxedAgentMock.mockImplementation(
+        async (input: AgentRuntimeHarnessInput) => {
+          const dependencyPath = join(
+            input.paths.workspacePath,
+            "node_modules",
+          );
+          await expect(pathExists(dependencyPath)).resolves.toBe(true);
+          await expect(readlink(dependencyPath)).resolves.toBe(
+            join(root, "node_modules"),
+          );
+          expect(input.prompt).toContain(
+            "You are sandboxed. If an operation is blocked, skip it and continue.",
+          );
+          expect(input.prompt).toContain(
+            "You are running headlessly. Do not pause for user interaction.",
+          );
+
+          await writeFile(
+            join(input.paths.workspacePath, "result.json"),
+            `${JSON.stringify({
+              preferred: blindedAlias,
+              ranking: [blindedAlias],
+              rationale: "Dependencies were pre-provisioned.",
+            })}\n`,
+            "utf8",
+          );
+
+          return {
+            exitCode: 0,
+            signal: null,
+            sandboxSettings: {},
+            manifestEnv: {},
+          } as unknown as AgentRuntimeHarnessResult;
+        },
+      );
+
+      const methods = await executeAndPersistRubricMethods({
+        root,
+        verificationId: "verify-deps",
+        resolvedTarget: buildRunTarget({
+          runId,
+          specPath,
+          candidateId,
+        }),
+        verificationConfig,
+        verifierAgents: [verifierAgent],
+        aliasMap: { [blindedAlias]: candidateId },
+        environment: {
+          node: {
+            dependencyRoots: ["node_modules"],
+          },
+        },
+        extraContextFiles: [],
+        maxParallel: 1,
+        teardown: createTeardownController("rubric dependency test"),
         mutators: createMutators(),
       });
 

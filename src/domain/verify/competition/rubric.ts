@@ -59,6 +59,7 @@ export async function executeAndPersistRubricMethods(options: {
     root,
     verificationId,
     resolvedTarget,
+    environment,
     aliasMap,
   });
 

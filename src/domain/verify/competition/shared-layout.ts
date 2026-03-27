@@ -7,8 +7,10 @@ import {
   sep,
 } from "node:path";
 
+import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import { pathExists } from "../../../utils/fs.js";
 import { createDetachedWorktree, removeWorktree } from "../../../utils/git.js";
+import { ensureWorkspaceDependencies } from "../../../workspace/dependencies.js";
 import {
   type AgentWorkspacePaths,
   buildAgentWorkspacePaths,
@@ -112,9 +114,11 @@ export async function prepareSharedVerificationInputs(options: {
   root: string;
   verificationId: string;
   resolvedTarget: ResolvedVerificationTarget;
+  environment: EnvironmentConfig;
   aliasMap?: Record<string, string>;
 }): Promise<SharedVerificationInputs> {
-  const { root, verificationId, resolvedTarget, aliasMap } = options;
+  const { root, verificationId, resolvedTarget, environment, aliasMap } =
+    options;
   const sharedRootAbsolute = resolve(
     root,
     ".voratiq",
@@ -140,6 +144,11 @@ export async function prepareSharedVerificationInputs(options: {
       baseRevision: resolvedTarget.baseRevisionSha,
     });
     detachedWorktreeCreated = true;
+    await ensureWorkspaceDependencies({
+      root,
+      workspacePath: referenceRepoAbsolute,
+      environment,
+    });
 
     if ("specRecord" in resolvedTarget) {
       const descriptionAbsolute = resolve(
