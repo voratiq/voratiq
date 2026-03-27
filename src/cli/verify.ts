@@ -50,6 +50,11 @@ import {
   VORATIQ_VERIFICATION_FILE,
   VORATIQ_VERIFICATION_SESSIONS_DIR,
 } from "../workspace/structure.js";
+import {
+  buildVerifyOperatorEnvelope,
+  createSilentCliWriter,
+  writeOperatorResultEnvelope,
+} from "./operator-envelope.js";
 import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
 
@@ -60,6 +65,7 @@ export interface VerifyCommandOptions {
   profile?: string;
   maxParallel?: number;
   extraContext?: string[];
+  json?: boolean;
   suppressHint?: boolean;
   stdout?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
   stderr?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
@@ -68,11 +74,14 @@ export interface VerifyCommandOptions {
 
 export interface VerifyCommandResult {
   verificationId: string;
+  status: VerificationRecord["status"];
+  target: VerificationRecord["target"];
   body: string;
   exitCode?: number;
   outputPath: string;
   selectedSpecPath?: string;
   selection?: VerificationSelectionPolicyOutput;
+  warningMessage?: string;
 }
 
 export async function runVerifyCommand(
@@ -85,11 +94,17 @@ export async function runVerifyCommand(
     profile,
     maxParallel,
     extraContext,
+    json = false,
     suppressHint,
     stdout,
     stderr,
-    writeOutput = writeCommandOutput,
+    writeOutput,
   } = options;
+  const effectiveWriteOutput = json
+    ? undefined
+    : (writeOutput ?? writeCommandOutput);
+  const rendererStdout = json ? createSilentCliWriter() : stdout;
+  const rendererStderr = json ? createSilentCliWriter() : stderr;
 
   const { root, workspacePaths } = await resolveCliContext();
 
@@ -101,17 +116,19 @@ export async function runVerifyCommand(
   });
 
   const startLine = createStageStartLineEmitter((message) => {
-    writeOutput({
+    effectiveWriteOutput?.({
       alerts: [{ severity: "info", message }],
     });
   });
-  startLine.emit("Verifying…");
+  if (effectiveWriteOutput) {
+    startLine.emit("Verifying…");
+  }
 
   const renderer = createVerifyRenderer({
-    stdout,
-    stderr,
+    stdout: rendererStdout,
+    stderr: rendererStderr,
   });
-  const isTty = stdout?.isTTY ?? process.stdout.isTTY;
+  const isTty = json ? false : (stdout?.isTTY ?? process.stdout.isTTY);
 
   const execution = await executeVerifyCommand({
     root,
@@ -220,6 +237,8 @@ export async function runVerifyCommand(
 
   return {
     verificationId: execution.verificationId,
+    status: execution.record.status,
+    target: execution.record.target,
     body,
     exitCode: execution.record.status === "succeeded" ? 0 : 1,
     outputPath,
@@ -228,6 +247,7 @@ export async function runVerifyCommand(
       ? { selectedSpecPath: execution.record.target.specPath }
       : {}),
     selection,
+    ...(selectionWarning ? { warningMessage: selectionWarning } : {}),
   };
 }
 
@@ -239,6 +259,7 @@ interface VerifyCommandActionOptions {
   profile?: string;
   maxParallel?: number;
   extraContext?: string[];
+  json?: boolean;
 }
 
 function collectAgentOption(value: string, previous: string[]): string[] {
@@ -326,6 +347,7 @@ export function createVerifyCommand(): Command {
         .default([], "")
         .argParser(collectExtraContextOption),
     )
+    .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
     .action(async (options: VerifyCommandActionOptions, command: Command) => {
       const target = resolveTargetFromOptions(options, command);
@@ -335,8 +357,24 @@ export function createVerifyCommand(): Command {
         profile: options.profile,
         maxParallel: options.maxParallel,
         extraContext: options.extraContext,
+        json: Boolean(options.json),
       });
 
+      if (options.json) {
+        writeOperatorResultEnvelope(
+          buildVerifyOperatorEnvelope({
+            verificationId: result.verificationId,
+            target: result.target,
+            outputPath: result.outputPath,
+            status: result.status,
+            selection: result.selection?.decision,
+            selectedSpecPath: result.selectedSpecPath,
+            warningMessage: result.warningMessage,
+          }),
+          result.exitCode,
+        );
+        return;
+      }
       writeCommandOutput({ body: result.body, exitCode: result.exitCode });
     });
 }

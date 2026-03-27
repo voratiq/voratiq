@@ -13,7 +13,10 @@ import {
   readReductionArtifact,
   type ReductionArtifact,
 } from "../domain/reduce/competition/reduction.js";
-import type { ReductionTarget } from "../domain/reduce/model/types.js";
+import type {
+  ReductionRecord,
+  ReductionTarget,
+} from "../domain/reduce/model/types.js";
 import { readReductionRecords } from "../domain/reduce/persistence/adapter.js";
 import {
   ensureSandboxDependencies,
@@ -37,6 +40,11 @@ import {
   VORATIQ_REDUCTION_FILE,
   VORATIQ_VERIFICATION_FILE,
 } from "../workspace/structure.js";
+import {
+  buildReduceOperatorEnvelope,
+  createSilentCliWriter,
+  writeOperatorResultEnvelope,
+} from "./operator-envelope.js";
 import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
 
@@ -47,13 +55,17 @@ export interface ReduceCommandOptions {
   profile?: string;
   maxParallel?: number;
   extraContext?: string[];
+  json?: boolean;
   suppressHint?: boolean;
   writeOutput?: CommandOutputWriter;
   stdout?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
+  stderr?: Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
 }
 
 export interface ReduceCommandResult {
   reductionId: string;
+  status: ReductionRecord["status"];
+  target: ReductionTarget;
   body: string;
   exitCode?: number;
 }
@@ -68,10 +80,17 @@ export async function runReduceCommand(
     profile,
     maxParallel,
     extraContext,
+    json = false,
     suppressHint,
-    writeOutput = writeCommandOutput,
+    writeOutput,
     stdout,
+    stderr,
   } = options;
+  const effectiveWriteOutput = json
+    ? undefined
+    : (writeOutput ?? writeCommandOutput);
+  const rendererStdout = json ? createSilentCliWriter() : stdout;
+  const rendererStderr = json ? createSilentCliWriter() : stderr;
 
   const { root, workspacePaths } = await resolveCliContext();
 
@@ -83,14 +102,17 @@ export async function runReduceCommand(
   });
 
   const startLine = createStageStartLineEmitter((message) => {
-    writeOutput({
+    effectiveWriteOutput?.({
       alerts: [{ severity: "info", message }],
     });
   });
-  startLine.emit("Reducing artifacts…");
+  if (effectiveWriteOutput) {
+    startLine.emit("Reducing artifacts…");
+  }
 
   const renderer = createReduceRenderer({
-    stdout,
+    stdout: rendererStdout,
+    stderr: rendererStderr,
   });
 
   const execution = await executeReduceCommand({
@@ -205,6 +227,8 @@ export async function runReduceCommand(
 
   return {
     reductionId: execution.reductionId,
+    status: record.status,
+    target: record.target,
     body,
     exitCode: record.status === "succeeded" ? 0 : 1,
   };
@@ -239,6 +263,7 @@ interface ReduceCommandActionOptions {
   profile?: string;
   maxParallel?: number;
   extraContext?: string[];
+  json?: boolean;
 }
 
 function collectAgentOption(value: string, previous: string[]): string[] {
@@ -333,6 +358,7 @@ export function createReduceCommand(): Command {
         .default([], "")
         .argParser(collectExtraContextOption),
     )
+    .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
     .action(async (options: ReduceCommandActionOptions, command: Command) => {
       const target = resolveTargetFromOptions(options, command);
@@ -342,9 +368,21 @@ export function createReduceCommand(): Command {
         profile: options.profile,
         maxParallel: options.maxParallel,
         extraContext: options.extraContext,
-        writeOutput: writeCommandOutput,
+        json: Boolean(options.json),
+        writeOutput: options.json ? undefined : writeCommandOutput,
       });
 
+      if (options.json) {
+        writeOperatorResultEnvelope(
+          buildReduceOperatorEnvelope({
+            reductionId: result.reductionId,
+            target: result.target,
+            status: result.status,
+          }),
+          result.exitCode,
+        );
+        return;
+      }
       writeCommandOutput({ body: result.body, exitCode: result.exitCode });
     });
 }

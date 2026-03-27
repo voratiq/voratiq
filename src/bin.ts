@@ -10,6 +10,10 @@ const SIGNAL_EXIT_CODES: Partial<Record<NodeJS.Signals, number>> = {
   SIGTERM: 143,
 };
 
+let activeJsonEnvelopeOperator:
+  | import("./cli/operator-envelope.js").EnvelopeOperator
+  | undefined;
+
 function installProcessGuards(): void {
   process.once("SIGINT", () => {
     void handleSignal("SIGINT");
@@ -33,6 +37,19 @@ async function handleFatalError(
 ): Promise<void> {
   await terminateActiveSessionsSafe("failed", context);
   await flushPendingHistory();
+  if (activeJsonEnvelopeOperator) {
+    const { buildFailedOperatorEnvelope, writeOperatorResultEnvelope } =
+      await import("./cli/operator-envelope.js");
+    writeOperatorResultEnvelope(
+      buildFailedOperatorEnvelope({
+        operator: activeJsonEnvelopeOperator,
+        error,
+      }),
+      1,
+    );
+    process.exit(1);
+    return;
+  }
   const { CliError, toCliError } = await import("./cli/errors.js");
   const { renderCliError } = await import("./render/utils/errors.js");
   const normalized = toCliError(error);
@@ -57,6 +74,17 @@ async function handleSignal(signal: NodeJS.Signals): Promise<void> {
   }
 
   await flushPendingHistory();
+  if (activeJsonEnvelopeOperator) {
+    const { buildFailedOperatorEnvelope, writeOperatorResultEnvelope } =
+      await import("./cli/operator-envelope.js");
+    writeOperatorResultEnvelope(
+      buildFailedOperatorEnvelope({
+        operator: activeJsonEnvelopeOperator,
+        error: new Error(`Signal received: ${signal}`),
+      }),
+      exitCode,
+    );
+  }
   process.exit(exitCode);
 }
 
@@ -173,6 +201,11 @@ export async function runCli(
   const { Command, CommanderError } = await import("commander");
   const program = new Command();
   const effectiveArgv = normalizeRootIntentArgv(argv);
+  const { resolveJsonEnvelopeOperator } = await import(
+    "./cli/operator-envelope.js"
+  );
+  const jsonEnvelopeOperator = resolveJsonEnvelopeOperator(effectiveArgv);
+  activeJsonEnvelopeOperator = jsonEnvelopeOperator;
 
   const localVersion = (await import("./utils/version.js")).getVoratiqVersion();
 
@@ -190,6 +223,14 @@ export async function runCli(
     .exitOverride()
     .showHelpAfterError()
     .helpCommand(false);
+
+  if (jsonEnvelopeOperator) {
+    program.configureOutput({
+      writeOut: () => {},
+      writeErr: () => {},
+      outputError: () => {},
+    });
+  }
 
   // Start update check (non-blocking)
   const { startUpdateCheck } = await import("./update-check/checker.js");
@@ -242,6 +283,18 @@ export async function runCli(
       await program.parseAsync(effectiveArgv);
     } catch (error) {
       if (error instanceof CommanderError) {
+        if (jsonEnvelopeOperator) {
+          const { buildFailedOperatorEnvelope, writeOperatorResultEnvelope } =
+            await import("./cli/operator-envelope.js");
+          writeOperatorResultEnvelope(
+            buildFailedOperatorEnvelope({
+              operator: jsonEnvelopeOperator,
+              error,
+            }),
+            error.exitCode ?? 1,
+          );
+          return;
+        }
         const { commanderAlreadyRendered } = await import(
           "./cli/commander-utils.js"
         );
@@ -261,6 +314,19 @@ export async function runCli(
         return;
       }
 
+      if (jsonEnvelopeOperator) {
+        const { buildFailedOperatorEnvelope, writeOperatorResultEnvelope } =
+          await import("./cli/operator-envelope.js");
+        writeOperatorResultEnvelope(
+          buildFailedOperatorEnvelope({
+            operator: jsonEnvelopeOperator,
+            error,
+          }),
+          1,
+        );
+        return;
+      }
+
       const { toCliError } = await import("./cli/errors.js");
       const { renderCliError } = await import("./render/utils/errors.js");
       const { writeCommandOutput } = await import("./cli/output.js");
@@ -272,6 +338,7 @@ export async function runCli(
       });
     }
   } finally {
+    activeJsonEnvelopeOperator = undefined;
     updateHandle?.finish();
   }
 }

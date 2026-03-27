@@ -19,6 +19,12 @@ import {
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { resolvePath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
+import { getSpecSessionDirectoryPath } from "../workspace/structure.js";
+import {
+  buildSpecOperatorEnvelope,
+  createSilentCliWriter,
+  writeOperatorResultEnvelope,
+} from "./operator-envelope.js";
 import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface SpecCommandOptions {
@@ -28,6 +34,7 @@ export interface SpecCommandOptions {
   maxParallel?: number;
   title?: string;
   extraContext?: string[];
+  json?: boolean;
   suppressHint?: boolean;
   suppressLeadingBlankLine?: boolean;
   suppressTrailingBlankLine?: boolean;
@@ -42,6 +49,7 @@ export interface SpecCommandResult {
   generatedSpecPaths: string[];
   /** Derived convenience path only when exactly one spec artifact was generated. */
   specPath?: string;
+  sessionPath?: string;
 }
 
 export async function runSpecCommand(
@@ -54,13 +62,19 @@ export async function runSpecCommand(
     maxParallel,
     title,
     extraContext,
+    json = false,
     suppressHint,
     suppressLeadingBlankLine,
     suppressTrailingBlankLine,
     stdout,
     stderr,
-    writeOutput = writeCommandOutput,
+    writeOutput,
   } = options;
+  const effectiveWriteOutput = json
+    ? undefined
+    : (writeOutput ?? writeCommandOutput);
+  const rendererStdout = json ? createSilentCliWriter() : stdout;
+  const rendererStderr = json ? createSilentCliWriter() : stderr;
 
   const { root, workspacePaths, workspaceAutoInitialized } =
     await resolveCliContext({
@@ -71,8 +85,8 @@ export async function runSpecCommand(
     ? renderWorkspaceAutoInitializedNotice()
     : undefined;
 
-  if (workspaceNotice && writeOutput) {
-    writeOutput({
+  if (workspaceNotice && effectiveWriteOutput) {
+    effectiveWriteOutput({
       alerts: [{ severity: "info", message: workspaceNotice }],
       leadingNewline: false,
     });
@@ -86,14 +100,14 @@ export async function runSpecCommand(
   });
 
   const startLine = createStageStartLineEmitter((message) => {
-    writeOutput({
+    effectiveWriteOutput?.({
       alerts: [{ severity: "info", message }],
     });
   });
 
   const renderer = createSpecRenderer({
-    stdout,
-    stderr,
+    stdout: rendererStdout,
+    stderr: rendererStderr,
     suppressLeadingBlankLine,
     suppressTrailingBlankLine,
   });
@@ -165,6 +179,7 @@ export async function runSpecCommand(
     generatedSpecPaths,
     specPath:
       generatedSpecPaths.length === 1 ? generatedSpecPaths[0] : undefined,
+    sessionPath: getSpecSessionDirectoryPath(result.sessionId),
   };
 }
 
@@ -175,6 +190,7 @@ interface SpecCommandActionOptions {
   maxParallel?: number;
   title?: string;
   extraContext?: string[];
+  json?: boolean;
 }
 
 function formatSpecPreview(spec: SpecData): string {
@@ -255,6 +271,7 @@ export function createSpecCommand(): Command {
         .default([], "")
         .argParser(collectExtraContextOption),
     )
+    .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
     .action(async (options: SpecCommandActionOptions) => {
       const result = await runSpecCommand({
@@ -264,7 +281,17 @@ export function createSpecCommand(): Command {
         maxParallel: options.maxParallel,
         title: options.title,
         extraContext: options.extraContext,
+        json: Boolean(options.json),
       });
+      if (options.json) {
+        writeOperatorResultEnvelope(
+          buildSpecOperatorEnvelope({
+            sessionId: result.sessionId,
+            generatedSpecPaths: result.generatedSpecPaths,
+          }),
+        );
+        return;
+      }
       writeCommandOutput({ body: result.body });
     });
 }
