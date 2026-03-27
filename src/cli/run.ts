@@ -18,6 +18,11 @@ import { renderWorkspaceAutoInitializedNotice } from "../render/transcripts/shar
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { mapRunStatusToExitCode } from "../status/index.js";
 import { parsePositiveInteger } from "../utils/validators.js";
+import {
+  buildRunOperatorEnvelope,
+  createSilentCliWriter,
+  writeOperatorResultEnvelope,
+} from "./operator-envelope.js";
 import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
 
@@ -29,6 +34,7 @@ export interface RunCommandOptions {
   maxParallel?: number;
   branch?: boolean;
   extraContext?: string[];
+  json?: boolean;
   suppressHint?: boolean;
   suppressLeadingBlankLine?: boolean;
   suppressTrailingBlankLine?: boolean;
@@ -54,6 +60,7 @@ export async function runRunCommand(
     maxParallel,
     branch,
     extraContext,
+    json = false,
     suppressHint,
     suppressLeadingBlankLine,
     suppressTrailingBlankLine,
@@ -61,6 +68,11 @@ export async function runRunCommand(
     stderr,
     writeOutput,
   } = options;
+  const effectiveWriteOutput = json
+    ? undefined
+    : (writeOutput ?? writeCommandOutput);
+  const rendererStdout = json ? createSilentCliWriter() : stdout;
+  const rendererStderr = json ? createSilentCliWriter() : stderr;
 
   const { root, workspacePaths, workspaceAutoInitialized } =
     await resolveCliContext({
@@ -71,8 +83,8 @@ export async function runRunCommand(
     ? renderWorkspaceAutoInitializedNotice()
     : undefined;
 
-  if (workspaceNotice && writeOutput) {
-    writeOutput({
+  if (workspaceNotice && effectiveWriteOutput) {
+    effectiveWriteOutput({
       alerts: [{ severity: "info", message: workspaceNotice }],
       leadingNewline: false,
     });
@@ -92,9 +104,9 @@ export async function runRunCommand(
     await checkoutOrCreateBranch(root, branchName);
   }
 
-  if (writeOutput) {
+  if (effectiveWriteOutput) {
     const startLine = createStageStartLineEmitter((message) => {
-      writeOutput({
+      effectiveWriteOutput({
         alerts: [{ severity: "info", message }],
       });
     });
@@ -102,8 +114,8 @@ export async function runRunCommand(
   }
 
   const renderer = createRunRenderer({
-    stdout,
-    stderr,
+    stdout: rendererStdout,
+    stderr: rendererStderr,
     suppressLeadingBlankLine,
     suppressTrailingBlankLine,
   });
@@ -152,6 +164,7 @@ interface RunCommandActionOptions {
   maxParallel?: number;
   branch?: boolean;
   extraContext?: string[];
+  json?: boolean;
 }
 
 function collectAgentOption(value: string, previous: string[]): string[] {
@@ -200,6 +213,7 @@ export function createRunCommand(): Command {
         .default([], "")
         .argParser(collectExtraContextOption),
     )
+    .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
     .action(async (options: RunCommandActionOptions) => {
       const runOptions: RunCommandOptions = {
@@ -209,10 +223,22 @@ export function createRunCommand(): Command {
         maxParallel: options.maxParallel,
         branch: options.branch,
         extraContext: options.extraContext,
-        writeOutput: writeCommandOutput,
+        json: Boolean(options.json),
+        writeOutput: options.json ? undefined : writeCommandOutput,
       };
 
       const result = await runRunCommand(runOptions);
+      if (options.json) {
+        writeOperatorResultEnvelope(
+          buildRunOperatorEnvelope({
+            runId: result.report.runId,
+            specPath: result.report.spec.path,
+            status: result.report.status,
+          }),
+          result.exitCode,
+        );
+        return;
+      }
       writeCommandOutput({
         body: result.body,
         exitCode: result.exitCode,

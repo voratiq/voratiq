@@ -7,6 +7,10 @@ import {
   resolveCliContext,
 } from "../preflight/index.js";
 import { renderApplyTranscript } from "../render/transcripts/apply.js";
+import {
+  buildApplyOperatorEnvelope,
+  writeOperatorResultEnvelope,
+} from "./operator-envelope.js";
 import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface ApplyCommandOptions {
@@ -14,6 +18,7 @@ export interface ApplyCommandOptions {
   agentId: string;
   ignoreBaseMismatch?: boolean;
   commit?: boolean;
+  json?: boolean;
   writeOutput?: CommandOutputWriter;
 }
 
@@ -57,6 +62,7 @@ interface ApplyCommandActionOptions {
   agent: string;
   ignoreBaseMismatch?: boolean;
   commit?: boolean;
+  json?: boolean;
 }
 
 export function createApplyCommand(): Command {
@@ -70,6 +76,7 @@ export function createApplyCommand(): Command {
       "Commit after apply, using the agent's summary as the message",
       () => true,
     )
+    .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
     .action(async (options: ApplyCommandActionOptions) => {
       const result = await runApplyCommand({
@@ -77,9 +84,22 @@ export function createApplyCommand(): Command {
         agentId: options.agent,
         ignoreBaseMismatch: options.ignoreBaseMismatch ?? false,
         commit: options.commit ?? false,
+        json: Boolean(options.json),
         writeOutput: writeCommandOutput,
       });
 
+      if (options.json) {
+        writeOperatorResultEnvelope(
+          buildApplyOperatorEnvelope({
+            runId: result.result.runId,
+            agentId: result.result.agent.agentId,
+            diffPath: result.result.diffPath,
+            ignoredBaseMismatch: result.result.ignoredBaseMismatch,
+          }),
+          result.exitCode,
+        );
+        return;
+      }
       writeCommandOutput({
         body: result.body,
         exitCode: result.exitCode,

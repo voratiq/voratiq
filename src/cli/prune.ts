@@ -12,6 +12,10 @@ import {
 } from "../render/transcripts/prune.js";
 import { createConfirmationWorkflow } from "./confirmation.js";
 import { CliError, NonInteractiveShellError } from "./errors.js";
+import {
+  buildPruneOperatorEnvelope,
+  writeOperatorResultEnvelope,
+} from "./operator-envelope.js";
 import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface PruneCommandOptions {
@@ -19,6 +23,7 @@ export interface PruneCommandOptions {
   all?: boolean;
   purge?: boolean;
   yes?: boolean;
+  json?: boolean;
   writeOutput?: CommandOutputWriter;
 }
 
@@ -35,6 +40,14 @@ export async function runPruneCommand(
   const all = Boolean(options.all);
   const purge = Boolean(options.purge);
   const assumeYes = Boolean(options.yes);
+
+  if (options.json && !assumeYes) {
+    throw new CliError(
+      "JSON-mode prune requires explicit confirmation.",
+      [],
+      ["Re-run with `--yes` to confirm the prune."],
+    );
+  }
 
   const { root, workspacePaths } = await resolveCliContext();
 
@@ -90,6 +103,7 @@ interface PruneCommandActionOptions {
   all?: boolean;
   purge?: boolean;
   yes?: boolean;
+  json?: boolean;
 }
 
 export function createPruneCommand(): Command {
@@ -101,6 +115,7 @@ export function createPruneCommand(): Command {
     )
     .option("--purge", "Delete all associated configs and artifacts")
     .option("-y, --yes", "Skip interactive confirmations")
+    .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
     .action(async (options: PruneCommandActionOptions, command: Command) => {
       const hasRun = typeof options.run === "string" && options.run.length > 0;
@@ -120,9 +135,23 @@ export function createPruneCommand(): Command {
         all: wantsAll,
         purge: Boolean(options.purge),
         yes: Boolean(options.yes),
+        json: Boolean(options.json),
         writeOutput: writeCommandOutput,
       });
 
+      if (options.json) {
+        writeOperatorResultEnvelope(
+          buildPruneOperatorEnvelope({
+            status: result.result.status,
+            ...("runId" in result.result ? { runId: result.result.runId } : {}),
+            ...("runPath" in result.result && result.result.runPath
+              ? { runPath: result.result.runPath }
+              : {}),
+          }),
+          result.exitCode,
+        );
+        return;
+      }
       writeCommandOutput({
         body: result.body,
         exitCode: result.exitCode,
