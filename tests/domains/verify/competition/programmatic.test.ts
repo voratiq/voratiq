@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -234,6 +234,95 @@ describe("executeAndPersistProgrammaticMethod", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("caps concurrent run-candidate programmatic execution at two and preserves candidate order", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "voratiq-programmatic-concurrency-"),
+    );
+
+    try {
+      createDetachedWorktreeMock.mockImplementation(async (options) => {
+        await mkdir(options.worktreePath, { recursive: true });
+      });
+      removeWorktreeMock.mockImplementation(async (options) => {
+        await rm(options.worktreePath, { recursive: true, force: true });
+      });
+
+      const startedCandidateIds: string[] = [];
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const releases: Array<() => void> = [];
+
+      executeProgrammaticChecksMock.mockImplementation(async (options) => {
+        const candidateId =
+          options.logsDirectory.split("/").at(-1) ?? "unknown";
+        startedCandidateIds.push(candidateId);
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+
+        await new Promise<void>((resolve) => {
+          releases.push(() => {
+            inFlight -= 1;
+            resolve();
+          });
+        });
+
+        return {
+          results: [{ slug: "tests", status: "succeeded" }],
+          warnings: [],
+        };
+      });
+
+      const snapshots: unknown[] = [];
+      const execution = executeAndPersistProgrammaticMethod({
+        root,
+        verificationId: "verify-concurrency",
+        resolvedTarget: buildRunTarget({
+          runId: "run-concurrency",
+          candidateIds: ["agent-1", "agent-2", "agent-3"],
+          diffCaptured: false,
+        }),
+        verificationConfig,
+        environment: {},
+        mutators: createMutators(snapshots),
+      });
+
+      await waitForCondition(() => startedCandidateIds.length === 2);
+      expect(maxInFlight).toBe(2);
+
+      releases.shift()?.();
+      await waitForCondition(() => startedCandidateIds.length === 3);
+      expect(maxInFlight).toBe(2);
+
+      while (releases.length > 0) {
+        releases.shift()?.();
+      }
+
+      const result = await execution;
+      expect(result?.status).toBe("succeeded");
+
+      const artifact = JSON.parse(
+        await readFile(
+          join(
+            root,
+            ".voratiq",
+            "verify",
+            "sessions",
+            "verify-concurrency",
+            "programmatic",
+            "artifacts",
+            "result.json",
+          ),
+          "utf8",
+        ),
+      ) as { candidates: Array<{ candidateId: string }> };
+      expect(
+        artifact.candidates.map((candidate) => candidate.candidateId),
+      ).toEqual(["agent-1", "agent-2", "agent-3"]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
 function createMutators(snapshots: unknown[]): VerificationRecordMutators {
@@ -251,37 +340,54 @@ function createMutators(snapshots: unknown[]): VerificationRecordMutators {
 
 function buildRunTarget(options: {
   runId: string;
-  candidateId: string;
+  candidateId?: string;
+  candidateIds?: string[];
   diffCaptured: boolean;
 }) {
-  const { runId, candidateId, diffCaptured } = options;
+  const { runId } = options;
+  const candidateIds =
+    options.candidateIds ?? (options.candidateId ? [options.candidateId] : []);
   const runRecord: RunRecord = createRunRecord({
     runId,
     status: "pruned",
     deletedAt: new Date().toISOString(),
-    agents: [
+    agents: candidateIds.map((candidateId) =>
       createAgentInvocationRecord({
         agentId: candidateId,
         artifacts: {
-          diffCaptured,
+          diffCaptured: options.diffCaptured,
           summaryCaptured: true,
           stdoutCaptured: true,
           stderrCaptured: true,
         },
       }),
-    ],
+    ),
   });
 
   return {
     baseRevisionSha: runRecord.baseRevisionSha,
-    competitiveCandidates: [
-      { canonicalId: candidateId, forbiddenIdentityTokens: [candidateId] },
-    ],
+    competitiveCandidates: candidateIds.map((candidateId) => ({
+      canonicalId: candidateId,
+      forbiddenIdentityTokens: [candidateId],
+    })),
     target: {
       kind: "run" as const,
       sessionId: runRecord.runId,
-      candidateIds: [candidateId],
+      candidateIds,
     },
     runRecord,
   };
+}
+
+async function waitForCondition(
+  predicate: () => boolean,
+  timeoutMs = 1_000,
+): Promise<void> {
+  const startedAt = Date.now();
+  while (!predicate()) {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error("Timed out waiting for condition");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
 }
