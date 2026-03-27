@@ -3,8 +3,11 @@ import type {
   AutoTerminalStatus,
 } from "../../domain/run/model/types.js";
 import type {
+  AutoVerificationSelectionDisposition,
   SelectionDecision,
-  SelectionDecisionUnresolvedReason,
+} from "../../policy/index.js";
+import {
+  classifyAutoVerificationSelection,
 } from "../../policy/index.js";
 import { mapRunStatusToExitCode, type RunStatus } from "../../status/index.js";
 import { HintedError, toErrorMessage } from "../../utils/errors.js";
@@ -292,17 +295,17 @@ export async function executeAutoCommand(
             "Spec verification returned a resolvable selection without a selected spec path.";
           hardFailure = true;
         } else {
-          const unresolvedSpecVerification = describeUnresolvedVerificationSelection(
-            "spec",
-            {
-              unresolvedReasons:
-                specVerifyResult.selection?.state === "unresolved"
-                  ? specVerifyResult.selection.unresolvedReasons
-                  : undefined,
-            },
-          );
-          specDetail = unresolvedSpecVerification;
-          markActionRequired(unresolvedSpecVerification);
+          const specSelectionDisposition = classifyAutoVerificationSelection({
+            targetKind: "spec",
+            selection: specVerifyResult.selection,
+          });
+          if (specSelectionDisposition.kind !== "action_required") {
+            throw new Error(
+              "Spec verification without a selected spec path must require manual action.",
+            );
+          }
+          specDetail = specSelectionDisposition.detail;
+          markActionRequired(specSelectionDisposition.detail);
         }
       } catch (error) {
         specStatus = "failed";
@@ -421,19 +424,17 @@ export async function executeAutoCommand(
       });
 
       if (verifySelection?.state === "unresolved") {
-        if (isNonBlockingVerificationSelection("run", verifySelection)) {
-          verifyDetail = describeNonBlockingVerificationSelection(
-            "run",
-            verifySelection,
-          );
-        } else {
-          const actionRequiredMessage = describeUnresolvedVerificationSelection(
-            "run",
-            verifySelection,
-          );
-          verifyDetail = actionRequiredMessage;
-          markActionRequired(actionRequiredMessage);
-        }
+        const verifySelectionDisposition = classifyAutoVerificationSelection({
+          targetKind: "run",
+          selection: verifySelection,
+        });
+        applyAutoVerificationSelectionDisposition({
+          disposition: verifySelectionDisposition,
+          onActionRequired: markActionRequired,
+          onVerifyDetail: (detail) => {
+            verifyDetail = detail;
+          },
+        });
       }
     } catch (error) {
       verifyStatus = "failed";
@@ -461,9 +462,16 @@ export async function executeAutoCommand(
             ],
           },
         );
-      } else if (isNonBlockingVerificationSelection("run", verifySelection)) {
+      }
+
+      const verifySelectionDisposition = classifyAutoVerificationSelection({
+        targetKind: "run",
+        selection: verifySelection,
+      });
+
+      if (verifySelectionDisposition.kind === "non_blocking") {
         applyStatus = "skipped";
-        applyDetail = describeNonBlockingApplyDecision("run", verifySelection);
+        applyDetail = verifySelectionDisposition.applyDetail;
       } else if (verifySelection.state !== "resolvable") {
         throw new HintedError(
           "Verify stage did not return a resolvable selection.",
@@ -605,76 +613,6 @@ function assertAutoOptionCompatibility(options: ExecuteAutoCommandInput): void {
   }
 }
 
-function describeUnresolvedVerificationSelection(
-  targetKind: "spec" | "run",
-  options: {
-    unresolvedReasons?: readonly SelectionDecisionUnresolvedReason[];
-  },
-): string {
-  if (
-    options.unresolvedReasons?.some(
-      (reason) => reason.code === "verifier_disagreement",
-    )
-  ) {
-    if (targetKind === "spec") {
-      return "Verifiers disagreed on the preferred draft; manual selection required.";
-    }
-
-    return "Verifiers disagreed on the preferred candidate; manual selection required.";
-  }
-
-  if (
-    targetKind === "run" &&
-    options.unresolvedReasons?.some(
-      (reason) => reason.code === "no_programmatic_candidates_passed",
-    )
-  ) {
-    return "No run candidate passed programmatic verification; manual selection required.";
-  }
-
-  if (targetKind === "spec") {
-    return "Verification did not select a draft; manual selection required.";
-  }
-
-  return "Verification did not produce a resolvable candidate; manual selection required.";
-}
-
-function isNonBlockingVerificationSelection(
-  targetKind: "spec" | "run",
-  decision?: SelectionDecision,
-): decision is Extract<SelectionDecision, { state: "unresolved" }> {
-  return (
-    targetKind === "run" &&
-    decision?.state === "unresolved" &&
-    decision.unresolvedReasons.length > 0 &&
-    decision.unresolvedReasons.every(
-      (reason) => reason.code === "no_programmatic_candidates_passed",
-    )
-  );
-}
-
-function describeNonBlockingVerificationSelection(
-  targetKind: "spec" | "run",
-  decision: Extract<SelectionDecision, { state: "unresolved" }>,
-): string {
-  if (isNonBlockingVerificationSelection(targetKind, decision)) {
-    return "No run candidate passed programmatic verification.";
-  }
-
-  return "Verification did not produce a resolvable candidate.";
-}
-
-function describeNonBlockingApplyDecision(
-  targetKind: "spec" | "run",
-  decision: Extract<SelectionDecision, { state: "unresolved" }>,
-): string {
-  if (isNonBlockingVerificationSelection(targetKind, decision)) {
-    return "Skipped apply because no run candidate passed programmatic verification.";
-  }
-
-  return "Apply skipped.";
-}
-
 function resolveAutoTerminalStatus(options: {
   hardFailure: boolean;
   actionRequired: boolean;
@@ -731,4 +669,24 @@ function resolveAutoTerminalDetail(options: {
 
 function toHeadline(error: unknown): string {
   return error instanceof HintedError ? error.headline : toErrorMessage(error);
+}
+
+function applyAutoVerificationSelectionDisposition(options: {
+  disposition: AutoVerificationSelectionDisposition;
+  onVerifyDetail: (detail: string) => void;
+  onActionRequired: (detail: string) => void;
+}): void {
+  const { disposition, onVerifyDetail, onActionRequired } = options;
+
+  switch (disposition.kind) {
+    case "proceed":
+      return;
+    case "non_blocking":
+      onVerifyDetail(disposition.verifyDetail);
+      return;
+    case "action_required":
+      onVerifyDetail(disposition.detail);
+      onActionRequired(disposition.detail);
+      return;
+  }
 }
