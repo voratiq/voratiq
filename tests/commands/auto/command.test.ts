@@ -261,8 +261,6 @@ describe("executeAutoCommand", () => {
         kind: "action_required",
         detail:
           "Verifiers disagreed on the preferred candidate; manual selection required.",
-        message:
-          "Verifiers disagreed on the preferred candidate; manual selection required.",
       }),
     );
     expect(findEventIndex(result.events, "body")).toBeLessThan(
@@ -333,8 +331,6 @@ describe("executeAutoCommand", () => {
         kind: "action_required",
         detail:
           "Verifiers disagreed on the preferred candidate; manual selection required.",
-        message:
-          "Verifiers disagreed on the preferred candidate; manual selection required.",
       }),
     );
     expect(findEventIndex(result.events, "body")).toBeLessThan(
@@ -403,8 +399,6 @@ describe("executeAutoCommand", () => {
       expect.objectContaining({
         kind: "action_required",
         detail:
-          "Spec verifiers disagreed on the preferred draft; manual selection required.",
-        message:
           "Spec verifiers disagreed on the preferred draft; manual selection required.",
       }),
     );
@@ -511,8 +505,6 @@ describe("executeAutoCommand", () => {
         kind: "action_required",
         detail:
           "No run candidate passed programmatic verification; manual selection required.",
-        message:
-          "No run candidate passed programmatic verification; manual selection required.",
       }),
     );
     expect(findEventIndex(result.events, "body")).toBeLessThan(
@@ -562,8 +554,6 @@ describe("executeAutoCommand", () => {
       expect.objectContaining({
         kind: "action_required",
         detail:
-          "Verification did not produce a resolvable candidate; manual selection required.",
-        message:
           "Verification did not produce a resolvable candidate; manual selection required.",
       }),
     );

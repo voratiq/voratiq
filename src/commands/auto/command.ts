@@ -111,7 +111,6 @@ export type AutoCommandEvent =
   | {
       kind: "action_required";
       detail: string;
-      message: string;
       separateWithDivider: boolean;
     };
 
@@ -215,7 +214,7 @@ export async function executeAutoCommand(
   let applyAgentId: string | undefined;
   let applyDetail: string | undefined;
 
-  const markActionRequired = (detail: string, message: string): void => {
+  const markActionRequired = (detail: string): void => {
     actionRequired = true;
     actionRequiredDetail = detail;
     applyStatus = "skipped";
@@ -223,7 +222,6 @@ export async function executeAutoCommand(
     recordEvent({
       kind: "action_required",
       detail,
-      message,
       separateWithDivider: bodyOutputEmitted,
     });
   };
@@ -294,18 +292,17 @@ export async function executeAutoCommand(
             "Spec verification returned a resolvable selection without a selected spec path.";
           hardFailure = true;
         } else {
-          const unresolvedSpecVerification =
-            describeUnresolvedVerificationSelection("spec", {
+          const unresolvedSpecVerification = describeUnresolvedVerificationSelection(
+            "spec",
+            {
               unresolvedReasons:
                 specVerifyResult.selection?.state === "unresolved"
                   ? specVerifyResult.selection.unresolvedReasons
                   : undefined,
-            });
-          specDetail = unresolvedSpecVerification.detail;
-          markActionRequired(
-            unresolvedSpecVerification.detail,
-            unresolvedSpecVerification.message,
+            },
           );
+          specDetail = unresolvedSpecVerification;
+          markActionRequired(unresolvedSpecVerification);
         }
       } catch (error) {
         specStatus = "failed";
@@ -428,11 +425,8 @@ export async function executeAutoCommand(
           "run",
           verifySelection,
         );
-        verifyDetail = actionRequiredMessage.detail;
-        markActionRequired(
-          actionRequiredMessage.detail,
-          actionRequiredMessage.message,
-        );
+        verifyDetail = actionRequiredMessage;
+        markActionRequired(actionRequiredMessage);
       }
     } catch (error) {
       verifyStatus = "failed";
@@ -606,30 +600,17 @@ function describeUnresolvedVerificationSelection(
   options: {
     unresolvedReasons?: readonly SelectionDecisionUnresolvedReason[];
   },
-): {
-  detail: string;
-  message: string;
-} {
+): string {
   if (
     options.unresolvedReasons?.some(
       (reason) => reason.code === "verifier_disagreement",
     )
   ) {
     if (targetKind === "spec") {
-      return {
-        detail:
-          "Spec verifiers disagreed on the preferred draft; manual selection required.",
-        message:
-          "Spec verifiers disagreed on the preferred draft; manual selection required.",
-      };
+      return "Verifiers disagreed on the preferred draft; manual selection required.";
     }
 
-    return {
-      detail:
-        "Verifiers disagreed on the preferred candidate; manual selection required.",
-      message:
-        "Verifiers disagreed on the preferred candidate; manual selection required.",
-    };
+    return "Verifiers disagreed on the preferred candidate; manual selection required.";
   }
 
   if (
@@ -638,29 +619,14 @@ function describeUnresolvedVerificationSelection(
       (reason) => reason.code === "no_programmatic_candidates_passed",
     )
   ) {
-    return {
-      detail:
-        "No run candidate passed programmatic verification; manual selection required.",
-      message:
-        "No run candidate passed programmatic verification; manual selection required.",
-    };
+    return "No run candidate passed programmatic verification; manual selection required.";
   }
 
   if (targetKind === "spec") {
-    return {
-      detail:
-        "Spec verification did not select a draft; manual selection required.",
-      message:
-        "Spec verification did not select a draft; manual selection required.",
-    };
+    return "Verification did not select a draft; manual selection required.";
   }
 
-  return {
-    detail:
-      "Verification did not produce a resolvable candidate; manual selection required.",
-    message:
-      "Verification did not produce a resolvable candidate; manual selection required.",
-  };
+  return "Verification did not produce a resolvable candidate; manual selection required.";
 }
 
 function resolveAutoTerminalStatus(options: {
