@@ -1793,7 +1793,7 @@ describe("voratiq auto", () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it("marks multi-draft spec generation as action required", async () => {
+  it("continues to spec verification when spec generation produces multiple drafts", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")
@@ -1810,23 +1810,51 @@ describe("voratiq auto", () => {
       ],
       body: "SPEC BODY",
     });
+    runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
+    mockRunVerifyImplementation((input) =>
+      Promise.resolve(
+        input.target.kind === "spec"
+          ? {
+              ...buildVerifyResult({
+                verificationId: "verify-spec-multi",
+                outputPath: ".voratiq/verify/sessions/verify-spec-multi",
+                body: "SPEC VERIFY BODY",
+              }),
+              selectedSpecPath:
+                ".voratiq/spec/sessions/spec-123/beta/artifacts/migration-plan-v2.md",
+              exitCode: 0,
+            }
+          : {
+              ...buildVerifyResult({
+                verificationId: "verify-run-multi",
+                outputPath: ".voratiq/verify/sessions/verify-run-multi",
+                body: "RUN VERIFY BODY",
+              }),
+              exitCode: 0,
+            },
+      ),
+    );
 
     const result = await runAutoCommand({
       description: "Draft a migration plan",
-      apply: true,
+      verifyAgentIds: ["reviewer"],
     });
 
-    expect(result.auto.status).toBe("action_required");
+    expect(result.auto.status).toBe("succeeded");
     expect(result.apply.status).toBe("skipped");
-    expect(result.exitCode).toBe(1);
-    expect(runRunCommandMock).not.toHaveBeenCalled();
+    expect(result.exitCode).toBe(0);
+    expect(runRunCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specPath:
+          ".voratiq/spec/sessions/spec-123/beta/artifacts/migration-plan-v2.md",
+      }),
+    );
     const output = stripAnsi(stdout.join(""));
     expect(output).toContain("SPEC BODY");
-    expect(output).toContain(
-      "Action required: Multiple specs generated; manual selection required.",
-    );
-    expect(output).toContain("Auto ACTION_REQUIRED");
-    expect(process.exitCode).toBe(1);
+    expect(output).toContain("SPEC VERIFY BODY");
+    expect(output).toContain("RUN VERIFY BODY");
+    expect(output).toContain("Auto SUCCEEDED");
+    expect(process.exitCode).toBe(0);
   });
 
   it("auto-applies when preferred_agent already matches a canonical run agent id", async () => {

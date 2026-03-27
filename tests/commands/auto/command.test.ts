@@ -78,8 +78,31 @@ function findEventIndex(
 }
 
 describe("executeAutoCommand", () => {
-  it("returns action required when spec generation produces multiple drafts", async () => {
-    const runRunStage = jest.fn<AutoCommandDependencies["runRunStage"]>();
+  it("continues through spec verification when spec generation produces multiple drafts", async () => {
+    const runRunStage = jest
+      .fn<AutoCommandDependencies["runRunStage"]>()
+      .mockResolvedValue(
+        createRunStageResult({
+          report: {
+            ...createRunStageResult().report,
+            spec: { path: "specs/b.md" },
+          },
+        }),
+      );
+    const runVerifyStage = jest
+      .fn<AutoCommandDependencies["runVerifyStage"]>()
+      .mockImplementation((input) =>
+        Promise.resolve(
+          input.target.kind === "spec"
+            ? createVerifyStageResult({
+                body: "spec verify body",
+                selectedSpecPath: "specs/b.md",
+              })
+            : createVerifyStageResult({
+                body: "run verify body",
+              }),
+        ),
+      );
     const dependencies = createDependencies({
       now: () => 0,
       runSpecStage: jest
@@ -90,30 +113,33 @@ describe("executeAutoCommand", () => {
           generatedSpecPaths: ["specs/a.md", "specs/b.md"],
         }),
       runRunStage,
+      runVerifyStage,
     });
 
     const result = await executeAutoCommand(
       {
         description: "Define the task",
-        apply: true,
       },
       dependencies,
     );
 
-    expect(runRunStage).not.toHaveBeenCalled();
-    expect(result.auto.status).toBe("action_required");
-    expect(result.auto.detail).toBe(
-      "Multiple specs generated; manual selection required.",
+    expect(runVerifyStage).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        target: { kind: "spec", sessionId: "spec-session-multi" },
+      }),
     );
+    expect(runRunStage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specPath: "specs/b.md",
+      }),
+    );
+    expect(result.auto.status).toBe("succeeded");
     expect(result.apply.status).toBe("skipped");
-    expect(result.summary.spec.detail).toBe(
-      "Multiple specs generated; manual selection required.",
-    );
-    expect(result.events).toContainEqual(
+    expect(result.summary.spec.detail).toBeUndefined();
+    expect(result.events).not.toContainEqual(
       expect.objectContaining({
         kind: "action_required",
-        detail: "Multiple specs generated; manual selection required.",
-        message: "Multiple specs generated; manual selection required.",
       }),
     );
   });
@@ -316,6 +342,128 @@ describe("executeAutoCommand", () => {
     );
   });
 
+  it("returns action required when verify(spec) is unresolved", async () => {
+    const runRunStage = jest.fn<AutoCommandDependencies["runRunStage"]>();
+    const runVerifyStage = jest
+      .fn<AutoCommandDependencies["runVerifyStage"]>()
+      .mockResolvedValueOnce(
+        createVerifyStageResult({
+          body: "spec verify body",
+          selection: {
+            state: "unresolved",
+            applyable: false,
+            unresolvedReasons: [
+              {
+                code: "verifier_disagreement",
+                selections: [
+                  {
+                    verifierAgentId: "reviewer-a",
+                    selectedCanonicalAgentId: "specs/a.md",
+                  },
+                  {
+                    verifierAgentId: "reviewer-b",
+                    selectedCanonicalAgentId: "specs/b.md",
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      );
+    const dependencies = createDependencies({
+      now: () => 0,
+      runSpecStage: jest
+        .fn<AutoCommandDependencies["runSpecStage"]>()
+        .mockResolvedValue({
+          sessionId: "spec-session-unresolved",
+          body: "spec body",
+          generatedSpecPaths: ["specs/a.md", "specs/b.md"],
+        }),
+      runRunStage,
+      runVerifyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        description: "Define the task",
+      },
+      dependencies,
+    );
+
+    expect(runRunStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("action_required");
+    expect(result.apply.status).toBe("skipped");
+    expect(result.auto.detail).toBe(
+      "Spec verifiers disagreed on the preferred draft; manual selection required.",
+    );
+    expect(result.summary.spec.detail).toBe(
+      "Spec verifiers disagreed on the preferred draft; manual selection required.",
+    );
+    expect(result.events).toContainEqual(
+      expect.objectContaining({
+        kind: "action_required",
+        detail:
+          "Spec verifiers disagreed on the preferred draft; manual selection required.",
+        message:
+          "Spec verifiers disagreed on the preferred draft; manual selection required.",
+      }),
+    );
+    expect(findEventIndex(result.events, "body")).toBeLessThan(
+      findEventIndex(result.events, "action_required"),
+    );
+  });
+
+  it("fails when verify(spec) returns a resolvable selection without a selected spec path", async () => {
+    const runRunStage = jest.fn<AutoCommandDependencies["runRunStage"]>();
+    const runVerifyStage = jest
+      .fn<AutoCommandDependencies["runVerifyStage"]>()
+      .mockResolvedValueOnce(
+        createVerifyStageResult({
+          body: "spec verify body",
+          selection: {
+            state: "resolvable",
+            applyable: true,
+            selectedCanonicalAgentId: "specs/b.md",
+            unresolvedReasons: [],
+          },
+        }),
+      );
+    const dependencies = createDependencies({
+      now: () => 0,
+      runSpecStage: jest
+        .fn<AutoCommandDependencies["runSpecStage"]>()
+        .mockResolvedValue({
+          sessionId: "spec-session-resolvable-without-path",
+          body: "spec body",
+          generatedSpecPaths: ["specs/a.md", "specs/b.md"],
+        }),
+      runRunStage,
+      runVerifyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        description: "Define the task",
+      },
+      dependencies,
+    );
+
+    expect(runRunStage).not.toHaveBeenCalled();
+    expect(result.exitCode).toBe(1);
+    expect(result.auto.status).toBe("failed");
+    expect(result.auto.detail).toBe(
+      "Spec verification returned a resolvable selection without a selected spec path.",
+    );
+    expect(result.summary.spec.detail).toBe(
+      "Spec verification returned a resolvable selection without a selected spec path.",
+    );
+    expect(result.events).not.toContainEqual(
+      expect.objectContaining({
+        kind: "action_required",
+      }),
+    );
+  });
+
   it("emits the verify transcript body before action required when no programmatic candidates passed", async () => {
     const dependencies = createDependencies({
       now: () => 0,
@@ -365,6 +513,58 @@ describe("executeAutoCommand", () => {
           "No run candidate passed programmatic verification; manual selection required.",
         message:
           "No run candidate passed programmatic verification; manual selection required.",
+      }),
+    );
+    expect(findEventIndex(result.events, "body")).toBeLessThan(
+      findEventIndex(result.events, "action_required"),
+    );
+  });
+
+  it("uses the generic unresolved fallback for verify(run)", async () => {
+    const dependencies = createDependencies({
+      now: () => 0,
+      runRunStage: jest
+        .fn<AutoCommandDependencies["runRunStage"]>()
+        .mockResolvedValue(createRunStageResult()),
+      runVerifyStage: jest
+        .fn<AutoCommandDependencies["runVerifyStage"]>()
+        .mockResolvedValue(
+          createVerifyStageResult({
+            body: "run verify body",
+            selection: {
+              state: "unresolved",
+              applyable: false,
+              unresolvedReasons: [
+                {
+                  code: "selector_unresolved",
+                  selector: "none",
+                  availableCanonicalAgentIds: ["alpha", "beta"],
+                  availableAliases: [],
+                },
+              ],
+            },
+          }),
+        ),
+    });
+
+    const result = await executeAutoCommand(
+      {
+        specPath: "specs/task.md",
+      },
+      dependencies,
+    );
+
+    expect(result.auto.status).toBe("action_required");
+    expect(result.summary.verify.detail).toBe(
+      "Verification did not produce a resolvable candidate; manual selection required.",
+    );
+    expect(result.events).toContainEqual(
+      expect.objectContaining({
+        kind: "action_required",
+        detail:
+          "Verification did not produce a resolvable candidate; manual selection required.",
+        message:
+          "Verification did not produce a resolvable candidate; manual selection required.",
       }),
     );
     expect(findEventIndex(result.events, "body")).toBeLessThan(
