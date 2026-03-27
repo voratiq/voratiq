@@ -6,9 +6,7 @@ import type {
   AutoVerificationSelectionDisposition,
   SelectionDecision,
 } from "../../policy/index.js";
-import {
-  classifyAutoVerificationSelection,
-} from "../../policy/index.js";
+import { classifyAutoVerificationSelection } from "../../policy/index.js";
 import { mapRunStatusToExitCode, type RunStatus } from "../../status/index.js";
 import { HintedError, toErrorMessage } from "../../utils/errors.js";
 

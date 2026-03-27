@@ -1,9 +1,9 @@
 export {
-  classifyAutoVerificationSelection,
   type AutoVerificationSelectionActionRequired,
   type AutoVerificationSelectionDisposition,
   type AutoVerificationSelectionNonBlocking,
   type AutoVerificationSelectionProceed,
+  classifyAutoVerificationSelection,
 } from "./auto.js";
 export {
   buildResolvableSelectionDecision,
