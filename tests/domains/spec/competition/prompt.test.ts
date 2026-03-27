@@ -1,4 +1,4 @@
-import { buildSpecPrompt } from "../../src/domain/spec/competition/prompt.js";
+import { buildSpecPrompt } from "../../../../src/domain/spec/competition/prompt.js";
 
 describe("buildSpecPrompt", () => {
   it("includes task framing, spec structure, and authoring guidance", () => {

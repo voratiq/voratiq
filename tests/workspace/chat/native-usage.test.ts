@@ -15,7 +15,7 @@ describe("extractProviderNativeTokenUsageForSession", () => {
   it("returns chat_not_captured when chat capture is unavailable", async () => {
     const result = await extractProviderNativeTokenUsageForSession({
       root: "/repo",
-      domain: "reviews",
+      domain: "verify",
       sessionId: "session-1",
       agentId: "agent-1",
       provider: "codex",
@@ -38,7 +38,7 @@ describe("extractProviderNativeTokenUsageForSession", () => {
   it("returns unsupported_provider when the provider is not supported", async () => {
     const result = await extractProviderNativeTokenUsageForSession({
       root: "/repo",
-      domain: "specs",
+      domain: "spec",
       sessionId: "session-2",
       agentId: "agent-2",
       provider: "openrouter",
@@ -170,7 +170,7 @@ describe("extractProviderNativeTokenUsageForSession", () => {
     await expect(
       extractProviderNativeTokenUsageForSession({
         root: "/repo",
-        domain: "specs",
+        domain: "spec",
         sessionId: "session-6",
         agentId: "agent-6",
         provider: "codex",

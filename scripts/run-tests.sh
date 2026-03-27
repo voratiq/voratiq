@@ -20,7 +20,7 @@ done
 cmd=("node" "--experimental-vm-modules" "$JEST_BIN")
 
 if [[ "$sandbox_only" == true ]]; then
-  cmd+=("--runTestsByPath" "tests/run/agents.test.ts" "tests/run/sandbox.test.ts")
+  cmd+=("--runTestsByPath" "tests/domains/run/competition/agents.test.ts" "tests/agents/runtime/sandbox.test.ts")
 fi
 
 if ((${#passthrough[@]})); then

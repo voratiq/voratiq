@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { buildReducePrompt } from "../../../src/domain/reduce/competition/prompt.js";
+import { buildReducePrompt } from "../../../../src/domain/reduce/competition/prompt.js";
 
 describe("buildReducePrompt", () => {
   it("includes markdown and reduction artifact requirements", () => {

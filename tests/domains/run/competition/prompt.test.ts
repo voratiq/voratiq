@@ -1,4 +1,4 @@
-import { buildRunPrompt } from "../../src/domain/run/competition/prompt.js";
+import { buildRunPrompt } from "../../../../src/domain/run/competition/prompt.js";
 
 describe("buildRunPrompt", () => {
   it("includes spec metadata, constraints, and workspace boundary instructions", () => {
@@ -27,5 +27,25 @@ describe("buildRunPrompt", () => {
     expect(prompt).toContain(
       "- Write access: `/repo/.voratiq/run/sessions/run-123/agent-123/workspace`.",
     );
+    expect(prompt).toContain("Do not write files outside the workspace.");
+  });
+
+  it("lists staged extra-context files when provided", () => {
+    const prompt = buildRunPrompt({
+      specContent: "# Spec\n\nDo the thing.\n",
+      workspacePath: "/repo/.voratiq/run/sessions/run-1/agent/workspace",
+      extraContextFiles: [
+        {
+          absolutePath: "/repo/notes/a.md",
+          displayPath: "notes/a.md",
+          stagedRelativePath: "../context/a.md",
+        },
+      ],
+    });
+
+    expect(prompt).toContain(
+      "Extra context files (staged alongside the workspace):",
+    );
+    expect(prompt).toContain("`../context/a.md` (source: `notes/a.md`)");
   });
 });

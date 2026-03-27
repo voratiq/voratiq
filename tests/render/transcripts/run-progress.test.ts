@@ -257,8 +257,8 @@ describe("createRunRenderer", () => {
     expect(nonTtyWrites).toEqual([]);
 
     const nonTtyFrame =
-      nonTtyTranscript.split("\n\nTo review results:")[0] ?? "";
-    const ttyFrame = tty.snapshot().split("\n\nTo review results:")[0] ?? "";
+      nonTtyTranscript.split("\n\nTo verify results:")[0] ?? "";
+    const ttyFrame = tty.snapshot().split("\n\nTo verify results:")[0] ?? "";
 
     expect(normalizeFrame(ttyFrame)).toBe(normalizeFrame(nonTtyFrame));
   });

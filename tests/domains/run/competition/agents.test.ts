@@ -10,29 +10,29 @@ import {
 } from "node:fs/promises";
 import { join, relative } from "node:path";
 
-import { runRunCommand } from "../../src/cli/run.js";
-import { loadAgentCatalog } from "../../src/configs/agents/loader.js";
+import { runRunCommand } from "../../../../src/cli/run.js";
+import { loadAgentCatalog } from "../../../../src/configs/agents/loader.js";
 import {
   type AgentInvocationEnhanced,
   buildRunRecordEnhanced,
   type RunRecordEnhanced,
-} from "../../src/domain/run/model/enhanced.js";
+} from "../../../../src/domain/run/model/enhanced.js";
 import type {
   AgentReport,
   RunRecord,
   RunReport,
-} from "../../src/domain/run/model/types.js";
-import { pathExists } from "../../src/utils/fs.js";
-import { createWorkspace } from "../../src/workspace/setup.js";
+} from "../../../../src/domain/run/model/types.js";
+import { pathExists } from "../../../../src/utils/fs.js";
+import { createWorkspace } from "../../../../src/workspace/setup.js";
 import {
   type AgentConfigDefinition,
   createRunTestWorkspace,
   type RunTestWorkspace,
-} from "../support/fixtures/run-workspace.js";
+} from "../../../support/fixtures/run-workspace.js";
 import {
   sandboxTest,
   withSandboxEnabled,
-} from "../support/sandbox-requirements.js";
+} from "../../../support/sandbox-requirements.js";
 
 // Skip agent-spawning integration tests in nested agent workspaces to break recursive eval loops.
 // Agent spawning is structurally impossible from within a sandboxed environment.
@@ -460,13 +460,13 @@ async function writeOrchestrationConfig(
   root: string,
   options: {
     runAgentIds?: readonly string[];
-    reviewAgentIds?: readonly string[];
+    verifyAgentIds?: readonly string[];
     specAgentIds?: readonly string[];
     reduceAgentIds?: readonly string[];
   } = {},
 ): Promise<void> {
   const runAgentIds = options.runAgentIds ?? [];
-  const reviewAgentIds = options.reviewAgentIds ?? [];
+  const verifyAgentIds = options.verifyAgentIds ?? [];
   const specAgentIds = options.specAgentIds ?? [];
   const reduceAgentIds = options.reduceAgentIds ?? [];
 
@@ -474,7 +474,7 @@ async function writeOrchestrationConfig(
   appendOrchestrationStage(lines, "spec", specAgentIds);
   appendOrchestrationStage(lines, "run", runAgentIds);
   appendOrchestrationStage(lines, "reduce", reduceAgentIds);
-  appendOrchestrationStage(lines, "verify", reviewAgentIds);
+  appendOrchestrationStage(lines, "verify", verifyAgentIds);
   lines.push("");
 
   await writeFile(

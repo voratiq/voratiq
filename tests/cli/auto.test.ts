@@ -170,7 +170,7 @@ describe("voratiq auto", () => {
       buildVerifyResult({
         verificationId: "verify-flat-parity",
         outputPath: ".voratiq/verify/sessions/verify-flat-parity",
-        body: "review-flat-parity SUCCEEDED",
+        body: "verify-flat-parity SUCCEEDED",
       }),
     );
 
@@ -245,7 +245,7 @@ describe("voratiq auto", () => {
       buildVerifyResult({
         verificationId: "verify-flat-apply-parity",
         outputPath: ".voratiq/verify/sessions/verify-flat-apply-parity",
-        body: "review-flat-apply-parity SUCCEEDED",
+        body: "verify-flat-apply-parity SUCCEEDED",
         selection: {
           state: "resolvable",
           applyable: true,
@@ -492,7 +492,7 @@ describe("voratiq auto", () => {
             verificationId: "verify-spec-123",
             outputPath: ".voratiq/verify/sessions/verify-spec-123",
             body: [
-              "spec-review-123 SUCCEEDED",
+              "verify-spec-123 SUCCEEDED",
               "",
               "VERIFIER",
               "reviewer",
@@ -558,7 +558,7 @@ describe("voratiq auto", () => {
       (output.match(/Spec saved: \.voratiq\/spec\/generated\.md/gu) ?? [])
         .length,
     ).toBe(1);
-    expect((output.match(/spec-review-123 SUCCEEDED/gu) ?? []).length).toBe(1);
+    expect((output.match(/verify-spec-123 SUCCEEDED/gu) ?? []).length).toBe(1);
     expect(output).toContain("run-123 SUCCEEDED");
     expect((output.match(/\nverify-run-123 SUCCEEDED/gu) ?? []).length).toBe(1);
     expect(verifyInvocationCount).toBe(2);
@@ -570,9 +570,9 @@ describe("voratiq auto", () => {
       output.indexOf("Spec saved: .voratiq/spec/generated.md"),
     ).toBeLessThan(output.indexOf("Generating verification…"));
     expect(output.indexOf("Generating verification…")).toBeLessThan(
-      output.indexOf("spec-review-123 SUCCEEDED"),
+      output.indexOf("verify-spec-123 SUCCEEDED"),
     );
-    expect(output.indexOf("spec-review-123 SUCCEEDED")).toBeLessThan(
+    expect(output.indexOf("verify-spec-123 SUCCEEDED")).toBeLessThan(
       output.indexOf("Executing run…"),
     );
     expect(output.indexOf("Executing run…")).toBeLessThan(
@@ -813,7 +813,7 @@ describe("voratiq auto", () => {
       buildVerifyResult({
         verificationId: "verify-spec-apply",
         outputPath: ".voratiq/verify/sessions/verify-spec-apply",
-        body: "review-spec-apply SUCCEEDED",
+        body: "verify-spec-apply SUCCEEDED",
       }),
     );
     runApplyCommandMock.mockResolvedValue({
@@ -846,24 +846,24 @@ describe("voratiq auto", () => {
 
     expect(runSpecCommandMock).not.toHaveBeenCalled();
     const runInvocation = runRunCommandMock.mock.invocationCallOrder.at(-1);
-    const reviewInvocation =
+    const verifyInvocation =
       runVerifyCommandMock.mock.invocationCallOrder.at(-1);
     const applyInvocation = runApplyCommandMock.mock.invocationCallOrder.at(-1);
     expect(runInvocation).toBeDefined();
-    expect(reviewInvocation).toBeDefined();
+    expect(verifyInvocation).toBeDefined();
     expect(applyInvocation).toBeDefined();
     expect(runInvocation).toBeLessThan(
-      reviewInvocation ?? Number.POSITIVE_INFINITY,
+      verifyInvocation ?? Number.POSITIVE_INFINITY,
     );
-    expect(reviewInvocation).toBeLessThan(
+    expect(verifyInvocation).toBeLessThan(
       applyInvocation ?? Number.POSITIVE_INFINITY,
     );
 
     const output = stripAnsi(stdout.join(""));
     expect(output.indexOf("run-spec-apply SUCCEEDED")).toBeLessThan(
-      output.indexOf("review-spec-apply SUCCEEDED"),
+      output.indexOf("verify-spec-apply SUCCEEDED"),
     );
-    expect(output.indexOf("review-spec-apply SUCCEEDED")).toBeLessThan(
+    expect(output.indexOf("verify-spec-apply SUCCEEDED")).toBeLessThan(
       output.indexOf("SPEC APPLY BODY"),
     );
     expect(output.indexOf("SPEC APPLY BODY")).toBeLessThan(
@@ -871,7 +871,7 @@ describe("voratiq auto", () => {
     );
   });
 
-  it("keeps per-phase final frames stable for auto --spec and non-success review output", async () => {
+  it("keeps per-phase final frames stable for auto --spec and non-success verify output", async () => {
     const stdout: string[] = [];
 
     stdoutSpy = jest
@@ -905,7 +905,7 @@ describe("voratiq auto", () => {
       return Promise.resolve({
         ...buildVerifyResult({
           verificationId: "verify-456",
-          body: ["review-456 ABORTED", "", "AGENT", "reviewer"].join("\n"),
+          body: ["verify-456 ABORTED", "", "AGENT", "reviewer"].join("\n"),
         }),
         exitCode: 1,
       });
@@ -918,12 +918,12 @@ describe("voratiq auto", () => {
 
     const output = stripAnsi(stdout.join(""));
     expect((output.match(/run-456 SUCCEEDED/gu) ?? []).length).toBe(1);
-    expect((output.match(/review-456 ABORTED/gu) ?? []).length).toBe(1);
+    expect((output.match(/verify-456 ABORTED/gu) ?? []).length).toBe(1);
     expect(output).toContain("Auto FAILED");
     expect(output.indexOf("run-456 SUCCEEDED")).toBeLessThan(
-      output.indexOf("review-456 ABORTED"),
+      output.indexOf("verify-456 ABORTED"),
     );
-    expect(output.indexOf("review-456 ABORTED")).toBeLessThan(
+    expect(output.indexOf("verify-456 ABORTED")).toBeLessThan(
       output.indexOf("Auto FAILED"),
     );
   });
@@ -972,7 +972,7 @@ describe("voratiq auto", () => {
       return Promise.resolve({
         ...buildVerifyResult({
           verificationId: "verify-789",
-          body: ["review-789 SUCCEEDED", "", "AGENT", "reviewer"].join("\n"),
+          body: ["verify-789 SUCCEEDED", "", "AGENT", "reviewer"].join("\n"),
         }),
         exitCode: 0,
       });
@@ -996,7 +996,7 @@ describe("voratiq auto", () => {
     expect(output).not.toMatch(cursorUpPattern);
   });
 
-  it("runs review even when run reports agent failure", async () => {
+  it("runs verification even when run reports agent failure", async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];
 
@@ -1096,7 +1096,7 @@ describe("voratiq auto", () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it("prints summary even if review fails", async () => {
+  it("prints summary even if verification fails", async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];
 
@@ -1127,7 +1127,7 @@ describe("voratiq auto", () => {
       body: "run body",
     });
 
-    runVerifyCommandMock.mockRejectedValue(new Error("review exploded"));
+    runVerifyCommandMock.mockRejectedValue(new Error("verification exploded"));
 
     await runAutoCommand({
       specPath: ".voratiq/spec/existing.md",
@@ -1135,14 +1135,14 @@ describe("voratiq auto", () => {
     });
 
     expect(stdout.join("")).toContain("Error:");
-    expect(stdout.join("")).toContain("review exploded");
+    expect(stdout.join("")).toContain("verification exploded");
     expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");
     expect(process.exitCode).toBe(1);
     expect(stderr.join("")).toHaveLength(0);
     expect(runApplyCommandMock).not.toHaveBeenCalled();
   });
 
-  it("passes run-stage overrides to run and allows orchestration-backed review resolution", async () => {
+  it("passes run-stage overrides to run and allows orchestration-backed verify resolution", async () => {
     runRunCommandMock.mockResolvedValue({
       report: {
         runId: "run-123",
@@ -1186,7 +1186,7 @@ describe("voratiq auto", () => {
     );
   });
 
-  it("passes --max-parallel through to review execution", async () => {
+  it("passes --max-parallel through to verify execution", async () => {
     runRunCommandMock.mockResolvedValue(buildRunResult(["alpha"]));
     mockRunVerifyResolvedValue(buildVerifyResult());
 
@@ -1311,7 +1311,7 @@ describe("voratiq auto", () => {
     expect(output).toContain("Auto FAILED");
   });
 
-  it("surfaces mixed-outcome review transcript when review returns exitCode 1", async () => {
+  it("surfaces mixed-outcome verify transcript when verify returns exitCode 1", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")
@@ -1322,18 +1322,19 @@ describe("voratiq auto", () => {
 
     runRunCommandMock.mockResolvedValue(buildRunResult(["codex"]));
     mockRunVerifyResolvedValue({
+      // `run-review` remains the persisted rubric template slug for compatibility.
       ...buildVerifyResult({
         verificationId: "verify-789",
         outputPath:
           ".voratiq/verify/sessions/verify-789/reviewer-a/run-review/artifacts/result.json",
         body: [
-          "review-789 FAILED",
+          "verify-789 FAILED",
           "",
           "AGENT       STATUS",
           "reviewer-a  SUCCEEDED",
           "reviewer-b  FAILED",
           "",
-          "Reviewer: reviewer-a",
+          "Verifier: reviewer-a",
           "",
           "```markdown",
           "## Recommendation",
@@ -1347,7 +1348,7 @@ describe("voratiq auto", () => {
           "",
           "---",
           "",
-          "Reviewer: reviewer-b",
+          "Verifier: reviewer-b",
           "",
           "Error: reviewer violated output contract",
         ].join("\n"),
@@ -1375,8 +1376,8 @@ describe("voratiq auto", () => {
     });
 
     const output = stripAnsi(stdout.join(""));
-    expect(output).toContain("review-789 FAILED");
-    expect(output).toContain("Reviewer: reviewer-b");
+    expect(output).toContain("verify-789 FAILED");
+    expect(output).toContain("Verifier: reviewer-b");
     expect(output).toContain("Error: reviewer violated output contract");
     expect(output).toContain("Auto FAILED");
     expect(runApplyCommandMock).not.toHaveBeenCalled();
@@ -1489,7 +1490,7 @@ describe("voratiq auto", () => {
     expect(output).toContain("Auto SUCCEEDED");
   });
 
-  it("auto-applies when multiple reviewers unanimously select the same agent", async () => {
+  it("auto-applies when multiple verifiers unanimously select the same agent", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")
@@ -1554,7 +1555,7 @@ describe("voratiq auto", () => {
     expect(process.exitCode).toBe(0);
   });
 
-  it("skips auto-apply and requests arbitration when reviewers disagree", async () => {
+  it("skips auto-apply and requests arbitration when verifiers disagree", async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];
     stdoutSpy = jest
@@ -1645,7 +1646,7 @@ describe("voratiq auto", () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it("marks multi-reviewer disagreement as action required even without resolved_preferred_agent on every reviewer", async () => {
+  it("marks multi-verifier disagreement as action required even without resolved_preferred_agent on every verifier", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")

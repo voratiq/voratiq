@@ -1,15 +1,15 @@
 import {
   toAgentReport,
   toRunReport,
-} from "../../src/domain/run/competition/reports.js";
+} from "../../../../src/domain/run/competition/reports.js";
 import type {
   AgentInvocationRecord,
   AgentReport,
-} from "../../src/domain/run/model/types.js";
+} from "../../../../src/domain/run/model/types.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,
-} from "../support/factories/run-records.js";
+} from "../../../support/factories/run-records.js";
 
 describe("report mapping helpers", () => {
   const runId = "123";

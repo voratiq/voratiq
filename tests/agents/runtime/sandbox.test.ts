@@ -17,20 +17,20 @@ import {
   configureSandboxSettings,
   getRunCommand,
   runAgentProcess,
-} from "../../src/agents/runtime/launcher.js";
-import type { AgentId } from "../../src/configs/agents/types.js";
-import { buildRunAgentWorkspacePaths } from "../../src/domain/run/competition/agents/workspace.js";
+} from "../../../src/agents/runtime/launcher.js";
+import type { AgentId } from "../../../src/configs/agents/types.js";
+import { buildRunAgentWorkspacePaths } from "../../../src/domain/run/competition/agents/workspace.js";
 import {
   buildAgentWorkspacePaths,
   scaffoldAgentWorkspace,
-} from "../../src/workspace/layout.js";
+} from "../../../src/workspace/layout.js";
 import {
   isSandboxLocalBindingPermissionError,
   sandboxTest,
-} from "../support/sandbox-requirements.js";
+} from "../../support/sandbox-requirements.js";
 
 const PROBE_SCRIPT_PATH = fileURLToPath(
-  new URL("../fixtures/sandbox/probe-write.py", import.meta.url),
+  new URL("../../fixtures/sandbox/probe-write.py", import.meta.url),
 );
 
 const TEMP_PREFIX = "voratiq-sandbox-run-";
