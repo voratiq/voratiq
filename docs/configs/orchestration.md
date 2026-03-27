@@ -28,7 +28,7 @@ Each profile has four stage blocks: `spec`, `run`, `reduce`, and `verify`. Each 
 - `agents` (required) - array of agent references.
 - `agents[].id` (required) - an agent id from `agents.yaml`.
 
-`spec` requires exactly one agent at runtime unless overridden with `--agent`. `run`, `reduce`, and `verify` accept multiple agents.
+All four stages accept multiple agents.
 
 ## Example
 

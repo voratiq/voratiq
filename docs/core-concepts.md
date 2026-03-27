@@ -4,99 +4,116 @@ title: Core Concepts
 
 # Core Concepts
 
-Voratiq is built around six ideas:
+Voratiq uses agent ensembles to design, generate, and select the best code for every task. Multiple agents work at each stage, and verification drives selection.
 
-- [Parallel Comparison](#parallel-comparison) — Run multiple agents concurrently to compare approaches
-- [Specs As the Source of Truth](#specs-as-the-source-of-truth) — Every run requires a Markdown spec that defines intent
-- [Verification-Native Judgment](#verification-native-judgment) — Programmatic checks and rubric verifiers select the best candidate
-- [Sandboxed Execution](#sandboxed-execution) — Agents run with minimal permissions by default
-- [Everything Is Auditable](#everything-is-auditable) — Complete audit trail preserved for every run
-- [Open & Transparent](#open--transparent) — The entire stack is inspectable, modifiable, and community-owned
+Five ideas shape the design:
 
-This document walks through each concept and explains how it shapes Voratiq's design.
+- [Composable Operators](#composable-operators) — Six operators that work independently or chain together
+- [Ensembles at Every Stage](#ensembles-at-every-stage) — Every agentic operator runs multiple agents concurrently
+- [First-Class Verification](#first-class-verification) — Blinded, cross-stage evaluation that drives selection
+- [Sandboxed by Default](#sandboxed-by-default) — Agents run with minimal permissions
+- [Full Auditability](#full-auditability) — Complete evidence trail for every session
 
-## Parallel Comparison
+---
 
-Voratiq runs multiple agents concurrently against the same spec. Each agent receives identical instructions but may approach the problem differently based on its model, training, or configuration.
+## Composable Operators
 
-Running agents in parallel lets you compare model capabilities, test different prompting strategies, or hedge against any single agent's failure. Verification helps you determine which outputs meet your quality bar.
+The core workflow is supported by four agentic operators:
 
-Disable agents in the agent configuration or limit concurrency when you need results from only one agent.
+| Operator   | Purpose                                                           |
+| ---------- | ----------------------------------------------------------------- |
+| **spec**   | Draft a Markdown specification from a task description            |
+| **run**    | Execute agents against a spec; collect diffs and artifacts        |
+| **reduce** | Synthesize artifact sets into a structured summary                |
+| **verify** | Evaluate candidates with programmatic checks and rubric verifiers |
 
-See [Agent Configuration](https://github.com/voratiq/voratiq/blob/main/docs/configs/agents.md) for managing which agents run.
+Two additional operators handle non-agentic work: `apply` merges a selected agent's diff into the working tree, and `prune` cleans up worktrees and artifacts from past sessions.
 
-## Specs As the Source of Truth
+Every run starts from a Markdown spec that defines the task, constraints, and context. Voratiq converts the spec into a prompt so all agents receive identical instructions. This makes results directly comparable and runs reproducible. Write specs by hand or generate them via `voratiq spec` or `voratiq auto --description`.
 
-Every run requires a Markdown spec via `--spec`. The spec defines the task, expected behavior, constraints, or any other context agents need. Voratiq converts the spec into a canonical prompt, ensuring all agents receive identical instructions.
+The full sequence is **spec → run → reduce → verify → apply**. `voratiq auto` runs spec → run → verify by default, with apply gated behind `--apply`.
 
-Specs make intent explicit, runs reproducible, and outcomes auditable. They prevent drift between agents and provide a clear baseline for comparing results.
+Operators are composable beyond this sequence:
 
-You can rerun the same spec against different agents or models to compare approaches, or replay a past run to debug unexpected behavior.
+- **Verify is a cross-stage gate.** It can target spec, run, or reduce sessions. You can verify a spec before running agents against it, verify run outputs before reduction, or verify the reduction itself.
+- **Reduce targets multiple operator outputs.** It can consume artifacts from spec, run, verify, or a prior reduction.
 
-See [CLI Reference](https://github.com/voratiq/voratiq/blob/main/docs/cli-reference.md) for `voratiq run` usage.
+Each operator can be invoked on its own from the CLI (`voratiq spec`, `voratiq run`, `voratiq reduce`, `voratiq verify`, `voratiq apply`, `voratiq prune`) or composed with others in any order.
 
-## Verification-Native Judgment
+See [CLI Reference](cli-reference.md) for operator usage. Configuration lives in plain text (YAML, JSON, Markdown) under `.voratiq/`.
 
-After candidates are produced, Voratiq runs verification: programmatic checks (tests, linters, build checks, custom scripts) plus rubric verifiers. Voratiq seeds a default verification config during `voratiq init` using heuristics to detect common checks.
+## Ensembles at Every Stage
 
-Programmatic checks are automated ways of gauging agent performance, checking correctness, style, security, or any criteria you define. Rubric verifiers provide a structured judgment signal over the artifacts.
+Voratiq runs multiple agents at each agentic stage:
 
-Extend or replace the default checks and templates when needed.
+- **Spec** — Multiple agents draft specifications from a task description
+- **Run** — Multiple agents generate candidate implementations against the same spec
+- **Reduce** — Multiple agents synthesize and summarize artifact sets
+- **Verify** — Multiple agents evaluate candidates against rubrics
 
-See [Verification Configuration](https://github.com/voratiq/voratiq/blob/main/docs/configs/verification.md) for defining programmatic and rubric verification.
+Each agent receives identical inputs but may approach the problem differently based on its model, training, or configuration. Running diverse models surfaces different approaches and reduces single-model failure modes.
 
-## Sandboxed Execution
+Voratiq supports agents from multiple providers (Claude, Codex, Gemini), and orchestration profiles control which agents participate at each stage. Disable agents or limit concurrency when you need results from only one.
 
-Agents run with minimal permissions by default. Network access is limited to domains required for the agent binary to function, and filesystem writes are restricted to the agent's workspace and sandbox home (for logging and temporary files).
+See [Agent Configuration](configs/agents.md) and [Orchestration Configuration](configs/orchestration.md) for managing ensembles.
 
-This security posture attempts to limit the scope of unexpected agent behavior (bugs, hallucinations, or malicious prompts) while still allowing agents to complete their work. Note that sandbox restrictions are not foolproof; exfiltration and other exploits remain possible, so treat agent runs with appropriate caution.
+## First-Class Verification
 
-When your workflow requires additional access (external APIs, shared caches, package installation), you can relax restrictions via sandbox configuration.
+Ensembles produce multiple candidates at each stage. Verification turns those candidates into a decision. It runs through two channels:
 
-See [Sandbox Configuration](https://github.com/voratiq/voratiq/blob/main/docs/configs/sandbox.md) for customizing network and filesystem policies.
+- **Programmatic checks** — shell commands like test suites, linters, type checkers, and build scripts. Automated pass/fail.
+- **Rubric verifiers** — agents that score candidates against structured rubric templates covering correctness, style, completeness, or any criteria you define.
 
-## Everything Is Auditable
+Rubric verification is **blinded**: verifiers see randomized candidate IDs, not agent names. This prevents model-loyalty bias.
 
-Voratiq preserves a complete audit trail for every run under `.voratiq/run/sessions/<run-id>/`. Each run directory contains the base git revision, agent logs (stdout/stderr), generated diffs, and agent summaries.
+Verification applies across the workflow. It can target **spec**, **run**, or **reduce** sessions. Programmatic checks apply to run targets, and rubric verification applies to all three.
 
-Inspect any past run, compare multiple agents' approaches to the same spec, or drill into verification artifacts to understand why a candidate was selected. Nothing is lost or overwritten.
+Results from both channels flow through a selection policy that aggregates scores and recommends a winner. When verifiers disagree, the policy reports the disagreement so you can decide.
 
-Example run directory:
+Extend the defaults by adding programmatic check commands or writing custom rubric templates with a prompt, rubric, and response schema.
+
+See [Verification Configuration](configs/verification.md) for defining checks and rubrics.
+
+## Sandboxed by Default
+
+Agents run with minimal permissions. Network access is restricted to domains required by the agent's provider, and filesystem writes are limited to the agent's workspace (a git worktree) and sandbox home (for logs and temporary files).
+
+This limits the scope of unexpected agent behavior (bugs, hallucinations, prompt injection) while allowing agents to complete work. `.voratiq/` is blocked from agent access so candidates can't see each other's work.
+
+Sandbox enforcement includes denial backoff (repeated violations trigger warnings, then delays, then fail-fast termination) and a watchdog that monitors time and memory limits.
+
+Sandboxing is defense in depth, not a guarantee — treat agent runs with appropriate caution.
+
+When your workflow requires additional access (external APIs, shared caches, package registries), relax restrictions via sandbox configuration. Permissions are explicit and auditable.
+
+See [Sandbox Configuration](configs/sandbox.md) for customizing network and filesystem policies.
+
+## Full Auditability
+
+Voratiq preserves an evidence trail for every session under `.voratiq/`. Ephemeral data — the prompt passed to agents and auth credentials — is cleaned up immediately after execution. What remains is the audit record: metadata, artifacts, and runtime configuration.
+
+Example run session after teardown:
 
 ```
-.voratiq/run/sessions/20251105-143022-abc123/
-├── record.json             # Run metadata (status, agents, timestamps)
-├── claude-sonnet-4-5-20250929/
-│   ├── artifacts/          # Harvested outputs
-│   │   ├── diff.patch      # Git diff of all changes made by the agent
-│   │   ├── stdout.log      # Agent's standard output stream
-│   │   ├── stderr.log      # Agent's standard error stream
-│   │   └── summary.txt     # Agent-written summary of what changed and why
-│   ├── runtime/            # Agent invocation details
-│   │   ├── manifest.json   # Binary path, argv, env vars, workspace path
-│   │   └── sandbox.json    # Applied network and filesystem policies
-│   ├── sandbox/            # Sandbox home (logs, temp files)
-│   └── workspace/          # Agent's git worktree (preserved for inspection)
-├── gpt-5-1-codex/
+.voratiq/run/sessions/20260113-235501-hhkox/
+├── record.json                        # Run metadata (status, agents, timestamps)
+├── claude-opus-4-6/
 │   ├── artifacts/
+│   │   ├── diff.patch                 # Git diff of all changes
+│   │   ├── stdout.log                 # Agent stdout
+│   │   ├── stderr.log                 # Agent stderr
+│   │   ├── summary.txt                # Agent-written summary
+│   │   └── chat.jsonl                 # Full conversation trace
 │   ├── runtime/
-│   └── workspace/
+│   │   ├── manifest.json              # Binary path, args, env, workspace
+│   │   └── sandbox.json               # Applied network/filesystem policies
+│   └── workspace/                     # Agent's git worktree (until prune)
+├── gpt-5-2-codex/
+│   └── ...
 └── gemini-2-5-pro/
-    ├── artifacts/
-    ├── runtime/
-    └── workspace/
+    └── ...
 ```
 
-Each agent directory follows the same structure, keeping runs consistent and easy to navigate.
+Agent worktrees persist on disk until you run `voratiq prune`. Run records are permanent.
 
-Note: Voratiq does not persist a run-level `prompt.txt`. It generates the canonical prompt from the spec at runtime, writes it to ephemeral runtime files, and removes those files when execution completes.
-
-## Open & Transparent
-
-Voratiq is fully open source. The CLI, orchestration layers, sandbox policies, and agent presets live in this repository. You can inspect every line, propose changes, or fork the workflow to match your stack.
-
-Open design lets you verify behavior, audit security decisions, and adapt the tool to your environment. All runs execute locally. You control where artifacts are stored, who accesses them, and when they're deleted.
-
-Configuration is stored in plain text (YAML, JSON, Markdown). Add new agents, wire in custom verification checks, or swap sandbox rules by editing config files.
-
-See the [Voratiq repository](https://github.com/voratiq/voratiq) for source code and contribution guidance.
+Spec, verification, and reduction sessions follow the same structure under `.voratiq/spec/`, `.voratiq/verify/`, and `.voratiq/reduce/`.
