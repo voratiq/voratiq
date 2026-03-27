@@ -26,6 +26,7 @@ import { pathExists } from "../../../utils/fs.js";
 import { prepareScratchAgentWorkspace } from "../../../workspace/agents.js";
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
+import { ensureWorkspaceDependencies } from "../../../workspace/dependencies.js";
 import {
   type AgentWorkspacePaths,
   buildScopedAgentWorkspacePaths,
@@ -216,6 +217,11 @@ export function createVerifyCompetitionAdapter(
         contextPath: workspacePaths.contextPath,
         sharedInputsAbsolute: sharedInputs.sharedInputsAbsolute,
         referenceRepoAbsolute: sharedInputs.referenceRepoAbsolute,
+      });
+      await ensureWorkspaceDependencies({
+        root,
+        workspacePath: workspacePaths.workspacePath,
+        environment,
       });
       await stageExtraContextFiles({
         contextPath: workspacePaths.contextPath,
