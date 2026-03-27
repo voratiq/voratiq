@@ -421,12 +421,19 @@ export async function executeAutoCommand(
       });
 
       if (verifySelection?.state === "unresolved") {
-        const actionRequiredMessage = describeUnresolvedVerificationSelection(
-          "run",
-          verifySelection,
-        );
-        verifyDetail = actionRequiredMessage;
-        markActionRequired(actionRequiredMessage);
+        if (isNonBlockingVerificationSelection("run", verifySelection)) {
+          verifyDetail = describeNonBlockingVerificationSelection(
+            "run",
+            verifySelection,
+          );
+        } else {
+          const actionRequiredMessage = describeUnresolvedVerificationSelection(
+            "run",
+            verifySelection,
+          );
+          verifyDetail = actionRequiredMessage;
+          markActionRequired(actionRequiredMessage);
+        }
       }
     } catch (error) {
       verifyStatus = "failed";
@@ -454,6 +461,9 @@ export async function executeAutoCommand(
             ],
           },
         );
+      } else if (isNonBlockingVerificationSelection("run", verifySelection)) {
+        applyStatus = "skipped";
+        applyDetail = describeNonBlockingApplyDecision("run", verifySelection);
       } else if (verifySelection.state !== "resolvable") {
         throw new HintedError(
           "Verify stage did not return a resolvable selection.",
@@ -627,6 +637,42 @@ function describeUnresolvedVerificationSelection(
   }
 
   return "Verification did not produce a resolvable candidate; manual selection required.";
+}
+
+function isNonBlockingVerificationSelection(
+  targetKind: "spec" | "run",
+  decision?: SelectionDecision,
+): decision is Extract<SelectionDecision, { state: "unresolved" }> {
+  return (
+    targetKind === "run" &&
+    decision?.state === "unresolved" &&
+    decision.unresolvedReasons.length > 0 &&
+    decision.unresolvedReasons.every(
+      (reason) => reason.code === "no_programmatic_candidates_passed",
+    )
+  );
+}
+
+function describeNonBlockingVerificationSelection(
+  targetKind: "spec" | "run",
+  decision: Extract<SelectionDecision, { state: "unresolved" }>,
+): string {
+  if (isNonBlockingVerificationSelection(targetKind, decision)) {
+    return "No run candidate passed programmatic verification.";
+  }
+
+  return "Verification did not produce a resolvable candidate.";
+}
+
+function describeNonBlockingApplyDecision(
+  targetKind: "spec" | "run",
+  decision: Extract<SelectionDecision, { state: "unresolved" }>,
+): string {
+  if (isNonBlockingVerificationSelection(targetKind, decision)) {
+    return "Skipped apply because no run candidate passed programmatic verification.";
+  }
+
+  return "Apply skipped.";
 }
 
 function resolveAutoTerminalStatus(options: {
