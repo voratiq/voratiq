@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
+import { runPreparedWithLimit } from "../../../competition/core.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import type { ProgrammaticCheckResult } from "../../../configs/verification/methods.js";
 import type { VerificationConfig } from "../../../configs/verification/types.js";
@@ -25,6 +26,8 @@ import type { VerificationRecord } from "../model/types.js";
 import { executeProgrammaticChecks } from "../programmatic/runner.js";
 import { writeVerificationArtifact } from "./artifacts.js";
 import type { ResolvedVerificationTarget } from "./target.js";
+
+const PROGRAMMATIC_CANDIDATE_MAX_PARALLEL = 2;
 
 export async function executeAndPersistProgrammaticMethod(options: {
   root: string;
@@ -80,9 +83,11 @@ export async function executeAndPersistProgrammaticMethod(options: {
 
   try {
     if (methodPlan.kind === "run" && "runRecord" in resolvedTarget) {
-      const candidates = await Promise.all(
-        resolvedTarget.target.candidateIds.map(async (candidateId) => {
-          return await executeProgrammaticChecksForRunCandidate({
+      const candidates = await runPreparedWithLimit({
+        prepared: resolvedTarget.target.candidateIds,
+        maxParallel: PROGRAMMATIC_CANDIDATE_MAX_PARALLEL,
+        executePrepared: async (candidateId) =>
+          await executeProgrammaticChecksForRunCandidate({
             root,
             verificationId,
             artifactPath,
@@ -92,9 +97,8 @@ export async function executeAndPersistProgrammaticMethod(options: {
             runRecord: resolvedTarget.runRecord,
             baseRevisionSha: resolvedTarget.baseRevisionSha,
             environment,
-          });
-        }),
-      );
+          }),
+      });
 
       await writeVerificationArtifact({
         root,
