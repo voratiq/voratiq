@@ -60,7 +60,7 @@ describe("stage output primitives", () => {
 
     emitter.emit("Executing run…");
     emitter.emit("Executing run…");
-    emitter.emit("Generating review…");
+    emitter.emit("Generating verification…");
 
     expect(writes).toEqual(["Executing run…"]);
   });
@@ -72,8 +72,8 @@ describe("stage output primitives", () => {
     });
 
     emitter.emit("   ");
-    emitter.emit("Generating review…");
+    emitter.emit("Generating verification…");
 
-    expect(writes).toEqual(["Generating review…"]);
+    expect(writes).toEqual(["Generating verification…"]);
   });
 });

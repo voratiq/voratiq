@@ -8,20 +8,20 @@ import {
   clearActiveRun,
   registerActiveRun,
   terminateActiveRun,
-} from "../../src/commands/run/lifecycle.js";
+} from "../../../../src/commands/run/lifecycle.js";
 import type {
   RunApplyStatus,
   RunRecord,
-} from "../../src/domain/run/model/types.js";
+} from "../../../../src/domain/run/model/types.js";
 import {
   appendRunRecord,
   flushAllRunRecordBuffers,
   rewriteRunRecord,
-} from "../../src/domain/run/persistence/adapter.js";
+} from "../../../../src/domain/run/persistence/adapter.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,
-} from "../support/factories/run-records.js";
+} from "../../../support/factories/run-records.js";
 
 describe("run applyStatus persistence", () => {
   const tempRoots: string[] = [];

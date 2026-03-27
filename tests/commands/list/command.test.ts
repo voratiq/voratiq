@@ -2,10 +2,10 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { executeListCommand } from "../../src/commands/list/command.js";
-import type { RunRecord } from "../../src/domain/run/model/types.js";
-import { appendRunRecord } from "../../src/domain/run/persistence/adapter.js";
-import { createRunRecord } from "../support/factories/run-records.js";
+import { executeListCommand } from "../../../src/commands/list/command.js";
+import type { RunRecord } from "../../../src/domain/run/model/types.js";
+import { appendRunRecord } from "../../../src/domain/run/persistence/adapter.js";
+import { createRunRecord } from "../../support/factories/run-records.js";
 
 describe("executeListCommand", () => {
   let testDir: string;

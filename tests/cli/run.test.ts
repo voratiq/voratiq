@@ -262,7 +262,7 @@ suite("voratiq run (integration)", () => {
         recursive: true,
         force: true,
       });
-      await rm(join(repoRoot, ".voratiq", "reviews", "index.json"), {
+      await rm(join(repoRoot, ".voratiq", "verify", "index.json"), {
         force: true,
       });
       await rm(join(repoRoot, ".voratiq", "spec", "sessions"), {
@@ -578,12 +578,12 @@ suite("voratiq run (integration)", () => {
       profiles: {
         default: {
           runAgentIds: ["claude"],
-          reviewAgentIds: [],
+          verifyAgentIds: [],
           specAgentIds: [],
         },
         quality: {
           runAgentIds: ["gemini", "codex"],
-          reviewAgentIds: [],
+          verifyAgentIds: [],
           specAgentIds: [],
         },
       },
@@ -631,12 +631,12 @@ suite("voratiq run (integration)", () => {
       profiles: {
         default: {
           runAgentIds: ["gemini"],
-          reviewAgentIds: [],
+          verifyAgentIds: [],
           specAgentIds: [],
         },
         quality: {
           runAgentIds: ["claude"],
-          reviewAgentIds: [],
+          verifyAgentIds: [],
           specAgentIds: [],
         },
       },
@@ -764,18 +764,18 @@ suite("voratiq run (integration)", () => {
     }
   });
 
-  it("ignores multi-agent review stage configuration when resolving run agents", async () => {
+  it("ignores multi-agent verify stage configuration when resolving run agents", async () => {
     await createWorkspace(repoRoot);
     await writeAgentsConfig(workspace, agentScriptPath);
     await writeOrchestrationConfig(repoRoot, {
       runAgentIds: ["gemini"],
-      reviewAgentIds: ["codex", "claude"],
+      verifyAgentIds: ["codex", "claude"],
     });
 
-    const specRelativePath = "specs/review-stage-does-not-affect-run.md";
+    const specRelativePath = "specs/verify-stage-does-not-affect-run.md";
     const specPath = join(repoRoot, specRelativePath);
     await mkdir(join(repoRoot, "specs"), { recursive: true });
-    await writeFile(specPath, "# Review stage isolation\n", "utf8");
+    await writeFile(specPath, "# Verify stage isolation\n", "utf8");
 
     const executeCompetitionSpy = jest.spyOn(
       commandAdapter,
@@ -1106,14 +1106,14 @@ async function writeOrchestrationConfig(
   root: string,
   options: {
     runAgentIds?: readonly string[];
-    reviewAgentIds?: readonly string[];
+    verifyAgentIds?: readonly string[];
     specAgentIds?: readonly string[];
     reduceAgentIds?: readonly string[];
     profiles?: Record<
       string,
       {
         runAgentIds?: readonly string[];
-        reviewAgentIds?: readonly string[];
+        verifyAgentIds?: readonly string[];
         specAgentIds?: readonly string[];
         reduceAgentIds?: readonly string[];
       }
@@ -1125,7 +1125,7 @@ async function writeOrchestrationConfig(
     ({
       default: {
         runAgentIds: options.runAgentIds ?? [],
-        reviewAgentIds: options.reviewAgentIds ?? [],
+        verifyAgentIds: options.verifyAgentIds ?? [],
         specAgentIds: options.specAgentIds ?? [],
         reduceAgentIds: options.reduceAgentIds ?? [],
       },
@@ -1133,7 +1133,7 @@ async function writeOrchestrationConfig(
       string,
       {
         runAgentIds?: readonly string[];
-        reviewAgentIds?: readonly string[];
+        verifyAgentIds?: readonly string[];
         specAgentIds?: readonly string[];
         reduceAgentIds?: readonly string[];
       }
@@ -1152,7 +1152,7 @@ async function writeOrchestrationConfig(
     appendOrchestrationStage(
       lines,
       "verify",
-      profileStages.reviewAgentIds ?? [],
+      profileStages.verifyAgentIds ?? [],
     );
   }
   lines.push("");

@@ -160,9 +160,9 @@ agents: {}
 providers:
   claude:
     agents:
-      reviewer:
+      verifier:
         allowedDomains:
-          - reviewer.internal
+          - verifier.internal
 `;
 
     expect(() =>

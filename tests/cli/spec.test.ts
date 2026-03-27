@@ -379,12 +379,12 @@ describe("voratiq spec (CLI)", () => {
       profiles: {
         default: {
           runAgentIds: [],
-          reviewAgentIds: [],
+          verifyAgentIds: [],
           specAgentIds: ["claude-haiku-4-5-20251001"],
         },
         quality: {
           runAgentIds: [],
-          reviewAgentIds: [],
+          verifyAgentIds: [],
           specAgentIds: ["codex-reviewer"],
         },
       },
@@ -426,12 +426,12 @@ describe("voratiq spec (CLI)", () => {
       profiles: {
         default: {
           runAgentIds: [],
-          reviewAgentIds: [],
+          verifyAgentIds: [],
           specAgentIds: ["codex-reviewer", "claude-haiku-4-5-20251001"],
         },
         quality: {
           runAgentIds: [],
-          reviewAgentIds: [],
+          verifyAgentIds: [],
           specAgentIds: ["codex-reviewer"],
         },
       },
@@ -880,14 +880,14 @@ async function writeOrchestrationConfig(
   root: string,
   options: {
     runAgentIds?: readonly string[];
-    reviewAgentIds?: readonly string[];
+    verifyAgentIds?: readonly string[];
     specAgentIds?: readonly string[];
     reduceAgentIds?: readonly string[];
     profiles?: Record<
       string,
       {
         runAgentIds?: readonly string[];
-        reviewAgentIds?: readonly string[];
+        verifyAgentIds?: readonly string[];
         specAgentIds?: readonly string[];
         reduceAgentIds?: readonly string[];
       }
@@ -899,7 +899,7 @@ async function writeOrchestrationConfig(
     ({
       default: {
         runAgentIds: options.runAgentIds ?? [],
-        reviewAgentIds: options.reviewAgentIds ?? [],
+        verifyAgentIds: options.verifyAgentIds ?? [],
         specAgentIds: options.specAgentIds ?? [],
         reduceAgentIds: options.reduceAgentIds ?? [],
       },
@@ -907,7 +907,7 @@ async function writeOrchestrationConfig(
       string,
       {
         runAgentIds?: readonly string[];
-        reviewAgentIds?: readonly string[];
+        verifyAgentIds?: readonly string[];
         specAgentIds?: readonly string[];
         reduceAgentIds?: readonly string[];
       }
@@ -919,7 +919,7 @@ async function writeOrchestrationConfig(
     appendStage(lines, "spec", profileStages.specAgentIds ?? []);
     appendStage(lines, "run", profileStages.runAgentIds ?? []);
     appendStage(lines, "reduce", profileStages.reduceAgentIds ?? []);
-    appendStage(lines, "verify", profileStages.reviewAgentIds ?? []);
+    appendStage(lines, "verify", profileStages.verifyAgentIds ?? []);
   }
   lines.push("");
 

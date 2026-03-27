@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { specRecordSchema } from "../../src/domain/spec/model/types.js";
+import { specRecordSchema } from "../../../../src/domain/spec/model/types.js";
 
 describe("specRecordSchema", () => {
   it("remains backward-compatible with legacy records that predate baseRevisionSha", () => {

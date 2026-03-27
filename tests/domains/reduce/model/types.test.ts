@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { reductionRecordSchema } from "../../src/domain/reduce/model/types.js";
+import { reductionRecordSchema } from "../../../../src/domain/reduce/model/types.js";
 
 describe("reductionRecordSchema", () => {
   it("parses reducer provider-native token usage payloads", () => {

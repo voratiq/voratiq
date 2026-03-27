@@ -1,29 +1,29 @@
 import {
   RunRecordNotFoundError,
   RunRecordParseError,
-} from "../../src/domain/run/model/errors.js";
+} from "../../../../src/domain/run/model/errors.js";
 import type {
   AgentInvocationRecord,
   RunRecord,
-} from "../../src/domain/run/model/types.js";
+} from "../../../../src/domain/run/model/types.js";
 import type {
   ReadRunRecordsOptions,
   RunRecordWarning,
-} from "../../src/domain/run/persistence/adapter.js";
+} from "../../../../src/domain/run/persistence/adapter.js";
 import {
   buildRunPredicate,
   fetchRuns,
   fetchRunsSafely,
   type RunQueryFilters,
-} from "../../src/domain/run/persistence/adapter.js";
+} from "../../../../src/domain/run/persistence/adapter.js";
 import {
   createAgentInvocationRecord,
   createRunRecord,
-} from "../support/factories/run-records.js";
+} from "../../../support/factories/run-records.js";
 import {
   resetReadRunRecordsImplementation,
   setReadRunRecordsImplementation,
-} from "../support/hooks/run-records.js";
+} from "../../../support/hooks/run-records.js";
 
 const mockedReadRunRecords = jest.fn<
   Promise<RunRecord[]>,

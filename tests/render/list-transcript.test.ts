@@ -18,7 +18,7 @@ describe("renderListTranscript", () => {
     expect(output).toContain("STATUS");
     expect(output).toContain("SPEC");
     expect(output).toContain("20251016-133651-woeqr");
-    expect(output).not.toContain("To review a run in more detail:");
+    expect(output).not.toContain("To verify a run in more detail:");
   });
 
   it("omits the hint when no records are provided", () => {

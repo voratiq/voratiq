@@ -6,7 +6,7 @@ import {
   appendVerificationRecord,
   flushAllVerificationRecordBuffers,
   readVerificationRecords,
-} from "../../src/domain/verify/persistence/adapter.js";
+} from "../../../../src/domain/verify/persistence/adapter.js";
 
 describe("verification persistence", () => {
   let root: string;

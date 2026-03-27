@@ -1,18 +1,21 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import { getActiveTerminationStatus } from "../../src/domain/run/competition/termination-state.js";
-import { createAgentRecordMutators } from "../../src/domain/run/model/mutators.js";
-import type { RunRecord } from "../../src/domain/run/model/types.js";
-import { rewriteRunRecord } from "../../src/domain/run/persistence/adapter.js";
+import { getActiveTerminationStatus } from "../../../../src/domain/run/competition/termination-state.js";
+import { createAgentRecordMutators } from "../../../../src/domain/run/model/mutators.js";
+import type { RunRecord } from "../../../../src/domain/run/model/types.js";
+import { rewriteRunRecord } from "../../../../src/domain/run/persistence/adapter.js";
 
-jest.mock("../../src/domain/run/persistence/adapter.js", () => ({
+jest.mock("../../../../src/domain/run/persistence/adapter.js", () => ({
   rewriteRunRecord: jest.fn(),
 }));
 
-jest.mock("../../src/domain/run/competition/termination-state.js", () => ({
-  getActiveTerminationStatus: jest.fn(),
-  RUN_ABORT_WARNING: "Run aborted before agent completed.",
-}));
+jest.mock(
+  "../../../../src/domain/run/competition/termination-state.js",
+  () => ({
+    getActiveTerminationStatus: jest.fn(),
+    RUN_ABORT_WARNING: "Run aborted before agent completed.",
+  }),
+);
 
 const rewriteRunRecordMock = jest.mocked(rewriteRunRecord);
 const getActiveTerminationStatusMock = jest.mocked(getActiveTerminationStatus);

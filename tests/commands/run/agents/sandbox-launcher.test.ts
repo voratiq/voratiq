@@ -1,12 +1,26 @@
-import { access, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import type { ChildProcess } from "node:child_process";
+import { EventEmitter } from "node:events";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { AgentRuntimeProcessError } from "../../../../src/agents/runtime/errors.js";
-import { stageManifestForSandbox } from "../../../../src/agents/runtime/launcher.js";
+import {
+  runAgentProcess,
+  stageManifestForSandbox,
+} from "../../../../src/agents/runtime/launcher.js";
 import * as watchdogModule from "../../../../src/agents/runtime/watchdog.js";
+import * as cliRootModule from "../../../../src/utils/cli-root.js";
+import * as processModule from "../../../../src/utils/process.js";
 
 const TEMP_DIR_PREFIX = "sandbox-launcher-test-";
 
@@ -72,6 +86,12 @@ describe("runAgentProcess watchdog cleanup", () => {
   let createWatchdogSpy: jest.SpiedFunction<
     typeof watchdogModule.createWatchdog
   >;
+  let getCliAssetPathSpy: jest.SpiedFunction<
+    typeof cliRootModule.getCliAssetPath
+  >;
+  let spawnStreamingProcessSpy: jest.SpiedFunction<
+    typeof processModule.spawnStreamingProcess
+  >;
 
   beforeEach(() => {
     cleanupSpy = jest.fn<() => void>();
@@ -82,21 +102,85 @@ describe("runAgentProcess watchdog cleanup", () => {
       getState: () => ({ triggered: null, triggeredReason: null }),
       abortSignal: new AbortController().signal,
     });
+    getCliAssetPathSpy = jest.spyOn(cliRootModule, "getCliAssetPath");
+    spawnStreamingProcessSpy = jest.spyOn(
+      processModule,
+      "spawnStreamingProcess",
+    );
   });
 
-  it("should call watchdog cleanup even when spawnStreamingProcess is not used (verifies cleanup spy setup)", () => {
-    // This test verifies our spy setup works correctly
-    // The actual integration test for cleanup-on-rejection requires mocking spawnStreamingProcess
-    // which is complex due to the async process handling
-    const mockController = createWatchdogSpy.getMockImplementation()!(
-      {} as never,
-      {} as never,
-      { providerId: "test" },
+  it("cleans up the watchdog and output streams when spawn fails after start", async () => {
+    const dir = await mkdtemp(join(tmpdir(), TEMP_DIR_PREFIX));
+    const runtimeDir = join(dir, "runtime");
+    const workspacePath = join(dir, "workspace");
+    const promptPath = join(dir, "prompt.txt");
+    const runtimeManifestPath = join(runtimeDir, "manifest.json");
+    const stdoutPath = join(dir, "artifacts", "stdout.log");
+    const stderrPath = join(dir, "artifacts", "stderr.log");
+    const sandboxSettingsPath = join(dir, "runtime", "sandbox.json");
+    const shimPath = join(dir, "run-agent-shim.mjs");
+
+    await mkdir(runtimeDir, { recursive: true });
+    await mkdir(workspacePath, { recursive: true });
+    await mkdir(dirname(stdoutPath), { recursive: true });
+    await writeFile(promptPath, "prompt", "utf8");
+    await writeFile(shimPath, "export {};\n", "utf8");
+    await writeFile(
+      runtimeManifestPath,
+      `${JSON.stringify(
+        {
+          binary: process.execPath,
+          argv: ["--version"],
+          promptPath,
+          workspace: workspacePath,
+          env: {},
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
     );
 
-    // Simulate calling cleanup as the finally block would
-    mockController.cleanup();
+    getCliAssetPathSpy.mockReturnValue(shimPath);
 
-    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+    let capturedStdout:
+      | (NodeJS.WritableStream & { writableEnded?: boolean })
+      | undefined;
+    let capturedStderr:
+      | (NodeJS.WritableStream & { writableEnded?: boolean })
+      | undefined;
+
+    spawnStreamingProcessSpy.mockImplementation((options) => {
+      capturedStdout = options.stdout.writable as typeof capturedStdout;
+      capturedStderr = options.stderr.writable as typeof capturedStderr;
+
+      const child = new EventEmitter() as unknown as ChildProcess;
+      Object.assign(child, { pid: 4242, exitCode: null, signalCode: null });
+      options.onSpawn?.(child);
+
+      return Promise.reject(new Error("spawn failed"));
+    });
+
+    try {
+      await expect(
+        runAgentProcess({
+          runtimeManifestPath,
+          agentRoot: dir,
+          stdoutPath,
+          stderrPath,
+          sandboxSettingsPath,
+          resolveRunInvocation: () => ({
+            command: process.execPath,
+            args: ["-e", "process.exit(0)"],
+          }),
+        }),
+      ).rejects.toThrow("spawn failed");
+
+      expect(cleanupSpy).toHaveBeenCalledTimes(1);
+      expect(capturedStdout?.writableEnded).toBe(true);
+      expect(capturedStderr?.writableEnded).toBe(true);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
