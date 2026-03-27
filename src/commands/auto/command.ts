@@ -4,7 +4,7 @@ import type {
 } from "../../domain/run/model/types.js";
 import type {
   SelectionDecision,
-  UnresolvedSelectionDecision,
+  SelectionDecisionUnresolvedReason,
 } from "../../policy/index.js";
 import { mapRunStatusToExitCode, type RunStatus } from "../../status/index.js";
 import { HintedError, toErrorMessage } from "../../utils/errors.js";
@@ -242,16 +242,6 @@ export async function executeAutoCommand(
       specStatus = "succeeded";
       specSessionId = specResult.sessionId;
       recordEvent({ kind: "body", body: specResult.body });
-
-      const unresolvedSpecSelection =
-        describeUnresolvedSpecSelection(specResult);
-      if (unresolvedSpecSelection) {
-        specDetail = unresolvedSpecSelection.detail;
-        markActionRequired(
-          unresolvedSpecSelection.detail,
-          unresolvedSpecSelection.message,
-        );
-      }
     } catch (error) {
       specStatus = "failed";
       specDetail = toHeadline(error);
@@ -298,10 +288,19 @@ export async function executeAutoCommand(
         ) {
           resolvedSpecPath = specVerifyResult.selectedSpecPath;
           specPath = specVerifyResult.selectedSpecPath;
+        } else if (specVerifyResult.selection?.state === "resolvable") {
+          specStatus = "failed";
+          specDetail =
+            "Spec verification returned a resolvable selection without a selected spec path.";
+          hardFailure = true;
         } else {
-          const unresolvedSpecVerification = describeUnresolvedSpecVerification(
-            specVerifyResult.selection,
-          );
+          const unresolvedSpecVerification =
+            describeUnresolvedVerificationSelection("spec", {
+              unresolvedReasons:
+                specVerifyResult.selection?.state === "unresolved"
+                  ? specVerifyResult.selection.unresolvedReasons
+                  : undefined,
+            });
           specDetail = unresolvedSpecVerification.detail;
           markActionRequired(
             unresolvedSpecVerification.detail,
@@ -425,8 +424,10 @@ export async function executeAutoCommand(
       });
 
       if (verifySelection?.state === "unresolved") {
-        const actionRequiredMessage =
-          describeUnresolvedAutoApplyDecision(verifySelection);
+        const actionRequiredMessage = describeUnresolvedVerificationSelection(
+          "run",
+          verifySelection,
+        );
         verifyDetail = actionRequiredMessage.detail;
         markActionRequired(
           actionRequiredMessage.detail,
@@ -600,56 +601,29 @@ function assertAutoOptionCompatibility(options: ExecuteAutoCommandInput): void {
   }
 }
 
-function describeUnresolvedSpecSelection(
-  result: AutoSpecStageResult,
-): { detail: string; message: string } | undefined {
-  if ((result.generatedSpecPaths?.length ?? 0) > 1) {
-    return {
-      detail: "Multiple specs generated; manual selection required.",
-      message: "Multiple specs generated; manual selection required.",
-    };
-  }
-
-  return undefined;
-}
-
-function describeUnresolvedSpecVerification(decision?: SelectionDecision): {
-  detail: string;
-  message: string;
-} {
-  if (
-    decision?.state === "unresolved" &&
-    decision.unresolvedReasons.some(
-      (reason) => reason.code === "verifier_disagreement",
-    )
-  ) {
-    return {
-      detail:
-        "Spec verifiers disagreed on the preferred draft; manual selection required.",
-      message:
-        "Spec verifiers disagreed on the preferred draft; manual selection required.",
-    };
-  }
-
-  return {
-    detail:
-      "Spec verification did not select a draft; manual selection required.",
-    message:
-      "Spec verification did not select a draft; manual selection required.",
-  };
-}
-
-function describeUnresolvedAutoApplyDecision(
-  decision: UnresolvedSelectionDecision,
+function describeUnresolvedVerificationSelection(
+  targetKind: "spec" | "run",
+  options: {
+    unresolvedReasons?: readonly SelectionDecisionUnresolvedReason[];
+  },
 ): {
   detail: string;
   message: string;
 } {
   if (
-    decision.unresolvedReasons.some(
+    options.unresolvedReasons?.some(
       (reason) => reason.code === "verifier_disagreement",
     )
   ) {
+    if (targetKind === "spec") {
+      return {
+        detail:
+          "Spec verifiers disagreed on the preferred draft; manual selection required.",
+        message:
+          "Spec verifiers disagreed on the preferred draft; manual selection required.",
+      };
+    }
+
     return {
       detail:
         "Verifiers disagreed on the preferred candidate; manual selection required.",
@@ -659,7 +633,8 @@ function describeUnresolvedAutoApplyDecision(
   }
 
   if (
-    decision.unresolvedReasons.some(
+    targetKind === "run" &&
+    options.unresolvedReasons?.some(
       (reason) => reason.code === "no_programmatic_candidates_passed",
     )
   ) {
@@ -668,6 +643,15 @@ function describeUnresolvedAutoApplyDecision(
         "No run candidate passed programmatic verification; manual selection required.",
       message:
         "No run candidate passed programmatic verification; manual selection required.",
+    };
+  }
+
+  if (targetKind === "spec") {
+    return {
+      detail:
+        "Spec verification did not select a draft; manual selection required.",
+      message:
+        "Spec verification did not select a draft; manual selection required.",
     };
   }
 
