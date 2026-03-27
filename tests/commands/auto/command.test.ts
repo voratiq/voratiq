@@ -261,8 +261,6 @@ describe("executeAutoCommand", () => {
         kind: "action_required",
         detail:
           "Verifiers disagreed on the preferred candidate; manual selection required.",
-        message:
-          "Verifiers disagreed on the preferred candidate; manual selection required.",
       }),
     );
     expect(findEventIndex(result.events, "body")).toBeLessThan(
@@ -333,8 +331,6 @@ describe("executeAutoCommand", () => {
         kind: "action_required",
         detail:
           "Verifiers disagreed on the preferred candidate; manual selection required.",
-        message:
-          "Verifiers disagreed on the preferred candidate; manual selection required.",
       }),
     );
     expect(findEventIndex(result.events, "body")).toBeLessThan(
@@ -394,18 +390,16 @@ describe("executeAutoCommand", () => {
     expect(result.auto.status).toBe("action_required");
     expect(result.apply.status).toBe("skipped");
     expect(result.auto.detail).toBe(
-      "Spec verifiers disagreed on the preferred draft; manual selection required.",
+      "Verifiers disagreed on the preferred draft; manual selection required.",
     );
     expect(result.summary.spec.detail).toBe(
-      "Spec verifiers disagreed on the preferred draft; manual selection required.",
+      "Verifiers disagreed on the preferred draft; manual selection required.",
     );
     expect(result.events).toContainEqual(
       expect.objectContaining({
         kind: "action_required",
         detail:
-          "Spec verifiers disagreed on the preferred draft; manual selection required.",
-        message:
-          "Spec verifiers disagreed on the preferred draft; manual selection required.",
+          "Verifiers disagreed on the preferred draft; manual selection required.",
       }),
     );
     expect(findEventIndex(result.events, "body")).toBeLessThan(
@@ -464,7 +458,7 @@ describe("executeAutoCommand", () => {
     );
   });
 
-  it("emits the verify transcript body before action required when no programmatic candidates passed", async () => {
+  it("does not block auto when no programmatic candidates passed", async () => {
     const dependencies = createDependencies({
       now: () => 0,
       runRunStage: jest
@@ -496,9 +490,10 @@ describe("executeAutoCommand", () => {
       dependencies,
     );
 
-    expect(result.auto.status).toBe("action_required");
+    expect(result.auto.status).toBe("succeeded");
+    expect(result.apply.status).toBe("skipped");
     expect(result.summary.verify.detail).toBe(
-      "No run candidate passed programmatic verification; manual selection required.",
+      "No run candidate passed programmatic verification.",
     );
     expect(result.events).toContainEqual(
       expect.objectContaining({
@@ -506,17 +501,56 @@ describe("executeAutoCommand", () => {
         body: "run verify body",
       }),
     );
-    expect(result.events).toContainEqual(
+    expect(result.events).not.toContainEqual(
       expect.objectContaining({
         kind: "action_required",
-        detail:
-          "No run candidate passed programmatic verification; manual selection required.",
-        message:
-          "No run candidate passed programmatic verification; manual selection required.",
       }),
     );
-    expect(findEventIndex(result.events, "body")).toBeLessThan(
-      findEventIndex(result.events, "action_required"),
+  });
+
+  it("skips apply when no programmatic candidates passed", async () => {
+    const runApplyStage = jest.fn<AutoCommandDependencies["runApplyStage"]>();
+    const dependencies = createDependencies({
+      now: () => 0,
+      runRunStage: jest
+        .fn<AutoCommandDependencies["runRunStage"]>()
+        .mockResolvedValue(createRunStageResult()),
+      runVerifyStage: jest
+        .fn<AutoCommandDependencies["runVerifyStage"]>()
+        .mockResolvedValue(
+          createVerifyStageResult({
+            body: "run verify body",
+            selection: {
+              state: "unresolved",
+              applyable: false,
+              unresolvedReasons: [
+                {
+                  code: "no_programmatic_candidates_passed",
+                  candidateIds: ["alpha", "beta"],
+                },
+              ],
+            },
+          }),
+        ),
+      runApplyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        specPath: "specs/task.md",
+        apply: true,
+      },
+      dependencies,
+    );
+
+    expect(runApplyStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("succeeded");
+    expect(result.apply.status).toBe("skipped");
+    expect(result.apply.detail).toBe(
+      "Skipped apply because no run candidate passed programmatic verification.",
+    );
+    expect(result.summary.verify.detail).toBe(
+      "No run candidate passed programmatic verification.",
     );
   });
 
@@ -562,8 +596,6 @@ describe("executeAutoCommand", () => {
       expect.objectContaining({
         kind: "action_required",
         detail:
-          "Verification did not produce a resolvable candidate; manual selection required.",
-        message:
           "Verification did not produce a resolvable candidate; manual selection required.",
       }),
     );

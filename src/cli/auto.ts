@@ -88,7 +88,7 @@ function replayAutoCommandEvent(event: AutoCommandEvent): void {
   const warningBody = formatAlertMessage(
     "Action required",
     "yellow",
-    event.message,
+    event.detail,
   );
   writeCommandOutput({
     body: event.separateWithDivider ? `---\n\n${warningBody}` : warningBody,
