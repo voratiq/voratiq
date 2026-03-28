@@ -5,6 +5,7 @@ import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.j
 import { formatAgentErrorLine } from "../utils/agents.js";
 import { formatAgentBadge } from "../utils/badges.js";
 import { formatRenderLifecycleDuration } from "../utils/duration.js";
+import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import {
   buildStageFrameLines,
@@ -18,18 +19,16 @@ import {
   formatTranscriptStatusLabel,
   renderTranscriptStatusTable,
   resolveTranscriptShellStyle,
+  resolveTranscriptShellStyleFromWriter,
 } from "../utils/transcript-shell.js";
 import type { StageProgressEventConsumer } from "./stage-progress.js";
 
-type CliWriter = Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
+type CliWriter = Pick<NodeJS.WriteStream, "write"> & {
+  isTTY?: boolean;
+  columns?: number;
+};
 
-const ERASE_LINE = "\u001b[2K";
-const CURSOR_COLUMN_START = "\u001b[0G";
 const DASH = "—";
-
-function cursorUp(lines: number): string {
-  return `\u001b[${lines}F`;
-}
 
 function formatErrorDetail(error: unknown): string {
   if (error instanceof Error) {
@@ -168,10 +167,9 @@ export function createSpecRenderer(
   let context: SpecProgressContext | undefined;
   let disabled = false;
   let warningLogged = false;
-  let blockInitialized = false;
-  let lastRenderedLines = 0;
   let refreshInterval: ReturnType<typeof setInterval> | undefined;
   let lastElapsedLabel: string | null = null;
+  const interactiveFrameRenderer = createInteractiveFrameRenderer(stdout);
 
   const agentOrder: string[] = [];
   const agentRecords = new Map<string, SpecProgressAgentRecord>();
@@ -341,7 +339,8 @@ export function createSpecRenderer(
 
     syncContextLifecycleFromAgentRecords();
 
-    const style: TranscriptShellStyleOptions = { isTty: true };
+    const style: TranscriptShellStyleOptions =
+      resolveTranscriptShellStyleFromWriter(stdout, { forceTty: true });
     const elapsed = formatSpecElapsed(context, now());
     lastElapsedLabel = elapsed ?? null;
 
@@ -366,31 +365,7 @@ export function createSpecRenderer(
       return;
     }
 
-    if (!blockInitialized) {
-      stdout.write(interactiveLines.join("\n"));
-      lastRenderedLines = interactiveLines.length;
-      blockInitialized = true;
-      return;
-    }
-
-    const linesToRewind = Math.max(0, lastRenderedLines - 1);
-    if (linesToRewind > 0) {
-      stdout.write(cursorUp(linesToRewind));
-    }
-    stdout.write(CURSOR_COLUMN_START);
-
-    const totalLines = Math.max(lastRenderedLines, interactiveLines.length);
-    const rewrittenLines: string[] = [];
-    for (let index = 0; index < totalLines; index += 1) {
-      const line = interactiveLines[index] ?? "";
-      rewrittenLines.push(CURSOR_COLUMN_START, ERASE_LINE, line);
-      if (index < totalLines - 1) {
-        rewrittenLines.push("\n");
-      }
-    }
-
-    stdout.write(rewrittenLines.join(""));
-    lastRenderedLines = totalLines;
+    interactiveFrameRenderer.render(interactiveLines);
   }
 
   function upsertAgent(record: SpecProgressAgentRecord): void {

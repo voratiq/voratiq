@@ -10,6 +10,7 @@ import {
 } from "../utils/agents.js";
 import { formatAgentBadge } from "../utils/badges.js";
 import { formatRenderLifecycleDuration } from "../utils/duration.js";
+import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import { buildRunMetadataSectionWithStyle } from "../utils/runs.js";
 import {
@@ -17,10 +18,16 @@ import {
   renderStageFinalFrame,
 } from "../utils/stage-output.js";
 import type { TranscriptShellStyleOptions } from "../utils/transcript-shell.js";
-import { renderTranscriptStatusTable } from "../utils/transcript-shell.js";
+import {
+  renderTranscriptStatusTable,
+  resolveTranscriptShellStyleFromWriter,
+} from "../utils/transcript-shell.js";
 import type { StageProgressEventConsumer } from "./stage-progress.js";
 
-type CliWriter = Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
+type CliWriter = Pick<NodeJS.WriteStream, "write"> & {
+  isTTY?: boolean;
+  columns?: number;
+};
 
 interface RunProgressContext {
   runId: string;
@@ -56,13 +63,6 @@ interface AgentRow {
   status: string;
   duration: string;
   diff: string;
-}
-
-const ERASE_LINE = "\u001b[2K";
-const CURSOR_COLUMN_START = "\u001b[0G";
-
-function cursorUp(lines: number): string {
-  return `\u001b[${lines}F`;
 }
 
 const DASH = "—";
@@ -118,10 +118,9 @@ export function createRunRenderer(
   let context: RunProgressContext | undefined;
   let disabled = false;
   let warningLogged = false;
-  let lastRenderedLines = 0;
-  let blockInitialized = false;
   let refreshInterval: ReturnType<typeof setInterval> | undefined;
   let lastElapsedLabel: string | null = null;
+  const interactiveFrameRenderer = createInteractiveFrameRenderer(stdout);
 
   const agentOrder: string[] = [];
   const agentRecords = new Map<string, AgentInvocationRecord>();
@@ -246,7 +245,8 @@ export function createRunRenderer(
       return;
     }
 
-    const style: TranscriptShellStyleOptions = { isTty: true };
+    const style: TranscriptShellStyleOptions =
+      resolveTranscriptShellStyleFromWriter(stdout, { forceTty: true });
     const shell = buildRunStageShell(context, style);
     const interactiveLines = buildStageFrameLines({
       metadataLines: shell.metadataLines,
@@ -259,32 +259,7 @@ export function createRunRenderer(
       return;
     }
 
-    if (!blockInitialized) {
-      stdout.write(interactiveLines.join("\n"));
-      lastRenderedLines = interactiveLines.length;
-      blockInitialized = true;
-      return;
-    }
-
-    const linesToRewind = Math.max(0, lastRenderedLines - 1);
-    if (linesToRewind > 0) {
-      stdout.write(cursorUp(linesToRewind));
-    }
-    stdout.write(CURSOR_COLUMN_START);
-
-    const totalLines = Math.max(lastRenderedLines, interactiveLines.length);
-    const rewrittenLines: string[] = [];
-
-    for (let index = 0; index < totalLines; index += 1) {
-      const line = interactiveLines[index] ?? "";
-      rewrittenLines.push(CURSOR_COLUMN_START, ERASE_LINE, line);
-      if (index < totalLines - 1) {
-        rewrittenLines.push("\n");
-      }
-    }
-
-    stdout.write(rewrittenLines.join(""));
-    lastRenderedLines = totalLines;
+    interactiveFrameRenderer.render(interactiveLines);
   }
 
   function buildAgentTable(style: TranscriptShellStyleOptions): string[] {

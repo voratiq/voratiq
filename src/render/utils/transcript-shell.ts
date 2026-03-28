@@ -5,17 +5,35 @@ import { renderTable } from "./table.js";
 
 export interface TranscriptShellStyleOptions {
   isTty?: boolean;
+  columns?: number;
 }
 
 export interface TranscriptShellStyle {
   isTty: boolean;
+  columns?: number;
 }
+
+type TerminalLikeWriter = {
+  isTTY?: boolean;
+  columns?: number;
+};
 
 export function resolveTranscriptShellStyle(
   options: TranscriptShellStyleOptions = {},
 ): TranscriptShellStyle {
   return {
     isTty: options.isTty ?? Boolean(process.stdout.isTTY),
+    columns: options.columns,
+  };
+}
+
+export function resolveTranscriptShellStyleFromWriter(
+  writer: TerminalLikeWriter,
+  options: { forceTty?: boolean } = {},
+): TranscriptShellStyleOptions {
+  return {
+    isTty: options.forceTty === true ? true : Boolean(writer.isTTY),
+    columns: writer.columns,
   };
 }
 
@@ -131,26 +149,40 @@ export type TranscriptDetailRow = {
 
 export function buildTranscriptDetailBodyRows(
   rows: readonly TranscriptDetailRow[],
+  options: {
+    maxWidth?: number;
+  } = {},
 ): string[] {
   if (rows.length === 0) {
     return [];
   }
 
-  const tableLines = renderTable({
-    columns: [
-      {
-        header: "FIELD",
-        accessor: (row: TranscriptDetailRow) => row.label,
-      },
-      {
-        header: "VALUE",
-        accessor: (row: TranscriptDetailRow) => row.value ?? "—",
-      },
-    ],
-    rows,
-  });
+  const labelWidth = rows.reduce(
+    (max, row) => Math.max(max, row.label.length),
+    0,
+  );
 
-  const [, ...bodyLines] = tableLines;
+  const bodyLines: string[] = [];
+  for (const row of rows) {
+    const value = row.value ?? "—";
+    const prefix = `${row.label.padEnd(labelWidth)}  `;
+    const continuationPrefix = " ".repeat(prefix.length);
+    const wrapWidth =
+      typeof options.maxWidth === "number"
+        ? Math.max(8, options.maxWidth - prefix.length)
+        : undefined;
+
+    const wrappedValueLines =
+      wrapWidth === undefined
+        ? [value]
+        : wrapValueForDetailRow(value, wrapWidth);
+
+    bodyLines.push(`${prefix}${wrappedValueLines[0] ?? ""}`.trimEnd());
+    for (const line of wrappedValueLines.slice(1)) {
+      bodyLines.push(`${continuationPrefix}${line}`.trimEnd());
+    }
+  }
+
   return bodyLines;
 }
 
@@ -181,12 +213,58 @@ export function buildTranscriptShellSection(options: {
     lines.push(badge);
   }
 
-  const detailBody = buildTranscriptDetailBodyRows(options.detailRows ?? []);
+  const maxWidth =
+    style.isTty && typeof style.columns === "number" && style.columns > 0
+      ? style.columns
+      : undefined;
+  const detailBody = buildTranscriptDetailBodyRows(options.detailRows ?? [], {
+    maxWidth,
+  });
   if (detailBody.length > 0) {
     lines.push("", ...detailBody);
   }
 
   return lines;
+}
+
+function wrapValueForDetailRow(value: string, maxWidth: number): string[] {
+  if (value.length <= maxWidth) {
+    return [value];
+  }
+
+  const lines: string[] = [];
+  let remaining = value;
+
+  while (remaining.length > maxWidth) {
+    const candidate = remaining.slice(0, maxWidth);
+    const breakIndex = findPreferredBreakIndex(candidate);
+    const splitIndex = breakIndex > 0 ? breakIndex : maxWidth;
+
+    lines.push(remaining.slice(0, splitIndex).trimEnd());
+    remaining = remaining.slice(splitIndex).trimStart();
+  }
+
+  if (remaining.length > 0) {
+    lines.push(remaining);
+  }
+
+  return lines.length > 0 ? lines : [""];
+}
+
+function findPreferredBreakIndex(candidate: string): number {
+  const minimumUsefulBreak = Math.floor(candidate.length * 0.6);
+
+  for (let index = candidate.length - 1; index >= 0; index -= 1) {
+    const char = candidate[index];
+    if (char === " " || char === "/" || char === "\\") {
+      if (index + 1 >= minimumUsefulBreak) {
+        return index + 1;
+      }
+      break;
+    }
+  }
+
+  return -1;
 }
 
 export interface TranscriptStatusTableColumn<Row> {
