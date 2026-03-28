@@ -3,5 +3,11 @@ dist/
 .voratiq/
 coverage/
 *.log
+.git/
+.idea/
+.env
+.env.*
+tmp/
+tmp/**
 .vscode/
 .DS_Store
