@@ -212,7 +212,7 @@ export async function runCli(
   program
     .name("voratiq")
     .description(
-      "Voratiq CLI \u2013 run coding agents against each other, merge the winner.",
+      "Agent ensembles to design, generate, and select the best code for every task.",
     )
     .enablePositionalOptions()
     .option(
