@@ -353,11 +353,11 @@ describe("executeAutoCommand", () => {
                 code: "verifier_disagreement",
                 selections: [
                   {
-                    verifierAgentId: "reviewer-a",
+                    verifierAgentId: "verifier-a",
                     selectedCanonicalAgentId: "specs/a.md",
                   },
                   {
-                    verifierAgentId: "reviewer-b",
+                    verifierAgentId: "verifier-b",
                     selectedCanonicalAgentId: "specs/b.md",
                   },
                 ],
