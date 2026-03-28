@@ -136,6 +136,10 @@ class VirtualTty {
       this.ensureLine(this.row);
       this.buffer[this.row] = "";
       this.col = 0;
+    } else if (code === "J") {
+      this.ensureLine(this.row);
+      this.buffer[this.row] = this.buffer[this.row].slice(0, this.col);
+      this.buffer = this.buffer.slice(0, this.row + 1);
     }
 
     return match[0].length;

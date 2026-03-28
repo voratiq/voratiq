@@ -187,6 +187,30 @@ describe("renderRunList", () => {
     expect(lines[1]).toContain("20251016-133651-woeqr");
     expect(lines[2]).toContain("20251016-023258-qifyb");
   });
+
+  it("wraps long SPEC values within the SPEC column for narrow TTY widths", () => {
+    const records: RunRecord[] = [
+      buildRunRecord({
+        runId: "20260328-210627-veijo",
+        specPath:
+          ".voratiq/spec/sessions/20260327-043019-uatir/gpt-5-4-high/artifacts/clean-up-stale-review-terminology-in-auto-verify-test-surface.md",
+        createdAt: "2026-03-28T21:06:27.000Z",
+      }),
+    ];
+
+    const output = renderRunList(records, { isTty: true, columns: 120 });
+    const lines = output.split("\n");
+
+    expect(lines.length).toBeGreaterThan(2);
+    expect(lines[1]).toContain("20260328-210627-veijo");
+    expect(lines[1]).toContain("SUCCEEDED");
+    expect(lines[1]).toContain(".voratiq/spec/sessions/");
+    expect(lines.slice(2).some((line) => line.includes("clean-up-stale"))).toBe(
+      true,
+    );
+    const createdMatches = lines.filter((line) => line.includes("2026-03-28"));
+    expect(createdMatches).toHaveLength(1);
+  });
 });
 
 function buildRunRecord(params: {

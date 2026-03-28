@@ -5,7 +5,10 @@ import {
   formatErrorMessage,
 } from "../utils/output.js";
 
-type CliWriter = Pick<NodeJS.WriteStream, "write"> & { isTTY?: boolean };
+type CliWriter = Pick<NodeJS.WriteStream, "write"> & {
+  isTTY?: boolean;
+  columns?: number;
+};
 
 export type AlertSeverity = "info" | "warn" | "error";
 
@@ -254,6 +257,9 @@ function createTrackingWriter(
   let hasWritten = false;
   return {
     isTTY: target.isTTY,
+    get columns() {
+      return target.columns;
+    },
     write(chunk: string | Uint8Array): boolean {
       const text =
         typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");

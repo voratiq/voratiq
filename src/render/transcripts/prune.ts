@@ -8,6 +8,7 @@ import { colorize } from "../../utils/colors.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import { buildRunMetadataSectionWithStyle } from "../utils/runs.js";
 import { renderBlocks, renderTranscript } from "../utils/transcript.js";
+import { resolveTranscriptShellStyleFromWriter } from "../utils/transcript-shell.js";
 import { renderRunList } from "./list.js";
 
 export interface PruneConfirmationPrefaceOptions {
@@ -39,13 +40,16 @@ export function buildPruneConfirmationPreface(
     previouslyDeletedAt,
   } = options;
 
-  const introLines = buildRunMetadataSectionWithStyle({
-    runId,
-    specPath,
-    status: runStatus,
-    workspacePath: runPath,
-    createdAt: formatRunTimestamp(createdAt),
-  });
+  const introLines = buildRunMetadataSectionWithStyle(
+    {
+      runId,
+      specPath,
+      status: runStatus,
+      workspacePath: runPath,
+      createdAt: formatRunTimestamp(createdAt),
+    },
+    resolveTranscriptShellStyleFromWriter(process.stdout),
+  );
 
   const sections: string[][] = [];
   const summaryLines = [...introLines];

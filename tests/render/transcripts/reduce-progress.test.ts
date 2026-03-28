@@ -26,6 +26,8 @@ class VirtualTty {
   private buffer: string[] = [""];
   private row = 0;
   private col = 0;
+  private savedRow: number | null = null;
+  private savedCol: number | null = null;
 
   write = (data: string): boolean => {
     this.writes.push(data);
@@ -69,6 +71,21 @@ class VirtualTty {
       return sgrMatch[0].length;
     }
 
+    if (sequence.startsWith("\u001b7")) {
+      this.savedRow = this.row;
+      this.savedCol = this.col;
+      return 2;
+    }
+
+    if (sequence.startsWith("\u001b8")) {
+      if (this.savedRow !== null && this.savedCol !== null) {
+        this.row = this.savedRow;
+        this.col = this.savedCol;
+        this.ensureLine(this.row);
+      }
+      return 2;
+    }
+
     const match = CONTROL_SEQUENCE.exec(sequence);
     if (!match) {
       return 1;
@@ -88,6 +105,10 @@ class VirtualTty {
       this.ensureLine(this.row);
       this.buffer[this.row] = "";
       this.col = 0;
+    } else if (code === "J") {
+      this.ensureLine(this.row);
+      this.buffer[this.row] = this.buffer[this.row].slice(0, this.col);
+      this.buffer = this.buffer.slice(0, this.row + 1);
     }
 
     return match[0].length;
