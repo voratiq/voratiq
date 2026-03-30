@@ -4,19 +4,19 @@ describe("resolveVerifyRubricMaxParallel", () => {
   const verificationConfig = {
     spec: {
       programmatic: [],
-      rubric: [{ template: "spec-review" }],
+      rubric: [{ template: "spec-verification" }],
     },
     run: {
       programmatic: [],
       rubric: [
-        { template: "run-review" },
+        { template: "run-verification" },
         { template: "run-type" },
         { template: "failure-modes" },
       ],
     },
     reduce: {
       programmatic: [],
-      rubric: [{ template: "reduce-review" }],
+      rubric: [{ template: "reduce-verification" }],
     },
   } as const;
 

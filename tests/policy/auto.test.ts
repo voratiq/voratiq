@@ -32,7 +32,7 @@ describe("policy auto verification selection", () => {
     });
   });
 
-  it("treats run programmatic failure as non-blocking", () => {
+  it("treats run programmatic-only failure as action required", () => {
     const disposition = classifyAutoVerificationSelection({
       targetKind: "run",
       selection: {
@@ -40,18 +40,17 @@ describe("policy auto verification selection", () => {
         applyable: false,
         unresolvedReasons: [
           {
-            code: "no_programmatic_candidates_passed",
-            candidateIds: ["alpha", "beta"],
+            code: "no_successful_verifiers",
+            failedVerifierAgentIds: [],
           },
         ],
       },
     });
 
     expect(disposition).toEqual({
-      kind: "non_blocking",
-      verifyDetail: "No run candidate passed programmatic verification.",
-      applyDetail:
-        "Skipped apply because no run candidate passed programmatic verification.",
+      kind: "action_required",
+      detail:
+        "Verification did not produce a resolvable candidate; manual selection required.",
     });
   });
 

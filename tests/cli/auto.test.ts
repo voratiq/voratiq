@@ -1,4 +1,11 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -12,6 +19,7 @@ import * as runCliModule from "../../src/cli/run.js";
 import * as specCli from "../../src/cli/spec.js";
 import * as verifyCli from "../../src/cli/verify.js";
 import { HintedError } from "../../src/utils/errors.js";
+import { createWorkspace } from "../../src/workspace/setup.js";
 
 const ESC = String.fromCharCode(0x1b);
 const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
@@ -175,24 +183,26 @@ describe("voratiq auto", () => {
     );
 
     try {
-      const flatResult = await invokeCli([
-        "--description",
-        "Draft a migration plan",
-        "--verify-agent",
-        "verifier",
-      ]);
-      const autoResult = await invokeCli([
-        "auto",
-        "--description",
-        "Draft a migration plan",
-        "--verify-agent",
-        "verifier",
-      ]);
+      await withTempRepo(async () => {
+        const flatResult = await invokeCli([
+          "--description",
+          "Draft a migration plan",
+          "--verify-agent",
+          "verifier",
+        ]);
+        const autoResult = await invokeCli([
+          "auto",
+          "--description",
+          "Draft a migration plan",
+          "--verify-agent",
+          "verifier",
+        ]);
 
-      expect(flatResult.exitCode).toBe(0);
-      expect(flatResult.exitCode).toBe(autoResult.exitCode);
-      expect(flatResult.stderr).toBe(autoResult.stderr);
-      expect(stripAnsi(flatResult.stdout)).toBe(stripAnsi(autoResult.stdout));
+        expect(flatResult.exitCode).toBe(0);
+        expect(flatResult.exitCode).toBe(autoResult.exitCode);
+        expect(flatResult.stderr).toBe(autoResult.stderr);
+        expect(stripAnsi(flatResult.stdout)).toBe(stripAnsi(autoResult.stdout));
+      });
 
       expect(runSpecCommandMock).toHaveBeenCalledTimes(2);
       expect(runRunCommandMock).toHaveBeenCalledTimes(2);
@@ -311,26 +321,29 @@ describe("voratiq auto", () => {
   it("keeps root --description failure semantics equivalent to auto --description", async () => {
     runSpecCommandMock.mockRejectedValue(new Error("spec exploded"));
 
-    const flatResult = await invokeCli([
-      "--description",
-      "Draft a migration plan",
-      "--verify-agent",
-      "verifier",
-    ]);
-    const autoResult = await invokeCli([
-      "auto",
-      "--description",
-      "Draft a migration plan",
-      "--verify-agent",
-      "verifier",
-    ]);
+    await withTempRepo(async () => {
+      const flatResult = await invokeCli([
+        "--description",
+        "Draft a migration plan",
+        "--verify-agent",
+        "verifier",
+      ]);
+      const autoResult = await invokeCli([
+        "auto",
+        "--description",
+        "Draft a migration plan",
+        "--verify-agent",
+        "verifier",
+      ]);
 
-    expect(flatResult.exitCode).toBe(1);
-    expect(flatResult.exitCode).toBe(autoResult.exitCode);
-    expect(flatResult.stderr).toBe(autoResult.stderr);
-    expect(stripAnsi(flatResult.stdout)).toBe(stripAnsi(autoResult.stdout));
-    expect(stripAnsi(flatResult.stdout)).toContain("spec exploded");
-    expect(stripAnsi(flatResult.stdout)).toContain("Auto FAILED");
+      expect(flatResult.exitCode).toBe(1);
+      expect(flatResult.exitCode).toBe(autoResult.exitCode);
+      expect(flatResult.stderr).toBe(autoResult.stderr);
+      expect(stripAnsi(flatResult.stdout)).toBe(stripAnsi(autoResult.stdout));
+      expect(stripAnsi(flatResult.stdout)).toContain("spec exploded");
+      expect(stripAnsi(flatResult.stdout)).toContain("Auto FAILED");
+    });
+
     expect(runRunCommandMock).not.toHaveBeenCalled();
     expect(runVerifyCommandMock).not.toHaveBeenCalled();
     expect(runApplyCommandMock).not.toHaveBeenCalled();
@@ -433,6 +446,186 @@ describe("voratiq auto", () => {
     ).rejects.toThrow("Option `--commit` requires `--apply`.");
     expect(runRunCommandMock).not.toHaveBeenCalled();
     expect(runApplyCommandMock).not.toHaveBeenCalled();
+  });
+
+  it("does not initialize the workspace when auto usage is invalid", async () => {
+    await withTempGitRepo(async (repoRoot) => {
+      await expect(
+        runAutoCommand({
+          verifyAgentIds: ["verifier"],
+        }),
+      ).rejects.toThrow(
+        "Exactly one of `--spec` or `--description` is required.",
+      );
+
+      await expect(access(join(repoRoot, ".voratiq"))).rejects.toBeDefined();
+    });
+
+    expect(runSpecCommandMock).not.toHaveBeenCalled();
+    expect(runRunCommandMock).not.toHaveBeenCalled();
+    expect(runVerifyCommandMock).not.toHaveBeenCalled();
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces commit/apply usage errors before verification-config preflight", async () => {
+    await withTempRepo(async (repoRoot) => {
+      await rewriteVerificationConfig(repoRoot, (content) =>
+        content.replace(
+          "run:\n  rubric:\n    - template: run-verification\n",
+          "run:\n  rubric: []\n",
+        ),
+      );
+
+      await expect(
+        runAutoCommand({
+          specPath: ".voratiq/spec/existing.md",
+          commit: true,
+        }),
+      ).rejects.toThrow("Option `--commit` requires `--apply`.");
+    });
+
+    expect(runSpecCommandMock).not.toHaveBeenCalled();
+    expect(runRunCommandMock).not.toHaveBeenCalled();
+    expect(runVerifyCommandMock).not.toHaveBeenCalled();
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+  });
+
+  it("fails preflight for --spec when run-verification is missing", async () => {
+    await withTempRepo(async (repoRoot) => {
+      await rewriteVerificationConfig(repoRoot, (content) =>
+        content.replace(
+          "run:\n  rubric:\n    - template: run-verification\n",
+          "run:\n  rubric: []\n",
+        ),
+      );
+
+      await expect(
+        runAutoCommand({
+          specPath: ".voratiq/spec/existing.md",
+        }),
+      ).rejects.toMatchObject({
+        headline: "Preflight failed. Aborting auto.",
+        detailLines: [
+          "Missing selector rubric `run-verification` in `.voratiq/verification.yaml` for run-stage auto resolution.",
+        ],
+      });
+    });
+
+    expect(runSpecCommandMock).not.toHaveBeenCalled();
+    expect(runRunCommandMock).not.toHaveBeenCalled();
+    expect(runVerifyCommandMock).not.toHaveBeenCalled();
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+  });
+
+  it("fails preflight for --description when spec-verification or run-verification is missing", async () => {
+    await withTempRepo(async (repoRoot) => {
+      await rewriteVerificationConfig(repoRoot, (content) =>
+        content
+          .replace(
+            "spec:\n  rubric:\n    - template: spec-verification\n",
+            "spec:\n  rubric: []\n",
+          )
+          .replace(
+            "run:\n  rubric:\n    - template: run-verification\n",
+            "run:\n  rubric: []\n",
+          ),
+      );
+
+      await expect(
+        runAutoCommand({
+          description: "Draft a migration plan",
+        }),
+      ).rejects.toMatchObject({
+        headline: "Preflight failed. Aborting auto.",
+        detailLines: [
+          "Missing selector rubric `spec-verification` in `.voratiq/verification.yaml` for spec-stage auto resolution.",
+          "Missing selector rubric `run-verification` in `.voratiq/verification.yaml` for run-stage auto resolution.",
+        ],
+      });
+    });
+
+    expect(runSpecCommandMock).not.toHaveBeenCalled();
+    expect(runRunCommandMock).not.toHaveBeenCalled();
+    expect(runVerifyCommandMock).not.toHaveBeenCalled();
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+  });
+
+  it("fails preflight for --spec when the run-verification template is missing on disk", async () => {
+    await withTempRepo(async (repoRoot) => {
+      await rm(
+        join(repoRoot, ".voratiq", "verify", "templates", "run-verification"),
+        {
+          recursive: true,
+          force: true,
+        },
+      );
+
+      await expect(
+        runAutoCommand({
+          specPath: ".voratiq/spec/existing.md",
+        }),
+      ).rejects.toMatchObject({
+        headline: "Preflight failed. Aborting auto.",
+        detailLines: [
+          "Missing selector template `.voratiq/verify/templates/run-verification/` for run-stage auto resolution.",
+        ],
+      });
+    });
+
+    expect(runSpecCommandMock).not.toHaveBeenCalled();
+    expect(runRunCommandMock).not.toHaveBeenCalled();
+    expect(runVerifyCommandMock).not.toHaveBeenCalled();
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+  });
+
+  it("repairs structural workspace entries before auto preflight", async () => {
+    await withTempRepo(async (repoRoot) => {
+      await rm(join(repoRoot, ".voratiq", "verify", "index.json"), {
+        force: true,
+      });
+      await rm(join(repoRoot, ".voratiq", "spec", "sessions"), {
+        recursive: true,
+        force: true,
+      });
+
+      runRunCommandMock.mockResolvedValue({
+        report: {
+          runId: "run-123",
+          spec: { path: ".voratiq/spec/existing.md" },
+          status: "succeeded",
+          createdAt: new Date().toISOString(),
+          baseRevisionSha: "deadbeef",
+          agents: [{ agentId: "codex" } as never],
+          hadAgentFailure: false,
+        },
+        body: "run body",
+      });
+      mockRunVerifyResolvedValue(
+        buildVerifyResult({
+          verificationId: "verify-123",
+          outputPath: ".voratiq/verify/sessions/verify-123",
+          body: "verify body",
+        }),
+      );
+
+      await expect(
+        runAutoCommand({
+          specPath: ".voratiq/spec/existing.md",
+        }),
+      ).resolves.toMatchObject({
+        exitCode: 0,
+      });
+
+      await expect(
+        readFile(join(repoRoot, ".voratiq", "verify", "index.json"), "utf8"),
+      ).resolves.toContain('"version": 1');
+      await expect(
+        access(join(repoRoot, ".voratiq", "spec", "sessions")),
+      ).resolves.toBeUndefined();
+    });
+
+    expect(runRunCommandMock).toHaveBeenCalled();
+    expect(runVerifyCommandMock).toHaveBeenCalled();
   });
 
   it("chains --description through spec -> verify(spec) -> run -> verify(run) in order without duplicate stage starts", async () => {
@@ -1322,11 +1515,10 @@ describe("voratiq auto", () => {
 
     runRunCommandMock.mockResolvedValue(buildRunResult(["codex"]));
     mockRunVerifyResolvedValue({
-      // `run-review` remains the persisted rubric template slug for compatibility.
       ...buildVerifyResult({
         verificationId: "verify-789",
         outputPath:
-          ".voratiq/verify/sessions/verify-789/verifier-a/run-review/artifacts/result.json",
+          ".voratiq/verify/sessions/verify-789/verifier-a/run-verification/artifacts/result.json",
         body: [
           "verify-789 FAILED",
           "",
@@ -1344,7 +1536,7 @@ describe("voratiq auto", () => {
           "voratiq apply --run run-123 --agent codex",
           "```",
           "",
-          "Artifact: .voratiq/verify/sessions/verify-789/verifier-a/run-review/artifacts/result.json",
+          "Artifact: .voratiq/verify/sessions/verify-789/verifier-a/run-verification/artifacts/result.json",
           "",
           "---",
           "",
@@ -1358,12 +1550,12 @@ describe("voratiq auto", () => {
         buildVerificationExecution({
           agentId: "verifier-a",
           outputPath:
-            ".voratiq/verify/sessions/verify-789/verifier-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-789/verifier-a/run-verification/artifacts/result.json",
         }),
         buildVerificationExecution({
           agentId: "verifier-b",
           outputPath:
-            ".voratiq/verify/sessions/verify-789/verifier-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-789/verifier-b/run-verification/artifacts/result.json",
           status: "failed",
           error: "verifier violated output contract",
         }),
@@ -1490,6 +1682,67 @@ describe("voratiq auto", () => {
     expect(output).toContain("Auto SUCCEEDED");
   });
 
+  it("surfaces verify warnings and still applies the resolved winner", async () => {
+    const stdout: string[] = [];
+
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockResolvedValue(buildRunResult(["agent-good"]));
+    mockRunVerifyResolvedValue(
+      buildVerifyResult({
+        verificationId: "verify-123",
+        body: "VERIFY BODY",
+        selection: {
+          decision: {
+            state: "resolvable",
+            applyable: true,
+            selectedCanonicalAgentId: "agent-good",
+            unresolvedReasons: [],
+          },
+          warnings: [
+            "No run candidate passed programmatic verification; proceeding with run-verification consensus.",
+          ],
+        },
+      }),
+    );
+    runApplyCommandMock.mockResolvedValue({
+      result: {} as never,
+      body: "APPLY BODY",
+    });
+
+    await withTempRepo(async () => {
+      const result = await runAutoCommand({
+        specPath: ".voratiq/spec/existing.md",
+        verifyAgentIds: ["verifier"],
+        apply: true,
+      });
+
+      expect(result.auto.status).toBe("succeeded");
+      expect(result.apply.status).toBe("succeeded");
+      expect(result.exitCode).toBe(0);
+    });
+
+    expect(runApplyCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-123",
+        agentId: "agent-good",
+        commit: false,
+      }),
+    );
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain(
+      "Warning: No run candidate passed programmatic verification; proceeding with run-verification consensus.",
+    );
+    expect(output).toContain("APPLY BODY");
+    expect(output).toContain("Auto SUCCEEDED");
+  });
+
   it("auto-applies when multiple verifiers unanimously select the same agent", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
@@ -1504,7 +1757,7 @@ describe("voratiq auto", () => {
       ...buildVerifyResult({
         verificationId: "verify-123",
         outputPath:
-          ".voratiq/verify/sessions/verify-123/verifier-a/run-review/artifacts/result.json",
+          ".voratiq/verify/sessions/verify-123/verifier-a/run-verification/artifacts/result.json",
         selection: {
           state: "resolvable",
           applyable: true,
@@ -1516,12 +1769,12 @@ describe("voratiq auto", () => {
         buildVerificationExecution({
           agentId: "verifier-a",
           outputPath:
-            ".voratiq/verify/sessions/verify-123/verifier-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/verifier-a/run-verification/artifacts/result.json",
         }),
         buildVerificationExecution({
           agentId: "verifier-b",
           outputPath:
-            ".voratiq/verify/sessions/verify-123/verifier-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/verifier-b/run-verification/artifacts/result.json",
         }),
       ],
     });
@@ -1576,7 +1829,7 @@ describe("voratiq auto", () => {
       ...buildVerifyResult({
         verificationId: "verify-123",
         outputPath:
-          ".voratiq/verify/sessions/verify-123/verifier-a/run-review/artifacts/result.json",
+          ".voratiq/verify/sessions/verify-123/verifier-a/run-verification/artifacts/result.json",
         body: [
           "VERIFY BODY",
           "",
@@ -1609,12 +1862,12 @@ describe("voratiq auto", () => {
         buildVerificationExecution({
           agentId: "verifier-a",
           outputPath:
-            ".voratiq/verify/sessions/verify-123/verifier-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/verifier-a/run-verification/artifacts/result.json",
         }),
         buildVerificationExecution({
           agentId: "verifier-b",
           outputPath:
-            ".voratiq/verify/sessions/verify-123/verifier-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/verifier-b/run-verification/artifacts/result.json",
         }),
       ],
     });
@@ -1660,7 +1913,7 @@ describe("voratiq auto", () => {
       ...buildVerifyResult({
         verificationId: "verify-999",
         outputPath:
-          ".voratiq/verify/sessions/verify-999/verifier-a/run-review/artifacts/result.json",
+          ".voratiq/verify/sessions/verify-999/verifier-a/run-verification/artifacts/result.json",
         selection: {
           state: "unresolved",
           applyable: false,
@@ -1685,12 +1938,12 @@ describe("voratiq auto", () => {
         buildVerificationExecution({
           agentId: "verifier-a",
           outputPath:
-            ".voratiq/verify/sessions/verify-999/verifier-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-999/verifier-a/run-verification/artifacts/result.json",
         }),
         buildVerificationExecution({
           agentId: "verifier-b",
           outputPath:
-            ".voratiq/verify/sessions/verify-999/verifier-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-999/verifier-b/run-verification/artifacts/result.json",
         }),
       ],
     });
@@ -1730,7 +1983,7 @@ describe("voratiq auto", () => {
       ...buildVerifyResult({
         verificationId: "verify-321",
         outputPath:
-          ".voratiq/verify/sessions/verify-321/verifier-a/run-review/artifacts/result.json",
+          ".voratiq/verify/sessions/verify-321/verifier-a/run-verification/artifacts/result.json",
         body: [
           "VERIFY BODY",
           "",
@@ -1763,12 +2016,12 @@ describe("voratiq auto", () => {
         buildVerificationExecution({
           agentId: "verifier-a",
           outputPath:
-            ".voratiq/verify/sessions/verify-321/verifier-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-321/verifier-a/run-verification/artifacts/result.json",
         }),
         buildVerificationExecution({
           agentId: "verifier-b",
           outputPath:
-            ".voratiq/verify/sessions/verify-321/verifier-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-321/verifier-b/run-verification/artifacts/result.json",
         }),
       ],
     });
@@ -2202,12 +2455,22 @@ function buildVerifyResult(
     agentId?: string;
     outputPath?: string;
     body?: string;
-    selection?: {
-      state: "resolvable" | "unresolved";
-      applyable: boolean;
-      selectedCanonicalAgentId?: string;
-      unresolvedReasons: readonly unknown[];
-    };
+    selection?:
+      | {
+          state: "resolvable" | "unresolved";
+          applyable: boolean;
+          selectedCanonicalAgentId?: string;
+          unresolvedReasons: readonly unknown[];
+        }
+      | {
+          decision: {
+            state: "resolvable" | "unresolved";
+            applyable: boolean;
+            selectedCanonicalAgentId?: string;
+            unresolvedReasons: readonly unknown[];
+          };
+          warnings?: readonly string[];
+        };
   } = {},
 ) {
   const verificationId = options.verificationId ?? "verify-123";
@@ -2234,7 +2497,7 @@ function buildVerificationExecution(
     agentId: overrides.agentId ?? "verifier",
     outputPath:
       overrides.outputPath ??
-      ".voratiq/verify/sessions/verify-123/verifier/run-review/artifacts/result.json",
+      ".voratiq/verify/sessions/verify-123/verifier/run-verification/artifacts/result.json",
     status: overrides.status ?? ("succeeded" as const),
     missingArtifacts: [],
     tokenUsageResult: {
@@ -2253,12 +2516,42 @@ async function withTempRepo<T>(
   const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-auto-"));
   const originalCwd = process.cwd();
   try {
+    await mkdir(join(repoRoot, ".git"), { recursive: true });
+    await createWorkspace(repoRoot);
     process.chdir(repoRoot);
     return await fn(repoRoot);
   } finally {
     process.chdir(originalCwd);
     await rm(repoRoot, { recursive: true, force: true });
   }
+}
+
+async function withTempGitRepo<T>(
+  fn: (repoRoot: string) => Promise<T>,
+): Promise<T> {
+  const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-auto-git-"));
+  const originalCwd = process.cwd();
+  try {
+    await mkdir(join(repoRoot, ".git"), { recursive: true });
+    process.chdir(repoRoot);
+    return await fn(repoRoot);
+  } finally {
+    process.chdir(originalCwd);
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+}
+
+async function rewriteVerificationConfig(
+  repoRoot: string,
+  mutate: (content: string) => string,
+): Promise<void> {
+  const verificationConfigPath = join(
+    repoRoot,
+    ".voratiq",
+    "verification.yaml",
+  );
+  const original = await readFile(verificationConfigPath, "utf8");
+  await writeFile(verificationConfigPath, mutate(original), "utf8");
 }
 
 function writeVerificationSelection(

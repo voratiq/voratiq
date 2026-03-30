@@ -20,7 +20,6 @@ import {
 import { resolvePath } from "../utils/path.js";
 import { resolveCanonicalAgentId } from "./resolution.js";
 import {
-  buildResolvableSelectionDecision,
   buildUnresolvedSelectionDecision,
   type SelectionDecision,
 } from "./result.js";
@@ -68,11 +67,22 @@ export interface VerificationSelectionProgrammaticCandidateInput {
   passing: boolean;
 }
 
+export interface StageVerificationUnanimityWinnerPolicy {
+  mode: "stage-verification-unanimity";
+}
+
+export type VerificationWinnerPolicy = StageVerificationUnanimityWinnerPolicy;
+
+export const DEFAULT_VERIFICATION_WINNER_POLICY: VerificationWinnerPolicy = {
+  mode: "stage-verification-unanimity",
+};
+
 export interface VerificationSelectionInput {
   sessionId: string;
   target: VerificationTarget;
   canonicalCandidateIds: readonly string[];
   blindedAliasMap?: NonNullable<VerificationRecord["blinded"]>["aliasMap"];
+  winnerPolicy?: VerificationWinnerPolicy;
   verifiers: readonly VerifierSelectionReviewerInput[];
   programmatic?: {
     candidates: readonly VerificationSelectionProgrammaticCandidateInput[];
@@ -82,6 +92,7 @@ export interface VerificationSelectionInput {
 export interface VerificationSelectionPolicyOutput {
   input: VerificationSelectionInput;
   decision: SelectionDecision;
+  warnings?: readonly string[];
 }
 
 export async function loadVerificationPolicyInput(options: {
@@ -149,10 +160,15 @@ export async function loadVerificationSelectionInput(options: {
   root: string;
   record: VerificationRecord;
   canonicalCandidateIds?: readonly string[];
+  winnerPolicy?: VerificationWinnerPolicy;
 }): Promise<VerificationSelectionInput> {
   const { record } = options;
   const policyInput = await loadVerificationPolicyInput(options);
-  const verifiers = buildVerificationSelectionVerifiers(policyInput);
+  const winnerPolicy = resolveVerificationWinnerPolicy(options.winnerPolicy);
+  const verifiers = buildVerificationSelectionVerifiers({
+    policyInput,
+    winnerPolicy,
+  });
   const canonicalCandidateIds = resolveCanonicalCandidateIds({
     record,
     providedCanonicalCandidateIds: options.canonicalCandidateIds,
@@ -167,6 +183,7 @@ export async function loadVerificationSelectionInput(options: {
     ...(policyInput.blinded?.aliasMap
       ? { blindedAliasMap: policyInput.blinded.aliasMap }
       : {}),
+    winnerPolicy,
     verifiers: verifiers.map((verifier) =>
       verifier.status === "failed"
         ? verifier
@@ -202,66 +219,34 @@ export async function loadVerificationSelectionPolicyOutput(options: {
   root: string;
   record: VerificationRecord;
   canonicalCandidateIds?: readonly string[];
+  winnerPolicy?: VerificationWinnerPolicy;
 }): Promise<VerificationSelectionPolicyOutput> {
   const input = await loadVerificationSelectionInput(options);
+  const decision = deriveVerificationSelectionDecision(input);
+  const warnings = describeVerificationSelectionWarnings({ input, decision });
   return {
     input,
-    decision: deriveVerificationSelectionDecision(input),
+    decision,
+    ...(warnings.length > 0 ? { warnings } : {}),
   };
 }
 
 export function deriveVerificationSelectionDecision(
   input: VerificationSelectionInput,
 ): SelectionDecision {
-  const eligibleCanonicalAgentIds = resolveEligibleCanonicalAgentIds(input);
-
-  if (input.programmatic && eligibleCanonicalAgentIds.length === 0) {
-    return buildUnresolvedSelectionDecision([
-      {
-        code: "no_programmatic_candidates_passed",
-        candidateIds: [...input.canonicalCandidateIds],
-      },
-    ]);
-  }
+  const winnerPolicy = resolveVerificationWinnerPolicy(input.winnerPolicy);
 
   if (input.verifiers.length > 0) {
-    const rubricDecision = deriveVerifierSelectionDecision({
-      canonicalAgentIds: input.canonicalCandidateIds,
+    const rubricDecision = deriveVerificationWinnerDecision({
+      winnerPolicy,
+      canonicalCandidateIds: input.canonicalCandidateIds,
       verifiers: input.verifiers,
     });
     if (rubricDecision.state === "unresolved") {
       return rubricDecision;
     }
 
-    if (
-      input.programmatic &&
-      !eligibleCanonicalAgentIds.includes(
-        rubricDecision.selectedCanonicalAgentId,
-      )
-    ) {
-      return buildUnresolvedSelectionDecision([
-        {
-          code: "selected_candidate_failed_programmatic",
-          selectedCanonicalAgentId: rubricDecision.selectedCanonicalAgentId,
-          eligibleCanonicalAgentIds,
-        },
-      ]);
-    }
-
     return rubricDecision;
-  }
-
-  if (eligibleCanonicalAgentIds.length === 1) {
-    return buildResolvableSelectionDecision(eligibleCanonicalAgentIds[0] ?? "");
-  }
-
-  if (eligibleCanonicalAgentIds.length > 1) {
-    return buildUnresolvedSelectionDecision([
-      {
-        code: "multiple_programmatic_candidates_passed",
-        eligibleCanonicalAgentIds,
-      },
-    ]);
   }
 
   return buildUnresolvedSelectionDecision([
@@ -270,6 +255,38 @@ export function deriveVerificationSelectionDecision(
       failedVerifierAgentIds: [],
     },
   ]);
+}
+
+function describeVerificationSelectionWarnings(options: {
+  input: VerificationSelectionInput;
+  decision: SelectionDecision;
+}): string[] {
+  const { input, decision } = options;
+
+  if (
+    input.target.kind !== "run" ||
+    input.verifiers.length === 0 ||
+    !input.programmatic ||
+    decision.state !== "resolvable"
+  ) {
+    return [];
+  }
+
+  const eligibleCanonicalAgentIds = resolveEligibleCanonicalAgentIds(input);
+
+  if (eligibleCanonicalAgentIds.length === 0) {
+    return [
+      "No run candidate passed programmatic verification; proceeding with run-verification consensus.",
+    ];
+  }
+
+  if (!eligibleCanonicalAgentIds.includes(decision.selectedCanonicalAgentId)) {
+    return [
+      "Selected run-verification winner failed programmatic verification; proceeding with run-verification consensus.",
+    ];
+  }
+
+  return [];
 }
 
 export function buildVerificationSelectorSource(
@@ -343,10 +360,13 @@ async function readArtifactJson(options: {
   return parsed;
 }
 
-function buildVerificationSelectionVerifiers(
-  policyInput: VerificationPolicyInput,
-): VerifierSelectionReviewerInput[] {
-  return policyInput.rubrics.map((rubric) => {
+function buildVerificationSelectionVerifiers(options: {
+  policyInput: VerificationPolicyInput;
+  winnerPolicy: VerificationWinnerPolicy;
+}): VerifierSelectionReviewerInput[] {
+  const participatingRubrics = resolveWinnerPolicyParticipatingRubrics(options);
+
+  return participatingRubrics.map((rubric) => {
     if (rubric.status !== "succeeded") {
       return {
         verifierAgentId: rubric.verifierId,
@@ -364,6 +384,55 @@ function buildVerificationSelectionVerifiers(
       ...(preferredCandidateId ? { preferredCandidateId } : {}),
     };
   });
+}
+
+function resolveVerificationWinnerPolicy(
+  winnerPolicy: VerificationWinnerPolicy | undefined,
+): VerificationWinnerPolicy {
+  return winnerPolicy ?? DEFAULT_VERIFICATION_WINNER_POLICY;
+}
+
+function deriveVerificationWinnerDecision(options: {
+  winnerPolicy: VerificationWinnerPolicy;
+  canonicalCandidateIds: readonly string[];
+  verifiers: readonly VerifierSelectionReviewerInput[];
+}): SelectionDecision {
+  switch (options.winnerPolicy.mode) {
+    case "stage-verification-unanimity":
+      return deriveVerifierSelectionDecision({
+        canonicalAgentIds: options.canonicalCandidateIds,
+        verifiers: options.verifiers,
+      });
+  }
+}
+
+function resolveWinnerPolicyParticipatingRubrics(options: {
+  policyInput: VerificationPolicyInput;
+  winnerPolicy: VerificationWinnerPolicy;
+}): VerificationPolicyRubricInput[] {
+  const { policyInput, winnerPolicy } = options;
+  switch (winnerPolicy.mode) {
+    case "stage-verification-unanimity": {
+      const stageVerificationTemplate =
+        resolveStageVerificationTemplateForTarget(policyInput.target);
+      return policyInput.rubrics.filter(
+        (rubric) => rubric.template === stageVerificationTemplate,
+      );
+    }
+  }
+}
+
+function resolveStageVerificationTemplateForTarget(
+  target: VerificationTarget,
+): "spec-verification" | "run-verification" | "reduce-verification" {
+  switch (target.kind) {
+    case "spec":
+      return "spec-verification";
+    case "run":
+      return "run-verification";
+    case "reduce":
+      return "reduce-verification";
+  }
 }
 
 function resolveCanonicalCandidateIds(options: {

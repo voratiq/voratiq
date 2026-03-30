@@ -54,6 +54,7 @@ async function seedVerificationSurface(
   options: {
     verificationConfigPath?: string;
     configExists?: boolean;
+    restoreTemplates?: boolean;
   } = {},
 ): Promise<{ createdDirectories: string[]; createdFiles: string[] }> {
   const createdDirectories: string[] = [];
@@ -70,6 +71,10 @@ async function seedVerificationSurface(
     const seededConfig = await buildSeededVerificationConfig(root);
     await writeFile(verificationConfigPath, seededConfig, { encoding: "utf8" });
     createdFiles.push(relativeToRoot(root, verificationConfigPath));
+  }
+
+  if (options.restoreTemplates === false) {
+    return { createdDirectories, createdFiles };
   }
 
   const templatesRoot = resolveWorkspacePath(
@@ -268,6 +273,9 @@ export async function createWorkspace(
 
 export async function repairWorkspaceStructure(
   root: string,
+  options: {
+    restoreShippedVerificationTemplates?: boolean;
+  } = {},
 ): Promise<RepairWorkspaceStructureResult> {
   const createdDirectories: string[] = [];
   const createdFiles: string[] = [];
@@ -291,7 +299,9 @@ export async function repairWorkspaceStructure(
     await ensureWorkspaceFileEntry(root, configPath);
   }
 
-  const seededVerification = await seedVerificationSurface(root);
+  const seededVerification = await seedVerificationSurface(root, {
+    restoreTemplates: options.restoreShippedVerificationTemplates ?? true,
+  });
   createdDirectories.push(...seededVerification.createdDirectories);
   createdFiles.push(...seededVerification.createdFiles);
 

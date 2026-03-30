@@ -62,12 +62,17 @@ export type WorkspaceAutoInitMode = "never" | "when-missing";
 export interface ResolveCliContextOptions {
   requireWorkspace?: boolean;
   workspaceAutoInitMode?: WorkspaceAutoInitMode;
+  restoreShippedVerificationTemplates?: boolean;
 }
 
 export async function resolveCliContext(
   options: ResolveCliContextOptions = {},
 ): Promise<CliContext> {
-  const { requireWorkspace = true, workspaceAutoInitMode = "never" } = options;
+  const {
+    requireWorkspace = true,
+    workspaceAutoInitMode = "never",
+    restoreShippedVerificationTemplates = true,
+  } = options;
   const root = process.cwd();
 
   await assertGitRepository(root);
@@ -92,7 +97,9 @@ export async function resolveCliContext(
     }
 
     if (!workspaceMissing) {
-      const repairResult = await repairWorkspaceStructure(root);
+      const repairResult = await repairWorkspaceStructure(root, {
+        restoreShippedVerificationTemplates,
+      });
       workspaceAutoRepaired = repairResult.repaired;
     }
 

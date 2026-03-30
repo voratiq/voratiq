@@ -6,7 +6,7 @@ describe("buildRubricPrompt", () => {
   it("includes sandbox/headless constraints for verifier workspaces", () => {
     const prompt = buildRubricPrompt({
       template: {
-        template: "run-review",
+        template: "run-verification",
         prompt: "Review the candidate outputs.",
         rubric: "Rank the candidates.",
         schema: "type: object",

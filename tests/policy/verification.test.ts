@@ -22,7 +22,7 @@ describe("verification policy handoff", () => {
     const programmaticArtifactPath =
       ".voratiq/verify/sessions/verify-1/programmatic/artifacts/result.json";
     const rubricArtifactPath =
-      ".voratiq/verify/sessions/verify-1/reviewer-a/run-review/artifacts/result.json";
+      ".voratiq/verify/sessions/verify-1/reviewer-a/run-verification/artifacts/result.json";
 
     await mkdir(dirname(join(root, programmaticArtifactPath)), {
       recursive: true,
@@ -62,7 +62,7 @@ describe("verification policy handoff", () => {
       JSON.stringify(
         {
           method: "rubric",
-          template: "run-review",
+          template: "run-verification",
           verifierId: "reviewer-a",
           generatedAt: "2026-03-19T20:00:05.000Z",
           status: "succeeded",
@@ -114,7 +114,7 @@ describe("verification policy handoff", () => {
           },
           {
             method: "rubric",
-            template: "run-review",
+            template: "run-verification",
             verifierId: "reviewer-a",
             scope: { kind: "run" },
             status: "succeeded",
@@ -157,7 +157,7 @@ describe("verification policy handoff", () => {
       rubrics: [
         {
           artifactPath: rubricArtifactPath,
-          template: "run-review",
+          template: "run-verification",
           verifierId: "reviewer-a",
           status: "succeeded",
           result: {
@@ -177,7 +177,7 @@ describe("verification policy handoff", () => {
 
   it("rejects blinded rubric artifacts whose selectors do not match the persisted alias map", async () => {
     const rubricArtifactPath =
-      ".voratiq/verify/sessions/verify-1/reviewer-a/run-review/artifacts/result.json";
+      ".voratiq/verify/sessions/verify-1/reviewer-a/run-verification/artifacts/result.json";
 
     await mkdir(dirname(join(root, rubricArtifactPath)), { recursive: true });
     await writeFile(
@@ -185,7 +185,7 @@ describe("verification policy handoff", () => {
       JSON.stringify(
         {
           method: "rubric",
-          template: "run-review",
+          template: "run-verification",
           verifierId: "reviewer-a",
           generatedAt: "2026-03-19T20:00:05.000Z",
           status: "succeeded",
@@ -225,7 +225,7 @@ describe("verification policy handoff", () => {
           methods: [
             {
               method: "rubric",
-              template: "run-review",
+              template: "run-verification",
               verifierId: "reviewer-a",
               scope: { kind: "run" },
               status: "succeeded",

@@ -52,12 +52,12 @@ describe("verification persistence", () => {
         },
         {
           method: "rubric" as const,
-          template: "run-review",
+          template: "run-verification",
           verifierId: "reviewer-a",
           scope: { kind: "run" as const },
           status: "succeeded" as const,
           artifactPath:
-            ".voratiq/verify/sessions/verify-20260319-abc123/reviewer-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-20260319-abc123/reviewer-a/run-verification/artifacts/result.json",
           startedAt: "2026-03-19T20:00:03.000Z",
           completedAt: "2026-03-19T20:00:05.000Z",
         },

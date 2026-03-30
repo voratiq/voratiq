@@ -171,17 +171,24 @@ export async function runVerifyCommand(
     }),
   );
 
-  let selectionWarning: string | undefined;
+  let selectionPolicyWarning: string | undefined;
   const selection = await loadVerificationSelectionPolicyOutput({
     root,
     record: execution.record,
   }).catch((error: unknown) => {
-    selectionWarning = [
+    selectionPolicyWarning = [
       "Warning: failed to load verification selection policy output; apply hint unavailable.",
       toErrorMessage(error),
     ].join("\n");
     return undefined;
   });
+  const selectionWarnings = (selection?.warnings ?? []).map(
+    (warning) => `Warning: ${warning}`,
+  );
+  const warningMessage = [
+    ...selectionWarnings,
+    ...(selectionPolicyWarning ? [selectionPolicyWarning] : []),
+  ].join("\n");
   const recommendedRunAgent =
     execution.record.target.kind === "run" &&
     selection !== undefined &&
@@ -190,7 +197,10 @@ export async function runVerifyCommand(
       : undefined;
 
   const hintMessage =
-    suppressHint || selectionWarning || execution.record.target.kind !== "run"
+    suppressHint ||
+    selectionPolicyWarning ||
+    execution.record.target.kind !== "run" ||
+    execution.record.status !== "succeeded"
       ? undefined
       : `To apply a solution:\n  voratiq apply --run ${execution.record.target.sessionId} --agent ${recommendedRunAgent ?? "<agent-id>"}`;
 
@@ -229,7 +239,7 @@ export async function runVerifyCommand(
     status: execution.record.status,
     methods: methodBlocks,
     suppressHint,
-    warningMessage: selectionWarning,
+    ...(warningMessage ? { warningMessage } : {}),
     hintMessage,
     isTty,
     includeSummarySection: !isTty,
@@ -247,7 +257,7 @@ export async function runVerifyCommand(
       ? { selectedSpecPath: execution.record.target.specPath }
       : {}),
     selection,
-    ...(selectionWarning ? { warningMessage: selectionWarning } : {}),
+    ...(warningMessage ? { warningMessage } : {}),
   };
 }
 

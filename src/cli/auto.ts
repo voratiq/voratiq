@@ -5,6 +5,11 @@ import {
   type AutoCommandEvent,
   executeAutoCommand,
 } from "../commands/auto/command.js";
+import {
+  validateAutoCommandOptions,
+  validateAutoVerificationConfig,
+} from "../commands/auto/validation.js";
+import { loadVerificationConfig } from "../configs/verification/loader.js";
 import type {
   AutoApplyStatus,
   AutoTerminalStatus,
@@ -13,6 +18,7 @@ import type {
 import { rewriteRunRecord } from "../domain/run/persistence/adapter.js";
 import { resolveCliContext } from "../preflight/index.js";
 import { renderAutoSummaryTranscript } from "../render/transcripts/auto.js";
+import { renderWorkspaceAutoInitializedNotice } from "../render/transcripts/shared.js";
 import { renderCliError } from "../render/utils/errors.js";
 import { HintedError } from "../utils/errors.js";
 import { formatAlertMessage } from "../utils/output.js";
@@ -80,6 +86,14 @@ function replayAutoCommandEvent(event: AutoCommandEvent): void {
     return;
   }
 
+  if (event.kind === "warning") {
+    const warningBody = formatAlertMessage("Warning", "yellow", event.detail);
+    writeCommandOutput({
+      body: event.separateWithDivider ? `---\n\n${warningBody}` : warningBody,
+    });
+    return;
+  }
+
   if (event.kind === "error") {
     writeCommandOutput({ body: renderCliError(toCliError(event.error)) });
     return;
@@ -126,7 +140,31 @@ export async function runAutoCommand(
   options: AutoCommandOptions,
   runtime: AutoRuntimeOptions = {},
 ): Promise<AutoCommandResult> {
+  validateAutoCommandOptions(options);
   const now = runtime.now ?? Date.now.bind(Date);
+  const { root, workspaceAutoInitialized } = await resolveCliContext({
+    workspaceAutoInitMode: "when-missing",
+    restoreShippedVerificationTemplates: false,
+  });
+  const workspaceNotice = workspaceAutoInitialized
+    ? renderWorkspaceAutoInitializedNotice()
+    : undefined;
+  if (workspaceNotice) {
+    writeCommandOutput({
+      alerts: [{ severity: "info", message: workspaceNotice }],
+      leadingNewline: false,
+    });
+  }
+  const verificationConfig = loadVerificationConfig({ root });
+  await validateAutoVerificationConfig({
+    root,
+    command: {
+      description: options.description,
+      specPath: options.specPath,
+    },
+    verificationConfig,
+  });
+
   const chainedOutput = beginChainedCommandOutput();
 
   try {
@@ -189,6 +227,7 @@ export async function runAutoCommand(
           exitCode: result.exitCode,
           selectedSpecPath: result.selectedSpecPath,
           selection: result.selection?.decision,
+          selectionWarnings: result.selection?.warnings,
         })),
       runApplyStage: async (input) =>
         runApplyCommand({
