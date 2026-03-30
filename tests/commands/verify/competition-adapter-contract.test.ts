@@ -33,7 +33,7 @@ function sleep(ms: number): Promise<void> {
 
 const environment: EnvironmentConfig = {};
 const template: RubricTemplateContents = {
-  template: "reduce-review",
+  template: "reduce-verification",
   prompt: "prompt",
   rubric: "rubric",
   schema: "schema: value",

@@ -1,7 +1,6 @@
 export {
   type AutoVerificationSelectionActionRequired,
   type AutoVerificationSelectionDisposition,
-  type AutoVerificationSelectionNonBlocking,
   type AutoVerificationSelectionProceed,
   classifyAutoVerificationSelection,
 } from "./auto.js";
@@ -22,10 +21,12 @@ export {
 } from "./selector.js";
 export {
   buildVerificationSelectorSource,
+  DEFAULT_VERIFICATION_WINNER_POLICY,
   deriveVerificationSelectionDecision,
   loadVerificationPolicyInput,
   loadVerificationSelectionInput,
   loadVerificationSelectionPolicyOutput,
+  type StageVerificationUnanimityWinnerPolicy,
   type VerificationPolicyInput,
   type VerificationPolicyProgrammaticCandidateInput,
   type VerificationPolicyProgrammaticInput,
@@ -33,6 +34,7 @@ export {
   type VerificationSelectionInput,
   type VerificationSelectionPolicyOutput,
   type VerificationSelectionProgrammaticCandidateInput,
+  type VerificationWinnerPolicy,
 } from "./verification.js";
 export {
   deriveVerifierSelectionDecision,

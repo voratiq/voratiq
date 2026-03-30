@@ -235,61 +235,6 @@ describe("executeApplyCommand", () => {
     }
   });
 
-  it("resolves aliases when the winner came from programmatic-only verification", async () => {
-    const repoRoot = await mkdtemp(
-      join(tmpdir(), "voratiq-apply-programmatic-alias-"),
-    );
-    try {
-      await initGitRepository(repoRoot);
-      await createWorkspace(repoRoot);
-
-      const { baseRevisionSha, diffContent, diffStatistics } =
-        await createDiffFixture({
-          repoRoot,
-          original: "console.log('hello');\n",
-          updated: "console.log('hello programmatic apply');\n",
-        });
-
-      const runId = "run-programmatic-alias";
-      const agentId = "claude";
-      await writeRunRecord({
-        repoRoot,
-        runId,
-        agentId,
-        baseRevisionSha,
-        diffContent,
-        diffStatistics,
-      });
-
-      const alias = "v_prog000000";
-      await writeProgrammaticVerificationRecord({
-        repoRoot,
-        verificationId: "verify-programmatic-alias",
-        runId,
-        aliasMap: { [alias]: agentId },
-        passingCandidateIds: [agentId],
-      });
-
-      const result = await executeApplyCommand({
-        root: repoRoot,
-        runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
-        verificationsFilePath: join(
-          repoRoot,
-          ".voratiq",
-          "verify",
-          "index.json",
-        ),
-        runId,
-        agentId: alias,
-        ignoreBaseMismatch: false,
-      });
-
-      expect(result.agent.agentId).toBe(agentId);
-    } finally {
-      await rm(repoRoot, { recursive: true, force: true });
-    }
-  });
-
   it("fails with valid canonical ids and aliases when selector is unresolved", async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), "voratiq-apply-unresolved-"));
     try {
@@ -1299,7 +1244,7 @@ async function writeVerificationRecord(options: {
   if (!resolvedPreferredSelector) {
     throw new Error("Expected at least one alias");
   }
-  const artifactPath = `.voratiq/verify/sessions/${verificationId}/reviewer/run-review/artifacts/result.json`;
+  const artifactPath = `.voratiq/verify/sessions/${verificationId}/reviewer/run-verification/artifacts/result.json`;
   await mkdir(
     join(
       repoRoot,
@@ -1308,7 +1253,7 @@ async function writeVerificationRecord(options: {
       "sessions",
       verificationId,
       "reviewer",
-      "run-review",
+      "run-verification",
       "artifacts",
     ),
     {
@@ -1321,7 +1266,7 @@ async function writeVerificationRecord(options: {
       corruptArtifact
         ? {
             method: "rubric",
-            template: "spec-review",
+            template: "spec-verification",
             verifierId: "reviewer",
             generatedAt: now,
             status: "succeeded",
@@ -1329,7 +1274,7 @@ async function writeVerificationRecord(options: {
           }
         : {
             method: "rubric",
-            template: "run-review",
+            template: "run-verification",
             verifierId: "reviewer",
             generatedAt: now,
             status: "succeeded",
@@ -1361,104 +1306,8 @@ async function writeVerificationRecord(options: {
       methods: [
         {
           method: "rubric",
-          template: "run-review",
+          template: "run-verification",
           verifierId: "reviewer",
-          scope: { kind: "run" },
-          status: "succeeded",
-          startedAt: now,
-          completedAt: now,
-          artifactPath,
-        },
-      ],
-      blinded: {
-        enabled: true,
-        aliasMap,
-      },
-    },
-  });
-}
-
-async function writeProgrammaticVerificationRecord(options: {
-  repoRoot: string;
-  verificationId: string;
-  runId: string;
-  aliasMap: Record<string, string>;
-  passingCandidateIds: readonly string[];
-}): Promise<void> {
-  const { repoRoot, verificationId, runId, aliasMap, passingCandidateIds } =
-    options;
-  const now = new Date().toISOString();
-  const verificationsFilePath = join(
-    repoRoot,
-    ".voratiq",
-    "verify",
-    "index.json",
-  );
-  const artifactPath = `.voratiq/verify/sessions/${verificationId}/programmatic/artifacts/result.json`;
-  await mkdir(
-    join(
-      repoRoot,
-      ".voratiq",
-      "verify",
-      "sessions",
-      verificationId,
-      "programmatic",
-      "artifacts",
-    ),
-    {
-      recursive: true,
-    },
-  );
-  await writeFile(
-    join(repoRoot, artifactPath),
-    JSON.stringify(
-      {
-        method: "programmatic",
-        generatedAt: now,
-        status: "succeeded",
-        target: {
-          kind: "run",
-          sessionId: runId,
-          candidateIds: Array.from(new Set(Object.values(aliasMap))).sort(),
-        },
-        scope: "run",
-        candidates: Array.from(new Set(Object.values(aliasMap)))
-          .sort()
-          .map((candidateId) => ({
-            candidateId,
-            results: [
-              {
-                slug: "tests",
-                status: passingCandidateIds.includes(candidateId)
-                  ? "succeeded"
-                  : "failed",
-              },
-            ],
-          })),
-      },
-      null,
-      2,
-    ),
-    "utf8",
-  );
-  await appendVerificationRecord({
-    root: repoRoot,
-    verificationsFilePath,
-    record: {
-      sessionId: verificationId,
-      createdAt: now,
-      startedAt: now,
-      completedAt: now,
-      status: "succeeded",
-      target: {
-        kind: "run",
-        sessionId: runId,
-        candidateIds: Array.from(new Set(Object.values(aliasMap))).sort(),
-      },
-      methods: [
-        {
-          method: "programmatic",
-          slug: "programmatic",
           scope: { kind: "run" },
           status: "succeeded",
           startedAt: now,

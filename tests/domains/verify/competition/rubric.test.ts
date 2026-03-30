@@ -47,7 +47,7 @@ jest.mock("../../../../src/workspace/chat/native-usage.js", () => ({
 
 const verificationConfig: VerificationConfig = {
   spec: { rubric: [] },
-  run: { programmatic: [], rubric: [{ template: "run-review" }] },
+  run: { programmatic: [], rubric: [{ template: "run-verification" }] },
   reduce: { rubric: [] },
 };
 
@@ -91,7 +91,7 @@ describe("executeAndPersistRubricMethods", () => {
         ".voratiq",
         "verify",
         "templates",
-        "run-review",
+        "run-verification",
       );
       await mkdir(templateDir, { recursive: true });
       await writeFile(join(templateDir, "prompt.md"), "Evaluate outcomes.\n");
@@ -208,7 +208,7 @@ describe("executeAndPersistRubricMethods", () => {
         expect.objectContaining({
           method: "rubric",
           verifierId: verifierAgent.id,
-          template: "run-review",
+          template: "run-verification",
           status: "succeeded",
         }),
       ]);
@@ -240,7 +240,7 @@ describe("executeAndPersistRubricMethods", () => {
         ".voratiq",
         "verify",
         "templates",
-        "run-review",
+        "run-verification",
       );
       await mkdir(templateDir, { recursive: true });
       await writeFile(join(templateDir, "prompt.md"), "Evaluate outcomes.\n");
@@ -324,7 +324,7 @@ describe("executeAndPersistRubricMethods", () => {
         expect.objectContaining({
           method: "rubric",
           verifierId: verifierAgent.id,
-          template: "run-review",
+          template: "run-verification",
           status: "succeeded",
         }),
       ]);

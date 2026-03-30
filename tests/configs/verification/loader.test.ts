@@ -8,31 +8,41 @@ run:
   programmatic:
     lint: npm run lint
   rubric:
-    - template: run-review
+    - template: run-verification
 `);
 
     expect(config.run.programmatic).toEqual([
       { slug: "lint", command: "npm run lint" },
     ]);
-    expect(config.run.rubric).toEqual([{ template: "run-review" }]);
+    expect(config.run.rubric).toEqual([{ template: "run-verification" }]);
+  });
+
+  it("accepts non-legacy custom rubric templates", () => {
+    const config = readVerificationConfig(`
+run:
+  rubric:
+    - template: failure-modes
+`);
+
+    expect(config.run.rubric).toEqual([{ template: "failure-modes" }]);
   });
 
   it("accepts rubric entries without scope", () => {
     const config = readVerificationConfig(`
 spec:
   rubric:
-    - template: spec-review
+    - template: spec-verification
 run:
   rubric:
-    - template: run-review
+    - template: run-verification
 reduce:
   rubric:
-    - template: reduce-review
+    - template: reduce-verification
 `);
 
-    expect(config.spec.rubric).toEqual([{ template: "spec-review" }]);
-    expect(config.run.rubric).toEqual([{ template: "run-review" }]);
-    expect(config.reduce.rubric).toEqual([{ template: "reduce-review" }]);
+    expect(config.spec.rubric).toEqual([{ template: "spec-verification" }]);
+    expect(config.run.rubric).toEqual([{ template: "run-verification" }]);
+    expect(config.reduce.rubric).toEqual([{ template: "reduce-verification" }]);
   });
 
   it("rejects rubric scope because it is no longer a supported config field", () => {
@@ -40,7 +50,7 @@ reduce:
       readVerificationConfig(`
 run:
   rubric:
-    - template: run-review
+    - template: run-verification
       scope: candidate
 `),
     ).toThrow(VerificationConfigError);

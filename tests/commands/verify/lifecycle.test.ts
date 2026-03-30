@@ -107,7 +107,7 @@ describe("verify lifecycle", () => {
         },
         {
           method: "rubric",
-          template: "run-review",
+          template: "run-verification",
           verifierId: "verifier-a",
           scope: { kind: "run" },
           status: "running",
@@ -115,12 +115,12 @@ describe("verify lifecycle", () => {
         },
         {
           method: "rubric",
-          template: "run-review",
+          template: "run-verification",
           verifierId: "verifier-b",
           scope: { kind: "run" },
           status: "succeeded",
           artifactPath:
-            ".voratiq/verify/sessions/verify-123/verifier-b/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/verifier-b/run-verification/artifacts/result.json",
           startedAt: "2026-01-01T00:00:07.000Z",
           completedAt: "2026-01-01T00:00:30.000Z",
           error: null,
@@ -169,7 +169,7 @@ describe("verify lifecycle", () => {
           verifierId: "verifier-a",
           status: "aborted",
           artifactPath:
-            ".voratiq/verify/sessions/verify-123/verifier-a/run-review/artifacts/result.json",
+            ".voratiq/verify/sessions/verify-123/verifier-a/run-verification/artifacts/result.json",
           error: VERIFY_ABORT_DETAIL,
           completedAt: expect.any(String),
         }),
@@ -203,7 +203,7 @@ describe("verify lifecycle", () => {
       "sessions",
       VERIFICATION_ID,
       "verifier",
-      "run-review",
+      "run-verification",
     );
     const workspacePath = join(agentRoot, "workspace");
     const artifactsPath = join(agentRoot, "artifacts");

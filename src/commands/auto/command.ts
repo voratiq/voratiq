@@ -9,6 +9,7 @@ import type {
 import { classifyAutoVerificationSelection } from "../../policy/index.js";
 import { mapRunStatusToExitCode, type RunStatus } from "../../status/index.js";
 import { HintedError, toErrorMessage } from "../../utils/errors.js";
+import { validateAutoCommandOptions } from "./validation.js";
 
 export interface ExecuteAutoCommandInput {
   specPath?: string;
@@ -85,6 +86,7 @@ export interface AutoVerifyStageResult {
   exitCode?: number;
   selectedSpecPath?: string;
   selection?: SelectionDecision;
+  selectionWarnings?: readonly string[];
 }
 
 export interface AutoApplyStageInput {
@@ -104,6 +106,11 @@ export type AutoCommandEvent =
       body: string;
       stderr?: string;
       exitCode?: number;
+    }
+  | {
+      kind: "warning";
+      detail: string;
+      separateWithDivider: boolean;
     }
   | {
       kind: "error";
@@ -421,6 +428,15 @@ export async function executeAutoCommand(
         exitCode: verifyResult.exitCode,
       });
 
+      for (const warning of verifyResult.selectionWarnings ?? []) {
+        verifyDetail = warning;
+        recordEvent({
+          kind: "warning",
+          detail: warning,
+          separateWithDivider: bodyOutputEmitted,
+        });
+      }
+
       if (verifySelection?.state === "unresolved") {
         const verifySelectionDisposition = classifyAutoVerificationSelection({
           targetKind: "run",
@@ -462,15 +478,12 @@ export async function executeAutoCommand(
         );
       }
 
-      const verifySelectionDisposition = classifyAutoVerificationSelection({
+      classifyAutoVerificationSelection({
         targetKind: "run",
         selection: verifySelection,
       });
 
-      if (verifySelectionDisposition.kind === "non_blocking") {
-        applyStatus = "skipped";
-        applyDetail = verifySelectionDisposition.applyDetail;
-      } else if (verifySelection.state !== "resolvable") {
+      if (verifySelection.state !== "resolvable") {
         throw new HintedError(
           "Verify stage did not return a resolvable selection.",
           {
@@ -589,26 +602,7 @@ export async function executeAutoCommand(
 }
 
 function assertAutoOptionCompatibility(options: ExecuteAutoCommandInput): void {
-  const hasSpecPath =
-    typeof options.specPath === "string" && options.specPath.trim().length > 0;
-  const hasDescription =
-    typeof options.description === "string" &&
-    options.description.trim().length > 0;
-
-  if (hasSpecPath === hasDescription) {
-    throw new HintedError(
-      "Exactly one of `--spec` or `--description` is required.",
-      {
-        hintLines: ["Pass exactly one."],
-      },
-    );
-  }
-
-  if (options.commit && !options.apply) {
-    throw new HintedError("Option `--commit` requires `--apply`.", {
-      hintLines: ["Add `--apply` when using `--commit`."],
-    });
-  }
+  validateAutoCommandOptions(options);
 }
 
 function resolveAutoTerminalStatus(options: {
@@ -678,9 +672,6 @@ function applyAutoVerificationSelectionDisposition(options: {
 
   switch (disposition.kind) {
     case "proceed":
-      return;
-    case "non_blocking":
-      onVerifyDetail(disposition.verifyDetail);
       return;
     case "action_required":
       onVerifyDetail(disposition.detail);

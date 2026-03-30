@@ -120,7 +120,7 @@ describe("createVerifyCompetitionAdapter", () => {
             argv: [],
           },
           template: {
-            template: "reduce-review",
+            template: "reduce-verification",
             prompt: "Evaluate the reduction.",
             rubric: "Choose the best reduction.",
             schema: "type: object",

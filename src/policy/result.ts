@@ -43,14 +43,6 @@ export type SelectionDecisionUnresolvedReason =
       resolutions: readonly SelectorResolutionMatch[];
     }
   | {
-      code: "no_programmatic_candidates_passed";
-      candidateIds: readonly string[];
-    }
-  | {
-      code: "multiple_programmatic_candidates_passed";
-      eligibleCanonicalAgentIds: readonly string[];
-    }
-  | {
       code: "selected_candidate_failed_programmatic";
       selectedCanonicalAgentId: string;
       eligibleCanonicalAgentIds: readonly string[];

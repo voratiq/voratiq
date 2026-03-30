@@ -458,7 +458,7 @@ describe("executeAutoCommand", () => {
     );
   });
 
-  it("does not block auto when no programmatic candidates passed", async () => {
+  it("does not block auto when selection carries programmatic warnings", async () => {
     const dependencies = createDependencies({
       now: () => 0,
       runRunStage: jest
@@ -470,15 +470,14 @@ describe("executeAutoCommand", () => {
           createVerifyStageResult({
             body: "run verify body",
             selection: {
-              state: "unresolved",
-              applyable: false,
-              unresolvedReasons: [
-                {
-                  code: "no_programmatic_candidates_passed",
-                  candidateIds: ["alpha", "beta"],
-                },
-              ],
+              state: "resolvable",
+              applyable: true,
+              selectedCanonicalAgentId: "alpha",
+              unresolvedReasons: [],
             },
+            selectionWarnings: [
+              "No run candidate passed programmatic verification; proceeding with run-verification consensus.",
+            ],
           }),
         ),
     });
@@ -493,12 +492,19 @@ describe("executeAutoCommand", () => {
     expect(result.auto.status).toBe("succeeded");
     expect(result.apply.status).toBe("skipped");
     expect(result.summary.verify.detail).toBe(
-      "No run candidate passed programmatic verification.",
+      "No run candidate passed programmatic verification; proceeding with run-verification consensus.",
     );
     expect(result.events).toContainEqual(
       expect.objectContaining({
         kind: "body",
         body: "run verify body",
+      }),
+    );
+    expect(result.events).toContainEqual(
+      expect.objectContaining({
+        kind: "warning",
+        detail:
+          "No run candidate passed programmatic verification; proceeding with run-verification consensus.",
       }),
     );
     expect(result.events).not.toContainEqual(
@@ -508,8 +514,10 @@ describe("executeAutoCommand", () => {
     );
   });
 
-  it("skips apply when no programmatic candidates passed", async () => {
-    const runApplyStage = jest.fn<AutoCommandDependencies["runApplyStage"]>();
+  it("applies the selected candidate when selection carries programmatic warnings", async () => {
+    const runApplyStage = jest
+      .fn<AutoCommandDependencies["runApplyStage"]>()
+      .mockResolvedValue(createApplyStageResult());
     const dependencies = createDependencies({
       now: () => 0,
       runRunStage: jest
@@ -521,15 +529,14 @@ describe("executeAutoCommand", () => {
           createVerifyStageResult({
             body: "run verify body",
             selection: {
-              state: "unresolved",
-              applyable: false,
-              unresolvedReasons: [
-                {
-                  code: "no_programmatic_candidates_passed",
-                  candidateIds: ["alpha", "beta"],
-                },
-              ],
+              state: "resolvable",
+              applyable: true,
+              selectedCanonicalAgentId: "alpha",
+              unresolvedReasons: [],
             },
+            selectionWarnings: [
+              "No run candidate passed programmatic verification; proceeding with run-verification consensus.",
+            ],
           }),
         ),
       runApplyStage,
@@ -543,14 +550,15 @@ describe("executeAutoCommand", () => {
       dependencies,
     );
 
-    expect(runApplyStage).not.toHaveBeenCalled();
+    expect(runApplyStage).toHaveBeenCalledWith({
+      runId: "run-1",
+      agentId: "alpha",
+      commit: false,
+    });
     expect(result.auto.status).toBe("succeeded");
-    expect(result.apply.status).toBe("skipped");
-    expect(result.apply.detail).toBe(
-      "Skipped apply because no run candidate passed programmatic verification.",
-    );
+    expect(result.apply.status).toBe("succeeded");
     expect(result.summary.verify.detail).toBe(
-      "No run candidate passed programmatic verification.",
+      "No run candidate passed programmatic verification; proceeding with run-verification consensus.",
     );
   });
 

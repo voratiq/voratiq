@@ -9,16 +9,9 @@ export interface AutoVerificationSelectionActionRequired {
   detail: string;
 }
 
-export interface AutoVerificationSelectionNonBlocking {
-  kind: "non_blocking";
-  verifyDetail: string;
-  applyDetail: string;
-}
-
 export type AutoVerificationSelectionDisposition =
   | AutoVerificationSelectionProceed
-  | AutoVerificationSelectionActionRequired
-  | AutoVerificationSelectionNonBlocking;
+  | AutoVerificationSelectionActionRequired;
 
 export function classifyAutoVerificationSelection(options: {
   targetKind: "spec" | "run";
@@ -28,15 +21,6 @@ export function classifyAutoVerificationSelection(options: {
 
   if (selection?.state === "resolvable") {
     return { kind: "proceed" };
-  }
-
-  if (isNonBlockingProgrammaticFailure({ targetKind, selection })) {
-    return {
-      kind: "non_blocking",
-      verifyDetail: "No run candidate passed programmatic verification.",
-      applyDetail:
-        "Skipped apply because no run candidate passed programmatic verification.",
-    };
   }
 
   return {
@@ -65,20 +49,4 @@ function describeActionRequiredSelection(options: {
   return targetKind === "spec"
     ? "Verification did not select a draft; manual selection required."
     : "Verification did not produce a resolvable candidate; manual selection required.";
-}
-
-function isNonBlockingProgrammaticFailure(options: {
-  targetKind: "spec" | "run";
-  selection?: SelectionDecision;
-}): boolean {
-  const { targetKind, selection } = options;
-
-  return (
-    targetKind === "run" &&
-    selection?.state === "unresolved" &&
-    selection.unresolvedReasons.length > 0 &&
-    selection.unresolvedReasons.every(
-      (reason) => reason.code === "no_programmatic_candidates_passed",
-    )
-  );
 }

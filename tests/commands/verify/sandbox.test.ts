@@ -58,7 +58,7 @@ async function setupVerifySandboxProbe(options: {
       "verify-1",
       "verifier-a",
       "rubrics",
-      "run-review",
+      "run-verification",
     );
     const workspacePaths = buildScopedAgentWorkspacePaths({ agentRoot });
     await prepareScratchAgentWorkspace({ paths: workspacePaths });

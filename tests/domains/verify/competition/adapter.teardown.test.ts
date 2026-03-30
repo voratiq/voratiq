@@ -93,7 +93,7 @@ describe("verify competition teardown", () => {
             argv: [],
           },
           template: {
-            template: "reduce-review",
+            template: "reduce-verification",
             prompt: "prompt",
             rubric: "rubric",
             schema: "schema: value",
