@@ -183,24 +183,26 @@ describe("voratiq auto", () => {
     );
 
     try {
-      const flatResult = await invokeCli([
-        "--description",
-        "Draft a migration plan",
-        "--verify-agent",
-        "verifier",
-      ]);
-      const autoResult = await invokeCli([
-        "auto",
-        "--description",
-        "Draft a migration plan",
-        "--verify-agent",
-        "verifier",
-      ]);
+      await withTempRepo(async () => {
+        const flatResult = await invokeCli([
+          "--description",
+          "Draft a migration plan",
+          "--verify-agent",
+          "verifier",
+        ]);
+        const autoResult = await invokeCli([
+          "auto",
+          "--description",
+          "Draft a migration plan",
+          "--verify-agent",
+          "verifier",
+        ]);
 
-      expect(flatResult.exitCode).toBe(0);
-      expect(flatResult.exitCode).toBe(autoResult.exitCode);
-      expect(flatResult.stderr).toBe(autoResult.stderr);
-      expect(stripAnsi(flatResult.stdout)).toBe(stripAnsi(autoResult.stdout));
+        expect(flatResult.exitCode).toBe(0);
+        expect(flatResult.exitCode).toBe(autoResult.exitCode);
+        expect(flatResult.stderr).toBe(autoResult.stderr);
+        expect(stripAnsi(flatResult.stdout)).toBe(stripAnsi(autoResult.stdout));
+      });
 
       expect(runSpecCommandMock).toHaveBeenCalledTimes(2);
       expect(runRunCommandMock).toHaveBeenCalledTimes(2);
@@ -319,26 +321,29 @@ describe("voratiq auto", () => {
   it("keeps root --description failure semantics equivalent to auto --description", async () => {
     runSpecCommandMock.mockRejectedValue(new Error("spec exploded"));
 
-    const flatResult = await invokeCli([
-      "--description",
-      "Draft a migration plan",
-      "--verify-agent",
-      "verifier",
-    ]);
-    const autoResult = await invokeCli([
-      "auto",
-      "--description",
-      "Draft a migration plan",
-      "--verify-agent",
-      "verifier",
-    ]);
+    await withTempRepo(async () => {
+      const flatResult = await invokeCli([
+        "--description",
+        "Draft a migration plan",
+        "--verify-agent",
+        "verifier",
+      ]);
+      const autoResult = await invokeCli([
+        "auto",
+        "--description",
+        "Draft a migration plan",
+        "--verify-agent",
+        "verifier",
+      ]);
 
-    expect(flatResult.exitCode).toBe(1);
-    expect(flatResult.exitCode).toBe(autoResult.exitCode);
-    expect(flatResult.stderr).toBe(autoResult.stderr);
-    expect(stripAnsi(flatResult.stdout)).toBe(stripAnsi(autoResult.stdout));
-    expect(stripAnsi(flatResult.stdout)).toContain("spec exploded");
-    expect(stripAnsi(flatResult.stdout)).toContain("Auto FAILED");
+      expect(flatResult.exitCode).toBe(1);
+      expect(flatResult.exitCode).toBe(autoResult.exitCode);
+      expect(flatResult.stderr).toBe(autoResult.stderr);
+      expect(stripAnsi(flatResult.stdout)).toBe(stripAnsi(autoResult.stdout));
+      expect(stripAnsi(flatResult.stdout)).toContain("spec exploded");
+      expect(stripAnsi(flatResult.stdout)).toContain("Auto FAILED");
+    });
+
     expect(runRunCommandMock).not.toHaveBeenCalled();
     expect(runVerifyCommandMock).not.toHaveBeenCalled();
     expect(runApplyCommandMock).not.toHaveBeenCalled();
