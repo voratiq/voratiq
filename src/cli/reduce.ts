@@ -408,14 +408,14 @@ function resolveReductionIndexPath(root: string): string {
 
 function mapTargetLabel(
   targetType: ReductionTarget["type"],
-): "Spec" | "Run" | "Verification" | "Reduce" {
+): "Spec" | "Run" | "Verify" | "Reduce" {
   switch (targetType) {
     case "spec":
       return "Spec";
     case "run":
       return "Run";
     case "verify":
-      return "Verification";
+      return "Verify";
     case "reduce":
       return "Reduce";
   }

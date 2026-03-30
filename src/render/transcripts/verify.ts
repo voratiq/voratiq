@@ -122,14 +122,17 @@ export interface VerifyTranscriptMethodBlock {
   errorLine?: string;
 }
 
-function formatVerifyTargetLabel(
+function resolveVerifyTargetDetailRow(
   targetKind: "spec" | "run" | "reduce",
   targetSessionId: string,
-): string {
-  const kindLabel =
+): { label: string; value: string } {
+  const label =
     targetKind === "spec" ? "Spec" : targetKind === "run" ? "Run" : "Reduce";
 
-  return `${kindLabel} ${targetSessionId}`;
+  return {
+    label,
+    value: targetSessionId,
+  };
 }
 
 function buildVerifyStageShell(options: {
@@ -146,6 +149,11 @@ function buildVerifyStageShell(options: {
   metadataLines: string[];
   statusTableLines: string[];
 } {
+  const targetDetailRow = resolveVerifyTargetDetailRow(
+    options.targetKind,
+    options.targetSessionId,
+  );
+
   return {
     metadataLines: buildTranscriptShellSection({
       badgeText: options.verificationId,
@@ -157,13 +165,7 @@ function buildVerifyStageShell(options: {
       detailRows: [
         { label: "Elapsed", value: options.elapsed },
         { label: "Created", value: formatRunTimestamp(options.createdAt) },
-        {
-          label: "Target",
-          value: formatVerifyTargetLabel(
-            options.targetKind,
-            options.targetSessionId,
-          ),
-        },
+        targetDetailRow,
         { label: "Workspace", value: options.workspacePath },
       ],
       style: options.style,

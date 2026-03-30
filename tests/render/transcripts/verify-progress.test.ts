@@ -282,6 +282,6 @@ describe("verify live progress renderer", () => {
     });
 
     expect(transcript).toContain("programmatic");
-    expect(transcript).toContain("Target     Run run-123");
+    expect(transcript).toContain("Run        run-123");
   });
 });
