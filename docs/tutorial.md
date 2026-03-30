@@ -132,7 +132,7 @@ Verifying…
 
 Elapsed    3m 13s
 Created    2026-02-21 15:30 PST
-Target     Run 20260113-235501-hhkox
+Run        20260113-235501-hhkox
 Workspace  .voratiq/verify/sessions/20260221-233012-txwtd
 
 AGENT            VERIFIER         STATUS     DURATION
