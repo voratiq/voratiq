@@ -632,6 +632,23 @@ Ranking requirements:
 - set \`preferred\` equal to \`ranking[0]\`
 - make \`comparison\` explain why \`ranking[0]\` beat \`ranking[1]\`
 
+Expected output shape:
+
+- \`assessments[]\` with one entry per candidate reduction
+- each assessment should include:
+  - \`candidate\`
+  - \`recommendation_level\`
+  - \`quality\`
+  - \`evaluation\`
+  - \`strengths\`
+  - \`gaps\`
+  - \`evidence_refs\`
+- top-level \`preferred\` naming the selected reduction
+- top-level \`comparison\` explaining why \`ranking[0]\` beat \`ranking[1]\`
+- top-level \`ranking\` must be strict, complete, and tie-free
+- top-level \`rationale\` should explain why \`preferred\` is the best carry-forward artifact
+- top-level \`next_actions\` should stay short and operational
+
 Return output matching \`schema.yaml\`.
 `,
       rubric: `# Reduce Review Rubric
@@ -688,6 +705,7 @@ properties:
     items:
       type: object
       required:
+        - candidate
         - recommendation_level
         - quality
         - evaluation
