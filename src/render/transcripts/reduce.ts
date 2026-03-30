@@ -31,7 +31,7 @@ export interface ReduceProgressContext {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
-  sourceLabel: "Spec" | "Run" | "Verification" | "Reduce";
+  sourceLabel: "Spec" | "Run" | "Verify" | "Reduce";
   sourcePath: string;
   workspacePath: string;
   status: "queued" | "running" | "succeeded" | "failed" | "aborted";
@@ -122,7 +122,7 @@ export interface ReduceTranscriptOptions {
   reductionId: string;
   createdAt: string;
   elapsed: string;
-  sourceLabel: "Spec" | "Run" | "Verification" | "Reduce";
+  sourceLabel: "Spec" | "Run" | "Verify" | "Reduce";
   sourcePath: string;
   workspacePath: string;
   status: "queued" | "succeeded" | "failed" | "aborted" | "running";
