@@ -59,18 +59,14 @@ See [Agent Configuration](configs/agents.md) and [Orchestration Configuration](c
 
 ## First-Class Verification
 
-Ensembles produce multiple candidates at each stage. Verification turns those candidates into a decision. It runs through two channels:
+Each stage runs multiple agents, producing a set of competing outputs. Verification decides which one to keep, through two channels:
 
-- **Programmatic checks** — shell commands like test suites, linters, type checkers, and build scripts. Automated pass/fail.
-- **Rubric verifiers** — agents that score candidates against structured rubric templates covering correctness, style, completeness, or any criteria you define.
+- **Programmatic checks** — shell commands (test suites, linters, type checkers, builds). Automated pass/fail. Run targets only.
+- **Rubric verifiers** — agents that score candidates against structured templates. Applies to spec, run, and reduce.
 
 Rubric verification is **blinded**: verifiers see randomized candidate IDs, not agent names. This prevents model-loyalty bias.
 
-Verification applies across the workflow. It can target **spec**, **run**, or **reduce** sessions. Programmatic checks apply to run targets, and rubric verification applies to all three.
-
-Results from both channels flow through a selection policy that aggregates scores and recommends a winner. When verifiers disagree, the policy reports the disagreement so you can decide.
-
-Extend the defaults by adding programmatic check commands or writing custom rubric templates with a prompt, rubric, and response schema.
+Both channels feed into a selection policy that aggregates scores and recommends a winner. This is what lets `voratiq auto` pick results without manual review at every stage. When verifiers disagree, the policy surfaces the disagreement so you can decide. As workflows get more autonomous, verification is what keeps selection grounded in evidence.
 
 See [Verification Configuration](configs/verification.md) for defining checks and rubrics.
 

@@ -55,7 +55,7 @@ Configuration:
 
 - [Agents](https://github.com/voratiq/voratiq/blob/main/docs/configs/agents.md) - Agent catalog and invocation details
 - [Orchestration](https://github.com/voratiq/voratiq/blob/main/docs/configs/orchestration.md) - Which agents run at each stage
-- [Verification](https://github.com/voratiq/voratiq/blob/main/docs/configs/verification.md) - Programmatic and rubric verification
+- [Verification](https://github.com/voratiq/voratiq/blob/main/docs/configs/verification.md) - How agent outputs are checked and scored before selection
 - [Environment](https://github.com/voratiq/voratiq/blob/main/docs/configs/environment.md) - Runtime dependencies for agents
 - [Sandbox](https://github.com/voratiq/voratiq/blob/main/docs/configs/sandbox.md) - Network and filesystem restrictions
 
