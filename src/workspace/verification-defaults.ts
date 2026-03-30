@@ -648,8 +648,6 @@ Expected output shape:
 - top-level \`ranking\` must be strict, complete, and tie-free
 - top-level \`rationale\` should explain why \`preferred\` is the best carry-forward artifact
 - top-level \`next_actions\` should stay short and operational
-
-Return output matching \`schema.yaml\`.
 `,
       rubric: `# Reduce Review Rubric
 
@@ -685,11 +683,32 @@ Comparison guidance:
 - prefer reductions that preserve the session's decisions and caveats, not just its topic area
 - do not reward verbosity by default
 
+## Candidate posture
+
+Each candidate assessment should also name:
+
+- \`recommendation_level\`: \`carry_forward_now\`, \`usable_with_gap\`, or \`not_recommended\`
+- \`quality\`: \`high\`, \`medium\`, or \`low\`
+
+These fields preserve the practical decision posture a reduction selector needs:
+
+- \`carry_forward_now\` means the reduction is strong enough to use immediately as the preferred carry-forward artifact
+- \`usable_with_gap\` means the reduction is directionally useful but has bounded omissions or weaknesses
+- \`not_recommended\` means the reduction should not win the stage
+
+Use \`strengths\` and \`gaps\` for per-candidate observations only. Put cross-candidate tradeoffs in \`comparison\` and final winner justification in \`rationale\`.
+
 Ranking rule:
 
 - rank the full eligible candidate set with no ties
 - set \`preferred\` equal to \`ranking[0]\`
 - make \`comparison\` explain why \`ranking[0]\` beat \`ranking[1]\`
+
+The verification artifact should also include:
+
+- \`comparison\`: cross-candidate tradeoffs, explicitly including why \`ranking[0]\` beat \`ranking[1]\`
+- \`rationale\`: why \`preferred\` / \`ranking[0]\` is the best carry-forward choice
+- \`next_actions\`: short, operational follow-up for the selected path only
 `,
       schema: `type: object
 required:
