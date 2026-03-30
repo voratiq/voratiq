@@ -4,16 +4,7 @@ title: Verification Configuration
 
 # Verification Configuration
 
-After `spec`, `run`, or `reduce` agents produce candidate outputs, the verification operator checks and scores them. `verification.yaml` controls what gets checked and how.
-
-## Overview
-
-Two methods:
-
-- **Programmatic** (run only): shell commands — tests, linters, build checks — that gauge correctness and style automatically.
-- **Rubric**: verifier agents score candidates against a structured rubric.
-
-Results are saved under `.voratiq/verify/`.
+Verification evaluates agent outputs and feeds the results into a selection policy that recommends a winner. `verification.yaml` controls what gets checked and how. Results are saved under `.voratiq/verify/`.
 
 ## Schema
 
