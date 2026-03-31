@@ -5,7 +5,6 @@ import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.j
 import { formatAgentErrorLine } from "../utils/agents.js";
 import { formatRenderLifecycleDuration } from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
-import { formatRunTimestamp } from "../utils/records.js";
 import {
   buildStageFrameLines,
   buildStageFrameSections,
@@ -13,7 +12,7 @@ import {
 import { renderTranscript } from "../utils/transcript.js";
 import type { TranscriptShellStyleOptions } from "../utils/transcript-shell.js";
 import {
-  buildTranscriptShellSection,
+  buildStandardSessionShellSection,
   formatTranscriptStatusLabel,
   renderTranscriptStatusTable,
   resolveTranscriptShellStyle,
@@ -31,8 +30,6 @@ export interface ReduceProgressContext {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
-  sourceLabel: "Spec" | "Run" | "Verify" | "Reduce";
-  sourcePath: string;
   workspacePath: string;
   status: "queued" | "running" | "succeeded" | "failed" | "aborted";
 }
@@ -112,7 +109,7 @@ export interface ReduceTranscriptReducerBlock {
   reducerAgentId: string;
   status: "queued" | "succeeded" | "failed" | "aborted" | "running";
   duration: string;
-  outputPath: string;
+  outputPath?: string;
   dataPath?: string;
   previewLines?: string[];
   errorLine?: string;
@@ -122,8 +119,6 @@ export interface ReduceTranscriptOptions {
   reductionId: string;
   createdAt: string;
   elapsed: string;
-  sourceLabel: "Spec" | "Run" | "Verify" | "Reduce";
-  sourcePath: string;
   workspacePath: string;
   status: "queued" | "succeeded" | "failed" | "aborted" | "running";
   reducers: readonly ReduceTranscriptReducerBlock[];
@@ -137,8 +132,6 @@ function buildReduceStageShell(options: {
   reductionId: string;
   createdAt: string;
   elapsed: string;
-  sourceLabel: string;
-  sourcePath: string;
   workspacePath: string;
   status: "queued" | "succeeded" | "failed" | "aborted" | "running";
   tableLines?: string[];
@@ -148,19 +141,16 @@ function buildReduceStageShell(options: {
   statusTableLines: string[];
 } {
   return {
-    metadataLines: buildTranscriptShellSection({
+    metadataLines: buildStandardSessionShellSection({
       badgeText: options.reductionId,
       badgeVariant: "reduce",
       status: {
         value: options.status,
         color: getRunStatusStyle(options.status).cli,
       },
-      detailRows: [
-        { label: "Elapsed", value: options.elapsed },
-        { label: "Created", value: formatRunTimestamp(options.createdAt) },
-        { label: options.sourceLabel, value: options.sourcePath },
-        { label: "Workspace", value: options.workspacePath },
-      ],
+      elapsed: options.elapsed,
+      createdAt: options.createdAt,
+      workspacePath: options.workspacePath,
       style: options.style,
     }),
     statusTableLines: options.tableLines ?? [],
@@ -370,8 +360,6 @@ export function createReduceRenderer(
       reductionId: context.reductionId,
       createdAt: context.createdAt,
       elapsed: elapsed ?? DASH,
-      sourceLabel: context.sourceLabel,
-      sourcePath: context.sourcePath,
       workspacePath: context.workspacePath,
       status: context.status,
       tableLines: buildReducerTable(style),
@@ -495,8 +483,6 @@ export function renderReduceTranscript(
     reductionId,
     createdAt,
     elapsed,
-    sourceLabel,
-    sourcePath,
     workspacePath,
     status,
     reducers,
@@ -515,8 +501,6 @@ export function renderReduceTranscript(
       reductionId,
       createdAt,
       elapsed,
-      sourceLabel,
-      sourcePath,
       workspacePath,
       status,
       tableLines:
@@ -545,7 +529,7 @@ export function renderReduceTranscript(
   }
 
   reducers.forEach((reducer, index) => {
-    const block: string[] = [`Reducer: ${reducer.reducerAgentId}`];
+    const block: string[] = [`Agent: ${reducer.reducerAgentId}`];
     if (reducer.previewLines && reducer.previewLines.length > 0) {
       block.push("", ...reducer.previewLines);
     }
@@ -553,9 +537,7 @@ export function renderReduceTranscript(
       const inlineError = reducer.errorLine.replace(/\s+/gu, " ").trim();
       block.push("", formatAgentErrorLine(inlineError, style));
     }
-    if (reducer.outputPath && reducer.status === "succeeded") {
-      block.push("", `Reduction: ${reducer.outputPath}`);
-    }
+    block.push("", `Output: ${reducer.outputPath ?? DASH}`);
     if (index < reducers.length - 1) {
       block.push("", "---");
     }

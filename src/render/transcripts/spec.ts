@@ -6,7 +6,6 @@ import { formatAgentErrorLine } from "../utils/agents.js";
 import { formatAgentBadge } from "../utils/badges.js";
 import { formatRenderLifecycleDuration } from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
-import { formatRunTimestamp } from "../utils/records.js";
 import {
   buildStageFrameLines,
   buildStageFrameSections,
@@ -15,7 +14,7 @@ import {
 import { renderTranscript } from "../utils/transcript.js";
 import type { TranscriptShellStyleOptions } from "../utils/transcript-shell.js";
 import {
-  buildTranscriptShellSection,
+  buildStandardSessionShellSection,
   formatTranscriptStatusLabel,
   renderTranscriptStatusTable,
   resolveTranscriptShellStyle,
@@ -137,18 +136,16 @@ function buildSpecStageShell(options: {
   statusTableLines: string[];
 } {
   return {
-    metadataLines: buildTranscriptShellSection({
+    metadataLines: buildStandardSessionShellSection({
       badgeText: options.sessionId,
       badgeVariant: "spec",
       status: {
         value: options.status,
         color: getRunStatusStyle(options.status).cli,
       },
-      detailRows: [
-        { label: "Elapsed", value: options.elapsed },
-        { label: "Created", value: formatRunTimestamp(options.createdAt) },
-        { label: "Workspace", value: options.workspacePath },
-      ],
+      elapsed: options.elapsed,
+      createdAt: options.createdAt,
+      workspacePath: options.workspacePath,
       style: options.style,
     }),
     statusTableLines: options.tableLines ?? [],
@@ -565,9 +562,7 @@ export function renderSpecTranscript(
       const inlineError = agent.errorLine.replace(/\s+/gu, " ").trim();
       block.push("", formatAgentErrorLine(inlineError, style));
     }
-    if (agent.outputPath && agent.status === "succeeded") {
-      block.push("", `Spec: ${agent.outputPath}`);
-    }
+    block.push("", `Output: ${agent.outputPath ?? DASH}`);
     if (index < agents.length - 1) {
       block.push("", "---");
     }

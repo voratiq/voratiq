@@ -98,7 +98,7 @@ describe("voratiq verify", () => {
     await expect(
       program.parseAsync(["node", "voratiq", "verify"]),
     ).rejects.toThrow(
-      /exactly one of --spec, --run, or --reduce is required/iu,
+      /exactly one target flag is required: `--spec`, `--run`, or `--reduce`/iu,
     );
   });
 
@@ -246,7 +246,8 @@ describe("voratiq verify", () => {
     expect(result.exitCode).toBe(0);
     expect(result.body).toContain("AGENT");
     expect(result.body).toContain("VERIFIER");
-    expect(result.body).toContain("Verifier: gpt-5-4");
+    expect(result.body).toContain("Agent: gpt-5-4");
+    expect(result.body).toContain("Verifier: run-verification");
     expect(result.body).toContain("```markdown");
     expect(result.body).toContain("**Preferred**: agent-a");
     expect(result.body).toContain(
@@ -257,7 +258,7 @@ describe("voratiq verify", () => {
       "voratiq apply --run run-123 --agent agent-a",
     );
     expect(result.body).toContain(
-      "Artifact: .voratiq/verify/sessions/verify-123/gpt-5-4/run-verification/artifacts/result.json",
+      "Output: .voratiq/verify/sessions/verify-123/gpt-5-4/run-verification/artifacts/result.json",
     );
     expect(result.body).toContain(
       "---\n\nTo apply a solution:\n  voratiq apply --run run-123 --agent agent-a",

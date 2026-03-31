@@ -210,8 +210,6 @@ export async function runReduceCommand(
         startedAt: record.startedAt,
         completedAt: record.completedAt,
       }) ?? "—",
-    sourceLabel: mapTargetLabel(record.target.type),
-    sourcePath: sourcePathForTarget(record.target),
     workspacePath: normalizePathForDisplay(
       relativeToRoot(
         root,
@@ -313,7 +311,7 @@ function resolveTargetFromOptions(
         ? "No target flag was provided."
         : `Provided: ${provided}.`;
     command.error(
-      `error: exactly one of --spec, --run, --verify, or --reduce is required (${detail})`,
+      `error: exactly one target flag is required: \`--spec\`, \`--run\`, \`--verify\`, or \`--reduce\` (${detail})`,
       { exitCode: 1 },
     );
   }
@@ -321,7 +319,7 @@ function resolveTargetFromOptions(
   const selected = entries[0];
   if (!selected || !selected.value) {
     command.error(
-      "error: exactly one of --spec, --run, --verify, or --reduce is required",
+      "error: exactly one target flag is required: `--spec`, `--run`, `--verify`, or `--reduce`",
       { exitCode: 1 },
     );
   }
@@ -404,32 +402,4 @@ async function readReductionSessionRecord(options: {
 
 function resolveReductionIndexPath(root: string): string {
   return resolvePath(root, `.voratiq/${VORATIQ_REDUCTION_FILE}`);
-}
-
-function mapTargetLabel(
-  targetType: ReductionTarget["type"],
-): "Spec" | "Run" | "Verify" | "Reduce" {
-  switch (targetType) {
-    case "spec":
-      return "Spec";
-    case "run":
-      return "Run";
-    case "verify":
-      return "Verify";
-    case "reduce":
-      return "Reduce";
-  }
-}
-
-function sourcePathForTarget(target: ReductionTarget): string {
-  switch (target.type) {
-    case "spec":
-      return `.voratiq/spec/sessions/${target.id}`;
-    case "run":
-      return `.voratiq/run/sessions/${target.id}`;
-    case "verify":
-      return `.voratiq/verify/sessions/${target.id}`;
-    case "reduce":
-      return `.voratiq/reduce/sessions/${target.id}`;
-  }
 }

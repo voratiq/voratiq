@@ -193,11 +193,9 @@ describe("json mode cleanliness", () => {
       input.renderer?.begin({
         runId: "run-123",
         status: "running",
-        specPath: "specs/task.md",
         workspacePath: ".voratiq/run/sessions/run-123",
         createdAt: "2026-03-27T00:00:00.000Z",
         startedAt: "2026-03-27T00:00:00.000Z",
-        baseRevisionSha: "abc123",
       });
       input.renderer?.update({
         agentId: "agent-a",
@@ -237,8 +235,6 @@ describe("json mode cleanliness", () => {
         startedAt: "2026-03-27T00:00:00.000Z",
         completedAt: undefined,
         workspacePath: ".voratiq/verify/sessions/verify-123",
-        targetKind: "run",
-        targetSessionId: "run-123",
         status: "running",
       });
       input.renderer?.update({
@@ -287,8 +283,6 @@ describe("json mode cleanliness", () => {
       input.renderer?.begin({
         reductionId: "reduce-123",
         createdAt: "2026-03-27T00:00:00.000Z",
-        sourceLabel: "Run",
-        sourcePath: ".voratiq/run/sessions/run-123",
         workspacePath: ".voratiq/reduce/sessions/reduce-123",
         status: "running",
       });

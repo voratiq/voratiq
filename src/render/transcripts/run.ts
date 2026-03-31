@@ -20,6 +20,7 @@ import {
 import type { TranscriptShellStyleOptions } from "../utils/transcript-shell.js";
 import {
   renderTranscriptStatusTable,
+  resolveTranscriptShellStyle,
   resolveTranscriptShellStyleFromWriter,
 } from "../utils/transcript-shell.js";
 import type { StageProgressEventConsumer } from "./stage-progress.js";
@@ -32,12 +33,10 @@ type CliWriter = Pick<NodeJS.WriteStream, "write"> & {
 interface RunProgressContext {
   runId: string;
   status: RunReport["status"];
-  specPath: string;
   workspacePath: string;
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
-  baseRevisionSha: string;
 }
 
 interface RunRendererOptions {
@@ -65,7 +64,95 @@ interface AgentRow {
   diff: string;
 }
 
+export interface RunTranscriptAgentRecord {
+  agentId: string;
+  status: AgentInvocationRecord["status"];
+  startedAt?: string;
+  completedAt?: string;
+  diffStatistics?: string;
+}
+
+export interface RunTranscriptOptions {
+  runId: string;
+  status: RunReport["status"];
+  workspacePath: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  agents: readonly RunTranscriptAgentRecord[];
+  isTty?: boolean;
+  now?: number;
+}
+
 const DASH = "—";
+
+export function formatRunElapsed(
+  source: {
+    status: RunReport["status"];
+    startedAt?: string;
+    completedAt?: string;
+  },
+  now?: number,
+): string | undefined {
+  return formatRenderLifecycleDuration({
+    lifecycle: {
+      status: source.status,
+      startedAt: source.startedAt,
+      completedAt: source.completedAt,
+    },
+    terminalStatuses: TERMINAL_RUN_STATUSES,
+    now,
+  });
+}
+
+export function renderRunTranscript(options: RunTranscriptOptions): string {
+  const style = resolveTranscriptShellStyle({ isTty: options.isTty });
+  const shell = {
+    metadataLines: buildRunMetadataSectionWithStyle(
+      {
+        runId: options.runId,
+        status: options.status,
+        workspacePath: options.workspacePath,
+        elapsed:
+          formatRunElapsed(
+            {
+              status: options.status,
+              startedAt: options.startedAt,
+              completedAt: options.completedAt,
+            },
+            options.now,
+          ) ?? DASH,
+        createdAt: formatRunTimestamp(options.createdAt),
+      },
+      style,
+    ),
+    statusTableLines:
+      options.agents.length === 0
+        ? []
+        : renderTranscriptStatusTable({
+            rows: options.agents.map((agent) => ({
+              agentId: formatAgentBadge(agent.agentId, style),
+              status: formatAgentStatusLabelWithStyle(agent.status, style),
+              duration:
+                agent.status === "running"
+                  ? DASH
+                  : (formatAgentDuration(agent, {
+                      now: options.now ?? Date.now(),
+                    }) ?? DASH),
+              diff: formatCompactDiffStatistics(agent.diffStatistics) ?? DASH,
+            })),
+            agent: (row) => row.agentId,
+            status: (row) => row.status,
+            duration: (row) => row.duration,
+            extras: [{ header: "CHANGES", accessor: (row) => row.diff }],
+          }),
+  };
+
+  return renderStageFinalFrame({
+    metadataLines: shell.metadataLines,
+    statusTableLines: shell.statusTableLines,
+  });
+}
 
 function formatErrorDetail(error: unknown): string {
   if (error instanceof Error) {
@@ -204,12 +291,10 @@ export function createRunRenderer(
     return {
       runId: context?.runId ?? report.runId,
       status: report.status,
-      specPath: context?.specPath ?? report.spec.path,
       workspacePath: context?.workspacePath ?? "",
       createdAt: context?.createdAt ?? report.createdAt,
       startedAt: context?.startedAt ?? report.startedAt,
       completedAt: context?.completedAt ?? report.completedAt,
-      baseRevisionSha: context?.baseRevisionSha ?? report.baseRevisionSha,
     };
   }
 
@@ -228,11 +313,9 @@ export function createRunRenderer(
         {
           runId: source.runId,
           status: source.status,
-          specPath: source.specPath,
           workspacePath: source.workspacePath,
           elapsed: elapsedLabel,
           createdAt: formatRunTimestamp(source.createdAt),
-          baseRevisionSha: source.baseRevisionSha,
         },
         style,
       ),

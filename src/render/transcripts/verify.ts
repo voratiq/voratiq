@@ -4,7 +4,6 @@ import { TERMINAL_VERIFICATION_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
 import { formatRenderLifecycleDuration } from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
-import { formatRunTimestamp } from "../utils/records.js";
 import {
   buildStageFrameLines,
   buildStageFrameSections,
@@ -13,7 +12,7 @@ import { renderTable } from "../utils/table.js";
 import { renderTranscript } from "../utils/transcript.js";
 import type { TranscriptShellStyleOptions } from "../utils/transcript-shell.js";
 import {
-  buildTranscriptShellSection,
+  buildStandardSessionShellSection,
   formatTranscriptErrorLine,
   formatTranscriptStatusLabel,
   resolveTranscriptShellStyle,
@@ -73,8 +72,6 @@ export interface VerifyProgressContext {
   startedAt?: string;
   completedAt?: string;
   workspacePath: string;
-  targetKind: "spec" | "run" | "reduce";
-  targetSessionId: string;
   status: "queued" | "running" | "succeeded" | "failed" | "aborted";
 }
 
@@ -114,7 +111,6 @@ export interface VerifyProgressRenderer
 export interface VerifyTranscriptMethodBlock {
   verifierLabel: string;
   agentLabel?: string;
-  heading?: string;
   status: "queued" | "running" | "succeeded" | "failed" | "aborted";
   duration: string;
   artifactPath?: string;
@@ -122,26 +118,11 @@ export interface VerifyTranscriptMethodBlock {
   errorLine?: string;
 }
 
-function resolveVerifyTargetDetailRow(
-  targetKind: "spec" | "run" | "reduce",
-  targetSessionId: string,
-): { label: string; value: string } {
-  const label =
-    targetKind === "spec" ? "Spec" : targetKind === "run" ? "Run" : "Reduce";
-
-  return {
-    label,
-    value: targetSessionId,
-  };
-}
-
 function buildVerifyStageShell(options: {
   verificationId: string;
   createdAt: string;
   elapsed: string;
   workspacePath: string;
-  targetKind: "spec" | "run" | "reduce";
-  targetSessionId: string;
   status: "queued" | "running" | "succeeded" | "failed" | "aborted";
   tableLines?: string[];
   style?: TranscriptShellStyleOptions;
@@ -149,25 +130,17 @@ function buildVerifyStageShell(options: {
   metadataLines: string[];
   statusTableLines: string[];
 } {
-  const targetDetailRow = resolveVerifyTargetDetailRow(
-    options.targetKind,
-    options.targetSessionId,
-  );
-
   return {
-    metadataLines: buildTranscriptShellSection({
+    metadataLines: buildStandardSessionShellSection({
       badgeText: options.verificationId,
       badgeVariant: "verify",
       status: {
         value: options.status,
         color: getRunStatusStyle(options.status).cli,
       },
-      detailRows: [
-        { label: "Elapsed", value: options.elapsed },
-        { label: "Created", value: formatRunTimestamp(options.createdAt) },
-        targetDetailRow,
-        { label: "Workspace", value: options.workspacePath },
-      ],
+      elapsed: options.elapsed,
+      createdAt: options.createdAt,
+      workspacePath: options.workspacePath,
       style: options.style,
     }),
     statusTableLines: options.tableLines ?? [],
@@ -408,8 +381,6 @@ export function createVerifyRenderer(
       createdAt: context.createdAt,
       elapsed: elapsed ?? DASH,
       workspacePath: context.workspacePath,
-      targetKind: context.targetKind,
-      targetSessionId: context.targetSessionId,
       status: context.status,
       tableLines: buildMethodTable(style),
       style,
@@ -531,8 +502,6 @@ export function renderVerifyTranscript(options: {
   createdAt: string;
   elapsed: string;
   workspacePath: string;
-  targetKind: "spec" | "run" | "reduce";
-  targetSessionId: string;
   status: "queued" | "running" | "succeeded" | "failed" | "aborted";
   methods: readonly VerifyTranscriptMethodBlock[];
   suppressHint?: boolean;
@@ -546,8 +515,6 @@ export function renderVerifyTranscript(options: {
     createdAt,
     elapsed,
     workspacePath,
-    targetKind,
-    targetSessionId,
     status,
     methods,
     suppressHint,
@@ -567,8 +534,6 @@ export function renderVerifyTranscript(options: {
       createdAt,
       elapsed,
       workspacePath,
-      targetKind,
-      targetSessionId,
       status,
       tableLines:
         methods.length === 0
@@ -601,28 +566,20 @@ export function renderVerifyTranscript(options: {
   }
 
   methods.forEach((method, index) => {
-    const block: string[] = method.heading ? [method.heading] : [];
+    const block: string[] = [`Agent: ${method.agentLabel ?? DASH}`];
+
+    block.push("", `Verifier: ${method.verifierLabel}`);
 
     if (method.bodyLines && method.bodyLines.length > 0) {
-      if (block.length > 0) {
-        block.push("");
-      }
-      block.push(...method.bodyLines);
+      block.push("", ...method.bodyLines);
     }
 
     if (method.errorLine) {
-      if (block.length > 0) {
-        block.push("");
-      }
+      block.push("");
       block.push(formatTranscriptErrorLine(method.errorLine, resolvedStyle));
     }
 
-    if (method.artifactPath) {
-      if (block.length > 0) {
-        block.push("");
-      }
-      block.push(`Artifact: ${method.artifactPath}`);
-    }
+    block.push("", `Output: ${method.artifactPath ?? DASH}`);
 
     if (index < methods.length - 1) {
       block.push("", "---");
@@ -646,7 +603,7 @@ export function renderVerifyTranscript(options: {
   return renderTranscript({ sections, hint });
 }
 
-function formatVerifyElapsed(
+export function formatVerifyElapsed(
   source: {
     status: VerifyProgressContext["status"];
     startedAt?: string;

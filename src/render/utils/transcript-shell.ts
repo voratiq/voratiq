@@ -1,6 +1,7 @@
 import type { TerminalColor } from "../../utils/colors.js";
 import { colorize } from "../../utils/colors.js";
 import { formatAlertMessage } from "../../utils/output.js";
+import { formatRunTimestamp } from "./records.js";
 import { renderTable } from "./table.js";
 
 export interface TranscriptShellStyleOptions {
@@ -147,11 +148,30 @@ export type TranscriptDetailRow = {
   value: string;
 };
 
+export function buildStandardSessionDetailRows(options: {
+  elapsed?: string;
+  createdAt?: string;
+  workspacePath?: string;
+}): TranscriptDetailRow[] {
+  const rows = [
+    { label: "Elapsed", value: options.elapsed },
+    {
+      label: "Created",
+      value: options.createdAt
+        ? formatRunTimestamp(options.createdAt)
+        : undefined,
+    },
+    { label: "Workspace", value: options.workspacePath },
+  ];
+
+  return rows.filter(
+    (row): row is TranscriptDetailRow =>
+      typeof row.value === "string" && row.value.length > 0,
+  );
+}
+
 export function buildTranscriptDetailBodyRows(
   rows: readonly TranscriptDetailRow[],
-  options: {
-    maxWidth?: number;
-  } = {},
 ): string[] {
   if (rows.length === 0) {
     return [];
@@ -166,21 +186,7 @@ export function buildTranscriptDetailBodyRows(
   for (const row of rows) {
     const value = row.value ?? "—";
     const prefix = `${row.label.padEnd(labelWidth)}  `;
-    const continuationPrefix = " ".repeat(prefix.length);
-    const wrapWidth =
-      typeof options.maxWidth === "number"
-        ? Math.max(8, options.maxWidth - prefix.length)
-        : undefined;
-
-    const wrappedValueLines =
-      wrapWidth === undefined
-        ? [value]
-        : wrapValueForDetailRow(value, wrapWidth);
-
-    bodyLines.push(`${prefix}${wrappedValueLines[0] ?? ""}`.trimEnd());
-    for (const line of wrappedValueLines.slice(1)) {
-      bodyLines.push(`${continuationPrefix}${line}`.trimEnd());
-    }
+    bodyLines.push(`${prefix}${value}`.trimEnd());
   }
 
   return bodyLines;
@@ -213,13 +219,7 @@ export function buildTranscriptShellSection(options: {
     lines.push(badge);
   }
 
-  const maxWidth =
-    style.isTty && typeof style.columns === "number" && style.columns > 0
-      ? style.columns
-      : undefined;
-  const detailBody = buildTranscriptDetailBodyRows(options.detailRows ?? [], {
-    maxWidth,
-  });
+  const detailBody = buildTranscriptDetailBodyRows(options.detailRows ?? []);
   if (detailBody.length > 0) {
     lines.push("", ...detailBody);
   }
@@ -227,44 +227,26 @@ export function buildTranscriptShellSection(options: {
   return lines;
 }
 
-function wrapValueForDetailRow(value: string, maxWidth: number): string[] {
-  if (value.length <= maxWidth) {
-    return [value];
-  }
-
-  const lines: string[] = [];
-  let remaining = value;
-
-  while (remaining.length > maxWidth) {
-    const candidate = remaining.slice(0, maxWidth);
-    const breakIndex = findPreferredBreakIndex(candidate);
-    const splitIndex = breakIndex > 0 ? breakIndex : maxWidth;
-
-    lines.push(remaining.slice(0, splitIndex).trimEnd());
-    remaining = remaining.slice(splitIndex).trimStart();
-  }
-
-  if (remaining.length > 0) {
-    lines.push(remaining);
-  }
-
-  return lines.length > 0 ? lines : [""];
-}
-
-function findPreferredBreakIndex(candidate: string): number {
-  const minimumUsefulBreak = Math.floor(candidate.length * 0.6);
-
-  for (let index = candidate.length - 1; index >= 0; index -= 1) {
-    const char = candidate[index];
-    if (char === " " || char === "/" || char === "\\") {
-      if (index + 1 >= minimumUsefulBreak) {
-        return index + 1;
-      }
-      break;
-    }
-  }
-
-  return -1;
+export function buildStandardSessionShellSection(options: {
+  badgeText: string;
+  badgeVariant: TranscriptBadgeVariant;
+  status?: { value: string; color: TerminalColor };
+  elapsed?: string;
+  createdAt?: string;
+  workspacePath?: string;
+  style?: TranscriptShellStyleOptions;
+}): string[] {
+  return buildTranscriptShellSection({
+    badgeText: options.badgeText,
+    badgeVariant: options.badgeVariant,
+    status: options.status,
+    detailRows: buildStandardSessionDetailRows({
+      elapsed: options.elapsed,
+      createdAt: options.createdAt,
+      workspacePath: options.workspacePath,
+    }),
+    style: options.style,
+  });
 }
 
 export interface TranscriptStatusTableColumn<Row> {

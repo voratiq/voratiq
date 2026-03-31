@@ -9,55 +9,53 @@ jest.mock("../../../src/render/utils/transcript-shell.js", () => {
   );
   return {
     ...actual,
-    buildTranscriptShellSection: jest.fn(actual.buildTranscriptShellSection),
+    buildStandardSessionShellSection: jest.fn(
+      actual.buildStandardSessionShellSection,
+    ),
   };
 });
 
 import { renderVerifyTranscript } from "../../../src/render/transcripts/verify.js";
 import { buildRunMetadataSectionWithStyle } from "../../../src/render/utils/runs.js";
-import { buildTranscriptShellSection } from "../../../src/render/utils/transcript-shell.js";
+import { buildStandardSessionShellSection } from "../../../src/render/utils/transcript-shell.js";
 
-const buildTranscriptShellSectionMock =
-  buildTranscriptShellSection as jest.MockedFunction<
-    typeof buildTranscriptShellSection
+const buildStandardSessionShellSectionMock =
+  buildStandardSessionShellSection as jest.MockedFunction<
+    typeof buildStandardSessionShellSection
   >;
 
 describe("shared transcript shell helpers", () => {
   beforeEach(() => {
-    buildTranscriptShellSectionMock.mockClear();
+    buildStandardSessionShellSectionMock.mockClear();
   });
 
-  it("renders run metadata via buildTranscriptShellSection", () => {
+  it("renders run metadata via buildStandardSessionShellSection", () => {
     buildRunMetadataSectionWithStyle(
       {
         runId: "run-123",
         status: "running",
-        specPath: "spec.md",
         workspacePath: ".voratiq/run/sessions/run-123",
         elapsed: "10s",
         createdAt: "2026-01-01T00:00:00.000Z",
-        baseRevisionSha: "abc123",
       },
       { isTty: false },
     );
 
-    expect(buildTranscriptShellSectionMock).toHaveBeenCalledTimes(1);
+    expect(buildStandardSessionShellSectionMock).toHaveBeenCalledTimes(1);
   });
 
-  it("renders verify header via buildTranscriptShellSection", () => {
+  it("renders verify header via buildStandardSessionShellSection", () => {
     renderVerifyTranscript({
       verificationId: "verify-123",
       createdAt: "2026-01-01T00:00:00.000Z",
       elapsed: "10s",
       workspacePath: ".voratiq/verify/sessions/verify-123",
-      targetKind: "run",
-      targetSessionId: "run-123",
       status: "running",
       methods: [],
       suppressHint: true,
       isTty: false,
     });
 
-    expect(buildTranscriptShellSectionMock).toHaveBeenCalledTimes(1);
+    expect(buildStandardSessionShellSectionMock).toHaveBeenCalledTimes(1);
   });
 });
