@@ -12,6 +12,7 @@ import {
   VORATIQ_REDUCTION_FILE,
   VORATIQ_VERIFICATION_FILE,
 } from "../workspace/structure.js";
+import { parseListInspectionCommandOptions } from "./contract.js";
 import { type Alert, writeCommandOutput } from "./output.js";
 
 export interface ListCommandOptions {
@@ -109,12 +110,13 @@ export function createListCommand(): Command {
     .option("--json", "Emit machine-readable list output")
     .allowExcessArguments(false)
     .action(async (options: ListCommandActionOptions, command: Command) => {
-      const selection = resolveOperatorSelection(options, command);
+      const selection = parseListInspectionCommandOptions(options, command);
       const result = await runListCommand({
         operator: selection.operator,
-        sessionId: selection.sessionId,
-        limit: options.limit,
-        verbose: Boolean(options.verbose),
+        sessionId:
+          selection.mode === "detail" ? selection.sessionId : undefined,
+        limit: selection.limit,
+        verbose: selection.verbose ?? false,
       });
 
       if (options.json) {
@@ -128,44 +130,4 @@ export function createListCommand(): Command {
         alerts: result.alerts,
       });
     });
-}
-
-function resolveOperatorSelection(
-  options: ListCommandActionOptions,
-  command: Command,
-): { operator: ListOperator; sessionId?: string } {
-  const entries = [
-    { operator: "spec" as const, value: options.spec, flag: "--spec" },
-    { operator: "run" as const, value: options.run, flag: "--run" },
-    { operator: "reduce" as const, value: options.reduce, flag: "--reduce" },
-    { operator: "verify" as const, value: options.verify, flag: "--verify" },
-  ].filter((entry) => entry.value !== undefined);
-
-  if (entries.length !== 1) {
-    const provided = entries.map((entry) => entry.flag).join(", ");
-    const detail =
-      entries.length === 0
-        ? "No operator flag was provided."
-        : `Provided: ${provided}.`;
-    command.error(
-      `error: exactly one operator flag is required: \`--spec\`, \`--run\`, \`--reduce\`, or \`--verify\` (${detail})`,
-      { exitCode: 1 },
-    );
-  }
-
-  const selected = entries[0];
-  if (!selected) {
-    command.error(
-      "error: exactly one operator flag is required: `--spec`, `--run`, `--reduce`, or `--verify`",
-      { exitCode: 1 },
-    );
-  }
-
-  return {
-    operator: selected.operator,
-    sessionId:
-      typeof selected.value === "string" && selected.value.length > 0
-        ? selected.value
-        : undefined,
-  };
 }

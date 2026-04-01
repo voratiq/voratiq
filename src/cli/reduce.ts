@@ -40,6 +40,7 @@ import {
   VORATIQ_REDUCTION_FILE,
   VORATIQ_VERIFICATION_FILE,
 } from "../workspace/structure.js";
+import { parseReduceExecutionCommandOptions } from "./contract.js";
 import {
   buildReduceOperatorEnvelope,
   createSilentCliWriter,
@@ -283,50 +284,6 @@ function parseMaxParallelOption(value: string): number {
   );
 }
 
-function resolveTargetFromOptions(
-  options: ReduceCommandActionOptions,
-  command: Command,
-): ReductionTarget {
-  const entries = [
-    { type: "spec" as const, flag: "--spec", value: options.spec },
-    { type: "run" as const, flag: "--run", value: options.run },
-    {
-      type: "verify" as const,
-      flag: "--verify",
-      value: options.verify,
-    },
-    {
-      type: "reduce" as const,
-      flag: "--reduce",
-      value: options.reduce,
-    },
-  ].filter(
-    (entry) => typeof entry.value === "string" && entry.value.length > 0,
-  );
-
-  if (entries.length !== 1) {
-    const provided = entries.map((entry) => entry.flag).join(", ");
-    const detail =
-      entries.length === 0
-        ? "No target flag was provided."
-        : `Provided: ${provided}.`;
-    command.error(
-      `error: exactly one target flag is required: \`--spec\`, \`--run\`, \`--verify\`, or \`--reduce\` (${detail})`,
-      { exitCode: 1 },
-    );
-  }
-
-  const selected = entries[0];
-  if (!selected || !selected.value) {
-    command.error(
-      "error: exactly one target flag is required: `--spec`, `--run`, `--verify`, or `--reduce`",
-      { exitCode: 1 },
-    );
-  }
-
-  return { type: selected.type, id: selected.value };
-}
-
 export function createReduceCommand(): Command {
   return new Command("reduce")
     .description("Reduce artifact sets into a summarized form")
@@ -359,13 +316,13 @@ export function createReduceCommand(): Command {
     .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
     .action(async (options: ReduceCommandActionOptions, command: Command) => {
-      const target = resolveTargetFromOptions(options, command);
+      const input = parseReduceExecutionCommandOptions(options, command);
       const result = await runReduceCommand({
-        target,
-        agentIds: options.agent,
-        profile: options.profile,
-        maxParallel: options.maxParallel,
-        extraContext: options.extraContext,
+        target: input.target,
+        agentIds: input.agentIds,
+        profile: input.profile,
+        maxParallel: input.maxParallel,
+        extraContext: input.extraContext,
         json: Boolean(options.json),
         writeOutput: options.json ? undefined : writeCommandOutput,
       });

@@ -11,6 +11,10 @@ import {
   renderPruneTranscript,
 } from "../render/transcripts/prune.js";
 import { createConfirmationWorkflow } from "./confirmation.js";
+import {
+  parseExternalPruneExecutionInput,
+  parsePruneCommandSelection,
+} from "./contract.js";
 import { CliError, NonInteractiveShellError } from "./errors.js";
 import {
   buildPruneOperatorEnvelope,
@@ -42,11 +46,20 @@ export async function runPruneCommand(
   const assumeYes = Boolean(options.yes);
 
   if (options.json && !assumeYes) {
-    throw new CliError(
-      "JSON-mode prune requires explicit confirmation.",
-      [],
-      ["Re-run with `--yes` to confirm the prune."],
-    );
+    try {
+      parseExternalPruneExecutionInput({
+        scope: runId ? "run" : "all",
+        ...(runId ? { runId } : {}),
+        purge: purge || undefined,
+        confirmed: assumeYes,
+      });
+    } catch {
+      throw new CliError(
+        "JSON-mode prune requires explicit confirmation.",
+        [],
+        ["Re-run with `--yes` to confirm the prune."],
+      );
+    }
   }
 
   const { root, workspacePaths } = await resolveCliContext();
@@ -118,23 +131,13 @@ export function createPruneCommand(): Command {
     .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
     .action(async (options: PruneCommandActionOptions, command: Command) => {
-      const hasRun = typeof options.run === "string" && options.run.length > 0;
-      const wantsAll = Boolean(options.all);
-
-      if (!hasRun && !wantsAll) {
-        command.error(
-          "error: either --run <run-id> or --all must be provided",
-          {
-            exitCode: 1,
-          },
-        );
-      }
+      const selection = parsePruneCommandSelection(options, command);
 
       const result = await runPruneCommand({
-        runId: options.run,
-        all: wantsAll,
-        purge: Boolean(options.purge),
-        yes: Boolean(options.yes),
+        runId: selection.runId,
+        all: selection.all,
+        purge: Boolean(selection.purge),
+        yes: Boolean(selection.yes),
         json: Boolean(options.json),
         writeOutput: writeCommandOutput,
       });

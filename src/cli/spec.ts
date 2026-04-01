@@ -20,6 +20,7 @@ import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { resolvePath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import { getSpecSessionDirectoryPath } from "../workspace/structure.js";
+import { parseSpecExecutionCommandOptions } from "./contract.js";
 import {
   buildSpecOperatorEnvelope,
   createSilentCliWriter,
@@ -273,14 +274,15 @@ export function createSpecCommand(): Command {
     )
     .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
-    .action(async (options: SpecCommandActionOptions) => {
+    .action(async (options: SpecCommandActionOptions, command: Command) => {
+      const input = parseSpecExecutionCommandOptions(options, command);
       const result = await runSpecCommand({
-        description: options.description,
-        agentIds: options.agent,
-        profile: options.profile,
-        maxParallel: options.maxParallel,
-        title: options.title,
-        extraContext: options.extraContext,
+        description: input.description,
+        agentIds: input.agentIds,
+        profile: input.profile,
+        maxParallel: input.maxParallel,
+        title: input.title,
+        extraContext: input.extraContext,
         json: Boolean(options.json),
       });
       if (options.json) {

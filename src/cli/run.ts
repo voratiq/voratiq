@@ -18,6 +18,7 @@ import { renderWorkspaceAutoInitializedNotice } from "../render/transcripts/shar
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { mapRunStatusToExitCode } from "../status/index.js";
 import { parsePositiveInteger } from "../utils/validators.js";
+import { parseRunExecutionCommandOptions } from "./contract.js";
 import {
   buildRunOperatorEnvelope,
   createSilentCliWriter,
@@ -215,14 +216,15 @@ export function createRunCommand(): Command {
     )
     .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
-    .action(async (options: RunCommandActionOptions) => {
+    .action(async (options: RunCommandActionOptions, command: Command) => {
+      const input = parseRunExecutionCommandOptions(options, command);
       const runOptions: RunCommandOptions = {
-        specPath: options.spec,
-        agentIds: options.agent,
-        profile: options.profile,
-        maxParallel: options.maxParallel,
-        branch: options.branch,
-        extraContext: options.extraContext,
+        specPath: input.specPath,
+        agentIds: input.agentIds,
+        profile: input.profile,
+        maxParallel: input.maxParallel,
+        branch: input.branch,
+        extraContext: input.extraContext,
         json: Boolean(options.json),
         writeOutput: options.json ? undefined : writeCommandOutput,
       };
