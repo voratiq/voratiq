@@ -10,15 +10,10 @@ import {
   getRunDirectoryPath,
   getSpecSessionDirectoryPath,
 } from "../workspace/structure.js";
+import { externalExecutionOperators } from "./contract.js";
 import { toCliError } from "./errors.js";
 
-export type EnvelopeOperator =
-  | "spec"
-  | "run"
-  | "reduce"
-  | "verify"
-  | "apply"
-  | "prune";
+export type EnvelopeOperator = (typeof externalExecutionOperators)[number];
 
 export type EnvelopeStatus = "succeeded" | "failed" | "unresolved";
 
@@ -421,14 +416,7 @@ export function resolveJsonEnvelopeOperator(
 }
 
 function isEnvelopeOperator(value: string): value is EnvelopeOperator {
-  return (
-    value === "spec" ||
-    value === "run" ||
-    value === "verify" ||
-    value === "reduce" ||
-    value === "apply" ||
-    value === "prune"
-  );
+  return externalExecutionOperators.includes(value as EnvelopeOperator);
 }
 
 function normalizeTerminalStatus(

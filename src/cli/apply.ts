@@ -7,6 +7,7 @@ import {
   resolveCliContext,
 } from "../preflight/index.js";
 import { renderApplyTranscript } from "../render/transcripts/apply.js";
+import { parseApplyExecutionCommandOptions } from "./contract.js";
 import {
   buildApplyOperatorEnvelope,
   writeOperatorResultEnvelope,
@@ -78,12 +79,13 @@ export function createApplyCommand(): Command {
     )
     .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
-    .action(async (options: ApplyCommandActionOptions) => {
+    .action(async (options: ApplyCommandActionOptions, command: Command) => {
+      const input = parseApplyExecutionCommandOptions(options, command);
       const result = await runApplyCommand({
-        runId: options.run,
-        agentId: options.agent,
-        ignoreBaseMismatch: options.ignoreBaseMismatch ?? false,
-        commit: options.commit ?? false,
+        runId: input.runId,
+        agentId: input.agentId,
+        ignoreBaseMismatch: input.ignoreBaseMismatch ?? false,
+        commit: input.commit ?? false,
         json: Boolean(options.json),
         writeOutput: writeCommandOutput,
       });
