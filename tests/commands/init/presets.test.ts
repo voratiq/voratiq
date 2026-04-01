@@ -1,5 +1,3 @@
-import type { SpawnSyncReturns } from "node:child_process";
-import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,37 +16,18 @@ import {
   serializeAgentsConfigEntries,
 } from "../../../src/workspace/templates.js";
 
-jest.mock("node:child_process", () => {
-  const actual =
-    jest.requireActual<typeof import("node:child_process")>(
-      "node:child_process",
-    );
-  return {
-    ...actual,
-    spawnSync: jest.fn(),
-  };
-});
-
 describe("voratiq init preset application", () => {
   let repoRoot: string;
+  let originalPath: string | undefined;
 
   beforeEach(async () => {
     repoRoot = await mkdtemp(join(tmpdir(), "voratiq-init-presets-"));
-    const spawnSyncMock = spawnSync as jest.MockedFunction<typeof spawnSync>;
-    spawnSyncMock.mockReset();
-    spawnSyncMock.mockReturnValue({
-      status: 1,
-      stdout: "",
-      stderr: "",
-      pid: 0,
-      signal: null,
-      output: ["", "", ""],
-    } as SpawnSyncReturns<string>);
+    originalPath = process.env.PATH;
+    process.env.PATH = "";
   });
 
   afterEach(async () => {
-    jest.restoreAllMocks();
-    (spawnSync as jest.MockedFunction<typeof spawnSync>).mockReset();
+    process.env.PATH = originalPath;
     await rm(repoRoot, { recursive: true, force: true });
   });
 

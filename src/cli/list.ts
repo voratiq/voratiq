@@ -1,10 +1,7 @@
 import { Command } from "commander";
 
-import {
-  executeListCommand,
-  type ListJsonOutput,
-  type ListOperator,
-} from "../commands/list/command.js";
+import { executeListCommand } from "../commands/list/command.js";
+import type { ListJsonOutput, ListOperator } from "../contracts/list.js";
 import { resolveCliContext } from "../preflight/index.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import {

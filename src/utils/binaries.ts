@@ -1,18 +1,19 @@
-import { spawnSync } from "node:child_process";
+import { accessSync, constants as fsConstants } from "node:fs";
+import { delimiter, join } from "node:path";
 
 export function detectBinary(command: string): string | undefined {
-  const result = spawnSync("bash", ["-c", `command -v ${command}`], {
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      PATH: process.env.PATH ?? "",
-    },
-  });
+  const pathEntries = (process.env.PATH ?? "")
+    .split(delimiter)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 
-  if (result.status === 0) {
-    const path = result.stdout.trim();
-    if (path.length > 0) {
-      return path;
+  for (const entry of pathEntries) {
+    const candidate = join(entry, command);
+    try {
+      accessSync(candidate, fsConstants.X_OK);
+      return candidate;
+    } catch {
+      continue;
     }
   }
 

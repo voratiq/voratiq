@@ -1,3 +1,17 @@
+import type {
+  ListJsonDetailOutput,
+  ListJsonOutput,
+  ListJsonTableRecord,
+  ListMode,
+  ListOperator,
+  ReduceListJsonRow,
+  ReductionListJsonArtifact,
+  RunListJsonRow,
+  SpecListJsonArtifact,
+  SpecListJsonRow,
+  VerificationListJsonArtifact,
+  VerifyListJsonRow,
+} from "../../contracts/list.js";
 import type { ReductionRecord } from "../../domain/reduce/model/types.js";
 import {
   readReductionRecords,
@@ -60,118 +74,6 @@ import {
 
 const DEFAULT_LIMIT = 10;
 const DASH = "—";
-
-export type ListOperator = "spec" | "run" | "reduce" | "verify";
-export type ListMode = "table" | "detail";
-
-interface ListJsonRecordBase {
-  id: string;
-  status: string;
-  createdAt: string;
-}
-
-interface ListJsonTargetRef {
-  kind: string;
-  id: string;
-}
-
-export interface RunListJsonTableRecord extends ListJsonRecordBase {
-  specPath: string;
-}
-
-export interface SpecListJsonTableRecord extends ListJsonRecordBase {
-  description: string | null;
-}
-
-export interface TargetedListJsonTableRecord extends ListJsonRecordBase {
-  target: ListJsonTargetRef;
-}
-
-export type ListJsonTableRecord =
-  | RunListJsonTableRecord
-  | SpecListJsonTableRecord
-  | TargetedListJsonTableRecord;
-
-export interface RunListJsonRow {
-  agentId: string;
-  status: string;
-  duration: string;
-  changes: string | null;
-}
-
-export interface SpecListJsonRow {
-  agentId: string;
-  status: string;
-  duration: string;
-}
-
-export interface ReduceListJsonRow {
-  agentId: string;
-  status: string;
-  duration: string;
-}
-
-export interface VerifyListJsonRow {
-  agentId: string | null;
-  verifier: string;
-  status: string;
-  duration: string;
-}
-
-export type ListJsonRow =
-  | RunListJsonRow
-  | SpecListJsonRow
-  | ReduceListJsonRow
-  | VerifyListJsonRow;
-
-export interface SpecListJsonArtifact {
-  kind: "spec";
-  agentId: string;
-  path: string | null;
-}
-
-export interface ReductionListJsonArtifact {
-  kind: "reduction";
-  agentId: string;
-  path: string | null;
-}
-
-export interface VerificationListJsonArtifact {
-  kind: "result";
-  agentId: string | null;
-  verifier: string;
-  path: string | null;
-}
-
-export type ListJsonArtifact =
-  | SpecListJsonArtifact
-  | ReductionListJsonArtifact
-  | VerificationListJsonArtifact;
-
-export interface ListJsonTableOutput {
-  operator: ListOperator;
-  mode: "table";
-  records: ListJsonTableRecord[];
-  warnings: string[];
-}
-
-export interface ListJsonDetailOutput {
-  operator: ListOperator;
-  mode: "detail";
-  sessionId: string;
-  session: {
-    id: string;
-    status: string;
-    createdAt: string;
-    elapsed?: string;
-    workspacePath: string;
-    rows: ListJsonRow[];
-    artifacts: ListJsonArtifact[];
-  } | null;
-  warnings: string[];
-}
-
-export type ListJsonOutput = ListJsonTableOutput | ListJsonDetailOutput;
 
 export interface ListCommandInput {
   root: string;

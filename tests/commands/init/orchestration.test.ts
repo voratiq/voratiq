@@ -1,6 +1,11 @@
-import type { SpawnSyncReturns } from "node:child_process";
-import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -14,42 +19,23 @@ import { buildDefaultOrchestrationTemplate } from "../../../src/configs/orchestr
 import { readOrchestrationConfig } from "../../../src/configs/orchestration/loader.js";
 import { buildAgentsTemplate } from "../../../src/workspace/templates.js";
 
-jest.mock("node:child_process", () => {
-  const actual =
-    jest.requireActual<typeof import("node:child_process")>(
-      "node:child_process",
-    );
-  return {
-    ...actual,
-    spawnSync: jest.fn(),
-  };
-});
-
 describe("init orchestration bootstrap", () => {
   let repoRoot: string;
+  let originalPath: string | undefined;
 
   beforeEach(async () => {
     repoRoot = await mkdtemp(join(tmpdir(), "voratiq-init-orchestration-"));
-    const spawnSyncMock = spawnSync as jest.MockedFunction<typeof spawnSync>;
-    spawnSyncMock.mockReset();
-    spawnSyncMock.mockReturnValue({
-      status: 1,
-      stdout: "",
-      stderr: "",
-      pid: 0,
-      signal: null,
-      output: ["", "", ""],
-    } as SpawnSyncReturns<string>);
+    originalPath = process.env.PATH;
+    process.env.PATH = "";
   });
 
   afterEach(async () => {
-    jest.restoreAllMocks();
-    (spawnSync as jest.MockedFunction<typeof spawnSync>).mockReset();
+    process.env.PATH = originalPath;
     await rm(repoRoot, { recursive: true, force: true });
   });
 
   it("creates orchestration.yaml from preset defaults when missing", async () => {
-    mockDetectedBinaries({
+    await mockDetectedBinaries(repoRoot, {
       claude: "/usr/local/bin/claude",
       codex: "/usr/local/bin/codex",
       gemini: "/usr/local/bin/gemini",
@@ -90,7 +76,7 @@ describe("init orchestration bootstrap", () => {
   });
 
   it("seeds lite run from detected enabled providers only", async () => {
-    mockDetectedBinaries({
+    await mockDetectedBinaries(repoRoot, {
       codex: "/usr/local/bin/codex",
       gemini: "/usr/local/bin/gemini",
     });
@@ -140,7 +126,7 @@ describe("init orchestration bootstrap", () => {
       "utf8",
     );
 
-    mockDetectedBinaries({
+    await mockDetectedBinaries(repoRoot, {
       codex: "/usr/local/bin/codex",
       gemini: "/usr/local/bin/gemini",
     });
@@ -180,7 +166,7 @@ describe("init orchestration bootstrap", () => {
   });
 
   it("seeds empty stage agent lists for manual preset", async () => {
-    mockDetectedBinaries({
+    await mockDetectedBinaries(repoRoot, {
       claude: "/usr/local/bin/claude",
       codex: "/usr/local/bin/codex",
       gemini: "/usr/local/bin/gemini",
@@ -204,7 +190,7 @@ describe("init orchestration bootstrap", () => {
   });
 
   it("seeds defaults in interactive mode without provider confirmation", async () => {
-    mockDetectedBinaries({
+    await mockDetectedBinaries(repoRoot, {
       claude: "/usr/local/bin/claude",
       codex: "/usr/local/bin/codex",
       gemini: "/usr/local/bin/gemini",
@@ -288,44 +274,18 @@ describe("init orchestration bootstrap", () => {
   });
 });
 
-function mockDetectedBinaries(binaries: Record<string, string>): void {
-  (spawnSync as jest.MockedFunction<typeof spawnSync>).mockImplementation(
-    (command, args) => {
-      if (command !== "bash" || !Array.isArray(args)) {
-        return {
-          status: 1,
-          stdout: "",
-          stderr: "",
-        } as SpawnSyncReturns<string>;
-      }
+async function mockDetectedBinaries(
+  root: string,
+  binaries: Record<string, string>,
+): Promise<void> {
+  const binDir = join(root, "bin");
+  await mkdir(binDir, { recursive: true });
 
-      const expression = String(args.at(-1));
-      const match = /command -v (\w+)/.exec(expression);
-      if (!match) {
-        return {
-          status: 1,
-          stdout: "",
-          stderr: "",
-        } as SpawnSyncReturns<string>;
-      }
+  for (const provider of Object.keys(binaries)) {
+    const filePath = join(binDir, provider);
+    await writeFile(filePath, "#!/usr/bin/env bash\nexit 0\n", "utf8");
+    await chmod(filePath, 0o755);
+  }
 
-      const binaryPath = binaries[match[1]];
-      if (!binaryPath) {
-        return {
-          status: 1,
-          stdout: "",
-          stderr: "",
-        } as SpawnSyncReturns<string>;
-      }
-
-      return {
-        status: 0,
-        stdout: `${binaryPath}\n`,
-        stderr: "",
-        pid: 0,
-        signal: null,
-        output: ["", `${binaryPath}\n`, ""],
-      } as SpawnSyncReturns<string>;
-    },
-  );
+  process.env.PATH = binDir;
 }

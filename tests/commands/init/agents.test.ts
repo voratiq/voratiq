@@ -1,6 +1,11 @@
-import type { SpawnSyncReturns } from "node:child_process";
-import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -24,35 +29,19 @@ const GEMINI_DEFAULT_ID = getDefaultAgentIdByProvider("gemini") ?? "gemini";
 const FULL_CATALOG_IDS = getSupportedAgentDefaults().map((entry) =>
   getAgentDefaultId(entry),
 );
-const SUPPORTED_PROVIDER_COUNT = new Set(
-  getSupportedAgentDefaults().map((entry) => entry.provider),
-).size;
-
-jest.mock("node:child_process", () => ({
-  spawnSync: jest.fn(),
-}));
-
 describe("configureAgents", () => {
   let repoRoot: string;
+  let originalPath: string | undefined;
 
   beforeEach(async () => {
     repoRoot = await mkdtemp(join(tmpdir(), "voratiq-agents-"));
     await mkdir(join(repoRoot, ".voratiq"), { recursive: true });
-    const spawnSyncMock = spawnSync as jest.MockedFunction<typeof spawnSync>;
-    spawnSyncMock.mockReset();
-    spawnSyncMock.mockReturnValue({
-      status: 1,
-      stdout: "",
-      stderr: "",
-      pid: 0,
-      signal: null,
-      output: ["", "", ""],
-    } as SpawnSyncReturns<string>);
+    originalPath = process.env.PATH;
+    process.env.PATH = "";
   });
 
   afterEach(async () => {
-    jest.restoreAllMocks();
-    (spawnSync as jest.MockedFunction<typeof spawnSync>).mockReset();
+    process.env.PATH = originalPath;
     await rm(repoRoot, { recursive: true, force: true });
   });
 
@@ -121,7 +110,7 @@ describe("configureAgents", () => {
   });
 
   it("enables detected providers without prompting", async () => {
-    mockDetectedBinaries({
+    const detectedBinaries = await mockDetectedBinaries(repoRoot, {
       claude: "/usr/bin/claude",
       codex: "/usr/bin/codex",
     });
@@ -139,8 +128,6 @@ describe("configureAgents", () => {
     });
 
     expect(confirm).not.toHaveBeenCalled();
-    expect(spawnSync).toHaveBeenCalledTimes(SUPPORTED_PROVIDER_COUNT);
-
     const updated = await readFile(configPath, "utf8");
     const parsed = readAgentsConfig(updated);
 
@@ -153,15 +140,15 @@ describe("configureAgents", () => {
     );
 
     expect(claude?.enabled).toBe(true);
-    expect(claude?.binary).toBe("/usr/bin/claude");
+    expect(claude?.binary).toBe(detectedBinaries.claude);
     expect(codex?.enabled).toBe(true);
-    expect(codex?.binary).toBe("/usr/bin/codex");
+    expect(codex?.binary).toBe(detectedBinaries.codex);
     expect(gemini?.enabled).toBe(true);
     expect(gemini?.binary).toBe("");
     for (const entry of parsed.agents) {
       const expectedBinary =
         entry.provider === "claude" || entry.provider === "codex"
-          ? `/usr/bin/${entry.provider}`
+          ? detectedBinaries[entry.provider]
           : "";
       expect(entry.binary).toBe(expectedBinary);
       expect(entry.enabled).toBe(true);
@@ -173,8 +160,8 @@ describe("configureAgents", () => {
       agentCount: FULL_CATALOG_IDS.length,
       zeroDetections: false,
       detectedProviders: [
-        { provider: "claude", binary: "/usr/bin/claude" },
-        { provider: "codex", binary: "/usr/bin/codex" },
+        { provider: "claude", binary: detectedBinaries.claude },
+        { provider: "codex", binary: detectedBinaries.codex },
       ],
       providerEnablementPrompted: false,
       configCreated: false,
@@ -183,7 +170,7 @@ describe("configureAgents", () => {
   });
 
   it("keeps the full catalog enabled for lite preset when providers are detected", async () => {
-    mockDetectedBinaries({
+    const detectedBinaries = await mockDetectedBinaries(repoRoot, {
       claude: "/usr/bin/claude",
       codex: "/usr/bin/codex",
       gemini: "/usr/bin/gemini",
@@ -209,13 +196,13 @@ describe("configureAgents", () => {
 
     const updated = readAgentsConfig(await readFile(configPath, "utf8"));
     for (const entry of updated.agents) {
-      expect(entry.binary).toBe(`/usr/bin/${entry.provider}`);
+      expect(entry.binary).toBe(detectedBinaries[entry.provider]);
       expect(entry.enabled).toBe(true);
     }
   });
 
   it("auto-accepts detected providers without prompting when assumeYes is set", async () => {
-    mockDetectedBinaries({
+    await mockDetectedBinaries(repoRoot, {
       claude: "/usr/bin/claude",
       codex: "/usr/bin/codex",
     });
@@ -292,7 +279,7 @@ describe("configureAgents", () => {
   });
 
   it("reports supported provider detections for manual preset", async () => {
-    mockDetectedBinaries({
+    const detectedBinaries = await mockDetectedBinaries(repoRoot, {
       claude: "/usr/bin/claude",
       codex: "/usr/bin/codex",
     });
@@ -308,8 +295,8 @@ describe("configureAgents", () => {
     expect(summary.agentCount).toBe(FULL_CATALOG_IDS.length);
     expect(summary.zeroDetections).toBe(false);
     expect(summary.detectedProviders).toEqual([
-      { provider: "claude", binary: "/usr/bin/claude" },
-      { provider: "codex", binary: "/usr/bin/codex" },
+      { provider: "claude", binary: detectedBinaries.claude },
+      { provider: "codex", binary: detectedBinaries.codex },
     ]);
     expect(summary.providerEnablementPrompted).toBe(false);
 
@@ -320,16 +307,16 @@ describe("configureAgents", () => {
       expect(entry.enabled).toBe(true);
       const expectedBinary =
         entry.provider === "claude"
-          ? "/usr/bin/claude"
+          ? detectedBinaries.claude
           : entry.provider === "codex"
-            ? "/usr/bin/codex"
+            ? detectedBinaries.codex
             : "";
       expect(entry.binary).toBe(expectedBinary);
     }
   });
 
   it("preserves explicit disabled entries on init reruns", async () => {
-    mockDetectedBinaries({
+    await mockDetectedBinaries(repoRoot, {
       claude: "/usr/bin/claude",
       codex: "/usr/bin/codex",
       gemini: "/usr/bin/gemini",
@@ -354,44 +341,23 @@ describe("configureAgents", () => {
   });
 });
 
-function mockDetectedBinaries(binaries: Record<string, string>): void {
-  (spawnSync as jest.MockedFunction<typeof spawnSync>).mockImplementation(
-    (command, args) => {
-      if (command !== "bash" || !Array.isArray(args)) {
-        return {
-          status: 1,
-          stdout: "",
-          stderr: "",
-        } as SpawnSyncReturns<string>;
-      }
+async function mockDetectedBinaries(
+  root: string,
+  binaries: Record<string, string>,
+): Promise<Record<string, string>> {
+  const binDir = join(root, "bin");
+  await mkdir(binDir, { recursive: true });
+  const detectedPaths: Record<string, string> = {};
 
-      const lookup = String(args.at(-1));
-      const match = /command -v (\w+)/.exec(lookup);
-      if (!match) {
-        return {
-          status: 1,
-          stdout: "",
-          stderr: "",
-        } as SpawnSyncReturns<string>;
-      }
+  for (const [provider, binaryPath] of Object.entries(binaries)) {
+    const binaryName = provider;
+    const filePath = join(binDir, binaryName);
+    await writeFile(filePath, "#!/usr/bin/env bash\nexit 0\n", "utf8");
+    await chmod(filePath, 0o755);
+    expect(binaryPath).toBe(`/usr/bin/${provider}`);
+    detectedPaths[provider] = filePath;
+  }
 
-      const binaryPath = binaries[match[1]];
-      if (!binaryPath) {
-        return {
-          status: 1,
-          stdout: "",
-          stderr: "",
-        } as SpawnSyncReturns<string>;
-      }
-
-      return {
-        status: 0,
-        stdout: `${binaryPath}\n`,
-        stderr: "",
-        pid: 0,
-        signal: null,
-        output: ["", `${binaryPath}\n`, ""],
-      } as SpawnSyncReturns<string>;
-    },
-  );
+  process.env.PATH = binDir;
+  return detectedPaths;
 }

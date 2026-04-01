@@ -1,6 +1,13 @@
 import { type Command } from "commander";
 import { z } from "zod";
 
+import {
+  type ListMode,
+  listModes,
+  type ListOperator,
+  listOperators,
+} from "../contracts/list.js";
+
 const nonEmptyStringSchema = z.string().min(1, "must not be empty");
 const positiveIntegerSchema = z
   .number()
@@ -20,20 +27,14 @@ export const externalExecutionOperators = [
   "prune",
 ] as const;
 
-export const externalInspectionOperators = [
-  "spec",
-  "run",
-  "reduce",
-  "verify",
-] as const;
+export const externalInspectionOperators = listOperators;
 
-export const externalInspectionModes = ["table", "detail"] as const;
+export const externalInspectionModes = listModes;
 
 export type ExternalExecutionOperator =
   (typeof externalExecutionOperators)[number];
-export type ExternalInspectionOperator =
-  (typeof externalInspectionOperators)[number];
-export type ExternalInspectionMode = (typeof externalInspectionModes)[number];
+export type ExternalInspectionOperator = ListOperator;
+export type ExternalInspectionMode = ListMode;
 
 export const externalExecutionOperatorSchema = z.enum(
   externalExecutionOperators,
