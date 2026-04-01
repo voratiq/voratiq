@@ -169,10 +169,8 @@ describe("createRunRenderer", () => {
       renderer.begin({
         runId: "run-123",
         status: "running",
-        specPath: "specs/test.md",
         workspacePath: ".voratiq/run/sessions/run-123",
         createdAt: "2025-11-05T12:00:00.000Z",
-        baseRevisionSha: "abc123",
       });
       renderer.update({
         agentId: "test-agent",
@@ -208,10 +206,8 @@ describe("createRunRenderer", () => {
     const context = {
       runId: "run-123",
       status: "running" as const,
-      specPath: "specs/test.md",
       workspacePath: ".voratiq/run/sessions/run-123",
       createdAt: "2025-11-05T12:00:00.000Z",
-      baseRevisionSha: "abc123",
     };
 
     const report = createRunReport({
@@ -282,11 +278,9 @@ describe("createRunRenderer", () => {
     renderer.begin({
       runId: "run-123",
       status: "running",
-      specPath: "specs/test.md",
       workspacePath: ".voratiq/run/sessions/run-123",
       createdAt: "2025-11-05T12:00:00.000Z",
       startedAt,
-      baseRevisionSha: "abc123",
     });
 
     const transcript = renderer.complete(
@@ -320,11 +314,9 @@ describe("createRunRenderer", () => {
     renderer.begin({
       runId: "run-123",
       status: "running",
-      specPath: "specs/test.md",
       workspacePath: ".voratiq/run/sessions/run-123",
       createdAt: "2025-11-05T12:00:00.000Z",
       startedAt: "2025-11-05T12:00:00.000Z",
-      baseRevisionSha: "abc123",
     });
     renderer.update({
       agentId: "test-agent",
@@ -334,7 +326,7 @@ describe("createRunRenderer", () => {
     });
 
     let frame = normalizeFrame(tty.snapshot());
-    expect(frame).toContain("Elapsed        19s");
+    expect(frame).toContain("Elapsed    19s");
     expect(frame).toMatch(/test-agent\s+RUNNING\s+—/u);
 
     currentTime = new Date("2025-11-05T12:00:23.000Z").getTime();
@@ -346,7 +338,7 @@ describe("createRunRenderer", () => {
     });
 
     frame = normalizeFrame(tty.snapshot());
-    expect(frame).toContain("Elapsed        23s");
+    expect(frame).toContain("Elapsed    23s");
     expect(frame).toMatch(/test-agent\s+RUNNING\s+—/u);
   });
 
@@ -370,10 +362,8 @@ describe("createRunRenderer", () => {
     renderer.begin({
       runId: "run-123",
       status: "running",
-      specPath: "specs/test.md",
       workspacePath: ".voratiq/run/sessions/run-123",
       createdAt: "2025-11-05T12:00:00.000Z",
-      baseRevisionSha: "abc123",
     });
 
     renderer.update({

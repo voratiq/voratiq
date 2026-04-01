@@ -138,8 +138,6 @@ describe("reduce live progress renderer", () => {
     renderer.begin({
       reductionId: "reduce-123",
       createdAt: "2026-01-01T00:00:00.000Z",
-      sourceLabel: "Run",
-      sourcePath: ".voratiq/run/sessions/run-123",
       workspacePath: ".voratiq/reduce/sessions/reduce-123",
       status: "running",
     });
@@ -172,8 +170,6 @@ describe("reduce live progress renderer", () => {
     renderer.begin({
       reductionId: "reduce-123",
       createdAt: "2026-01-01T00:00:00.000Z",
-      sourceLabel: "Run",
-      sourcePath: ".voratiq/run/sessions/run-123",
       workspacePath: ".voratiq/reduce/sessions/reduce-123",
       status: "running",
     });
@@ -197,8 +193,6 @@ describe("reduce live progress renderer", () => {
       reductionId: "reduce-123",
       createdAt: "2026-01-01T00:00:00.000Z",
       elapsed: "3s",
-      sourceLabel: "Run",
-      sourcePath: ".voratiq/run/sessions/run-123",
       workspacePath: ".voratiq/reduce/sessions/reduce-123",
       status: "succeeded",
       reducers: [
@@ -232,8 +226,6 @@ describe("reduce live progress renderer", () => {
       reductionId: "reduce-123",
       createdAt: "2026-01-01T00:00:00.000Z",
       startedAt: "2026-01-01T00:00:00.000Z",
-      sourceLabel: "Run",
-      sourcePath: ".voratiq/run/sessions/run-123",
       workspacePath: ".voratiq/reduce/sessions/reduce-123",
       status: "running",
     });
@@ -257,5 +249,28 @@ describe("reduce live progress renderer", () => {
     frame = normalizeFrame(tty.snapshot());
     expect(frame).toContain("Elapsed    7s");
     expect(frame).toMatch(/reducer-a\s+RUNNING\s+—/u);
+  });
+
+  it("renders '-' for a missing reduction artifact in transcript blocks", () => {
+    const transcript = renderReduceTranscript({
+      reductionId: "reduce-123",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      elapsed: "3s",
+      workspacePath: ".voratiq/reduce/sessions/reduce-123",
+      status: "running",
+      reducers: [
+        {
+          reducerAgentId: "reducer-a",
+          duration: "—",
+          status: "running",
+        },
+      ],
+      suppressHint: true,
+      isTty: false,
+      includeSummarySection: true,
+    });
+
+    expect(transcript).toContain("Agent: reducer-a");
+    expect(transcript).toContain("Output: —");
   });
 });

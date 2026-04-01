@@ -337,8 +337,6 @@ describe("executeReduceCommand integration", () => {
     expect(renderer.begin.mock.calls[0]?.[0]).toEqual({
       reductionId: "reduce-123",
       createdAt: expect.any(String),
-      sourceLabel: "Run",
-      sourcePath: ".voratiq/run/sessions/run-123",
       workspacePath: ".voratiq/reduce/sessions/reduce-123",
       status: "running",
     });

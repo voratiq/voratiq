@@ -11,7 +11,6 @@ describe("renderTranscriptWithMetadata", () => {
       metadata: {
         runId: "run_123",
         status: "queued",
-        specPath: "spec.md",
       },
       agents: [
         {
@@ -45,7 +44,6 @@ describe("renderTranscriptWithMetadata", () => {
       metadata: {
         runId: "run_123",
         status: "failed",
-        specPath: "spec.md",
       },
       agents: [
         {

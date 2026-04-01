@@ -13,7 +13,6 @@ import { renderRunList } from "./list.js";
 
 export interface PruneConfirmationPrefaceOptions {
   runId: string;
-  specPath: string;
   runStatus: RunStatus;
   createdAt: string;
   runPath?: string;
@@ -29,7 +28,6 @@ export function buildPruneConfirmationPreface(
 ): string[] {
   const {
     runId,
-    specPath,
     runStatus,
     createdAt,
     runPath,
@@ -43,7 +41,6 @@ export function buildPruneConfirmationPreface(
   const introLines = buildRunMetadataSectionWithStyle(
     {
       runId,
-      specPath,
       status: runStatus,
       workspacePath: runPath,
       createdAt: formatRunTimestamp(createdAt),

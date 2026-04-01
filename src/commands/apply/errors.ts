@@ -30,7 +30,7 @@ export class ApplyAgentNotFoundError extends ApplyError {
     super(
       `Agent \`${agentId}\` not found in run \`${runId}\`.`,
       [],
-      ["Check available agents with `voratiq list`."],
+      ["Check available agents with `voratiq list --run <run-id>`."],
     );
     this.name = "ApplyAgentNotFoundError";
   }

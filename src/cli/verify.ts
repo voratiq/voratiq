@@ -29,6 +29,7 @@ import {
 } from "../preflight/index.js";
 import {
   createVerifyRenderer,
+  formatVerifyElapsed,
   renderVerifyTranscript,
 } from "../render/transcripts/verify.js";
 import { formatRenderLifecycleDuration } from "../render/utils/duration.js";
@@ -161,7 +162,6 @@ export async function runVerifyCommand(
       return {
         verifierLabel: formatMethodVerifierLabel(method),
         agentLabel: formatMethodAgentLabel(method),
-        heading: formatMethodHeading(method),
         status: method.status,
         duration: formatMethodDuration(method),
         artifactPath: method.artifactPath,
@@ -234,8 +234,6 @@ export async function runVerifyCommand(
         ),
       ),
     ),
-    targetKind: execution.record.target.kind,
-    targetSessionId: execution.record.target.sessionId,
     status: execution.record.status,
     methods: methodBlocks,
     suppressHint,
@@ -310,7 +308,7 @@ function resolveTargetFromOptions(
         ? "No target flag was provided."
         : `Provided: ${provided}.`;
     command.error(
-      `error: exactly one of --spec, --run, or --reduce is required (${detail})`,
+      `error: exactly one target flag is required: \`--spec\`, \`--run\`, or \`--reduce\` (${detail})`,
       { exitCode: 1 },
     );
   }
@@ -318,7 +316,7 @@ function resolveTargetFromOptions(
   const selected = entries[0];
   if (!selected || !selected.value) {
     command.error(
-      "error: exactly one of --spec, --run, or --reduce is required",
+      "error: exactly one target flag is required: `--spec`, `--run`, or `--reduce`",
       { exitCode: 1 },
     );
   }
@@ -389,23 +387,6 @@ export function createVerifyCommand(): Command {
     });
 }
 
-function formatVerifyElapsed(options: {
-  status: VerificationRecord["status"];
-  startedAt?: string;
-  completedAt?: string;
-  now?: number;
-}): string | undefined {
-  return formatRenderLifecycleDuration({
-    lifecycle: {
-      status: options.status,
-      startedAt: options.startedAt,
-      completedAt: options.completedAt,
-    },
-    terminalStatuses: TERMINAL_VERIFICATION_STATUSES,
-    now: options.now,
-  });
-}
-
 function formatMethodDuration(method: VerificationMethodResultRef): string {
   return (
     formatRenderLifecycleDuration({
@@ -437,16 +418,6 @@ function formatMethodAgentLabel(
   }
 
   return method.verifierId;
-}
-
-function formatMethodHeading(
-  method: VerificationMethodResultRef,
-): string | undefined {
-  if (method.method === "programmatic") {
-    return undefined;
-  }
-
-  return `Verifier: ${method.verifierId ?? "unknown"}`;
 }
 
 async function buildMethodBodyLines(options: {

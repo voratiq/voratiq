@@ -135,9 +135,9 @@ describe("reduce transcript contract", () => {
     const body = stripAnsi(result.body);
     expect(body).toContain("reduce-123");
     expect(body).toContain("Workspace");
-    expect(body).toContain("Reducer: alpha");
-    expect(body).toContain("Reducer: beta");
-    expect(body).toContain("Reducer: gamma");
+    expect(body).toContain("Agent: alpha");
+    expect(body).toContain("Agent: beta");
+    expect(body).toContain("Agent: gamma");
     expect(body).toContain("SUCCEEDED");
     expect(body).toContain("FAILED");
 
@@ -239,8 +239,8 @@ describe("reduce transcript contract", () => {
     });
 
     const body = stripAnsi(result.body);
-    expect(body).toContain("Reducer: alpha");
-    expect(body).toContain("Reducer: beta");
+    expect(body).toContain("Agent: alpha");
+    expect(body).toContain("Agent: beta");
     expect(body).toContain("Error:");
     expect(body).not.toContain("Next:");
     expect(body).not.toContain("--extra-context");

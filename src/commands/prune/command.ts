@@ -93,7 +93,6 @@ export async function executePruneCommand(
     defaultValue: false,
     prefaceLines: buildPruneConfirmationPreface({
       runId: runRecord.runId,
-      specPath: runRecord.spec.path,
       workspaces: workspaceTargets.map((target) => target.displayPath),
       directories: agentDirectories,
       branches,

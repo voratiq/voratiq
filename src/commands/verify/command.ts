@@ -132,8 +132,6 @@ export async function executeVerifyCommand(
         ),
       ),
     ),
-    targetKind: resolvedTarget.target.kind,
-    targetSessionId: resolvedTarget.target.sessionId,
     status: "running",
   });
 

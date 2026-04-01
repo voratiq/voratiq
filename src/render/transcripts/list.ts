@@ -1,26 +1,19 @@
+import type { ReductionRecord } from "../../domain/reduce/model/types.js";
 import type { RunRecord } from "../../domain/run/model/types.js";
+import type { SpecRecord } from "../../domain/spec/model/types.js";
+import type { VerificationRecord } from "../../domain/verify/model/types.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import { renderTable } from "../utils/table.js";
 import { renderTranscript } from "../utils/transcript.js";
 
-interface ListRenderOptions {
-  isTty?: boolean;
-  columns?: number;
-}
+const DASH = "—";
+const SPEC_DESCRIPTION_PREVIEW_LENGTH = 32;
 
-const COLUMN_GAP = "  ";
-const MIN_SPEC_WIDTH = 24;
-const MIN_WRAP_WIDTH = 10;
-const ANSI_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
-
-export function renderRunList(
-  records: readonly RunRecord[],
-  options: ListRenderOptions = {},
-): string {
+export function renderRunList(records: readonly RunRecord[]): string {
   const rows = records.map((record) => ({
     run: record.runId,
-    status: record.status.toUpperCase(),
     spec: record.spec.path,
+    status: record.status.toUpperCase(),
     created: formatRunTimestamp(record.createdAt),
   }));
 
@@ -29,26 +22,18 @@ export function renderRunList(
     accessor: (row: (typeof rows)[number]) => string;
   }[] = [
     { header: "RUN", accessor: (row: (typeof rows)[number]) => row.run },
+    { header: "SPEC", accessor: (row: (typeof rows)[number]) => row.spec },
     {
       header: "STATUS",
       accessor: (row: (typeof rows)[number]) => row.status,
     },
-    { header: "SPEC", accessor: (row: (typeof rows)[number]) => row.spec },
     {
       header: "CREATED",
       accessor: (row: (typeof rows)[number]) => row.created,
     },
   ];
 
-  const isTty = options.isTty ?? Boolean(process.stdout.isTTY);
-  const columnsWidth = options.columns ?? process.stdout.columns;
-
-  const lines =
-    isTty && typeof columnsWidth === "number" && columnsWidth > 0
-      ? renderWrappedRunTable(rows, columnsWidth)
-      : renderTable({ columns, rows });
-
-  return lines.join("\n");
+  return renderTable({ columns, rows }).join("\n");
 }
 
 export function renderListTranscript(records: readonly RunRecord[]): string {
@@ -57,134 +42,117 @@ export function renderListTranscript(records: readonly RunRecord[]): string {
   }
 
   const tableOutput = renderRunList(records);
+  return renderListTableTranscript(tableOutput);
+}
+
+export function renderSpecList(records: readonly SpecRecord[]): string {
+  return renderTable({
+    columns: [
+      {
+        header: "SPEC",
+        accessor: (record) => record.sessionId,
+      },
+      {
+        header: "DESCRIPTION",
+        accessor: (record) =>
+          truncatePreview(record.description, SPEC_DESCRIPTION_PREVIEW_LENGTH),
+      },
+      {
+        header: "STATUS",
+        accessor: (record) => record.status.toUpperCase(),
+      },
+      {
+        header: "CREATED",
+        accessor: (record) => formatRunTimestamp(record.createdAt),
+      },
+    ],
+    rows: records,
+  }).join("\n");
+}
+
+export function renderReduceList(records: readonly ReductionRecord[]): string {
+  return renderTable({
+    columns: [
+      {
+        header: "REDUCE",
+        accessor: (record) => record.sessionId,
+      },
+      {
+        header: "TARGET",
+        accessor: (record) => `${record.target.type}:${record.target.id}`,
+      },
+      {
+        header: "STATUS",
+        accessor: (record) => record.status.toUpperCase(),
+      },
+      {
+        header: "CREATED",
+        accessor: (record) => formatRunTimestamp(record.createdAt),
+      },
+    ],
+    rows: records,
+  }).join("\n");
+}
+
+export function renderVerifyList(
+  records: readonly VerificationRecord[],
+): string {
+  return renderTable({
+    columns: [
+      {
+        header: "VERIFY",
+        accessor: (record) => record.sessionId,
+      },
+      {
+        header: "TARGET",
+        accessor: (record) =>
+          `${record.target.kind}:${record.target.sessionId}`,
+      },
+      {
+        header: "STATUS",
+        accessor: (record) => record.status.toUpperCase(),
+      },
+      {
+        header: "CREATED",
+        accessor: (record) => formatRunTimestamp(record.createdAt),
+      },
+    ],
+    rows: records,
+  }).join("\n");
+}
+
+export function renderListTableTranscript(tableOutput: string): string {
+  if (tableOutput.trim().length === 0) {
+    return "";
+  }
+
   const sections: string[][] = [];
 
-  if (tableOutput.trim().length > 0) {
-    sections.push(tableOutput.split("\n"));
-  }
+  sections.push(tableOutput.split("\n"));
 
   return renderTranscript({ sections });
 }
 
-function renderWrappedRunTable(
-  rows: ReadonlyArray<{
-    run: string;
-    status: string;
-    spec: string;
-    created: string;
-  }>,
-  terminalColumns: number,
-): string[] {
-  const runWidth = Math.max("RUN".length, ...rows.map((row) => row.run.length));
-  const statusWidth = Math.max(
-    "STATUS".length,
-    ...rows.map((row) => row.status.length),
-  );
-  const createdWidth = Math.max(
-    "CREATED".length,
-    ...rows.map((row) => row.created.length),
-  );
-  const fixedWidth =
-    runWidth + statusWidth + createdWidth + COLUMN_GAP.length * 3;
-  const remaining = terminalColumns - fixedWidth;
-  const specWidth = Math.max(
-    MIN_WRAP_WIDTH,
-    Math.min(Math.max("SPEC".length, MIN_SPEC_WIDTH), remaining),
-  );
-
-  if (
-    specWidth <= MIN_WRAP_WIDTH ||
-    terminalColumns < fixedWidth + MIN_WRAP_WIDTH
-  ) {
-    return renderTable({
-      columns: [
-        { header: "RUN", accessor: (row) => row.run },
-        { header: "STATUS", accessor: (row) => row.status },
-        { header: "SPEC", accessor: (row) => row.spec },
-        { header: "CREATED", accessor: (row) => row.created },
-      ],
-      rows,
-    });
+function truncatePreview(
+  value: string | null | undefined,
+  maxLength: number,
+): string {
+  if (!value) {
+    return DASH;
   }
 
-  const lines: string[] = [
-    [
-      padVisible("RUN", runWidth),
-      padVisible("STATUS", statusWidth),
-      padVisible("SPEC", specWidth),
-      padVisible("CREATED", createdWidth),
-    ].join(COLUMN_GAP),
-  ];
-
-  for (const row of rows) {
-    const runLines = wrapForColumn(row.run, runWidth);
-    const statusLines = wrapForColumn(row.status, statusWidth);
-    const specLines = wrapForColumn(row.spec, specWidth);
-    const createdLines = wrapForColumn(row.created, createdWidth);
-    const rowHeight = Math.max(
-      runLines.length,
-      statusLines.length,
-      specLines.length,
-      createdLines.length,
-    );
-
-    for (let index = 0; index < rowHeight; index += 1) {
-      lines.push(
-        [
-          padVisible(runLines[index] ?? "", runWidth),
-          padVisible(statusLines[index] ?? "", statusWidth),
-          padVisible(specLines[index] ?? "", specWidth),
-          padVisible(createdLines[index] ?? "", createdWidth),
-        ].join(COLUMN_GAP),
-      );
-    }
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length === 0) {
+    return DASH;
   }
 
-  return lines;
-}
-
-function wrapForColumn(value: string, width: number): string[] {
-  if (visibleLength(value) <= width) {
-    return [value];
+  if (normalized.length <= maxLength) {
+    return normalized;
   }
 
-  const lines: string[] = [];
-  let remaining = value;
-  while (visibleLength(remaining) > width) {
-    const chunk = remaining.slice(0, width);
-    const splitIndex = findWrapSplit(chunk);
-    lines.push(remaining.slice(0, splitIndex).trimEnd());
-    remaining = remaining.slice(splitIndex).trimStart();
-  }
-  lines.push(remaining);
-  return lines;
-}
-
-function findWrapSplit(chunk: string): number {
-  const minimumUsefulBreak = Math.floor(chunk.length * 0.6);
-
-  for (let index = chunk.length - 1; index >= 0; index -= 1) {
-    const char = chunk[index];
-    if (char === " " || char === "/" || char === "\\") {
-      if (index + 1 >= minimumUsefulBreak) {
-        return index + 1;
-      }
-      break;
-    }
+  if (maxLength <= 3) {
+    return normalized.slice(0, maxLength);
   }
 
-  return chunk.length;
-}
-
-function visibleLength(value: string): number {
-  return value.replace(ANSI_PATTERN, "").length;
-}
-
-function padVisible(value: string, width: number): string {
-  const length = visibleLength(value);
-  if (length >= width) {
-    return value;
-  }
-
-  return value + " ".repeat(width - length);
+  return `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
 }

@@ -1,10 +1,14 @@
 import type { RunRecord } from "../../src/domain/run/model/types.js";
-import { renderRunList } from "../../src/render/transcripts/list.js";
+import type { SpecRecord } from "../../src/domain/spec/model/types.js";
+import {
+  renderRunList,
+  renderSpecList,
+} from "../../src/render/transcripts/list.js";
 import { formatRunTimestamp } from "../../src/render/utils/records.js";
 import { createRunRecord } from "../support/factories/run-records.js";
 
 describe("renderRunList", () => {
-  it("renders a table with RUN, STATUS, SPEC, CREATED columns", () => {
+  it("renders a table with RUN, SPEC, STATUS, CREATED columns", () => {
     const records: RunRecord[] = [
       buildRunRecord({
         runId: "20251016-133651-woeqr",
@@ -62,7 +66,7 @@ describe("renderRunList", () => {
     ).toBe(true);
   });
 
-  it("orders columns as RUN, STATUS, SPEC, CREATED", () => {
+  it("orders columns as RUN, SPEC, STATUS, CREATED", () => {
     const records: RunRecord[] = [
       buildRunRecord({
         runId: "20251016-133651-woeqr",
@@ -79,8 +83,8 @@ describe("renderRunList", () => {
     const specIndex = headerLine.indexOf("SPEC");
     const createdIndex = headerLine.indexOf("CREATED");
 
-    expect(runIndex).toBeLessThan(statusIndex);
-    expect(statusIndex).toBeLessThan(specIndex);
+    expect(runIndex).toBeLessThan(specIndex);
+    expect(specIndex).toBeLessThan(statusIndex);
     expect(specIndex).toBeLessThan(createdIndex);
   });
 
@@ -133,16 +137,18 @@ describe("renderRunList", () => {
     const secondRow = lines[2] ?? "";
 
     const runIndex = headerLine.indexOf("RUN");
-    const statusIndex = headerLine.indexOf("STATUS");
     const specIndex = headerLine.indexOf("SPEC");
+    const statusIndex = headerLine.indexOf("STATUS");
 
     expect(firstRow.charAt(specIndex)).not.toBe(" ");
     expect(secondRow.charAt(specIndex)).not.toBe(" ");
 
     expect(firstRow.charAt(runIndex)).toBe("2");
     expect(secondRow.charAt(runIndex)).toBe("2");
-    expect(firstRow.slice(statusIndex, specIndex).trim()).toBe("SUCCEEDED");
-    expect(secondRow.slice(statusIndex, specIndex).trim()).toBe("SUCCEEDED");
+    expect(firstRow.slice(specIndex, statusIndex)).toContain("specs/");
+    expect(secondRow.slice(specIndex, statusIndex)).toContain("specs/");
+    expect(firstRow.slice(statusIndex).trim()).toContain("SUCCEEDED");
+    expect(secondRow.slice(statusIndex).trim()).toContain("SUCCEEDED");
   });
 
   it("renders single record", () => {
@@ -159,8 +165,8 @@ describe("renderRunList", () => {
 
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain("RUN");
-    expect(lines[0]).toContain("STATUS");
     expect(lines[0]).toContain("SPEC");
+    expect(lines[0]).toContain("STATUS");
     expect(lines[1]).toContain("specs/onboarding-ux.md");
   });
 
@@ -188,7 +194,7 @@ describe("renderRunList", () => {
     expect(lines[2]).toContain("20251016-023258-qifyb");
   });
 
-  it("wraps long SPEC values within the SPEC column for narrow TTY widths", () => {
+  it("keeps long SPEC values on a single line for narrow TTY widths", () => {
     const records: RunRecord[] = [
       buildRunRecord({
         runId: "20260328-210627-veijo",
@@ -198,18 +204,53 @@ describe("renderRunList", () => {
       }),
     ];
 
-    const output = renderRunList(records, { isTty: true, columns: 120 });
+    const output = renderRunList(records);
     const lines = output.split("\n");
 
-    expect(lines.length).toBeGreaterThan(2);
+    expect(lines).toHaveLength(2);
     expect(lines[1]).toContain("20260328-210627-veijo");
     expect(lines[1]).toContain("SUCCEEDED");
     expect(lines[1]).toContain(".voratiq/spec/sessions/");
-    expect(lines.slice(2).some((line) => line.includes("clean-up-stale"))).toBe(
-      true,
+    expect(lines[1]).toContain("clean-up-stale");
+  });
+});
+
+describe("renderSpecList", () => {
+  it("truncates long descriptions to a 32-character preview", () => {
+    const records: SpecRecord[] = [
+      buildSpecRecord({
+        sessionId: "20260331-193636-uixyb",
+        status: "running",
+        description:
+          "Generalize voratiq list from a run-only command into an operator-shaped read command.",
+      }),
+    ];
+
+    const output = renderSpecList(records);
+    const lines = output.split("\n");
+
+    expect(lines[0]).toContain("DESCRIPTION");
+    expect(lines[1]).toContain("Generalize voratiq list from...");
+    expect(lines[1]).not.toContain(
+      "Generalize voratiq list from a run-only command into an operator-shaped read command.",
     );
-    const createdMatches = lines.filter((line) => line.includes("2026-03-28"));
-    expect(createdMatches).toHaveLength(1);
+  });
+
+  it("normalizes whitespace before truncating descriptions", () => {
+    const records: SpecRecord[] = [
+      buildSpecRecord({
+        sessionId: "20260331-192546-vitwq",
+        status: "failed",
+        description:
+          "Generalize \nNo runs recorded. from a run-only command into an operator-shaped read command.",
+      }),
+    ];
+
+    const output = renderSpecList(records);
+    const lines = output.split("\n");
+
+    expect(lines[1]).toContain("Generalize No runs recorded...");
+    expect(lines[1]).not.toContain("\n");
   });
 });
 
@@ -229,4 +270,22 @@ function buildRunRecord(params: {
     agents: [],
     deletedAt: params.deletedAt ?? null,
   });
+}
+
+function buildSpecRecord(params: {
+  sessionId: string;
+  status: SpecRecord["status"];
+  description: string;
+}): SpecRecord {
+  const createdAt = "2026-03-01T00:00:00.000Z";
+
+  return {
+    sessionId: params.sessionId,
+    createdAt,
+    startedAt: createdAt,
+    status: params.status,
+    description: params.description,
+    agents: [],
+    error: null,
+  };
 }

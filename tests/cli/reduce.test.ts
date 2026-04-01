@@ -13,7 +13,9 @@ describe("reduce command options", () => {
 
     await expect(
       program.parseAsync(["reduce", "--agent", "alpha"], { from: "user" }),
-    ).rejects.toThrow(/exactly one of --spec, --run, --verify, or --reduce/i);
+    ).rejects.toThrow(
+      /exactly one target flag is required: `--spec`, `--run`, `--verify`, or `--reduce`/i,
+    );
   });
 
   it("rejects multiple target flags", async () => {
@@ -27,7 +29,9 @@ describe("reduce command options", () => {
       program.parseAsync(["reduce", "--spec", "spec-1", "--run", "run-2"], {
         from: "user",
       }),
-    ).rejects.toThrow(/exactly one of --spec, --run, --verify, or --reduce/i);
+    ).rejects.toThrow(
+      /exactly one target flag is required: `--spec`, `--run`, `--verify`, or `--reduce`/i,
+    );
   });
 
   it("parses reducer options", async () => {

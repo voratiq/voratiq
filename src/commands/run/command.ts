@@ -143,11 +143,9 @@ export async function executeRunCommand(
     renderer.begin({
       runId,
       status: "running",
-      specPath: specDisplayPath,
       workspacePath: formatRunWorkspaceRelative(runId),
       createdAt,
       startedAt,
-      baseRevisionSha: validation.baseRevisionSha,
     });
   }
 

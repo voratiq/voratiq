@@ -1526,7 +1526,9 @@ describe("voratiq auto", () => {
           "verifier-a  SUCCEEDED",
           "verifier-b  FAILED",
           "",
-          "Verifier: verifier-a",
+          "Agent: verifier-a",
+          "",
+          "Verifier: run-verification",
           "",
           "```markdown",
           "## Recommendation",
@@ -1536,11 +1538,13 @@ describe("voratiq auto", () => {
           "voratiq apply --run run-123 --agent codex",
           "```",
           "",
-          "Artifact: .voratiq/verify/sessions/verify-789/verifier-a/run-verification/artifacts/result.json",
+          "Output: .voratiq/verify/sessions/verify-789/verifier-a/run-verification/artifacts/result.json",
           "",
           "---",
           "",
-          "Verifier: verifier-b",
+          "Agent: verifier-b",
+          "",
+          "Verifier: run-verification",
           "",
           "Error: verifier violated output contract",
         ].join("\n"),
@@ -1569,7 +1573,8 @@ describe("voratiq auto", () => {
 
     const output = stripAnsi(stdout.join(""));
     expect(output).toContain("verify-789 FAILED");
-    expect(output).toContain("Verifier: verifier-b");
+    expect(output).toContain("Agent: verifier-b");
+    expect(output).toContain("Verifier: run-verification");
     expect(output).toContain("Error: verifier violated output contract");
     expect(output).toContain("Auto FAILED");
     expect(runApplyCommandMock).not.toHaveBeenCalled();

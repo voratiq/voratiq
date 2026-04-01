@@ -97,8 +97,6 @@ export async function executeReduceCommand(
   renderer?.begin({
     reductionId,
     createdAt,
-    sourceLabel: mapReduceSourceLabel(target.type),
-    sourcePath: mapReduceSourcePath(target),
     workspacePath: `.voratiq/reduce/sessions/${reductionId}`,
     status: "running",
   });
@@ -171,34 +169,6 @@ export async function executeReduceCommand(
     reducerAgentIds: reducers.map((reducer) => reducer.id),
     reductions: reductionResults,
   };
-}
-
-function mapReduceSourceLabel(
-  targetType: ReductionTarget["type"],
-): "Spec" | "Run" | "Verify" | "Reduce" {
-  switch (targetType) {
-    case "spec":
-      return "Spec";
-    case "run":
-      return "Run";
-    case "verify":
-      return "Verify";
-    case "reduce":
-      return "Reduce";
-  }
-}
-
-function mapReduceSourcePath(target: ReductionTarget): string {
-  switch (target.type) {
-    case "spec":
-      return `.voratiq/spec/sessions/${target.id}`;
-    case "run":
-      return `.voratiq/run/sessions/${target.id}`;
-    case "verify":
-      return `.voratiq/verify/sessions/${target.id}`;
-    case "reduce":
-      return `.voratiq/reduce/sessions/${target.id}`;
-  }
 }
 
 function resolveReduceAgents(options: {

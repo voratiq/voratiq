@@ -35,7 +35,7 @@ export class RunNotFoundCliError extends CliError {
     super(
       `Run \`${runId}\` not found.`,
       [],
-      ["Check available runs with `voratiq list`."],
+      ["Check available runs with `voratiq list --run`."],
     );
     this.name = "RunNotFoundCliError";
   }

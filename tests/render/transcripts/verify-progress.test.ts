@@ -138,8 +138,6 @@ describe("verify live progress renderer", () => {
       verificationId: "verify-123",
       createdAt: "2026-01-01T00:00:00.000Z",
       workspacePath: ".voratiq/verify/sessions/verify-123",
-      targetKind: "run",
-      targetSessionId: "run-123",
       status: "running",
     });
     renderer.update({
@@ -172,8 +170,6 @@ describe("verify live progress renderer", () => {
       verificationId: "verify-123",
       createdAt: "2026-01-01T00:00:00.000Z",
       workspacePath: ".voratiq/verify/sessions/verify-123",
-      targetKind: "run",
-      targetSessionId: "run-123",
       status: "running",
     });
     renderer.update({
@@ -197,8 +193,6 @@ describe("verify live progress renderer", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
       elapsed: "3s",
       workspacePath: ".voratiq/verify/sessions/verify-123",
-      targetKind: "run",
-      targetSessionId: "run-123",
       status: "succeeded",
       methods: [
         {
@@ -232,8 +226,6 @@ describe("verify live progress renderer", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
       startedAt: "2026-01-01T00:00:00.000Z",
       workspacePath: ".voratiq/verify/sessions/verify-123",
-      targetKind: "run",
-      targetSessionId: "run-123",
       status: "running",
     });
     renderer.update({
@@ -265,8 +257,6 @@ describe("verify live progress renderer", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
       elapsed: "3s",
       workspacePath: ".voratiq/verify/sessions/verify-123",
-      targetKind: "run",
-      targetSessionId: "run-123",
       status: "succeeded",
       methods: [
         {
@@ -282,6 +272,30 @@ describe("verify live progress renderer", () => {
     });
 
     expect(transcript).toContain("programmatic");
-    expect(transcript).toContain("Run        run-123");
+    expect(transcript).not.toContain("Run        run-123");
+    expect(transcript).toContain("Agent: —");
+    expect(transcript).toContain("Verifier: programmatic");
+  });
+
+  it("renders '-' for a missing artifact in transcript blocks", () => {
+    const transcript = renderVerifyTranscript({
+      verificationId: "verify-123",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      elapsed: "3s",
+      workspacePath: ".voratiq/verify/sessions/verify-123",
+      status: "running",
+      methods: [
+        {
+          verifierLabel: "programmatic",
+          duration: "—",
+          status: "running",
+        },
+      ],
+      suppressHint: true,
+      isTty: false,
+      includeSummarySection: true,
+    });
+
+    expect(transcript).toContain("Output: —");
   });
 });

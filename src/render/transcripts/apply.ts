@@ -49,10 +49,8 @@ export function renderApplyTranscript(result: ApplyResult): string {
     metadata: {
       runId: result.runId,
       status: result.status,
-      specPath: result.specPath,
       workspacePath: formatRunWorkspaceRelative(result.runId),
       createdAt: formatRunTimestamp(result.createdAt),
-      baseRevisionSha: result.baseRevisionSha,
     },
     agents: [agentDisplay],
     warnings,
