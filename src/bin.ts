@@ -206,6 +206,7 @@ export async function runCli(
   );
   const jsonEnvelopeOperator = resolveJsonEnvelopeOperator(effectiveArgv);
   activeJsonEnvelopeOperator = jsonEnvelopeOperator;
+  const commandName = findCommandName(effectiveArgv);
 
   const localVersion = (await import("./utils/version.js")).getVoratiqVersion();
 
@@ -232,42 +233,47 @@ export async function runCli(
     });
   }
 
-  // Start update check (non-blocking)
-  const { startUpdateCheck } = await import("./update-check/checker.js");
-  const { resolveUpdateStatePath } = await import(
-    "./update-check/state-path.js"
-  );
-  const updateHandle = startUpdateCheck(localVersion, {
-    isTty: Boolean(process.stdin.isTTY && process.stdout.isTTY),
-    env: process.env,
-    cachePath: resolveUpdateStatePath(process.env),
-  });
+  const isMcpCommand = commandName === "mcp";
+  const updateHandle = isMcpCommand
+    ? undefined
+    : (await import("./update-check/checker.js")).startUpdateCheck(
+        localVersion,
+        {
+          isTty: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+          env: process.env,
+          cachePath: (
+            await import("./update-check/state-path.js")
+          ).resolveUpdateStatePath(process.env),
+        },
+      );
 
   try {
-    // Show update prompt if a cached notice is available
-    const updateNotice = updateHandle?.peekNotice();
-    if (updateNotice) {
-      const { showUpdatePrompt } = await import("./update-check/prompt.js");
-      const { createConfirmationInteractor } = await import(
-        "./render/interactions/confirmation.js"
-      );
-      const { writeCommandOutput } = await import("./cli/output.js");
+    if (!isMcpCommand) {
+      // Show update prompt if a cached notice is available
+      const updateNotice = updateHandle?.peekNotice();
+      if (updateNotice) {
+        const { showUpdatePrompt } = await import("./update-check/prompt.js");
+        const { createConfirmationInteractor } = await import(
+          "./render/interactions/confirmation.js"
+        );
+        const { writeCommandOutput } = await import("./cli/output.js");
 
-      const interactor = createConfirmationInteractor();
-      try {
-        const result = await showUpdatePrompt(updateNotice, {
-          prompt: (opts) => interactor.prompt(opts),
-          write: (text) => process.stdout.write(text),
-          writeCommandOutput,
-        });
-        if (result.shouldExit) {
-          if (result.exitCode !== undefined && result.exitCode !== 0) {
-            process.exitCode = result.exitCode;
+        const interactor = createConfirmationInteractor();
+        try {
+          const result = await showUpdatePrompt(updateNotice, {
+            prompt: (opts) => interactor.prompt(opts),
+            write: (text) => process.stdout.write(text),
+            writeCommandOutput,
+          });
+          if (result.shouldExit) {
+            if (result.exitCode !== undefined && result.exitCode !== 0) {
+              process.exitCode = result.exitCode;
+            }
+            return;
           }
-          return;
+        } finally {
+          interactor.close();
         }
-      } finally {
-        interactor.close();
       }
     }
 
@@ -387,22 +393,23 @@ async function registerCommands(
   const commandName = findCommandName(argv);
   const wantsHelp = argv.includes("--help") || argv.includes("-h");
   const wantsVersion = argv.includes("--version") || argv.includes("-v");
+  const knownCommandNames = new Set([
+    "auto",
+    "init",
+    "spec",
+    "run",
+    "verify",
+    "reduce",
+    "apply",
+    "list",
+    "prune",
+    "mcp",
+  ]);
 
   const loadAll =
     commandName === undefined ||
-    wantsHelp ||
-    (commandName !== undefined &&
-      ![
-        "auto",
-        "init",
-        "spec",
-        "run",
-        "verify",
-        "reduce",
-        "apply",
-        "list",
-        "prune",
-      ].includes(commandName));
+    (wantsHelp && commandName === undefined) ||
+    (commandName !== undefined && !knownCommandNames.has(commandName));
 
   if (commandName === undefined && wantsVersion && !wantsHelp) {
     return;
@@ -418,6 +425,7 @@ async function registerCommands(
     program.addCommand((await import("./cli/apply.js")).createApplyCommand());
     program.addCommand((await import("./cli/list.js")).createListCommand());
     program.addCommand((await import("./cli/prune.js")).createPruneCommand());
+    program.addCommand((await import("./cli/mcp.js")).createMcpCommand());
     return;
   }
 
@@ -452,6 +460,9 @@ async function registerCommands(
       break;
     case "prune":
       program.addCommand((await import("./cli/prune.js")).createPruneCommand());
+      break;
+    case "mcp":
+      program.addCommand((await import("./cli/mcp.js")).createMcpCommand());
       break;
   }
 }

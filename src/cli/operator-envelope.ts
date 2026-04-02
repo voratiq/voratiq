@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { ReductionTarget } from "../domain/reduce/model/types.js";
 import type { SelectionDecision } from "../policy/index.js";
 import type {
@@ -46,6 +48,70 @@ export interface OperatorResultEnvelope {
   alerts?: Array<{ level: "info" | "warn" | "error"; message: string }>;
   error?: { code: string; message: string };
 }
+
+export const operatorResultEnvelopeSchema = z
+  .object({
+    version: z.literal(1),
+    operator: z.enum(externalExecutionOperators),
+    status: z.enum(["succeeded", "failed", "unresolved"]),
+    timestamp: z.string(),
+    ids: z
+      .object({
+        sessionId: z.string().optional(),
+        runId: z.string().optional(),
+        verificationId: z.string().optional(),
+        reductionId: z.string().optional(),
+        agentId: z.string().optional(),
+      })
+      .passthrough()
+      .optional(),
+    artifacts: z.array(
+      z
+        .object({
+          kind: z.string(),
+          path: z.string(),
+          role: z.string().optional(),
+          agentId: z.string().optional(),
+        })
+        .passthrough(),
+    ),
+    selection: z
+      .object({
+        state: z.enum(["resolvable", "unresolved"]),
+        selectedCanonicalAgentId: z.string().optional(),
+        selectedSpecPath: z.string().optional(),
+      })
+      .passthrough()
+      .optional(),
+    unresolvedReasons: z
+      .array(
+        z
+          .object({
+            code: z.string(),
+            detail: z.string().optional(),
+          })
+          .passthrough(),
+      )
+      .optional(),
+    alerts: z
+      .array(
+        z
+          .object({
+            level: z.enum(["info", "warn", "error"]),
+            message: z.string(),
+          })
+          .passthrough(),
+      )
+      .optional(),
+    error: z
+      .object({
+        code: z.string(),
+        message: z.string(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
 
 export interface VerifyEnvelopeInput {
   verificationId: string;
