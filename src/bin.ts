@@ -6,6 +6,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const SIGNAL_EXIT_CODES: Partial<Record<NodeJS.Signals, number>> = {
+  SIGHUP: 129,
   SIGINT: 130,
   SIGTERM: 143,
 };
@@ -13,14 +14,19 @@ const SIGNAL_EXIT_CODES: Partial<Record<NodeJS.Signals, number>> = {
 let activeJsonEnvelopeOperator:
   | import("./cli/operator-envelope.js").EnvelopeOperator
   | undefined;
+let processGuardsInstalled = false;
 
 function installProcessGuards(): void {
-  process.once("SIGINT", () => {
-    void handleSignal("SIGINT");
-  });
-  process.once("SIGTERM", () => {
-    void handleSignal("SIGTERM");
-  });
+  if (processGuardsInstalled) {
+    return;
+  }
+  processGuardsInstalled = true;
+
+  for (const signal of ["SIGHUP", "SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      void handleSignal(signal);
+    });
+  }
 
   process.on("uncaughtException", (error) => {
     void handleFatalError("uncaught exception", error);
@@ -110,6 +116,16 @@ async function flushPendingHistory(): Promise<void> {
     );
   }
   try {
+    const { flushAllInteractiveSessionBuffers } = await import(
+      "./domain/interactive/persistence/adapter.js"
+    );
+    await flushAllInteractiveSessionBuffers();
+  } catch (error) {
+    console.warn(
+      `[voratiq] Failed to flush interactive history buffers: ${(error as Error).message}`,
+    );
+  }
+  try {
     const { flushAllSpecRecordBuffers } = await import(
       "./domain/spec/persistence/adapter.js"
     );
@@ -171,6 +187,27 @@ async function terminateActiveVerificationSafe(
   }
 }
 
+async function terminateActiveInteractiveSafe(
+  status: "failed" | "aborted",
+  context: string,
+): Promise<Error | null> {
+  try {
+    const { terminateActiveInteractive } = await import(
+      "./commands/interactive/lifecycle.js"
+    );
+    await terminateActiveInteractive(status, context);
+    return null;
+  } catch (error) {
+    const { toErrorMessage } = await import("./utils/errors.js");
+    const normalizedError =
+      error instanceof Error ? error : new Error(toErrorMessage(error));
+    console.error(
+      `[voratiq] Failed to teardown interactive session after ${context}: ${toErrorMessage(error)}`,
+    );
+    return normalizedError;
+  }
+}
+
 async function terminateActiveSessionsSafe(
   status: "failed" | "aborted",
   context: string,
@@ -180,8 +217,12 @@ async function terminateActiveSessionsSafe(
     status,
     context,
   );
+  const interactiveError = await terminateActiveInteractiveSafe(
+    status,
+    context,
+  );
 
-  const errors = [runError, verificationError].filter(
+  const errors = [runError, verificationError, interactiveError].filter(
     (error): error is Error => error instanceof Error,
   );
 
@@ -198,9 +239,11 @@ async function terminateActiveSessionsSafe(
 export async function runCli(
   argv: readonly string[] = process.argv,
 ): Promise<void> {
+  installProcessGuards();
+
   const { Command, CommanderError } = await import("commander");
   const program = new Command();
-  const effectiveArgv = normalizeRootIntentArgv(argv);
+  const effectiveArgv = argv;
   const { resolveJsonEnvelopeOperator } = await import(
     "./cli/operator-envelope.js"
   );
@@ -216,10 +259,6 @@ export async function runCli(
       "Agent ensembles to design, generate, and select the best code for every task.",
     )
     .enablePositionalOptions()
-    .option(
-      "--description <text>",
-      "Describe what to build, then run the full pipeline",
-    )
     .version(localVersion, "-v, --version", "print the Voratiq version")
     .exitOverride()
     .showHelpAfterError()
@@ -278,6 +317,43 @@ export async function runCli(
     }
 
     await registerCommands(program, effectiveArgv);
+
+    const { shouldStartRootLauncher } = await import("./cli/root-launcher.js");
+    if (shouldStartRootLauncher(effectiveArgv)) {
+      try {
+        const { runInteractiveRootLauncher } = await import(
+          "./cli/root-launcher.js"
+        );
+        const { createEntrypointVoratiqCliTarget } = await import(
+          "./utils/voratiq-cli-target.js"
+        );
+        await runInteractiveRootLauncher({
+          selfCliTarget: createEntrypointVoratiqCliTarget({
+            cliEntrypoint: effectiveArgv[1],
+          }),
+        });
+      } catch (error) {
+        const { GitRepositoryError } = await import("./utils/errors.js");
+        if (
+          error instanceof GitRepositoryError &&
+          (error.reason === "no_repository" ||
+            error.reason === "not_repository_root")
+        ) {
+          const { writeCommandOutput } = await import("./cli/output.js");
+          writeCommandOutput({ body: program.helpInformation() });
+          return;
+        }
+        const { toCliError } = await import("./cli/errors.js");
+        const { renderCliError } = await import("./render/utils/errors.js");
+        const { writeCommandOutput } = await import("./cli/output.js");
+        const cliError = toCliError(error);
+        writeCommandOutput({
+          body: renderCliError(cliError),
+          exitCode: 1,
+        });
+      }
+      return;
+    }
 
     if (effectiveArgv.length <= 2) {
       const { writeCommandOutput } = await import("./cli/output.js");
@@ -347,43 +423,6 @@ export async function runCli(
     activeJsonEnvelopeOperator = undefined;
     updateHandle?.finish();
   }
-}
-
-function normalizeRootIntentArgv(argv: readonly string[]): readonly string[] {
-  if (!shouldRouteRootDescriptionToAuto(argv)) {
-    return argv;
-  }
-
-  const [nodePath = "node", cliPath = "voratiq"] = argv;
-  return [nodePath, cliPath, "auto", ...argv.slice(2)];
-}
-
-function shouldRouteRootDescriptionToAuto(argv: readonly string[]): boolean {
-  const firstUserArgument = argv[2];
-  if (!firstUserArgument || firstUserArgument === "--") {
-    return false;
-  }
-
-  if (!firstUserArgument.startsWith("-")) {
-    return false;
-  }
-
-  return hasRootDescriptionFlag(argv);
-}
-
-function hasRootDescriptionFlag(argv: readonly string[]): boolean {
-  for (let index = 2; index < argv.length; index += 1) {
-    const entry = argv[index];
-    if (!entry || entry === "--") {
-      return false;
-    }
-
-    if (entry === "--description" || entry.startsWith("--description=")) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 async function registerCommands(

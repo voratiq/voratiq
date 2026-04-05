@@ -8,7 +8,10 @@ import {
 } from "../../domain/run/competition/errors.js";
 import { toRunReport } from "../../domain/run/competition/reports.js";
 import { generateRunId } from "../../domain/run/model/id.js";
-import { createAgentRecordMutators } from "../../domain/run/model/mutators.js";
+import {
+  createAgentRecordMutators,
+  mergeAgentRecords,
+} from "../../domain/run/model/mutators.js";
 import type {
   AgentInvocationRecord,
   RunRecord,
@@ -191,7 +194,7 @@ export async function executeRunCommand(
 
         return {
           ...existing,
-          agents: agentRecords,
+          agents: mergeFinalAgentRecords(existing.agents, agentRecords),
           status: derivedRunStatus,
           ...buildRecordLifecycleCompleteFields({ existing }),
           deletedAt: null,
@@ -219,7 +222,10 @@ export async function executeRunCommand(
 
             return {
               ...existing,
-              agents: agentRecords.length > 0 ? agentRecords : existing.agents,
+              agents:
+                agentRecords.length > 0
+                  ? mergeFinalAgentRecords(existing.agents, agentRecords)
+                  : existing.agents,
               status: "errored",
               ...buildRecordLifecycleCompleteFields({ existing }),
               deletedAt: null,
@@ -263,4 +269,24 @@ function registerRunWorkspaceTeardown(
   teardown.addPath(workspacePaths.contextPath, `${agentId} context`);
   teardown.addPath(workspacePaths.runtimePath, `${agentId} runtime`);
   teardown.addPath(workspacePaths.sandboxPath, `${agentId} sandbox`);
+}
+
+function mergeFinalAgentRecords(
+  existing: readonly AgentInvocationRecord[],
+  incoming: readonly AgentInvocationRecord[],
+): AgentInvocationRecord[] {
+  const merged = new Map<string, AgentInvocationRecord>();
+
+  for (const agent of existing) {
+    merged.set(agent.agentId, agent);
+  }
+
+  for (const agent of incoming) {
+    merged.set(
+      agent.agentId,
+      mergeAgentRecords(merged.get(agent.agentId), agent),
+    );
+  }
+
+  return [...merged.values()];
 }

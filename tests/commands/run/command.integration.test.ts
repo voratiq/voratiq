@@ -20,6 +20,7 @@ import { generateRunId } from "../../../src/domain/run/model/id.js";
 import {
   type AgentRecordMutators,
   createAgentRecordMutators,
+  mergeAgentRecords,
 } from "../../../src/domain/run/model/mutators.js";
 import type {
   AgentInvocationRecord,
@@ -44,6 +45,16 @@ jest.mock("../../../src/commands/run/record-init.js", () => ({
 
 jest.mock("../../../src/domain/run/model/mutators.js", () => ({
   createAgentRecordMutators: jest.fn(),
+  mergeAgentRecords: jest.fn(
+    (
+      existing: AgentInvocationRecord | undefined,
+      incoming: AgentInvocationRecord,
+    ) => ({
+      ...(existing ?? {}),
+      ...incoming,
+      artifacts: incoming.artifacts ?? existing?.artifacts,
+    }),
+  ),
 }));
 
 jest.mock("../../../src/domain/run/competition/agent-execution.js", () => ({
@@ -76,6 +87,7 @@ const validateAndPrepareMock = jest.mocked(validateAndPrepare);
 const prepareRunWorkspaceMock = jest.mocked(prepareRunWorkspace);
 const initializeRunRecordMock = jest.mocked(initializeRunRecord);
 const createAgentRecordMutatorsMock = jest.mocked(createAgentRecordMutators);
+const mergeAgentRecordsMock = jest.mocked(mergeAgentRecords);
 const executeAgentsMock = jest.mocked(executeAgents);
 const rewriteRunRecordMock = jest.mocked(rewriteRunRecord);
 const toRunReportMock = jest.mocked(toRunReport);
@@ -97,6 +109,16 @@ describe("executeRunCommand integration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     finalizeActiveRunMock.mockResolvedValue(undefined);
+    mergeAgentRecordsMock.mockImplementation(
+      (
+        existing: AgentInvocationRecord | undefined,
+        incoming: AgentInvocationRecord,
+      ) => ({
+        ...(existing ?? {}),
+        ...incoming,
+        artifacts: incoming.artifacts ?? existing?.artifacts,
+      }),
+    );
     resolveStageCompetitorsMock.mockReturnValue({
       source: "orchestration",
       agentIds: ["alpha"],
@@ -260,6 +282,140 @@ describe("executeRunCommand integration", () => {
     expect(rewriteRunRecordMock).toHaveBeenCalled();
     expect(finalizeActiveRunMock).toHaveBeenCalledWith("run-xyz");
     expect(report).toEqual(runReport);
+  });
+
+  it("preserves richer persisted agent artifacts when finalizing the run record", async () => {
+    generateRunIdMock.mockReturnValue("run-xyz");
+    const createdAt = "2025-11-10T00:00:00.000Z";
+    const validationResult: ValidationResult = {
+      specContent: "Implement feature",
+      baseRevisionSha: "abc123",
+      agents: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+      effectiveMaxParallel: 1,
+      environment: {},
+    };
+    validateAndPrepareMock.mockResolvedValue(validationResult);
+
+    prepareRunWorkspaceMock.mockResolvedValue({
+      runWorkspace: {
+        absolute: "/tmp/run-workspace",
+        relative: ".voratiq/run/sessions/run-xyz",
+      },
+    });
+
+    initializeRunRecordMock.mockResolvedValue({
+      initialRecord: {
+        runId: "run-xyz",
+        baseRevisionSha: validationResult.baseRevisionSha,
+        rootPath: ".",
+        spec: { path: "spec.md" },
+        status: "running",
+        createdAt,
+        startedAt: createdAt,
+        agents: [],
+        deletedAt: null,
+      },
+      recordPersisted: true,
+    });
+
+    createAgentRecordMutatorsMock.mockReturnValue({
+      recordAgentQueued: jest.fn(() => Promise.resolve()),
+      recordAgentSnapshot: jest.fn(() => Promise.resolve()),
+    });
+
+    const agentRecord: AgentInvocationRecord = {
+      agentId: "alpha",
+      model: "claude-3",
+      status: "succeeded",
+      startedAt: "2025-11-10T00:00:00.000Z",
+      completedAt: "2025-11-10T00:10:00.000Z",
+    };
+
+    executeAgentsMock.mockResolvedValue({
+      agentRecords: [agentRecord],
+      agentReports: [
+        {
+          agentId: "alpha",
+          status: "succeeded",
+          tokenUsageResult: buildUnavailableTokenUsageResult("claude-3"),
+          runtimeManifestPath: "/repo/agent.json",
+          baseDirectory: "/repo/agent",
+          assets: {
+            stdoutPath: "/repo/stdout.log",
+            stderrPath: "/repo/stderr.log",
+          },
+          startedAt: "2025-11-10T00:00:00.000Z",
+          completedAt: "2025-11-10T00:10:00.000Z",
+          diffAttempted: false,
+          diffCaptured: false,
+        },
+      ],
+      hadAgentFailure: false,
+    });
+
+    let currentRecord: RunRecord = {
+      runId: "run-xyz",
+      baseRevisionSha: "abc123",
+      rootPath: ".",
+      spec: { path: "spec.md" },
+      status: "running",
+      createdAt,
+      startedAt: createdAt,
+      agents: [
+        {
+          agentId: "alpha",
+          model: "claude-3",
+          status: "succeeded",
+          startedAt: "2025-11-10T00:00:00.000Z",
+          completedAt: "2025-11-10T00:10:00.000Z",
+          artifacts: {
+            stdoutCaptured: true,
+            summaryCaptured: true,
+          },
+        },
+      ],
+      deletedAt: null,
+    };
+    rewriteRunRecordMock.mockImplementation(({ mutate }) => {
+      currentRecord = mutate(currentRecord);
+      return Promise.resolve(currentRecord);
+    });
+
+    toRunReportMock.mockReturnValue({
+      runId: "run-xyz",
+      spec: { path: "spec.md" },
+      status: "succeeded",
+      createdAt,
+      baseRevisionSha: "abc123",
+      agents: [],
+      hadAgentFailure: false,
+    });
+
+    await executeRunCommand({
+      root: "/repo",
+      runsFilePath: "/repo/runs.json",
+      specAbsolutePath: "/repo/spec.md",
+      specDisplayPath: "spec.md",
+    });
+
+    expect(currentRecord.agents[0]?.artifacts?.summaryCaptured).toBe(true);
+    expect(mergeAgentRecordsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: "alpha",
+        artifacts: expect.objectContaining({
+          summaryCaptured: true,
+        }),
+      }),
+      agentRecord,
+    );
   });
 
   it("marks the run succeeded when at least one agent succeeds in a mixed outcome", async () => {

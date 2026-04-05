@@ -1,10 +1,10 @@
-import { randomBytes } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { mkdir, rm } from "node:fs/promises";
+import { dirname } from "node:path";
 
 import { loadSandboxProviderConfig } from "../../configs/sandbox/loader.js";
 import type { DenialBackoffConfig } from "../../configs/sandbox/types.js";
 import { toErrorMessage } from "../../utils/errors.js";
+import { writeStagedPrompt } from "../launch/prompt.js";
 import { stageAgentAuth } from "./auth.js";
 import { captureAgentChatArtifacts } from "./chat.js";
 import {
@@ -23,8 +23,6 @@ import type {
   AgentRuntimeHarnessInput,
   AgentRuntimeHarnessResult,
 } from "./types.js";
-
-const PROMPT_TMP_PREFIX = "prompt.ephemeral";
 
 export async function runSandboxedAgent(
   input: AgentRuntimeHarnessInput,
@@ -58,7 +56,7 @@ export async function runSandboxedAgent(
   await mkdir(dirname(paths.stdoutPath), { recursive: true });
   await mkdir(dirname(paths.stderrPath), { recursive: true });
 
-  const promptPath = await writeEphemeralPrompt({
+  const promptPath = await writeStagedPrompt({
     runtimePath: paths.runtimePath,
     prompt,
   });
@@ -152,18 +150,6 @@ export async function runSandboxedAgent(
       ).catch(() => {});
     }
   }
-}
-
-async function writeEphemeralPrompt(options: {
-  runtimePath: string;
-  prompt: string;
-}): Promise<string> {
-  const { runtimePath, prompt } = options;
-  const nonce = randomBytes(8).toString("hex");
-  const path = join(runtimePath, `${PROMPT_TMP_PREFIX}.${nonce}.txt`);
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, prompt, { encoding: "utf8" });
-  return path;
 }
 
 function resolveDenialBackoff(options: {

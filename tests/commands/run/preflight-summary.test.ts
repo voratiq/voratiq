@@ -131,7 +131,7 @@ describe("run preflight error summary", () => {
     await mkdir(join(root, ".voratiq"), { recursive: true });
     await writeFile(
       join(root, ".voratiq", "settings.yaml"),
-      "codex:\n  globalConfigPolicy: unignore\n",
+      "bounded:\n  codex:\n    globalConfigPolicy: unignore\n",
       "utf8",
     );
 

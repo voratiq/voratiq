@@ -39,8 +39,6 @@ const CODEX_DEFAULT_ARGV = [
   MODEL_PLACEHOLDER,
   "--experimental-json",
   "--dangerously-bypass-approvals-and-sandbox",
-  "-c",
-  "mcp_servers={}",
 ] as const;
 
 const GEMINI_DEFAULT_ARGV = [

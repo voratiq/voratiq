@@ -118,8 +118,6 @@ agents:
           "o4-mini",
           "--experimental-json",
           "--dangerously-bypass-approvals-and-sandbox",
-          "-c",
-          "mcp_servers={}",
         ]);
       },
     );
@@ -150,8 +148,6 @@ agents:
           "o4-mini",
           "--experimental-json",
           "--dangerously-bypass-approvals-and-sandbox",
-          "-c",
-          "mcp_servers={}",
           "--config",
           "model_reasoning_effort=high",
         ]);
@@ -406,8 +402,6 @@ agents:
           "o4-mini",
           "--experimental-json",
           "--dangerously-bypass-approvals-and-sandbox",
-          "-c",
-          "mcp_servers={}",
         ]);
       },
     );

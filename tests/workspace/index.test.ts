@@ -65,10 +65,12 @@ describe("workspace bootstrap", () => {
     expect(createdDirs).toEqual(
       expect.arrayContaining([
         normalizeForAssertion(".voratiq"),
+        normalizeForAssertion(join(".voratiq", "interactive")),
         normalizeForAssertion(join(".voratiq", "run")),
         normalizeForAssertion(join(".voratiq", "reduce")),
         normalizeForAssertion(join(".voratiq", "spec")),
         normalizeForAssertion(join(".voratiq", "verify")),
+        normalizeForAssertion(join(".voratiq", "interactive", "sessions")),
         normalizeForAssertion(join(".voratiq", "run", "sessions")),
         normalizeForAssertion(join(".voratiq", "reduce", "sessions")),
         normalizeForAssertion(join(".voratiq", "spec", "sessions")),
@@ -77,6 +79,7 @@ describe("workspace bootstrap", () => {
     );
     expect(createdFiles).toEqual(
       expect.arrayContaining([
+        normalizeForAssertion(join(".voratiq", "interactive", "index.json")),
         normalizeForAssertion(join(".voratiq", "run", "index.json")),
         normalizeForAssertion(join(".voratiq", "reduce", "index.json")),
         normalizeForAssertion(join(".voratiq", "spec", "index.json")),
@@ -90,6 +93,20 @@ describe("workspace bootstrap", () => {
     );
 
     await expect(validateWorkspace(repoRoot)).resolves.toBeUndefined();
+  });
+
+  it("fails validation when the interactive index is missing", async () => {
+    await createWorkspace(repoRoot);
+    const interactivePath = resolveWorkspacePath(
+      repoRoot,
+      "interactive",
+      "index.json",
+    );
+    await rm(interactivePath, { force: true });
+
+    await expect(validateWorkspace(repoRoot)).rejects.toBeInstanceOf(
+      WorkspaceMissingEntryError,
+    );
   });
 
   it("fails validation when the run index is missing", async () => {

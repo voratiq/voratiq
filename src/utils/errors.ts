@@ -1,7 +1,12 @@
+export type GitRepositoryErrorReason = "no_repository" | "not_repository_root";
+
 export class GitRepositoryError extends Error {
-  constructor(message: string) {
+  public readonly reason: GitRepositoryErrorReason;
+
+  constructor(message: string, reason: GitRepositoryErrorReason) {
     super(message);
     this.name = "GitRepositoryError";
+    this.reason = reason;
   }
 }
 

@@ -19,6 +19,9 @@ export const VORATIQ_VERIFICATION_DIR = "verify";
 export const VORATIQ_VERIFICATION_FILE = "verify/index.json";
 export const VORATIQ_VERIFICATION_SESSIONS_DIR = "verify/sessions";
 export const VORATIQ_VERIFICATION_TEMPLATES_DIR = "verify/templates";
+export const VORATIQ_INTERACTIVE_DIR = "interactive";
+export const VORATIQ_INTERACTIVE_FILE = "interactive/index.json";
+export const VORATIQ_INTERACTIVE_SESSIONS_DIR = "interactive/sessions";
 export const VORATIQ_INDEX_FILENAME = "index.json";
 export const VORATIQ_HISTORY_LOCK_FILENAME = "history.lock";
 export const VORATIQ_SESSIONS_DIRNAME = "sessions";
@@ -181,6 +184,44 @@ export function getReductionIndexPath(): string {
 
 export function getReductionSessionsDirectoryPath(): string {
   return getDomainSessionsDirectoryPath(VORATIQ_REDUCTION_DIR);
+}
+
+export function getInteractiveDirectoryPath(): string {
+  return getDomainDirectoryPath(VORATIQ_INTERACTIVE_DIR);
+}
+
+export function getInteractiveIndexPath(): string {
+  return getDomainIndexPath(VORATIQ_INTERACTIVE_DIR);
+}
+
+export function getInteractiveHistoryLockPath(): string {
+  return formatDomainScopedPath(VORATIQ_INTERACTIVE_DIR, "history.lock");
+}
+
+export function getInteractiveSessionsDirectoryPath(): string {
+  return getDomainSessionsDirectoryPath(VORATIQ_INTERACTIVE_DIR);
+}
+
+export function getInteractiveSessionDirectoryPath(sessionId: string): string {
+  return getSessionDirectoryPath(VORATIQ_INTERACTIVE_DIR, sessionId);
+}
+
+export function getInteractiveSessionRecordPath(sessionId: string): string {
+  return formatSessionScopedPath(
+    VORATIQ_INTERACTIVE_DIR,
+    sessionId,
+    "record.json",
+  );
+}
+
+export function getInteractiveSessionArtifactsDirectoryPath(
+  sessionId: string,
+): string {
+  return formatSessionScopedPath(
+    VORATIQ_INTERACTIVE_DIR,
+    sessionId,
+    ARTIFACTS_DIRNAME,
+  );
 }
 
 export function getDomainSessionsDirectoryPath(domain: string): string {

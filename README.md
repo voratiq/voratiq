@@ -34,14 +34,21 @@ Windows is not currently supported.
 Get started with a single command:
 
 ```bash
-voratiq --description "add dark mode toggle with localStorage persistence"
+voratiq
 ```
 
-This uses ensembles to:
+This drops you into an interactive session with an agent of your choice.
 
-- draft the spec
-- generate candidate implementations
-- verify and select the best result
+That agent gets access to Voratiq tools for orchestration and verification.
+
+Describe what you want built, and the agent can use those tools to:
+
+- turn your request into a structured execution plan
+- delegate work to a custom-designed swarm or a multi-stage workflow
+- verify outputs and compare alternatives before choosing what to keep
+- track outcomes across runs to learn which agents and workflows work best
+
+You keep the native interactive workflow, with more execution depth and control.
 
 ## Documentation
 

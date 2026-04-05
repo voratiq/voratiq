@@ -100,7 +100,7 @@ await mkdir(ignoreRoot, { recursive: true });
 await mkdir(path.join(ignoreRoot, ".voratiq"), { recursive: true });
 await writeFile(
   path.join(ignoreRoot, ".voratiq", "settings.yaml"),
-  "codex:\n  globalConfigPolicy: ignore\n",
+  "bounded:\n  codex:\n    globalConfigPolicy: ignore\n",
   "utf8",
 );
 

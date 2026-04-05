@@ -38,6 +38,10 @@ function buildValidWorkspaceTree(
   return {
     [`${root}/.git`]: "",
     [`${root}/.voratiq`]: null,
+    [`${root}/.voratiq/interactive`]: null,
+    [`${root}/.voratiq/interactive/sessions`]: null,
+    [`${root}/.voratiq/interactive/index.json`]:
+      '{"version":1,"sessions":[]}\n',
     [`${root}/.voratiq/run`]: null,
     [`${root}/.voratiq/run/sessions`]: null,
     [`${root}/.voratiq/run/index.json`]: '{"version":2,"sessions":[]}\n',
@@ -65,6 +69,9 @@ describe("CLI Context", () => {
     jest.spyOn(process, "cwd").mockReturnValue("/app/voratiq");
     executeInitCommandMock.mockReset();
     executeInitCommandMock.mockImplementation(async ({ root }) => {
+      await fs.promises.mkdir(`${root}/.voratiq/interactive/sessions`, {
+        recursive: true,
+      });
       await fs.promises.mkdir(`${root}/.voratiq/run/sessions`, {
         recursive: true,
       });
@@ -78,6 +85,10 @@ describe("CLI Context", () => {
         recursive: true,
       });
 
+      await fs.promises.writeFile(
+        `${root}/.voratiq/interactive/index.json`,
+        '{"version":1,"sessions":[]}\n',
+      );
       await fs.promises.writeFile(
         `${root}/.voratiq/run/index.json`,
         '{"version":2,"sessions":[]}\n',

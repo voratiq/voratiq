@@ -27,11 +27,16 @@ import {
   type ListJsonOutput,
   listJsonOutputSchema,
 } from "../contracts/list.js";
-import { detectBinary } from "../utils/binaries.js";
 import { getVoratiqVersion } from "../utils/version.js";
+import {
+  createEntrypointVoratiqCliTarget as createEntrypointCliTarget,
+  resolveVoratiqCliTarget,
+  type VoratiqCliTarget,
+} from "../utils/voratiq-cli-target.js";
 
 const JSON_RPC_VERSION = "2.0" as const;
 const HEADER_DELIMITER = Buffer.from("\r\n\r\n", "utf8");
+const LF_HEADER_DELIMITER = Buffer.from("\n\n", "utf8");
 
 const JSON_RPC_PARSE_ERROR = -32700;
 const JSON_RPC_INVALID_REQUEST = -32600;
@@ -40,6 +45,19 @@ const JSON_RPC_INVALID_PARAMS = -32602;
 const JSON_RPC_INTERNAL_ERROR = -32603;
 
 export const VORATIQ_MCP_PROTOCOL_VERSION = "2025-11-25" as const;
+export const VORATIQ_SUPPORTED_MCP_PROTOCOL_VERSIONS = [
+  VORATIQ_MCP_PROTOCOL_VERSION,
+  "2025-06-18",
+  "2024-11-05",
+] as const;
+
+function isSupportedMcpProtocolVersion(
+  protocolVersion: string,
+): protocolVersion is (typeof VORATIQ_SUPPORTED_MCP_PROTOCOL_VERSIONS)[number] {
+  return (
+    VORATIQ_SUPPORTED_MCP_PROTOCOL_VERSIONS as readonly string[]
+  ).includes(protocolVersion);
+}
 
 export type VoratiqMcpExecutionToolName =
   | "voratiq_spec"
@@ -84,6 +102,7 @@ interface ToolSpec {
   readonly operator: VoratiqMcpOperator;
   readonly description: string;
   readonly inputSchemaSource: z.ZodTypeAny;
+  readonly mcpInputSchema?: Record<string, unknown>;
   readonly buildArgs: (input: unknown) => string[];
   readonly outputContract: "execution" | "list";
 }
@@ -151,6 +170,12 @@ interface JsonRpcErrorResponse {
 
 type JsonRpcResponse = JsonRpcSuccessResponse | JsonRpcErrorResponse;
 
+interface JsonRpcNotificationResponse {
+  jsonrpc: "2.0";
+  method: string;
+  params?: unknown;
+}
+
 interface CallToolResult {
   content: Array<{ type: "text"; text: string }>;
   structuredContent: unknown;
@@ -175,7 +200,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_spec",
     operator: "spec",
     description:
-      "Invoke `voratiq spec --json` using the external execution contract.",
+      "Draft or refine a Voratiq spec session from a task description, an existing spec, or related repo context.",
     inputSchemaSource: externalSpecExecutionInputSchema,
     buildArgs: (input) =>
       buildSpecExecutionArgs(input as ExternalSpecExecutionInput),
@@ -185,7 +210,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_run",
     operator: "run",
     description:
-      "Invoke `voratiq run --json` using the external execution contract.",
+      "Execute a Voratiq spec session and create a run with agent outputs and artifacts.",
     inputSchemaSource: externalRunExecutionInputSchema,
     buildArgs: (input) =>
       buildRunExecutionArgs(input as ExternalRunExecutionInput),
@@ -195,7 +220,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_reduce",
     operator: "reduce",
     description:
-      "Invoke `voratiq reduce --json` using the external execution contract.",
+      "Reduce a set of Voratiq artifacts into a summarized output for comparison or follow-on work.",
     inputSchemaSource: externalReduceExecutionInputSchema,
     buildArgs: (input) =>
       buildReduceExecutionArgs(input as ExternalReduceExecutionInput),
@@ -205,7 +230,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_verify",
     operator: "verify",
     description:
-      "Invoke `voratiq verify --json` using the external execution contract.",
+      "Verify a Voratiq spec, run, or reduction session and record the evaluation result.",
     inputSchemaSource: externalVerifyExecutionInputSchema,
     buildArgs: (input) =>
       buildVerifyExecutionArgs(input as ExternalVerifyExecutionInput),
@@ -215,7 +240,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_apply",
     operator: "apply",
     description:
-      "Invoke `voratiq apply --json` using the external execution contract.",
+      "Apply an accepted Voratiq run diff into the current working tree.",
     inputSchemaSource: externalApplyExecutionInputSchema,
     buildArgs: (input) =>
       buildApplyExecutionArgs(input as ExternalApplyExecutionInput),
@@ -225,8 +250,9 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_prune",
     operator: "prune",
     description:
-      "Invoke `voratiq prune --json` using the external execution contract.",
+      "Prune Voratiq run workspaces or all pruneable run state after confirmation.",
     inputSchemaSource: externalPruneExecutionInputSchema,
+    mcpInputSchema: createPruneMcpInputSchema(),
     buildArgs: (input) =>
       buildPruneExecutionArgs(input as ExternalPruneExecutionInput),
     outputContract: "execution",
@@ -235,8 +261,9 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_list",
     operator: "list",
     description:
-      "Invoke `voratiq list --json` using the external inspection contract.",
+      "List recorded Voratiq sessions for one operator (`spec`, `run`, `reduce`, or `verify`) in table or detail mode.",
     inputSchemaSource: externalListInspectionInputSchema,
+    mcpInputSchema: createListMcpInputSchema(),
     buildArgs: (input) =>
       buildListInspectionArgs(input as ExternalListInspectionInput),
     outputContract: "list",
@@ -246,8 +273,12 @@ const toolSpecs: readonly ToolSpec[] = [
 const toolDefinitions: readonly McpToolDefinition[] = toolSpecs.map((tool) => ({
   name: tool.name,
   description: tool.description,
-  inputSchema: toToolInputJsonSchema(tool.inputSchemaSource),
+  inputSchema:
+    tool.mcpInputSchema ?? toToolInputJsonSchema(tool.inputSchemaSource),
 }));
+
+const VORATIQ_MCP_SERVER_INSTRUCTIONS =
+  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, or verify sessions. Use voratiq_spec, voratiq_run, voratiq_verify, voratiq_apply, and voratiq_prune for the normal Voratiq workflow. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
 
 const toolSpecsByName: ReadonlyMap<VoratiqMcpToolName, ToolSpec> = new Map(
   toolSpecs.map((tool) => [tool.name, tool]),
@@ -294,15 +325,16 @@ export function createVoratiqMcpRequestHandler(
           );
         }
 
-        if (
-          parsedParams.data.protocolVersion !== VORATIQ_MCP_PROTOCOL_VERSION
-        ) {
+        if (!isSupportedMcpProtocolVersion(parsedParams.data.protocolVersion)) {
           return createErrorResponse(
             message.id,
             JSON_RPC_INVALID_PARAMS,
             "Unsupported MCP protocol version.",
             {
               expectedProtocolVersion: VORATIQ_MCP_PROTOCOL_VERSION,
+              supportedProtocolVersions: [
+                ...VORATIQ_SUPPORTED_MCP_PROTOCOL_VERSIONS,
+              ],
               receivedProtocolVersion: parsedParams.data.protocolVersion,
             },
           );
@@ -310,10 +342,13 @@ export function createVoratiqMcpRequestHandler(
 
         hasInitialized = true;
         return createSuccessResponse(message.id, {
-          protocolVersion: VORATIQ_MCP_PROTOCOL_VERSION,
+          protocolVersion: parsedParams.data.protocolVersion,
           capabilities: {
-            tools: {},
+            tools: {
+              listChanged: true,
+            },
           },
+          instructions: VORATIQ_MCP_SERVER_INSTRUCTIONS,
           serverInfo: {
             name: "voratiq",
             version: serverVersion,
@@ -411,6 +446,8 @@ interface McpOutputStream {
   write(chunk: string | Buffer): boolean;
 }
 
+type McpTransportEncoding = "framed" | "jsonl";
+
 export async function runVoratiqMcpStdioServer(
   options: RunVoratiqMcpStdioServerOptions = {},
 ): Promise<void> {
@@ -430,6 +467,7 @@ export async function runVoratiqMcpStdioServer(
   const pendingPayloads: string[] = [];
   let isDraining = false;
   let hasEnded = false;
+  let transportEncoding: McpTransportEncoding = "framed";
 
   await new Promise<void>((resolve, reject) => {
     const tryResolve = (): void => {
@@ -462,8 +500,9 @@ export async function runVoratiqMcpStdioServer(
             const parsed = JSON.parse(payload) as unknown;
             const message = normalizeIncomingMessage(parsed);
             if (!message) {
-              writeFramedMessage(
+              writeMessage(
                 stdout,
+                transportEncoding,
                 createErrorResponse(
                   null,
                   JSON_RPC_INVALID_REQUEST,
@@ -475,15 +514,23 @@ export async function runVoratiqMcpStdioServer(
 
             if ("id" in message) {
               const response = await requestHandler.handleRequest(message);
-              writeFramedMessage(stdout, response);
+              writeMessage(stdout, transportEncoding, response);
+              if (message.method === "initialize" && !("error" in response)) {
+                writeMessage(
+                  stdout,
+                  transportEncoding,
+                  createNotification("notifications/tools/list_changed"),
+                );
+              }
               continue;
             }
 
             await requestHandler.handleNotification(message);
           } catch (error) {
             if (error instanceof SyntaxError) {
-              writeFramedMessage(
+              writeMessage(
                 stdout,
+                transportEncoding,
                 createErrorResponse(
                   null,
                   JSON_RPC_PARSE_ERROR,
@@ -494,8 +541,9 @@ export async function runVoratiqMcpStdioServer(
               continue;
             }
 
-            writeFramedMessage(
+            writeMessage(
               stdout,
+              transportEncoding,
               createErrorResponse(
                 null,
                 JSON_RPC_INTERNAL_ERROR,
@@ -516,41 +564,41 @@ export async function runVoratiqMcpStdioServer(
       buffer = Buffer.concat([buffer, toBuffer(chunk)]);
 
       while (true) {
-        const headerEnd = buffer.indexOf(HEADER_DELIMITER);
-        if (headerEnd < 0) {
+        const extracted = extractNextPayload(buffer, transportEncoding);
+        if (!extracted) {
           break;
         }
 
-        const headerBlock = buffer.subarray(0, headerEnd).toString("utf8");
-        const contentLength = parseContentLength(headerBlock);
-        if (contentLength === null) {
-          writeFramedMessage(
+        if (extracted.kind === "invalid") {
+          writeMessage(
             stdout,
+            transportEncoding,
             createErrorResponse(
               null,
               JSON_RPC_INVALID_REQUEST,
-              "Missing or invalid Content-Length header.",
+              extracted.message,
             ),
           );
           buffer = Buffer.alloc(0);
           break;
         }
 
-        const messageStart = headerEnd + HEADER_DELIMITER.length;
-        const messageEnd = messageStart + contentLength;
-        if (buffer.length < messageEnd) {
-          break;
-        }
-
-        const payload = buffer.subarray(messageStart, messageEnd).toString();
-        pendingPayloads.push(payload);
-        buffer = buffer.subarray(messageEnd);
+        transportEncoding = extracted.transportEncoding;
+        pendingPayloads.push(extracted.payload);
+        buffer = Buffer.from(extracted.remaining);
       }
 
       drainQueue();
     });
 
     stdin.on("end", () => {
+      const trailingPayload = extractTrailingJsonLine(buffer);
+      if (trailingPayload) {
+        transportEncoding = "jsonl";
+        pendingPayloads.push(trailingPayload);
+        buffer = Buffer.alloc(0);
+        drainQueue();
+      }
       hasEnded = true;
       tryResolve();
     });
@@ -668,6 +716,22 @@ function buildCallToolResult(
     structuredContent: payload,
     isError,
   };
+}
+
+function createNotification(
+  method: string,
+  params?: unknown,
+): JsonRpcNotificationResponse {
+  return params === undefined
+    ? {
+        jsonrpc: JSON_RPC_VERSION,
+        method,
+      }
+    : {
+        jsonrpc: JSON_RPC_VERSION,
+        method,
+        params,
+      };
 }
 
 function buildTransportFailureCallResult(
@@ -795,40 +859,7 @@ function appendOptionalTrueFlag(
   }
 }
 
-interface VoratiqCliTarget {
-  command: string;
-  argsPrefix: string[];
-}
-
-export function createEntrypointCliTarget(input: {
-  cliEntrypoint: string | undefined;
-  nodeExecutable?: string;
-}): VoratiqCliTarget | undefined {
-  const { cliEntrypoint, nodeExecutable = process.execPath } = input;
-  if (!cliEntrypoint || cliEntrypoint.length === 0) {
-    return undefined;
-  }
-
-  return {
-    command: nodeExecutable,
-    argsPrefix: [cliEntrypoint],
-  };
-}
-
-export function resolveVoratiqCliTarget(): VoratiqCliTarget {
-  const installedBinary = detectBinary("voratiq");
-  if (installedBinary) {
-    return {
-      command: installedBinary,
-      argsPrefix: [],
-    };
-  }
-
-  return {
-    command: "voratiq",
-    argsPrefix: [],
-  };
-}
+export { createEntrypointCliTarget, resolveVoratiqCliTarget };
 
 export function createDefaultCliJsonContractInvoker(
   target: VoratiqCliTarget = resolveVoratiqCliTarget(),
@@ -901,6 +932,45 @@ function toToolInputJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   return jsonSchema;
 }
 
+function createPruneMcpInputSchema(): Record<string, unknown> {
+  return toToolInputJsonSchema(
+    z
+      .object({
+        scope: z.enum(["run", "all"]),
+        runId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Required when scope is `run`."),
+        purge: z.boolean().optional(),
+        confirmed: z
+          .literal(true)
+          .describe("Must be true to confirm prune operations."),
+      })
+      .strict(),
+  );
+}
+
+function createListMcpInputSchema(): Record<string, unknown> {
+  return toToolInputJsonSchema(
+    z
+      .object({
+        operator: z.enum(["spec", "run", "reduce", "verify"]),
+        mode: z
+          .enum(["table", "detail"])
+          .describe("Use `detail` only when inspecting a specific session."),
+        sessionId: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Required when mode is `detail`."),
+        verbose: z.boolean().optional(),
+        limit: z.number().int().positive().optional(),
+      })
+      .strict(),
+  );
+}
+
 function createSuccessResponse(
   id: number | string | null,
   result: unknown,
@@ -963,7 +1033,7 @@ function normalizeIncomingMessage(
 }
 
 function parseContentLength(headerBlock: string): number | null {
-  const lines = headerBlock.split("\r\n");
+  const lines = headerBlock.split(/\r?\n/u);
   for (const line of lines) {
     const separatorIndex = line.indexOf(":");
     if (separatorIndex <= 0) {
@@ -986,13 +1056,183 @@ function parseContentLength(headerBlock: string): number | null {
   return null;
 }
 
+function findHeaderDelimiter(
+  buffer: Buffer,
+): { index: number; delimiter: Buffer } | undefined {
+  const crlfIndex = buffer.indexOf(HEADER_DELIMITER);
+  const lfIndex = buffer.indexOf(LF_HEADER_DELIMITER);
+
+  if (crlfIndex < 0 && lfIndex < 0) {
+    return undefined;
+  }
+  if (crlfIndex < 0) {
+    return {
+      index: lfIndex,
+      delimiter: LF_HEADER_DELIMITER,
+    };
+  }
+  if (lfIndex < 0 || crlfIndex <= lfIndex) {
+    return {
+      index: crlfIndex,
+      delimiter: HEADER_DELIMITER,
+    };
+  }
+  return {
+    index: lfIndex,
+    delimiter: LF_HEADER_DELIMITER,
+  };
+}
+
+function writeMessage(
+  stdout: McpOutputStream,
+  transportEncoding: McpTransportEncoding,
+  message: JsonRpcResponse | JsonRpcNotificationResponse,
+): void {
+  if (transportEncoding === "jsonl") {
+    stdout.write(`${JSON.stringify(message)}\n`);
+    return;
+  }
+  writeFramedMessage(stdout, message);
+}
+
 function writeFramedMessage(
   stdout: McpOutputStream,
-  message: JsonRpcResponse,
+  message: JsonRpcResponse | JsonRpcNotificationResponse,
 ): void {
   const payload = Buffer.from(JSON.stringify(message), "utf8");
   const header = Buffer.from(`Content-Length: ${payload.byteLength}\r\n\r\n`);
   stdout.write(Buffer.concat([header, payload]));
+}
+
+function extractNextPayload(
+  buffer: Buffer,
+  currentTransportEncoding: McpTransportEncoding,
+):
+  | {
+      kind: "payload";
+      payload: string;
+      remaining: Buffer;
+      transportEncoding: McpTransportEncoding;
+    }
+  | {
+      kind: "invalid";
+      message: string;
+    }
+  | undefined {
+  if (
+    currentTransportEncoding === "framed" &&
+    (startsWithContentLengthHeader(buffer) || looksLikeFramedTransport(buffer))
+  ) {
+    return extractFramedPayload(buffer);
+  }
+
+  const jsonLinePayload = extractJsonLinePayload(buffer);
+  if (jsonLinePayload) {
+    return jsonLinePayload;
+  }
+
+  if (currentTransportEncoding === "framed") {
+    return extractFramedPayload(buffer);
+  }
+
+  return undefined;
+}
+
+function startsWithContentLengthHeader(buffer: Buffer): boolean {
+  const firstLineEnd = buffer.indexOf("\n");
+  const firstLine =
+    firstLineEnd >= 0
+      ? buffer.subarray(0, firstLineEnd).toString("utf8")
+      : buffer.toString("utf8");
+  return /^content-length\s*:/iu.test(firstLine.trim());
+}
+
+function looksLikeFramedTransport(buffer: Buffer): boolean {
+  const headerDelimiter = findHeaderDelimiter(buffer);
+  if (!headerDelimiter) {
+    return false;
+  }
+  const headerBlock = buffer
+    .subarray(0, headerDelimiter.index)
+    .toString("utf8");
+  return /(^|\r?\n)content-length\s*:/iu.test(headerBlock);
+}
+
+function extractFramedPayload(buffer: Buffer):
+  | {
+      kind: "payload";
+      payload: string;
+      remaining: Buffer;
+      transportEncoding: McpTransportEncoding;
+    }
+  | {
+      kind: "invalid";
+      message: string;
+    }
+  | undefined {
+  const headerDelimiter = findHeaderDelimiter(buffer);
+  if (!headerDelimiter) {
+    return undefined;
+  }
+
+  const headerBlock = buffer
+    .subarray(0, headerDelimiter.index)
+    .toString("utf8");
+  const contentLength = parseContentLength(headerBlock);
+  if (contentLength === null) {
+    return {
+      kind: "invalid",
+      message: "Missing or invalid Content-Length header.",
+    };
+  }
+
+  const messageStart = headerDelimiter.index + headerDelimiter.delimiter.length;
+  const messageEnd = messageStart + contentLength;
+  if (buffer.length < messageEnd) {
+    return undefined;
+  }
+
+  return {
+    kind: "payload",
+    payload: buffer.subarray(messageStart, messageEnd).toString("utf8"),
+    remaining: buffer.subarray(messageEnd),
+    transportEncoding: "framed",
+  };
+}
+
+function extractJsonLinePayload(buffer: Buffer):
+  | {
+      kind: "payload";
+      payload: string;
+      remaining: Buffer;
+      transportEncoding: McpTransportEncoding;
+    }
+  | undefined {
+  const newlineIndex = buffer.indexOf("\n");
+  if (newlineIndex < 0) {
+    return undefined;
+  }
+
+  const line = buffer
+    .subarray(0, newlineIndex)
+    .toString("utf8")
+    .replace(/\r$/u, "");
+  const remaining = buffer.subarray(newlineIndex + 1);
+  if (line.trim().length === 0) {
+    return extractJsonLinePayload(remaining);
+  }
+
+  return {
+    kind: "payload",
+    payload: line,
+    remaining,
+    transportEncoding: "jsonl",
+  };
+}
+
+function extractTrailingJsonLine(buffer: Buffer): string | undefined {
+  const payload = buffer.toString("utf8").trim();
+  return payload.length > 0 ? payload : undefined;
 }
 
 function toBuffer(chunk: Buffer | string): Buffer {

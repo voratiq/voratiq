@@ -204,7 +204,7 @@ describe("CLI entrypoint error handling", () => {
     expect(process.exitCode).toBe(0);
   });
 
-  it("documents root description intent option in help", async () => {
+  it("does not expose the old root description shortcut in help", async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];
 
@@ -225,10 +225,11 @@ describe("CLI entrypoint error handling", () => {
     await runCli(["node", "voratiq", "--help"]);
 
     const help = stripAnsi(stdout.join(""));
-    expect(help).toContain("--description <text>");
-    expect(help).toContain(
+    expect(help).not.toContain("--description <text>");
+    expect(help).not.toContain(
       "Describe what to build, then run the full pipeline",
     );
+    expect(help).toContain("auto [options]");
     expect(stderr.join("")).toHaveLength(0);
     expect(process.exitCode).toBe(0);
   });

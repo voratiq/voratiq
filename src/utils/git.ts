@@ -36,11 +36,13 @@ export async function assertGitRepository(root: string): Promise<void> {
       // We're in a repo but not at the root
       throw new GitRepositoryError(
         "Run `voratiq init` from the repository root.",
+        "not_repository_root",
       );
     }
     // No git repository exists at all
     throw new GitRepositoryError(
       "No git repository found. Run `git init` or switch to an existing repository.",
+      "no_repository",
     );
   }
 }
