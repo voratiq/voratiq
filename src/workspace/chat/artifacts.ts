@@ -1,6 +1,6 @@
 import { once } from "node:events";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { finished } from "node:stream/promises";
 
@@ -30,6 +30,27 @@ export interface ChatArtifactCaptureResult {
 export interface PreserveChatArtifactsOptions {
   providerId: string;
   agentRoot: string;
+  searchEnv?: NodeJS.ProcessEnv;
+  baseline?: ProviderTranscriptBaseline;
+}
+
+export interface ProviderTranscriptSnapshotEntry {
+  path: string;
+  size: number;
+  mtimeMs: number;
+}
+
+export type ProviderTranscriptBaseline =
+  readonly ProviderTranscriptSnapshotEntry[];
+
+export async function snapshotProviderTranscripts(
+  options: Omit<PreserveChatArtifactsOptions, "baseline">,
+): Promise<ProviderTranscriptBaseline> {
+  const transcriptPaths = await findProviderTranscripts(options.providerId, {
+    agentRoot: options.agentRoot,
+    env: options.searchEnv,
+  });
+  return await collectTranscriptSnapshot(transcriptPaths);
 }
 
 export async function preserveProviderChatTranscripts(
@@ -42,7 +63,23 @@ export async function preserveProviderChatTranscripts(
 
   let transcriptPaths: readonly string[];
   try {
-    transcriptPaths = await findProviderTranscripts(providerId, agentRoot);
+    transcriptPaths = await findProviderTranscripts(providerId, {
+      agentRoot,
+      env: options.searchEnv,
+    });
+  } catch (error) {
+    return {
+      status: "error",
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+  }
+
+  let candidatePaths: readonly string[];
+  try {
+    candidatePaths = await filterTranscriptPathsAgainstBaseline(
+      transcriptPaths,
+      options.baseline,
+    );
   } catch (error) {
     return {
       status: "error",
@@ -54,7 +91,7 @@ export async function preserveProviderChatTranscripts(
     await locateExistingChatArtifact(agentRoot);
 
   const selection: TranscriptSelection | undefined =
-    selectTranscriptFiles(transcriptPaths);
+    selectTranscriptFiles(candidatePaths);
   if (!selection) {
     if (existing !== undefined) {
       return {
@@ -162,7 +199,7 @@ async function bundleJsonTranscripts(options: {
   for (const file of files) {
     const raw = await readFile(file, "utf8");
     transcripts.push({
-      source: relative(agentRoot, file),
+      source: toArtifactSourcePath(agentRoot, file),
       payload: parseJsonOrString(raw),
     });
   }
@@ -226,4 +263,68 @@ function parseJsonOrString(content: string): unknown {
   } catch {
     return content;
   }
+}
+
+async function collectTranscriptSnapshot(
+  transcriptPaths: readonly string[],
+): Promise<ProviderTranscriptBaseline> {
+  const snapshots: ProviderTranscriptSnapshotEntry[] = [];
+  for (const path of transcriptPaths) {
+    try {
+      const details = await stat(path);
+      if (!details.isFile()) {
+        continue;
+      }
+      snapshots.push({
+        path,
+        size: details.size,
+        mtimeMs: details.mtimeMs,
+      });
+    } catch {
+      continue;
+    }
+  }
+  snapshots.sort((left, right) => left.path.localeCompare(right.path));
+  return snapshots;
+}
+
+async function filterTranscriptPathsAgainstBaseline(
+  transcriptPaths: readonly string[],
+  baseline: ProviderTranscriptBaseline | undefined,
+): Promise<readonly string[]> {
+  if (!baseline || baseline.length === 0) {
+    return transcriptPaths;
+  }
+
+  const baselineByPath = new Map(
+    baseline.map((entry) => [entry.path, entry] as const),
+  );
+  const freshPaths: string[] = [];
+  for (const path of transcriptPaths) {
+    const prior = baselineByPath.get(path);
+    if (!prior) {
+      freshPaths.push(path);
+      continue;
+    }
+
+    try {
+      const current = await stat(path);
+      if (
+        !current.isFile() ||
+        current.size !== prior.size ||
+        current.mtimeMs !== prior.mtimeMs
+      ) {
+        freshPaths.push(path);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return freshPaths.sort();
+}
+
+function toArtifactSourcePath(agentRoot: string, file: string): string {
+  const source = relative(agentRoot, file);
+  return source.startsWith("..") ? file : source;
 }

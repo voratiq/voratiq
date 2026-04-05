@@ -30,7 +30,8 @@ describe("stageAgentAuth", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     loadRepoSettingsMock.mockReturnValue({
-      codex: { globalConfigPolicy: "apply" },
+      bounded: { codex: { globalConfigPolicy: "apply" } },
+      mcp: { codex: "ask", claude: "ask", gemini: "ask" },
     });
   });
 

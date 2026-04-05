@@ -26,7 +26,6 @@ describe("external adapter contract definitions", () => {
     expect(externalAdapterContractReference.excludedCommands).toEqual([
       "auto",
       "init",
-      "root --description",
     ]);
   });
 

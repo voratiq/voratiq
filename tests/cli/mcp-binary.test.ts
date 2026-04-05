@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 
 describe("bundled MCP binary smoke", () => {
-  it("serves framed stdio responses from dist/bin.js without update noise and exits on stdin close", async () => {
+  it("serves framed stdio responses from dist/bin.js and exits on stdin close", async () => {
     const child = spawn(
       process.execPath,
       [resolve("dist/bin.js"), "mcp", "--stdio"],
@@ -24,7 +24,7 @@ describe("bundled MCP binary smoke", () => {
       stderr += chunk;
     });
 
-    const responsePromise = collectFramedResponses(child.stdout, 2);
+    const responsePromise = collectFramedResponses(child.stdout, 3);
 
     child.stdin.write(
       toFramedJson({
@@ -66,13 +66,26 @@ describe("bundled MCP binary smoke", () => {
     const initialize = responses[0] as {
       result: {
         protocolVersion: string;
+        capabilities: {
+          tools: {
+            listChanged: boolean;
+          };
+        };
         serverInfo: { name: string };
       };
     };
     expect(initialize.result.protocolVersion).toBe("2025-11-25");
+    expect(initialize.result.capabilities.tools.listChanged).toBe(true);
     expect(initialize.result.serverInfo.name).toBe("voratiq");
 
-    const toolList = responses[1] as {
+    const toolsChanged = responses[1] as {
+      jsonrpc: string;
+      method: string;
+    };
+    expect(toolsChanged.jsonrpc).toBe("2.0");
+    expect(toolsChanged.method).toBe("notifications/tools/list_changed");
+
+    const toolList = responses[2] as {
       result: { tools: Array<{ name: string }> };
     };
     expect(toolList.result.tools.map((tool) => tool.name)).toEqual([

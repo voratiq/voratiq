@@ -202,7 +202,7 @@ export const externalAdapterContractReference = {
     authoritativeType: "ListJsonOutput",
     versioned: false,
   },
-  excludedCommands: ["auto", "init", "root --description"] as const,
+  excludedCommands: ["auto", "init"] as const,
   compatibility: {
     additiveChangesAreNonBreaking: true,
     breakingChangesRequireExecutionEnvelopeVersionBump: true,

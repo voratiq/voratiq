@@ -14,14 +14,30 @@ export interface LoadRepoSettingsOptions {
 }
 
 const DEFAULT_SETTINGS: RepoSettings = {
-  codex: {
-    globalConfigPolicy: "ignore",
+  bounded: {
+    codex: {
+      globalConfigPolicy: "ignore",
+    },
+  },
+  mcp: {
+    codex: "ask",
+    claude: "ask",
+    gemini: "ask",
   },
 };
 
 function cloneSettings(settings: RepoSettings): RepoSettings {
   return {
-    codex: { globalConfigPolicy: settings.codex.globalConfigPolicy },
+    bounded: {
+      codex: {
+        globalConfigPolicy: settings.bounded.codex.globalConfigPolicy,
+      },
+    },
+    mcp: {
+      codex: settings.mcp.codex,
+      claude: settings.mcp.claude,
+      gemini: settings.mcp.gemini,
+    },
   };
 }
 
@@ -35,10 +51,19 @@ const repoSettingsLoader = createConfigLoader<
   handleMissing: () => cloneSettings(DEFAULT_SETTINGS),
   parse: (content, context) => {
     const parsed = parseSettingsYaml(content, context);
-    const { codex } = parsed;
+    const { bounded, mcp } = parsed;
     return {
-      codex: {
-        globalConfigPolicy: codex?.globalConfigPolicy ?? "apply",
+      bounded: {
+        codex: {
+          globalConfigPolicy:
+            bounded?.codex?.globalConfigPolicy ??
+            DEFAULT_SETTINGS.bounded.codex.globalConfigPolicy,
+        },
+      },
+      mcp: {
+        codex: mcp?.codex ?? "ask",
+        claude: mcp?.claude ?? "ask",
+        gemini: mcp?.gemini ?? "ask",
       },
     };
   },
@@ -55,7 +80,12 @@ function parseSettingsYaml(
   content: string,
   context: { filePath: string },
 ): {
-  codex?: { globalConfigPolicy?: "ignore" | "apply" };
+  bounded?: { codex?: { globalConfigPolicy?: "ignore" | "apply" } };
+  mcp?: {
+    codex?: "ask" | "never";
+    claude?: "ask" | "never";
+    gemini?: "ask" | "never";
+  };
 } {
   let document: unknown;
   try {

@@ -41,13 +41,7 @@ Provide exactly one of `--spec` or `--description`.
 
 Stages run in order: `spec` (if `--description`), `run`, `verify`, `apply` (if `--apply`).
 
-As a convenience, `voratiq --description <text> ...` is shorthand for `voratiq auto --description <text> ...`.
-
 ### Examples
-
-```bash
-voratiq --description "add retries to billing webhook delivery"
-```
 
 ```bash
 # Apply and commit the winner

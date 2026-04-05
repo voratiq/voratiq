@@ -91,9 +91,26 @@ export function createAgentRecordMutators(
     record: AgentInvocationRecord,
   ): Promise<void> => {
     const snapshot = normalizeSnapshotForTermination(runId, record);
-    await updateAgentRecord(record.agentId, (existing) =>
-      mergeAgentRecords(existing, snapshot),
-    );
+    await rewriteRunRecord({
+      root,
+      runsFilePath,
+      runId,
+      forceFlush: TERMINAL_AGENT_STATUSES.includes(snapshot.status),
+      mutate: (existing) => {
+        const agents = [...existing.agents];
+        const index = agents.findIndex(
+          (agent) => agent.agentId === record.agentId,
+        );
+        const current = index >= 0 ? agents[index] : undefined;
+        const updated = mergeAgentRecords(current, snapshot);
+        if (index >= 0) {
+          agents[index] = updated;
+        } else {
+          agents.push(updated);
+        }
+        return { ...existing, agents };
+      },
+    });
 
     emitStageProgressEvent(renderer, {
       type: "stage.candidate",
@@ -121,7 +138,7 @@ function mergeArtifactState(
   };
 }
 
-function mergeAgentRecords(
+export function mergeAgentRecords(
   existing: AgentInvocationRecord | undefined,
   incoming: AgentInvocationRecord,
 ): AgentInvocationRecord {

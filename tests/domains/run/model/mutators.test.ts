@@ -185,6 +185,49 @@ describe("createAgentRecordMutators", () => {
     expect(record.completedAt).toBe("2025-11-05T13:02:00.000Z");
   });
 
+  it("force flushes terminal agent snapshots immediately", async () => {
+    const runId = "run-terminal-flush";
+    let currentRecord: RunRecord = {
+      runId,
+      baseRevisionSha: "base-sha",
+      rootPath: ".",
+      spec: { path: "specs/demo.md" },
+      status: "running",
+      createdAt: "2025-11-05T13:00:00.000Z",
+      agents: [],
+    };
+
+    rewriteRunRecordMock.mockImplementation(({ mutate }) => {
+      currentRecord = mutate(currentRecord);
+      return Promise.resolve(currentRecord);
+    });
+
+    const mutators = createAgentRecordMutators({
+      root: "/repo",
+      runsFilePath: "/repo/.voratiq/run/index.json",
+      runId,
+    });
+
+    await mutators.recordAgentSnapshot({
+      agentId: "alpha",
+      model: "gpt-4",
+      status: "succeeded",
+      startedAt: "2025-11-05T13:01:00.000Z",
+      completedAt: "2025-11-05T13:02:00.000Z",
+      artifacts: {
+        summaryCaptured: true,
+      },
+    });
+
+    expect(rewriteRunRecordMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId,
+        forceFlush: true,
+      }),
+    );
+    expect(currentRecord.agents[0]?.artifacts?.summaryCaptured).toBe(true);
+  });
+
   it("rejects terminal snapshots missing canonical lifecycle timestamps during abort normalization", async () => {
     const runId = "run-termination-invalid";
     let currentRecord: RunRecord = {
