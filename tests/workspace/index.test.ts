@@ -66,24 +66,44 @@ describe("workspace bootstrap", () => {
       expect.arrayContaining([
         normalizeForAssertion(".voratiq"),
         normalizeForAssertion(join(".voratiq", "interactive")),
+        normalizeForAssertion(join(".voratiq", "spec")),
         normalizeForAssertion(join(".voratiq", "run")),
         normalizeForAssertion(join(".voratiq", "reduce")),
-        normalizeForAssertion(join(".voratiq", "spec")),
         normalizeForAssertion(join(".voratiq", "verify")),
+        normalizeForAssertion(join(".voratiq", "message")),
         normalizeForAssertion(join(".voratiq", "interactive", "sessions")),
+        normalizeForAssertion(join(".voratiq", "spec", "sessions")),
         normalizeForAssertion(join(".voratiq", "run", "sessions")),
         normalizeForAssertion(join(".voratiq", "reduce", "sessions")),
-        normalizeForAssertion(join(".voratiq", "spec", "sessions")),
         normalizeForAssertion(join(".voratiq", "verify", "sessions")),
+        normalizeForAssertion(join(".voratiq", "message", "sessions")),
       ]),
     );
+    expect(
+      createdDirs.filter((dir) =>
+        [
+          ".voratiq/spec",
+          ".voratiq/run",
+          ".voratiq/reduce",
+          ".voratiq/verify",
+          ".voratiq/message",
+        ].includes(dir),
+      ),
+    ).toEqual([
+      ".voratiq/spec",
+      ".voratiq/run",
+      ".voratiq/reduce",
+      ".voratiq/verify",
+      ".voratiq/message",
+    ]);
     expect(createdFiles).toEqual(
       expect.arrayContaining([
         normalizeForAssertion(join(".voratiq", "interactive", "index.json")),
+        normalizeForAssertion(join(".voratiq", "spec", "index.json")),
         normalizeForAssertion(join(".voratiq", "run", "index.json")),
         normalizeForAssertion(join(".voratiq", "reduce", "index.json")),
-        normalizeForAssertion(join(".voratiq", "spec", "index.json")),
         normalizeForAssertion(join(".voratiq", "verify", "index.json")),
+        normalizeForAssertion(join(".voratiq", "message", "index.json")),
         normalizeForAssertion(join(".voratiq", "agents.yaml")),
         normalizeForAssertion(join(".voratiq", "verification.yaml")),
         normalizeForAssertion(join(".voratiq", "environment.yaml")),
@@ -91,6 +111,23 @@ describe("workspace bootstrap", () => {
         normalizeForAssertion(join(".voratiq", "orchestration.yaml")),
       ]),
     );
+    expect(
+      createdFiles.filter((file) =>
+        [
+          ".voratiq/spec/index.json",
+          ".voratiq/run/index.json",
+          ".voratiq/reduce/index.json",
+          ".voratiq/verify/index.json",
+          ".voratiq/message/index.json",
+        ].includes(file),
+      ),
+    ).toEqual([
+      ".voratiq/spec/index.json",
+      ".voratiq/run/index.json",
+      ".voratiq/reduce/index.json",
+      ".voratiq/verify/index.json",
+      ".voratiq/message/index.json",
+    ]);
 
     await expect(validateWorkspace(repoRoot)).resolves.toBeUndefined();
   });

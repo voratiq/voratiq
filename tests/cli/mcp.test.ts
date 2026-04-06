@@ -91,20 +91,20 @@ describe("bundled MCP server", () => {
     expect(definitions.map((definition) => definition.name)).toEqual([
       "voratiq_spec",
       "voratiq_run",
-      "voratiq_message",
       "voratiq_reduce",
       "voratiq_verify",
+      "voratiq_message",
       "voratiq_apply",
-      "voratiq_prune",
       "voratiq_list",
+      "voratiq_prune",
     ]);
 
     const expectedInputSchemas = {
       voratiq_spec: toInputSchema(externalSpecExecutionInputSchema),
       voratiq_run: toInputSchema(externalRunExecutionInputSchema),
-      voratiq_message: toInputSchema(externalMessageExecutionInputSchema),
       voratiq_reduce: toInputSchema(externalReduceExecutionInputSchema),
       voratiq_verify: toInputSchema(externalVerifyExecutionInputSchema),
+      voratiq_message: toInputSchema(externalMessageExecutionInputSchema),
       voratiq_apply: toInputSchema(externalApplyExecutionInputSchema),
       voratiq_prune: {
         type: "object",
@@ -212,12 +212,12 @@ describe("bundled MCP server", () => {
     expect(tools.tools.map((tool) => tool.name)).toEqual([
       "voratiq_spec",
       "voratiq_run",
-      "voratiq_message",
       "voratiq_reduce",
       "voratiq_verify",
+      "voratiq_message",
       "voratiq_apply",
-      "voratiq_prune",
       "voratiq_list",
+      "voratiq_prune",
     ]);
     expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
   });

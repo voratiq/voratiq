@@ -143,6 +143,12 @@ export interface RepairWorkspaceStructureResult {
 const DOMAIN_STRUCTURE_DEFINITIONS: readonly WorkspaceDomainStructureDefinition[] =
   [
     {
+      directorySegment: VORATIQ_SPEC_DIR,
+      sessionsSegment: VORATIQ_SPEC_SESSIONS_DIR,
+      indexSegment: VORATIQ_SPEC_FILE,
+      indexVersion: 1,
+    },
+    {
       directorySegment: VORATIQ_RUN_DIR,
       sessionsSegment: VORATIQ_RUN_SESSIONS_DIR,
       indexSegment: VORATIQ_RUN_FILE,
@@ -155,21 +161,15 @@ const DOMAIN_STRUCTURE_DEFINITIONS: readonly WorkspaceDomainStructureDefinition[
       indexVersion: 1,
     },
     {
-      directorySegment: VORATIQ_MESSAGE_DIR,
-      sessionsSegment: VORATIQ_MESSAGE_SESSIONS_DIR,
-      indexSegment: VORATIQ_MESSAGE_FILE,
-      indexVersion: 1,
-    },
-    {
-      directorySegment: VORATIQ_SPEC_DIR,
-      sessionsSegment: VORATIQ_SPEC_SESSIONS_DIR,
-      indexSegment: VORATIQ_SPEC_FILE,
-      indexVersion: 1,
-    },
-    {
       directorySegment: VORATIQ_VERIFICATION_DIR,
       sessionsSegment: VORATIQ_VERIFICATION_SESSIONS_DIR,
       indexSegment: VORATIQ_VERIFICATION_FILE,
+      indexVersion: 1,
+    },
+    {
+      directorySegment: VORATIQ_MESSAGE_DIR,
+      sessionsSegment: VORATIQ_MESSAGE_SESSIONS_DIR,
+      indexSegment: VORATIQ_MESSAGE_FILE,
       indexVersion: 1,
     },
     {

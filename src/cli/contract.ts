@@ -71,7 +71,7 @@ export const externalReduceExecutionInputSchema = z
   .object({
     target: z
       .object({
-        type: z.enum(["spec", "run", "verify", "reduce", "message"]),
+        type: z.enum(["spec", "run", "reduce", "verify", "message"]),
         id: nonEmptyStringSchema,
       })
       .strict(),
@@ -160,9 +160,9 @@ export const externalListInspectionInputSchema = z.discriminatedUnion("mode", [
 export const externalExecutionInputSchemas = {
   spec: externalSpecExecutionInputSchema,
   run: externalRunExecutionInputSchema,
-  message: externalMessageExecutionInputSchema,
   reduce: externalReduceExecutionInputSchema,
   verify: externalVerifyExecutionInputSchema,
+  message: externalMessageExecutionInputSchema,
   apply: externalApplyExecutionInputSchema,
   prune: externalPruneExecutionInputSchema,
 } as const;
@@ -217,7 +217,7 @@ export const externalAdapterContractReference = {
     authoritativeType: "ListJsonOutput",
     versioned: false,
   },
-  excludedCommands: ["auto", "init"] as const,
+  excludedCommands: ["init", "auto"] as const,
   compatibility: {
     additiveChangesAreNonBreaking: true,
     breakingChangesRequireExecutionEnvelopeVersionBump: true,
@@ -266,8 +266,8 @@ const reduceCommandActionOptionsSchema = z
   .object({
     spec: nonEmptyStringSchema.optional(),
     run: nonEmptyStringSchema.optional(),
-    verify: nonEmptyStringSchema.optional(),
     reduce: nonEmptyStringSchema.optional(),
+    verify: nonEmptyStringSchema.optional(),
     message: nonEmptyStringSchema.optional(),
     agent: z.array(nonEmptyStringSchema).optional(),
     profile: nonEmptyStringSchema.optional(),
@@ -316,9 +316,9 @@ const listCommandActionOptionsSchema = z
   .object({
     spec: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
     run: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
-    message: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
     reduce: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
     verify: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
+    message: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
     limit: positiveIntegerSchema.optional(),
     verbose: z.boolean().optional(),
     json: z.boolean().optional(),
@@ -407,8 +407,8 @@ export function parseReduceExecutionCommandOptions(
     [
       { key: "spec", flag: "--spec", value: "spec" },
       { key: "run", flag: "--run", value: "run" },
-      { key: "verify", flag: "--verify", value: "verify" },
       { key: "reduce", flag: "--reduce", value: "reduce" },
+      { key: "verify", flag: "--verify", value: "verify" },
       { key: "message", flag: "--message", value: "message" },
     ],
     parsed,

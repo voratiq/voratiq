@@ -8,10 +8,10 @@ import {
 describe("orchestration types", () => {
   test("includes message in the canonical orchestration stage ids", () => {
     expect(ORCHESTRATION_STAGE_IDS).toEqual([
-      "run",
-      "verify",
       "spec",
+      "run",
       "reduce",
+      "verify",
       "message",
     ]);
   });

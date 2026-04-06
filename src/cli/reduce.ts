@@ -294,8 +294,8 @@ export function createReduceCommand(): Command {
     .description("Reduce artifact sets into a summarized form")
     .addOption(new Option("--spec <spec-id>", "Spec to reduce"))
     .addOption(new Option("--run <run-id>", "Run to reduce"))
-    .addOption(new Option("--verify <verify-id>", "Verification to reduce"))
     .addOption(new Option("--reduce <reduce-id>", "Reduction to reduce"))
+    .addOption(new Option("--verify <verify-id>", "Verification to reduce"))
     .addOption(
       new Option("--message <message-id>", "Message session to reduce"),
     )

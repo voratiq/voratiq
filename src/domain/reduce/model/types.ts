@@ -23,8 +23,8 @@ export { reductionStatusSchema, TERMINAL_REDUCTION_STATUSES };
 export const reductionTargetTypeSchema = z.enum([
   "spec",
   "run",
-  "verify",
   "reduce",
+  "verify",
   "message",
 ]);
 

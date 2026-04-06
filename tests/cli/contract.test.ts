@@ -26,8 +26,8 @@ describe("external adapter contract definitions", () => {
       "message",
     ]);
     expect(externalAdapterContractReference.excludedCommands).toEqual([
-      "auto",
       "init",
+      "auto",
     ]);
   });
 

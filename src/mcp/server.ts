@@ -64,9 +64,9 @@ function isSupportedMcpProtocolVersion(
 export type VoratiqMcpExecutionToolName =
   | "voratiq_spec"
   | "voratiq_run"
-  | "voratiq_message"
   | "voratiq_reduce"
   | "voratiq_verify"
+  | "voratiq_message"
   | "voratiq_apply"
   | "voratiq_prune";
 
@@ -75,12 +75,12 @@ export type VoratiqMcpToolName = VoratiqMcpExecutionToolName | "voratiq_list";
 export type VoratiqMcpOperator =
   | "spec"
   | "run"
-  | "message"
   | "reduce"
   | "verify"
+  | "message"
   | "apply"
-  | "prune"
-  | "list";
+  | "list"
+  | "prune";
 
 export type TransportFailureKind =
   | "invalid_input"
@@ -221,16 +221,6 @@ const toolSpecs: readonly ToolSpec[] = [
     outputContract: "execution",
   },
   {
-    name: "voratiq_message",
-    operator: "message",
-    description:
-      "Send an isolated prompt to one or more Voratiq agents and persist their independent replies as a durable message session.",
-    inputSchemaSource: externalMessageExecutionInputSchema,
-    buildArgs: (input) =>
-      buildMessageExecutionArgs(input as ExternalMessageExecutionInput),
-    outputContract: "execution",
-  },
-  {
     name: "voratiq_reduce",
     operator: "reduce",
     description:
@@ -251,6 +241,16 @@ const toolSpecs: readonly ToolSpec[] = [
     outputContract: "execution",
   },
   {
+    name: "voratiq_message",
+    operator: "message",
+    description:
+      "Send an isolated prompt to one or more Voratiq agents and persist their independent replies as a durable message session.",
+    inputSchemaSource: externalMessageExecutionInputSchema,
+    buildArgs: (input) =>
+      buildMessageExecutionArgs(input as ExternalMessageExecutionInput),
+    outputContract: "execution",
+  },
+  {
     name: "voratiq_apply",
     operator: "apply",
     description:
@@ -258,17 +258,6 @@ const toolSpecs: readonly ToolSpec[] = [
     inputSchemaSource: externalApplyExecutionInputSchema,
     buildArgs: (input) =>
       buildApplyExecutionArgs(input as ExternalApplyExecutionInput),
-    outputContract: "execution",
-  },
-  {
-    name: "voratiq_prune",
-    operator: "prune",
-    description:
-      "Prune Voratiq run workspaces or all pruneable run state after confirmation.",
-    inputSchemaSource: externalPruneExecutionInputSchema,
-    mcpInputSchema: createPruneMcpInputSchema(),
-    buildArgs: (input) =>
-      buildPruneExecutionArgs(input as ExternalPruneExecutionInput),
     outputContract: "execution",
   },
   {
@@ -282,6 +271,17 @@ const toolSpecs: readonly ToolSpec[] = [
       buildListInspectionArgs(input as ExternalListInspectionInput),
     outputContract: "list",
   },
+  {
+    name: "voratiq_prune",
+    operator: "prune",
+    description:
+      "Prune Voratiq run workspaces or all pruneable run state after confirmation.",
+    inputSchemaSource: externalPruneExecutionInputSchema,
+    mcpInputSchema: createPruneMcpInputSchema(),
+    buildArgs: (input) =>
+      buildPruneExecutionArgs(input as ExternalPruneExecutionInput),
+    outputContract: "execution",
+  },
 ] as const;
 
 const toolDefinitions: readonly McpToolDefinition[] = toolSpecs.map((tool) => ({
@@ -292,7 +292,7 @@ const toolDefinitions: readonly McpToolDefinition[] = toolSpecs.map((tool) => ({
 }));
 
 const VORATIQ_MCP_SERVER_INSTRUCTIONS =
-  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, verify, or message sessions. Use voratiq_spec, voratiq_run, voratiq_message, voratiq_verify, voratiq_apply, and voratiq_prune for the normal Voratiq workflow. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
+  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, verify, or message sessions. Use voratiq_spec, voratiq_run, voratiq_reduce, voratiq_verify, voratiq_message, voratiq_apply, and voratiq_prune for the normal Voratiq workflow. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
 
 const toolSpecsByName: ReadonlyMap<VoratiqMcpToolName, ToolSpec> = new Map(
   toolSpecs.map((tool) => [tool.name, tool]),

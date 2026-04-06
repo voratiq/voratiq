@@ -14,7 +14,7 @@ describe("reduce command options", () => {
     await expect(
       program.parseAsync(["reduce", "--agent", "alpha"], { from: "user" }),
     ).rejects.toThrow(
-      /exactly one target flag is required: `--spec`, `--run`, `--verify`, `--reduce`, or `--message`/i,
+      /exactly one target flag is required: `--spec`, `--run`, `--reduce`, `--verify`, or `--message`/i,
     );
   });
 
@@ -30,7 +30,7 @@ describe("reduce command options", () => {
         from: "user",
       }),
     ).rejects.toThrow(
-      /exactly one target flag is required: `--spec`, `--run`, `--verify`, `--reduce`, or `--message`/i,
+      /exactly one target flag is required: `--spec`, `--run`, `--reduce`, `--verify`, or `--message`/i,
     );
   });
 
