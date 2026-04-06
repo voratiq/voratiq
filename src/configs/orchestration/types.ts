@@ -7,6 +7,7 @@ export const ORCHESTRATION_STAGE_IDS = [
   "verify",
   "spec",
   "reduce",
+  "message",
 ] as const;
 export type OrchestrationStageId = (typeof ORCHESTRATION_STAGE_IDS)[number];
 
@@ -42,14 +43,13 @@ export const orchestrationStageSchema = z
 
 export type OrchestrationStageConfig = z.infer<typeof orchestrationStageSchema>;
 
-const orchestrationProfileShape = {} as Record<
-  OrchestrationStageId,
-  typeof orchestrationStageSchema
->;
-
-for (const stageId of ORCHESTRATION_STAGE_IDS) {
-  orchestrationProfileShape[stageId] = orchestrationStageSchema;
-}
+const orchestrationProfileShape = {
+  run: orchestrationStageSchema,
+  verify: orchestrationStageSchema,
+  spec: orchestrationStageSchema,
+  reduce: orchestrationStageSchema,
+  message: orchestrationStageSchema.default({ agents: [] }),
+} satisfies Record<OrchestrationStageId, z.ZodTypeAny>;
 
 export const orchestrationProfileSchema = z
   .object(orchestrationProfileShape)

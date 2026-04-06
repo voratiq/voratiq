@@ -19,7 +19,7 @@ import {
 } from "../../workspace/structure.js";
 import type { SandboxPolicyOverrides } from "./types.js";
 
-export type SandboxStageId = "run" | "spec" | "verify" | "reduce";
+export type SandboxStageId = "run" | "spec" | "verify" | "reduce" | "message";
 
 export interface BuildSandboxPolicyInput {
   stageId: SandboxStageId;

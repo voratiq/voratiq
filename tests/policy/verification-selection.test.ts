@@ -257,6 +257,31 @@ describe("verification winner policy defaults", () => {
       unresolvedReasons: [],
     });
   });
+
+  it("matches message stage participation to message-verification by default", async () => {
+    const output = await loadVerificationSelectionPolicyOutput({
+      root,
+      record: await writeMessageVerificationRecord({
+        root,
+        verificationId: "verify-message-1",
+      }),
+    });
+
+    expect(output.input.verifiers).toEqual([
+      {
+        verifierAgentId: "message-verifier",
+        status: "succeeded",
+        preferredCandidateId: "v_aaaaaaaaaa",
+        resolvedPreferredCandidateId: "agent-a",
+      },
+    ]);
+    expect(output.decision).toEqual({
+      state: "resolvable",
+      applyable: true,
+      selectedCanonicalAgentId: "agent-a",
+      unresolvedReasons: [],
+    });
+  });
 });
 
 async function writeRunVerificationRecord(options: {
@@ -411,6 +436,82 @@ async function writeReduceVerificationRecord(options: {
     target: {
       kind: "reduce",
       sessionId: "reduce-1",
+    },
+    methods,
+  };
+}
+
+async function writeMessageVerificationRecord(options: {
+  root: string;
+  verificationId: string;
+}): Promise<VerificationRecord> {
+  const { root, verificationId } = options;
+  const generatedAt = "2026-03-19T20:00:05.000Z";
+  const aliasMap = {
+    v_aaaaaaaaaa: "agent-a",
+    v_bbbbbbbbbb: "agent-b",
+  };
+  const methods: VerificationMethodResultRef[] = [];
+
+  const messageArtifactPath = `.voratiq/verify/sessions/${verificationId}/message-verifier/message-verification/artifacts/result.json`;
+  await writeArtifact(root, messageArtifactPath, {
+    method: "rubric",
+    template: "message-verification",
+    verifierId: "message-verifier",
+    generatedAt,
+    status: "succeeded",
+    result: {
+      preferred: "v_aaaaaaaaaa",
+      ranking: ["v_aaaaaaaaaa", "v_bbbbbbbbbb"],
+    },
+  });
+  methods.push({
+    method: "rubric",
+    template: "message-verification",
+    verifierId: "message-verifier",
+    scope: { kind: "target" },
+    status: "succeeded",
+    artifactPath: messageArtifactPath,
+    startedAt: generatedAt,
+    completedAt: generatedAt,
+  });
+
+  const failureModesArtifactPath = `.voratiq/verify/sessions/${verificationId}/failure-reviewer/failure-modes/artifacts/result.json`;
+  await writeArtifact(root, failureModesArtifactPath, {
+    method: "rubric",
+    template: "failure-modes",
+    verifierId: "failure-reviewer",
+    generatedAt,
+    status: "succeeded",
+    result: {
+      preferred: "v_bbbbbbbbbb",
+      ranking: ["v_bbbbbbbbbb", "v_aaaaaaaaaa"],
+    },
+  });
+  methods.push({
+    method: "rubric",
+    template: "failure-modes",
+    verifierId: "failure-reviewer",
+    scope: { kind: "target" },
+    status: "succeeded",
+    artifactPath: failureModesArtifactPath,
+    startedAt: generatedAt,
+    completedAt: generatedAt,
+  });
+
+  return {
+    sessionId: verificationId,
+    createdAt: generatedAt,
+    startedAt: generatedAt,
+    completedAt: generatedAt,
+    status: "succeeded",
+    target: {
+      kind: "message",
+      sessionId: "message-1",
+    },
+    blinded: {
+      enabled: true,
+      aliasMap,
     },
     methods,
   };

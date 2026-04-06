@@ -61,12 +61,15 @@ describe("orchestration bootstrap generator", () => {
         "    verify:",
         "      agents:",
         "        - id: zeta",
+        "    message:",
+        "      agents:",
+        "        - id: zeta",
         "",
       ].join("\n"),
     );
   });
 
-  test("manual preset seeds empty run/verify/spec/reduce", () => {
+  test("manual preset seeds empty run/verify/spec/reduce/message", () => {
     const config: AgentsConfig = {
       agents: [
         {
@@ -93,6 +96,8 @@ describe("orchestration bootstrap generator", () => {
         "    reduce:",
         "      agents: []",
         "    verify:",
+        "      agents: []",
+        "    message:",
         "      agents: []",
         "",
       ].join("\n"),
@@ -191,7 +196,7 @@ describe("orchestration bootstrap generator", () => {
     const lines = yaml.split("\n");
 
     // Both agents in all stages
-    for (const stage of ["spec", "run", "reduce", "verify"]) {
+    for (const stage of ["spec", "run", "reduce", "verify", "message"]) {
       const stageStart = lines.indexOf(`    ${stage}:`);
       expect(stageStart).toBeGreaterThan(-1);
       const agentsLine = lines[stageStart + 1];

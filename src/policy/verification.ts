@@ -424,7 +424,11 @@ function resolveWinnerPolicyParticipatingRubrics(options: {
 
 function resolveStageVerificationTemplateForTarget(
   target: VerificationTarget,
-): "spec-verification" | "run-verification" | "reduce-verification" {
+):
+  | "spec-verification"
+  | "run-verification"
+  | "reduce-verification"
+  | "message-verification" {
   switch (target.kind) {
     case "spec":
       return "spec-verification";
@@ -432,6 +436,8 @@ function resolveStageVerificationTemplateForTarget(
       return "run-verification";
     case "reduce":
       return "reduce-verification";
+    case "message":
+      return "message-verification";
   }
 }
 

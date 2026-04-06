@@ -206,4 +206,58 @@ describe("buildForbiddenVerificationIdentityTokens", () => {
     });
     expect(result).toEqual([]);
   });
+
+  it("uses succeeded message recipient ids as forbidden leakage tokens", () => {
+    const target: ResolvedVerificationTarget = {
+      competitiveCandidates: [
+        {
+          canonicalId: "agent-a",
+          forbiddenIdentityTokens: ["agent-a"],
+        },
+        {
+          canonicalId: "agent-b",
+          forbiddenIdentityTokens: ["agent-b"],
+        },
+      ],
+      target: {
+        kind: "message",
+        sessionId: "message-123",
+      },
+      messageRecord: {
+        sessionId: "message-123",
+        createdAt: "2026-04-06T00:00:00.000Z",
+        startedAt: "2026-04-06T00:00:00.000Z",
+        completedAt: "2026-04-06T00:00:05.000Z",
+        status: "succeeded",
+        prompt: "Review the response.",
+        recipients: [
+          {
+            agentId: "agent-a",
+            status: "succeeded",
+            startedAt: "2026-04-06T00:00:00.000Z",
+            completedAt: "2026-04-06T00:00:05.000Z",
+            outputPath:
+              ".voratiq/message/sessions/message-123/agent-a/artifacts/response.md",
+            error: null,
+          },
+          {
+            agentId: "agent-b",
+            status: "succeeded",
+            startedAt: "2026-04-06T00:00:00.000Z",
+            completedAt: "2026-04-06T00:00:05.000Z",
+            outputPath:
+              ".voratiq/message/sessions/message-123/agent-b/artifacts/response.md",
+            error: null,
+          },
+        ],
+        error: null,
+      },
+    };
+
+    expect(
+      buildForbiddenVerificationIdentityTokens({
+        resolvedTarget: target,
+      }).sort(),
+    ).toEqual(["agent-a", "agent-b"]);
+  });
 });

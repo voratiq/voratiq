@@ -88,6 +88,50 @@ describe("resolveStageCompetitors", () => {
     }
   });
 
+  it("includes agent override guidance when message stage has no configured agents", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-message-resolution-"));
+    try {
+      await writeOrchestrationFixture(root, [
+        "profiles:",
+        "  default:",
+        "    spec:",
+        "      agents: []",
+        "    run:",
+        "      agents: []",
+        "    reduce:",
+        "      agents: []",
+        "    verify:",
+        "      agents: []",
+        "    message:",
+        "      agents: []",
+        "",
+      ]);
+
+      let caught: unknown;
+      try {
+        resolveStageCompetitors({
+          root,
+          stageId: "message",
+          includeDefinitions: false,
+        });
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(HintedError);
+      const hinted = caught as HintedError;
+      expect(hinted.headline).toBe("No agents configured for stage `message`.");
+      expect(hinted.hintLines).toContain(
+        "Configure at least one agent under `profiles.default.message.agents` in `orchestration.yaml`.",
+      );
+      expect(hinted.hintLines).toContain(
+        "Or pass one or more `--agent` overrides.",
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("resolves run stage agents from the selected profile in configured order", async () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-profile-resolution-"));
     try {

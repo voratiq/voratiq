@@ -1,6 +1,8 @@
+import type { MessageRecord } from "../../src/domain/message/model/types.js";
 import type { RunRecord } from "../../src/domain/run/model/types.js";
 import type { SpecRecord } from "../../src/domain/spec/model/types.js";
 import {
+  renderMessageList,
   renderRunList,
   renderSpecList,
 } from "../../src/render/transcripts/list.js";
@@ -254,6 +256,71 @@ describe("renderSpecList", () => {
   });
 });
 
+describe("renderMessageList", () => {
+  it("renders a table with MESSAGE, PROMPT, STATUS, CREATED columns", () => {
+    const records: MessageRecord[] = [
+      buildMessageRecord({
+        sessionId: "20260406-031050-itblf",
+        status: "running",
+      }),
+    ];
+
+    const output = renderMessageList(records);
+    const lines = output.split("\n");
+
+    expect(lines[0]).toContain("MESSAGE");
+    expect(lines[0]).toContain("PROMPT");
+    expect(lines[0]).toContain("STATUS");
+    expect(lines[0]).toContain("CREATED");
+    expect(lines[0]).not.toContain("RECIPIENTS");
+    expect(lines[1]).toContain("20260406-031050-itblf");
+    expect(lines[1]).toContain("Review this change.");
+    expect(lines[1]).toContain("RUNNING");
+  });
+
+  it("orders columns as MESSAGE, PROMPT, STATUS, CREATED", () => {
+    const records: MessageRecord[] = [
+      buildMessageRecord({
+        sessionId: "20260406-031050-itblf",
+        status: "running",
+      }),
+    ];
+
+    const output = renderMessageList(records);
+    const headerLine = output.split("\n")[0] ?? "";
+
+    const messageIndex = headerLine.indexOf("MESSAGE");
+    const promptIndex = headerLine.indexOf("PROMPT");
+    const statusIndex = headerLine.indexOf("STATUS");
+    const createdIndex = headerLine.indexOf("CREATED");
+
+    expect(messageIndex).toBeLessThan(promptIndex);
+    expect(promptIndex).toBeLessThan(statusIndex);
+    expect(statusIndex).toBeLessThan(createdIndex);
+  });
+
+  it("truncates long prompts to a 32-character preview", () => {
+    const records: MessageRecord[] = [
+      {
+        ...buildMessageRecord({
+          sessionId: "20260406-031050-itblf",
+          status: "running",
+        }),
+        prompt:
+          "Ask how commit 013bdf0 aligns with the existing codebase architecture and patterns.",
+      },
+    ];
+
+    const output = renderMessageList(records);
+    const lines = output.split("\n");
+
+    expect(lines[1]).toContain("Ask how commit 013bdf0 aligns...");
+    expect(lines[1]).not.toContain(
+      "Ask how commit 013bdf0 aligns with the existing codebase architecture and patterns.",
+    );
+  });
+});
+
 function buildRunRecord(params: {
   runId: string;
   specPath: string;
@@ -286,6 +353,39 @@ function buildSpecRecord(params: {
     status: params.status,
     description: params.description,
     agents: [],
+    error: null,
+  };
+}
+
+function buildMessageRecord(params: {
+  sessionId: string;
+  status: MessageRecord["status"];
+}): MessageRecord {
+  const createdAt = "2026-03-01T00:00:00.000Z";
+  const completedAt =
+    params.status === "running" ? undefined : "2026-03-01T00:05:00.000Z";
+
+  return {
+    sessionId: params.sessionId,
+    createdAt,
+    startedAt: createdAt,
+    ...(completedAt ? { completedAt } : {}),
+    status: params.status,
+    prompt: "Review this change.",
+    recipients: [
+      {
+        agentId: "agent-a",
+        status: params.status === "running" ? "running" : "succeeded",
+        startedAt: createdAt,
+        ...(completedAt ? { completedAt } : {}),
+        ...(params.status === "running"
+          ? {}
+          : {
+              outputPath: `.voratiq/message/sessions/${params.sessionId}/agent-a/artifacts/response.md`,
+            }),
+        error: null,
+      },
+    ],
     error: null,
   };
 }

@@ -35,7 +35,7 @@ The full sequence is **spec → run → reduce → verify → apply**. `voratiq 
 
 Operators are composable beyond this sequence:
 
-- **Verify is a cross-stage gate.** It can target spec, run, or reduce sessions. You can verify a spec before running agents against it, verify run outputs before reduction, or verify the reduction itself.
+- **Verify is a cross-stage gate.** It can target spec, run, reduce, or message sessions. You can verify a spec before running agents against it, verify run outputs before reduction, verify the reduction itself, or verify persisted message responses directly.
 - **Reduce targets multiple operator outputs.** It can consume artifacts from spec, run, verify, or a prior reduction.
 
 Each operator can be invoked on its own from the CLI (`voratiq spec`, `voratiq run`, `voratiq reduce`, `voratiq verify`, `voratiq apply`, `voratiq prune`) or composed with others in any order.
@@ -62,7 +62,7 @@ See [Agent Configuration](configs/agents.md) and [Orchestration Configuration](c
 Each stage runs multiple agents, producing a set of competing outputs. Verification decides which one to keep, through two channels:
 
 - **Programmatic checks** — shell commands (test suites, linters, type checkers, builds). Automated pass/fail. Run targets only.
-- **Rubric verifiers** — agents that score candidates against structured templates. Applies to spec, run, and reduce.
+- **Rubric verifiers** — agents that score candidates against structured templates. Applies to spec, run, reduce, and message.
 
 Rubric verification is **blinded**: verifiers see randomized candidate IDs, not agent names. This prevents model-loyalty bias.
 

@@ -20,6 +20,7 @@ import {
 } from "../../../competition/shared/teardown.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
+import { readMessageRecords } from "../../../domain/message/persistence/adapter.js";
 import { validateReductionOutputContract } from "../../../domain/reduce/competition/output-validation.js";
 import { buildReducePrompt } from "../../../domain/reduce/competition/prompt.js";
 import { parseReductionArtifact } from "../../../domain/reduce/competition/reduction.js";
@@ -64,6 +65,7 @@ import {
 } from "../../../workspace/layout.js";
 import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
 import {
+  MESSAGE_RESPONSE_FILENAME,
   REDUCTION_ARTIFACT_INFO_FILENAME,
   REDUCTION_DATA_FILENAME,
   REDUCTION_FILENAME,
@@ -109,6 +111,7 @@ export interface CreateReduceCompetitionAdapterInput {
   readonly reductionsFilePath: string;
   readonly specsFilePath: string;
   readonly runsFilePath: string;
+  readonly messagesFilePath: string;
   readonly verificationsFilePath: string;
   readonly target: ReductionTarget;
   readonly environment: EnvironmentConfig;
@@ -130,6 +133,7 @@ export function createReduceCompetitionAdapter(
     reductionsFilePath,
     specsFilePath,
     runsFilePath,
+    messagesFilePath,
     verificationsFilePath,
     target,
     environment,
@@ -175,6 +179,7 @@ export function createReduceCompetitionAdapter(
         root,
         specsFilePath,
         runsFilePath,
+        messagesFilePath,
         verificationsFilePath,
         reductionsFilePath,
         target,
@@ -599,6 +604,7 @@ async function prepareReductionTargetContext(options: {
   root: string;
   specsFilePath: string;
   runsFilePath: string;
+  messagesFilePath: string;
   verificationsFilePath: string;
   reductionsFilePath: string;
   target: ReductionTarget;
@@ -613,6 +619,8 @@ async function prepareReductionTargetContext(options: {
       return await prepareVerificationTargetContext(options);
     case "reduce":
       return await prepareReductionTargetContextInternal(options);
+    case "message":
+      return await prepareMessageTargetContext(options);
   }
 }
 
@@ -883,6 +891,69 @@ async function prepareReductionTargetContextInternal(options: {
         id: record.sessionId,
         path: `.voratiq/reduce/sessions/${record.sessionId}`,
         sourceTarget: record.target,
+      },
+      artifacts,
+    },
+  };
+}
+
+async function prepareMessageTargetContext(options: {
+  root: string;
+  messagesFilePath: string;
+  target: ReductionTarget;
+}): Promise<ReductionTargetContext> {
+  const { root, messagesFilePath, target } = options;
+  const [record] = await readMessageRecords({
+    root,
+    messagesFilePath,
+    limit: 1,
+    predicate: (entry) => entry.sessionId === target.id,
+  });
+  if (!record) {
+    throw new Error(`Message session \`${target.id}\` not found.`);
+  }
+
+  const succeededRecipients = record.recipients.filter(
+    (recipient): recipient is typeof recipient & { outputPath: string } =>
+      recipient.status === "succeeded" &&
+      typeof recipient.outputPath === "string",
+  );
+  if (succeededRecipients.length === 0) {
+    throw new Error(
+      `Message session \`${target.id}\` has no generated artifacts.`,
+    );
+  }
+
+  const stagedFiles: StagedTargetFile[] = [];
+  const artifacts: Array<Record<string, unknown>> = [];
+
+  for (const recipient of succeededRecipients) {
+    const outputRelative = `inputs/recipients/${recipient.agentId}/${MESSAGE_RESPONSE_FILENAME}`;
+    stagedFiles.push({
+      sourceAbsolutePath: resolvePath(root, recipient.outputPath),
+      stagedRelativePath: outputRelative,
+    });
+    artifacts.push({
+      artifactId: `message:${recipient.agentId}`,
+      kind: "message-output",
+      agentId: recipient.agentId,
+      status: recipient.status,
+      outputPath: outputRelative,
+      ...(recipient.tokenUsage ? { tokenUsage: recipient.tokenUsage } : {}),
+    });
+  }
+
+  return {
+    target,
+    displayPath: `.voratiq/message/sessions/${record.sessionId}`,
+    stagedFiles,
+    manifest: {
+      target: {
+        operator: "message",
+        id: record.sessionId,
+        path: `.voratiq/message/sessions/${record.sessionId}`,
+        status: record.status,
+        prompt: record.prompt,
       },
       artifacts,
     },

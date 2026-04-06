@@ -49,6 +49,7 @@ const verificationConfig: VerificationConfig = {
   spec: { rubric: [] },
   run: { programmatic: [], rubric: [{ template: "run-verification" }] },
   reduce: { rubric: [] },
+  message: { rubric: [{ template: "message-verification" }] },
 };
 
 const verifierAgent: AgentDefinition = {
@@ -332,6 +333,59 @@ describe("executeAndPersistRubricMethods", () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  it("fails clearly when message verification has no configured rubric templates", async () => {
+    await expect(
+      executeAndPersistRubricMethods({
+        root: "/repo",
+        verificationId: "verify-message-no-rubric",
+        resolvedTarget: {
+          competitiveCandidates: [
+            {
+              canonicalId: "agent-a",
+              forbiddenIdentityTokens: ["agent-a"],
+            },
+          ],
+          target: {
+            kind: "message",
+            sessionId: "message-123",
+          },
+          messageRecord: {
+            sessionId: "message-123",
+            createdAt: "2026-04-06T00:00:00.000Z",
+            startedAt: "2026-04-06T00:00:00.000Z",
+            completedAt: "2026-04-06T00:00:05.000Z",
+            status: "succeeded",
+            prompt: "Review the response.",
+            recipients: [
+              {
+                agentId: "agent-a",
+                status: "succeeded",
+                startedAt: "2026-04-06T00:00:00.000Z",
+                completedAt: "2026-04-06T00:00:05.000Z",
+                outputPath:
+                  ".voratiq/message/sessions/message-123/agent-a/artifacts/response.md",
+                error: null,
+              },
+            ],
+            error: null,
+          },
+        },
+        verificationConfig: {
+          ...verificationConfig,
+          message: { rubric: [] },
+        },
+        verifierAgents: [verifierAgent],
+        environment: {},
+        extraContextFiles: [],
+        maxParallel: 1,
+        teardown: createTeardownController("message no-rubric test"),
+        mutators: createMutators(),
+      }),
+    ).rejects.toThrow(
+      /message verification requires at least one configured rubric template/iu,
+    );
   });
 });
 

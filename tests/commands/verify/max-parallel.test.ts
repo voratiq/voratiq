@@ -18,6 +18,9 @@ describe("resolveVerifyRubricMaxParallel", () => {
       programmatic: [],
       rubric: [{ template: "reduce-verification" }],
     },
+    message: {
+      rubric: [{ template: "message-verification" }],
+    },
   } as const;
 
   it("defaults rubric parallelism to the flattened verifier-template execution count", () => {
@@ -52,5 +55,15 @@ describe("resolveVerifyRubricMaxParallel", () => {
         verifierAgentCount: 2,
       }),
     ).toBe(0);
+  });
+
+  it("counts message-stage rubric executions explicitly", () => {
+    expect(
+      resolveVerifyRubricMaxParallel({
+        targetKind: "message",
+        verificationConfig: verificationConfig as never,
+        verifierAgentCount: 3,
+      }),
+    ).toBe(3);
   });
 });

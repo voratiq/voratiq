@@ -86,6 +86,22 @@ export function buildRubricPrompt(options: {
         return `  - ${candidate.alias}${suffix}`;
       }),
     );
+  } else if (staged.kind === "message") {
+    lines.push(
+      `- Original message prompt: \`${staged.promptPath}\``,
+      "- Candidate responses:",
+      ...staged.candidates.map(
+        (candidate) => `  - ${candidate.alias}: \`${candidate.responsePath}\``,
+      ),
+    );
+  } else if (staged.kind === "reduce-no-reference") {
+    lines.push(
+      `- No repository snapshot is available for this reduction target because its lineage reaches message session \`${staged.referenceRepoUnavailable.messageSessionId}\` without a durable base revision.`,
+      "- Reduction candidates:",
+      ...staged.candidates.map(
+        (candidate) => `  - ${candidate.alias}: \`${candidate.reductionPath}\``,
+      ),
+    );
   } else {
     lines.push(
       `- Base repository snapshot (read-only): \`${staged.referenceRepoPath}/\``,

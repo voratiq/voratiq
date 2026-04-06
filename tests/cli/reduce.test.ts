@@ -14,7 +14,7 @@ describe("reduce command options", () => {
     await expect(
       program.parseAsync(["reduce", "--agent", "alpha"], { from: "user" }),
     ).rejects.toThrow(
-      /exactly one target flag is required: `--spec`, `--run`, `--verify`, or `--reduce`/i,
+      /exactly one target flag is required: `--spec`, `--run`, `--verify`, `--reduce`, or `--message`/i,
     );
   });
 
@@ -30,8 +30,33 @@ describe("reduce command options", () => {
         from: "user",
       }),
     ).rejects.toThrow(
-      /exactly one target flag is required: `--spec`, `--run`, `--verify`, or `--reduce`/i,
+      /exactly one target flag is required: `--spec`, `--run`, `--verify`, `--reduce`, or `--message`/i,
     );
+  });
+
+  it("parses a message reduction target", async () => {
+    let received: ReduceCommandActionOptions | undefined;
+
+    const reduceCommand = silenceCommander(createReduceCommand());
+    reduceCommand
+      .exitOverride()
+      .action((options: ReduceCommandActionOptions) => {
+        received = options;
+      });
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(reduceCommand);
+
+    await program.parseAsync(
+      ["reduce", "--message", "message-123", "--agent", "alpha"],
+      { from: "user" },
+    );
+
+    expect(received).toEqual({
+      message: "message-123",
+      agent: ["alpha"],
+      extraContext: [],
+    });
   });
 
   it("parses reducer options", async () => {
@@ -108,6 +133,7 @@ interface ReduceCommandActionOptions {
   run?: string;
   verify?: string;
   reduce?: string;
+  message?: string;
   agent?: string[];
   profile?: string;
   maxParallel?: number;

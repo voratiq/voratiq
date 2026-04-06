@@ -12,6 +12,9 @@ export const VORATIQ_RUN_SESSIONS_DIR = "run/sessions";
 export const VORATIQ_REDUCTION_DIR = "reduce";
 export const VORATIQ_REDUCTION_FILE = "reduce/index.json";
 export const VORATIQ_REDUCTION_SESSIONS_DIR = "reduce/sessions";
+export const VORATIQ_MESSAGE_DIR = "message";
+export const VORATIQ_MESSAGE_FILE = "message/index.json";
+export const VORATIQ_MESSAGE_SESSIONS_DIR = "message/sessions";
 export const VORATIQ_SPEC_DIR = "spec";
 export const VORATIQ_SPEC_FILE = "spec/index.json";
 export const VORATIQ_SPEC_SESSIONS_DIR = "spec/sessions";
@@ -41,6 +44,7 @@ export const CHAT_JSON_FILENAME = "chat.json";
 export const CHAT_JSONL_FILENAME = "chat.jsonl";
 export const REDUCTION_FILENAME = "reduction.md";
 export const REDUCTION_DATA_FILENAME = "reduction.json";
+export const MESSAGE_RESPONSE_FILENAME = "response.md";
 export const RUNTIME_DIRNAME = "runtime";
 export const ARTIFACTS_DIRNAME = "artifacts";
 export const MANIFEST_FILENAME = "manifest.json";
@@ -186,6 +190,18 @@ export function getReductionSessionsDirectoryPath(): string {
   return getDomainSessionsDirectoryPath(VORATIQ_REDUCTION_DIR);
 }
 
+export function getMessageDirectoryPath(): string {
+  return getDomainDirectoryPath(VORATIQ_MESSAGE_DIR);
+}
+
+export function getMessageIndexPath(): string {
+  return getDomainIndexPath(VORATIQ_MESSAGE_DIR);
+}
+
+export function getMessageSessionsDirectoryPath(): string {
+  return getDomainSessionsDirectoryPath(VORATIQ_MESSAGE_DIR);
+}
+
 export function getInteractiveDirectoryPath(): string {
   return getDomainDirectoryPath(VORATIQ_INTERACTIVE_DIR);
 }
@@ -241,6 +257,10 @@ export function getSpecSessionDirectoryPath(sessionId: string): string {
 
 export function getReductionSessionDirectoryPath(sessionId: string): string {
   return getSessionDirectoryPath(VORATIQ_REDUCTION_DIR, sessionId);
+}
+
+export function getMessageSessionDirectoryPath(sessionId: string): string {
+  return getSessionDirectoryPath(VORATIQ_MESSAGE_DIR, sessionId);
 }
 
 export function getVerificationSessionDirectoryPath(sessionId: string): string {

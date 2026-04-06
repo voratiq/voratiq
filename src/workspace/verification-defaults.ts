@@ -6,6 +6,7 @@ import { detectProgrammaticSuggestions } from "../configs/verification/programma
 const DEFAULT_SPEC_RUBRIC = [{ template: "spec-verification" }] as const;
 const DEFAULT_RUN_RUBRIC = [{ template: "run-verification" }] as const;
 const DEFAULT_REDUCE_RUBRIC = [{ template: "reduce-verification" }] as const;
+const DEFAULT_MESSAGE_RUBRIC = [{ template: "message-verification" }] as const;
 
 export async function buildDefaultVerificationConfigYaml(params: {
   root: string;
@@ -28,6 +29,8 @@ export async function buildDefaultVerificationConfigYaml(params: {
   appendRunStage(lines, runProgrammaticDefaults);
   lines.push("");
   appendRubricStage(lines, "reduce", DEFAULT_REDUCE_RUBRIC);
+  lines.push("");
+  appendRubricStage(lines, "message", DEFAULT_MESSAGE_RUBRIC);
 
   return `${lines.join("\n")}\n`;
 }
@@ -54,7 +57,7 @@ function appendRunStage(
 
 function appendRubricStage(
   lines: string[],
-  stage: "spec" | "reduce",
+  stage: "spec" | "reduce" | "message",
   rubric: ReadonlyArray<{ template: string }>,
 ): void {
   lines.push(`${stage}:`);
@@ -65,7 +68,11 @@ function appendRubricStage(
 }
 
 export interface ShippedVerificationTemplate {
-  name: "spec-verification" | "run-verification" | "reduce-verification";
+  name:
+    | "spec-verification"
+    | "run-verification"
+    | "reduce-verification"
+    | "message-verification";
   prompt: string;
   rubric: string;
   schema: string;
@@ -769,6 +776,258 @@ properties:
           items:
             type: string
         gaps:
+          type: array
+          items:
+            type: string
+        evidence_refs:
+          type: array
+          items:
+            type: string
+  comparison:
+    type: string
+  preferred:
+    type: string
+  ranking:
+    type: array
+    items:
+      type: string
+  rationale:
+    type: string
+  next_actions:
+    type: array
+    items:
+      type: string
+`,
+    },
+    {
+      name: "message-verification",
+      prompt: `You are a blinded verifier agent reviewing multiple message responses to the same prompt and choosing the single best response artifact to carry forward.
+
+Inputs:
+
+- the original message prompt
+- the full blinded response set
+- any shared context needed to understand the prompt
+
+Expected working style:
+
+1. Read the original message prompt first.
+2. Derive the key response requirements the prompt establishes and use stable ids such as \`R1\`, \`R2\`, \`R3\`.
+3. Inspect the blinded response set directly.
+4. Assess each response against the verification rubric.
+5. Record per-response requirement coverage, completion posture, recommendation posture, and bounded follow-up work.
+6. Derive a strict best-to-worst ranking from those assessments.
+7. Make the ranking strict, complete, and tie-free across the full eligible response set.
+8. Set \`preferred\` equal to \`ranking[0]\`.
+
+Judgment discipline:
+
+- make claims only when you can point to evidence from the prompt or the response artifacts
+- if you cannot verify something, say so explicitly
+- focus on whether the response actually answered the asked prompt, not whether it merely sounds polished
+- distinguish bounded omissions from fundamental prompt misses
+- focus on decision-relevant follow-up work
+- include lightweight \`evidence_refs\` for each response assessment
+- keep \`comparison\` focused on cross-response tradeoffs such as prompt adherence, response quality, and carry-forward usefulness
+- make \`comparison\` explain why \`ranking[0]\` beat \`ranking[1]\`, not just why lower-ranked responses lost
+- include \`next_actions\` only for the selected response path
+
+Expected output shape:
+
+- \`assessments[]\` with one entry per response candidate
+- top-level \`preferred\` naming the selected candidate
+- each assessment should include:
+  - \`candidate\`
+  - \`completion_status\`
+  - \`recommendation_level\`
+  - \`quality\`
+  - \`evaluation\`
+  - \`requirements_coverage\`
+  - \`implementation_notes\`
+  - \`follow_up\`
+  - \`evidence_refs\`
+- top-level \`comparison\` should capture cross-candidate tradeoffs
+- top-level \`ranking\` must be strict, complete, and tie-free
+- top-level \`rationale\` should explain why \`preferred\` / \`ranking[0]\` is the best carry-forward response
+- top-level \`next_actions\` should stay short and operational
+`,
+      rubric: `# Message Review
+
+Review the response set by assessing each candidate on:
+
+- prompt adherence
+- task fit
+- response quality
+- decision usefulness
+- evidence
+
+Then derive a final ranking from those assessments.
+
+## Prompt Adherence
+
+Ask:
+
+- Does the response answer the actual prompt?
+- Are key prompt requirements clearly met, partially met, not met, or not verifiable?
+- Are there obvious mismatches between what the prompt asked for and what the response delivered?
+
+Prompt adherence should dominate polish or stylistic preference.
+
+Every candidate assessment should include explicit \`requirements_coverage\` entries so the ranking is traceable back to the original prompt rather than inferred from generic quality labels.
+
+## Task Fit
+
+Ask:
+
+- Does the response take the right posture for the prompt, not just produce superficially plausible language?
+- Does it stay within the asked scope instead of drifting into adjacent advice, cleanup, or speculation?
+- Does it answer at the right level of abstraction for the task?
+
+## Response Quality
+
+Ask:
+
+- Is the response coherent, direct, and internally consistent?
+- Does it surface uncertainty honestly instead of bluffing?
+- Does it preserve the important distinctions or caveats the prompt context requires?
+
+## Decision Usefulness
+
+Ask:
+
+- Would this response be the best durable artifact to keep from the message session?
+- Does it leave later operators or humans with a clear answer, recommendation, or next step?
+- Are any missing follow-ups bounded and low-risk, or do they reopen major prompt questions?
+
+## Evidence
+
+Ask:
+
+- Are important claims supported by concrete prompt or response evidence?
+- Does the response leave meaningful uncertainty unresolved?
+
+Evidence here means direct artifact evidence for the prompt/response pair itself:
+
+- the staged prompt artifact
+- the blinded response artifacts
+- cited prompt or response excerpts
+
+## Candidate posture
+
+Each candidate assessment should also name:
+
+- \`completion_status\`: \`complete\`, \`complete_with_gap\`, \`complete_with_gaps\`, \`incomplete\`, or \`not_verifiable\`
+- \`recommendation_level\`: \`carry_forward_now\`, \`strong_foundation\`, or \`not_recommended\`
+- \`quality\`: \`high\`, \`medium\`, or \`low\`
+
+These fields preserve the practical decision posture a message selector needs:
+
+- \`carry_forward_now\` means the response is fit to keep as the preferred durable message artifact immediately
+- \`strong_foundation\` means the response is directionally strong but still needs bounded tightening or follow-up
+- \`not_recommended\` means the response should not win the message verification
+
+## Ranking rule
+
+The final ranking should follow from the candidate assessments above.
+
+It should answer:
+
+- which response should win?
+- which ordering best reflects carry-forward usefulness?
+
+It should not ignore the structured per-candidate assessments.
+It must rank the full eligible response set with no ties.
+Set \`preferred\` equal to \`ranking[0]\`.
+
+The verification artifact should also include:
+
+- \`comparison\`: cross-candidate tradeoffs, explicitly including why \`ranking[0]\` beat \`ranking[1]\`
+- \`rationale\`: why \`preferred\` / \`ranking[0]\` is the best choice
+- \`next_actions\`: short, operational follow-up for the selected path
+`,
+      schema: `type: object
+required:
+  - assessments
+  - preferred
+  - comparison
+  - ranking
+  - rationale
+  - next_actions
+properties:
+  assessments:
+    type: array
+    items:
+      type: object
+      required:
+        - candidate
+        - completion_status
+        - recommendation_level
+        - quality
+        - evaluation
+        - requirements_coverage
+        - implementation_notes
+        - follow_up
+        - evidence_refs
+      properties:
+        candidate:
+          type: string
+        completion_status:
+          type: string
+          enum: ["complete", "complete_with_gap", "complete_with_gaps", "incomplete", "not_verifiable"]
+        recommendation_level:
+          type: string
+          enum: ["carry_forward_now", "strong_foundation", "not_recommended"]
+        quality:
+          type: string
+          enum: ["high", "medium", "low"]
+        evaluation:
+          type: object
+          required:
+            - prompt_adherence
+            - task_fit
+            - response_quality
+            - decision_usefulness
+            - evidence
+          properties:
+            prompt_adherence:
+              type: string
+              enum: ["strong", "acceptable", "weak", "not_verifiable"]
+            task_fit:
+              type: string
+              enum: ["strong", "acceptable", "weak", "not_verifiable"]
+            response_quality:
+              type: string
+              enum: ["strong", "acceptable", "weak", "not_verifiable"]
+            decision_usefulness:
+              type: string
+              enum: ["strong", "acceptable", "weak", "not_verifiable"]
+            evidence:
+              type: string
+              enum: ["strong", "acceptable", "weak", "missing"]
+        requirements_coverage:
+          type: array
+          items:
+            type: object
+            required:
+              - requirement
+              - status
+              - note
+              - evidence_refs
+            properties:
+              requirement:
+                type: string
+              status:
+                type: string
+                enum: ["met", "partial", "not_met", "not_verifiable"]
+              note:
+                type: string
+              evidence_refs:
+                type: array
+                items:
+                  type: string
+        implementation_notes:
+          type: string
+        follow_up:
           type: array
           items:
             type: string

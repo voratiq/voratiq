@@ -171,6 +171,51 @@ export const IN_PROGRESS_REDUCTION_STATUSES: readonly ReductionStatus[] = [
   "running",
 ] as const satisfies readonly ReductionStatus[];
 
+export const MESSAGE_STATUS_VALUES = [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "aborted",
+] as const;
+
+export type MessageStatus = (typeof MESSAGE_STATUS_VALUES)[number];
+
+export const messageStatusSchema = z.enum(MESSAGE_STATUS_VALUES);
+
+export const TERMINAL_MESSAGE_STATUSES: readonly MessageStatus[] = [
+  "succeeded",
+  "failed",
+  "aborted",
+] as const satisfies readonly MessageStatus[];
+
+export const IN_PROGRESS_MESSAGE_STATUSES: readonly MessageStatus[] = [
+  "queued",
+  "running",
+] as const satisfies readonly MessageStatus[];
+
+export const MESSAGE_RECIPIENT_STATUS_VALUES = [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "aborted",
+] as const;
+
+export type MessageRecipientStatus =
+  (typeof MESSAGE_RECIPIENT_STATUS_VALUES)[number];
+
+export const messageRecipientStatusSchema = z.enum(
+  MESSAGE_RECIPIENT_STATUS_VALUES,
+);
+
+export const TERMINAL_MESSAGE_RECIPIENT_STATUSES: readonly MessageRecipientStatus[] =
+  [
+    "succeeded",
+    "failed",
+    "aborted",
+  ] as const satisfies readonly MessageRecipientStatus[];
+
 export const SPEC_RECORD_STATUS_VALUES = [
   "running",
   "succeeded",

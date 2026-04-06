@@ -226,12 +226,12 @@ voratiq reduce --run 20251031-232802-abc123
 
 ## `voratiq verify`
 
-Verify a recorded spec, run, or reduction.
+Verify a recorded spec, run, reduce, or message session.
 
 ### Usage
 
 ```bash
-voratiq verify (--spec <spec-id> | --run <run-id> | --reduce <reduce-id>) [options]
+voratiq verify (--spec <spec-id> | --run <run-id> | --reduce <reduce-id> | --message <message-id>) [options]
 ```
 
 ### Options
@@ -239,6 +239,7 @@ voratiq verify (--spec <spec-id> | --run <run-id> | --reduce <reduce-id>) [optio
 - `--spec <spec-id>`: Spec to verify
 - `--run <run-id>`: Run to verify
 - `--reduce <reduce-id>`: Reduction to verify
+- `--message <message-id>`: Message session to verify
 - `--agent <agent-id>`: Set verifiers directly (repeatable; order preserved)
 - `--profile <name>`: Orchestration profile (default: `default`)
 - `--max-parallel <count>`: Max concurrent verifiers (default: all)
@@ -252,6 +253,10 @@ Verification is blinded when comparing candidates — verifiers see randomized c
 
 ```bash
 voratiq verify --run 20251031-232802-abc123
+```
+
+```bash
+voratiq verify --message 20251031-232802-abc123
 ```
 
 ```bash

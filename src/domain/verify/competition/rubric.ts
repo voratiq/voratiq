@@ -49,7 +49,18 @@ export async function executeAndPersistRubricMethods(options: {
       ? verificationConfig.spec.rubric
       : resolvedTarget.target.kind === "run"
         ? verificationConfig.run.rubric
-        : verificationConfig.reduce.rubric;
+        : resolvedTarget.target.kind === "reduce"
+          ? verificationConfig.reduce.rubric
+          : verificationConfig.message.rubric;
+
+  if (
+    resolvedTarget.target.kind === "message" &&
+    rubricTemplates.length === 0
+  ) {
+    throw new Error(
+      "Message verification requires at least one configured rubric template under `message.rubric` in `.voratiq/verification.yaml`.",
+    );
+  }
 
   if (rubricTemplates.length === 0 || verifierAgents.length === 0) {
     return [];

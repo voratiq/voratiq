@@ -53,6 +53,7 @@ const verificationConfig: VerificationConfig = {
     rubric: [],
   },
   reduce: { rubric: [] },
+  message: { rubric: [] },
 };
 
 describe("executeAndPersistProgrammaticMethod", () => {
@@ -322,6 +323,54 @@ describe("executeAndPersistProgrammaticMethod", () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  it("returns a no-op plan for message targets without recording method snapshots", async () => {
+    const snapshots: unknown[] = [];
+
+    const result = await executeAndPersistProgrammaticMethod({
+      root: "/repo",
+      verificationId: "verify-message",
+      resolvedTarget: {
+        competitiveCandidates: [
+          {
+            canonicalId: "agent-a",
+            forbiddenIdentityTokens: ["agent-a"],
+          },
+        ],
+        target: {
+          kind: "message",
+          sessionId: "message-123",
+        },
+        messageRecord: {
+          sessionId: "message-123",
+          createdAt: "2026-04-06T00:00:00.000Z",
+          startedAt: "2026-04-06T00:00:00.000Z",
+          completedAt: "2026-04-06T00:00:05.000Z",
+          status: "succeeded",
+          prompt: "Review this response.",
+          recipients: [
+            {
+              agentId: "agent-a",
+              status: "succeeded",
+              startedAt: "2026-04-06T00:00:00.000Z",
+              completedAt: "2026-04-06T00:00:05.000Z",
+              outputPath:
+                ".voratiq/message/sessions/message-123/agent-a/artifacts/response.md",
+              error: null,
+            },
+          ],
+          error: null,
+        },
+      },
+      verificationConfig,
+      environment: {},
+      mutators: createMutators(snapshots),
+    });
+
+    expect(result).toBeUndefined();
+    expect(snapshots).toEqual([]);
+    expect(executeProgrammaticChecksMock).not.toHaveBeenCalled();
   });
 });
 

@@ -8,6 +8,7 @@ import type {
   VerificationStatus,
 } from "../status/index.js";
 import {
+  getMessageSessionDirectoryPath,
   getReductionSessionDirectoryPath,
   getRunDirectoryPath,
   getSpecSessionDirectoryPath,
@@ -36,7 +37,12 @@ export interface OperatorResultEnvelope {
     runId?: string;
     verificationId?: string;
     reductionId?: string;
+    messageId?: string;
     agentId?: string;
+  };
+  target?: {
+    kind: string;
+    sessionId: string;
   };
   artifacts: EnvelopeArtifactRef[];
   selection?: {
@@ -61,7 +67,15 @@ export const operatorResultEnvelopeSchema = z
         runId: z.string().optional(),
         verificationId: z.string().optional(),
         reductionId: z.string().optional(),
+        messageId: z.string().optional(),
         agentId: z.string().optional(),
+      })
+      .passthrough()
+      .optional(),
+    target: z
+      .object({
+        kind: z.string(),
+        sessionId: z.string(),
       })
       .passthrough()
       .optional(),
@@ -116,7 +130,7 @@ export const operatorResultEnvelopeSchema = z
 export interface VerifyEnvelopeInput {
   verificationId: string;
   target: {
-    kind: "spec" | "run" | "reduce";
+    kind: "spec" | "run" | "reduce" | "message";
     sessionId: string;
   };
   outputPath: string;
@@ -130,6 +144,15 @@ export interface ReduceEnvelopeInput {
   reductionId: string;
   target: ReductionTarget;
   status: ReductionStatus;
+}
+
+export interface MessageEnvelopeInput {
+  sessionId: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "aborted";
+  outputArtifacts?: ReadonlyArray<{
+    agentId: string;
+    outputPath?: string;
+  }>;
 }
 
 export interface ApplyEnvelopeInput {
@@ -154,6 +177,7 @@ export function buildOperatorEnvelope(options: {
   unresolvedReasons?: OperatorResultEnvelope["unresolvedReasons"];
   alerts?: OperatorResultEnvelope["alerts"];
   error?: OperatorResultEnvelope["error"];
+  target?: OperatorResultEnvelope["target"];
   timestamp?: string;
 }): OperatorResultEnvelope {
   const envelope: OperatorResultEnvelope = {
@@ -169,6 +193,9 @@ export function buildOperatorEnvelope(options: {
   }
   if (options.selection) {
     envelope.selection = options.selection;
+  }
+  if (options.target) {
+    envelope.target = options.target;
   }
   if (
     options.status === "unresolved" &&
@@ -276,6 +303,9 @@ export function buildVerifyOperatorEnvelope(
   if (options.target.kind === "reduce") {
     ids.reductionId = options.target.sessionId;
   }
+  if (options.target.kind === "message") {
+    ids.messageId = options.target.sessionId;
+  }
 
   const alerts: NonNullable<OperatorResultEnvelope["alerts"]> = [];
   if (options.warningMessage) {
@@ -292,6 +322,7 @@ export function buildVerifyOperatorEnvelope(
     operator: "verify",
     status,
     ids,
+    target: options.target,
     artifacts: [
       {
         kind: "session",
@@ -364,6 +395,37 @@ export function buildReduceOperatorEnvelope(
         role: "input",
         path: getReductionSourcePath(options.target),
       },
+    ],
+  });
+}
+
+export function buildMessageOperatorEnvelope(
+  options: MessageEnvelopeInput,
+): OperatorResultEnvelope {
+  return buildOperatorEnvelope({
+    operator: "message",
+    status: normalizeTerminalStatus(options.status),
+    ids: {
+      sessionId: options.sessionId,
+    },
+    artifacts: [
+      {
+        kind: "session",
+        role: "session",
+        path: getMessageSessionDirectoryPath(options.sessionId),
+      },
+      ...(options.outputArtifacts ?? []).flatMap((artifact) => [
+        ...(artifact.outputPath
+          ? [
+              {
+                kind: "output" as const,
+                role: "output" as const,
+                agentId: artifact.agentId,
+                path: artifact.outputPath,
+              } satisfies EnvelopeArtifactRef,
+            ]
+          : []),
+      ]),
     ],
   });
 }
@@ -486,7 +548,14 @@ function isEnvelopeOperator(value: string): value is EnvelopeOperator {
 }
 
 function normalizeTerminalStatus(
-  status: RunStatus | VerificationStatus,
+  status:
+    | RunStatus
+    | VerificationStatus
+    | "queued"
+    | "running"
+    | "succeeded"
+    | "failed"
+    | "aborted",
 ): EnvelopeStatus {
   return status === "succeeded" ? "succeeded" : "failed";
 }
@@ -527,6 +596,8 @@ function getReductionSourcePath(target: ReductionTarget): string {
       return `.voratiq/spec/sessions/${target.id}`;
     case "run":
       return `.voratiq/run/sessions/${target.id}`;
+    case "message":
+      return `.voratiq/message/sessions/${target.id}`;
     case "verify":
       return `.voratiq/verify/sessions/${target.id}`;
     case "reduce":

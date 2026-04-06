@@ -6,12 +6,13 @@ import {
 } from "../../../src/configs/orchestration/types.js";
 
 describe("orchestration types", () => {
-  test("includes reduce in the canonical orchestration stage ids", () => {
+  test("includes message in the canonical orchestration stage ids", () => {
     expect(ORCHESTRATION_STAGE_IDS).toEqual([
       "run",
       "verify",
       "spec",
       "reduce",
+      "message",
     ]);
   });
 

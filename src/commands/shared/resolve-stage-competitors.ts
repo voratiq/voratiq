@@ -203,6 +203,10 @@ function assertResolvedAgentCount(options: {
     const configInstruction = enforceSingleCompetitor
       ? `Configure exactly one agent under \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`
       : `Configure at least one agent under \`${stageAgentsPath}\` in \`${ORCHESTRATION_CONFIG_DISPLAY_PATH}\`.`;
+    const overrideInstruction =
+      enforceSingleCompetitor || stageId === "reduce"
+        ? []
+        : ["Or pass one or more `--agent` overrides."];
     throw new HintedError(missingAgentsHeadline(stageId), {
       detailLines:
         stageId === "reduce"
@@ -213,7 +217,7 @@ function assertResolvedAgentCount(options: {
       hintLines:
         stageId === "reduce"
           ? [configInstruction, "Or pass one or more `--agent` overrides."]
-          : [configInstruction],
+          : [configInstruction, ...overrideInstruction],
     });
   }
 

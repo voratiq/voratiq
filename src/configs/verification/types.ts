@@ -59,6 +59,9 @@ export const verificationConfigSchema = z
     reduce: verificationRubricOnlyStageConfigSchema
       .optional()
       .default({ rubric: [] }),
+    message: verificationRubricOnlyStageConfigSchema
+      .optional()
+      .default({ rubric: [] }),
   })
   .strict();
 

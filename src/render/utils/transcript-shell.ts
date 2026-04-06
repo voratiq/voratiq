@@ -56,12 +56,14 @@ export type TranscriptBadgeVariant =
   | "verify"
   | "reduce"
   | "spec"
+  | "message"
   | "agent";
 
 const BRAND_COLOR = "164;203;153";
 const VERIFY_COLOR = "255;238;140";
 const REDUCE_COLOR = "226;159;115";
 const SPEC_COLOR = "144;190;228";
+const MESSAGE_COLOR = "245;242;235";
 
 const BADGE_STYLES: Record<TranscriptBadgeVariant, BadgeStyle> = {
   run: {
@@ -82,6 +84,11 @@ const BADGE_STYLES: Record<TranscriptBadgeVariant, BadgeStyle> = {
   spec: {
     foreground: `${ESC}38;2;0;0;0m`,
     background: `${ESC}48;2;${SPEC_COLOR}m`,
+    bold: true,
+  },
+  message: {
+    foreground: `${ESC}38;2;0;0;0m`,
+    background: `${ESC}48;2;${MESSAGE_COLOR}m`,
     bold: true,
   },
   agent: {

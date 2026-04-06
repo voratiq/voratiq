@@ -14,6 +14,7 @@ describe("external adapter contract definitions", () => {
       "run",
       "reduce",
       "verify",
+      "message",
       "apply",
       "prune",
     ]);
@@ -22,6 +23,7 @@ describe("external adapter contract definitions", () => {
       "run",
       "reduce",
       "verify",
+      "message",
     ]);
     expect(externalAdapterContractReference.excludedCommands).toEqual([
       "auto",
@@ -45,10 +47,35 @@ describe("external adapter contract definitions", () => {
     ).toBe(true);
 
     expect(
+      externalExecutionInputSchemas.message.safeParse({
+        prompt: "Reply with status",
+        profile: "default",
+      }).success,
+    ).toBe(true);
+
+    expect(
+      externalExecutionInputSchemas.reduce.safeParse({
+        target: {
+          type: "message",
+          id: "message-123",
+        },
+      }).success,
+    ).toBe(true);
+
+    expect(
       externalExecutionInputSchemas.verify.safeParse({
         target: {
           kind: "run",
           sessionId: "run-123",
+        },
+      }).success,
+    ).toBe(true);
+
+    expect(
+      externalExecutionInputSchemas.verify.safeParse({
+        target: {
+          kind: "message",
+          sessionId: "message-123",
         },
       }).success,
     ).toBe(true);

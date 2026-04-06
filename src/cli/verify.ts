@@ -47,6 +47,7 @@ import {
 import { parsePositiveInteger } from "../utils/validators.js";
 import {
   resolveWorkspacePath,
+  VORATIQ_MESSAGE_FILE,
   VORATIQ_REDUCTION_FILE,
   VORATIQ_VERIFICATION_FILE,
   VORATIQ_VERIFICATION_SESSIONS_DIR,
@@ -139,6 +140,9 @@ export async function runVerifyCommand(
     reductionsFilePath:
       workspacePaths.reductionsFile ??
       resolveWorkspacePath(root, VORATIQ_REDUCTION_FILE),
+    messagesFilePath:
+      workspacePaths.messagesFile ??
+      resolveWorkspacePath(root, VORATIQ_MESSAGE_FILE),
     verificationsFilePath:
       workspacePaths.verificationsFile ??
       resolveWorkspacePath(root, VORATIQ_VERIFICATION_FILE),
@@ -235,6 +239,7 @@ export async function runVerifyCommand(
         ),
       ),
     ),
+    target: execution.record.target,
     status: execution.record.status,
     methods: methodBlocks,
     suppressHint,
@@ -264,6 +269,7 @@ interface VerifyCommandActionOptions {
   spec?: string;
   run?: string;
   reduce?: string;
+  message?: string;
   agent?: string[];
   profile?: string;
   maxParallel?: number;
@@ -292,10 +298,13 @@ function parseMaxParallelOption(value: string): number {
 
 export function createVerifyCommand(): Command {
   return new Command("verify")
-    .description("Verify a recorded spec, run, or reduction")
+    .description("Verify a recorded spec, run, reduction, or message session")
     .addOption(new Option("--spec <spec-id>", "Spec to verify"))
     .addOption(new Option("--run <run-id>", "Run to verify"))
     .addOption(new Option("--reduce <reduce-id>", "Reduction to verify"))
+    .addOption(
+      new Option("--message <message-id>", "Message session to verify"),
+    )
     .addOption(
       new Option(
         "--agent <agent-id>",

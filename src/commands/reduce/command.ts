@@ -33,6 +33,7 @@ export interface ReduceCommandInput {
   specsFilePath: string;
   runsFilePath: string;
   reductionsFilePath: string;
+  messagesFilePath: string;
   verificationsFilePath: string;
   target: ReductionTarget;
   agentIds?: readonly string[];
@@ -58,6 +59,7 @@ export async function executeReduceCommand(
     specsFilePath,
     runsFilePath,
     reductionsFilePath,
+    messagesFilePath,
     verificationsFilePath,
     target,
     agentIds,
@@ -73,6 +75,7 @@ export async function executeReduceCommand(
     specsFilePath,
     runsFilePath,
     reductionsFilePath,
+    messagesFilePath,
     verificationsFilePath,
     target,
   });
@@ -115,6 +118,7 @@ export async function executeReduceCommand(
         reductionsFilePath,
         specsFilePath,
         runsFilePath,
+        messagesFilePath,
         verificationsFilePath,
         target,
         environment,

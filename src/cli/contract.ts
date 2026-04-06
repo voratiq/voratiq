@@ -23,6 +23,7 @@ export const externalExecutionOperators = [
   "run",
   "reduce",
   "verify",
+  "message",
   "apply",
   "prune",
 ] as const;
@@ -70,10 +71,20 @@ export const externalReduceExecutionInputSchema = z
   .object({
     target: z
       .object({
-        type: z.enum(["spec", "run", "verify", "reduce"]),
+        type: z.enum(["spec", "run", "verify", "reduce", "message"]),
         id: nonEmptyStringSchema,
       })
       .strict(),
+    agentIds: optionalNonEmptyStringArraySchema,
+    profile: nonEmptyStringSchema.optional(),
+    maxParallel: positiveIntegerSchema.optional(),
+    extraContext: optionalNonEmptyStringArraySchema,
+  })
+  .strict();
+
+export const externalMessageExecutionInputSchema = z
+  .object({
+    prompt: nonEmptyStringSchema,
     agentIds: optionalNonEmptyStringArraySchema,
     profile: nonEmptyStringSchema.optional(),
     maxParallel: positiveIntegerSchema.optional(),
@@ -85,7 +96,7 @@ export const externalVerifyExecutionInputSchema = z
   .object({
     target: z
       .object({
-        kind: z.enum(["spec", "run", "reduce"]),
+        kind: z.enum(["spec", "run", "reduce", "message"]),
         sessionId: nonEmptyStringSchema,
       })
       .strict(),
@@ -149,6 +160,7 @@ export const externalListInspectionInputSchema = z.discriminatedUnion("mode", [
 export const externalExecutionInputSchemas = {
   spec: externalSpecExecutionInputSchema,
   run: externalRunExecutionInputSchema,
+  message: externalMessageExecutionInputSchema,
   reduce: externalReduceExecutionInputSchema,
   verify: externalVerifyExecutionInputSchema,
   apply: externalApplyExecutionInputSchema,
@@ -171,6 +183,9 @@ export type ExternalRunExecutionInput = z.infer<
 >;
 export type ExternalReduceExecutionInput = z.infer<
   typeof externalReduceExecutionInputSchema
+>;
+export type ExternalMessageExecutionInput = z.infer<
+  typeof externalMessageExecutionInputSchema
 >;
 export type ExternalVerifyExecutionInput = z.infer<
   typeof externalVerifyExecutionInputSchema
@@ -253,6 +268,18 @@ const reduceCommandActionOptionsSchema = z
     run: nonEmptyStringSchema.optional(),
     verify: nonEmptyStringSchema.optional(),
     reduce: nonEmptyStringSchema.optional(),
+    message: nonEmptyStringSchema.optional(),
+    agent: z.array(nonEmptyStringSchema).optional(),
+    profile: nonEmptyStringSchema.optional(),
+    maxParallel: positiveIntegerSchema.optional(),
+    extraContext: z.array(nonEmptyStringSchema).optional(),
+    json: z.boolean().optional(),
+  })
+  .strict();
+
+const messageCommandActionOptionsSchema = z
+  .object({
+    prompt: nonEmptyStringSchema,
     agent: z.array(nonEmptyStringSchema).optional(),
     profile: nonEmptyStringSchema.optional(),
     maxParallel: positiveIntegerSchema.optional(),
@@ -266,6 +293,7 @@ const verifyCommandActionOptionsSchema = z
     spec: nonEmptyStringSchema.optional(),
     run: nonEmptyStringSchema.optional(),
     reduce: nonEmptyStringSchema.optional(),
+    message: nonEmptyStringSchema.optional(),
     agent: z.array(nonEmptyStringSchema).optional(),
     profile: nonEmptyStringSchema.optional(),
     maxParallel: positiveIntegerSchema.optional(),
@@ -288,6 +316,7 @@ const listCommandActionOptionsSchema = z
   .object({
     spec: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
     run: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
+    message: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
     reduce: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
     verify: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
     limit: positiveIntegerSchema.optional(),
@@ -380,6 +409,7 @@ export function parseReduceExecutionCommandOptions(
       { key: "run", flag: "--run", value: "run" },
       { key: "verify", flag: "--verify", value: "verify" },
       { key: "reduce", flag: "--reduce", value: "reduce" },
+      { key: "message", flag: "--message", value: "message" },
     ],
     parsed,
     command,
@@ -393,6 +423,29 @@ export function parseReduceExecutionCommandOptions(
         type: selected.value,
         id: selected.argument,
       },
+      agentIds: normalizeOptionalStringArray(parsed.agent),
+      profile: parsed.profile,
+      maxParallel: parsed.maxParallel,
+      extraContext: normalizeOptionalStringArray(parsed.extraContext),
+    },
+    command,
+  );
+}
+
+export function parseMessageExecutionCommandOptions(
+  options: unknown,
+  command: Command,
+): ExternalMessageExecutionInput {
+  const parsed = parseCommandOptions(
+    messageCommandActionOptionsSchema,
+    options,
+    command,
+  );
+
+  return parseCommandOptions(
+    externalMessageExecutionInputSchema,
+    {
+      prompt: parsed.prompt,
       agentIds: normalizeOptionalStringArray(parsed.agent),
       profile: parsed.profile,
       maxParallel: parsed.maxParallel,
@@ -416,6 +469,7 @@ export function parseVerifyExecutionCommandOptions(
       { key: "spec", flag: "--spec", value: "spec" },
       { key: "run", flag: "--run", value: "run" },
       { key: "reduce", flag: "--reduce", value: "reduce" },
+      { key: "message", flag: "--message", value: "message" },
     ],
     parsed,
     command,
@@ -499,6 +553,7 @@ export function parseListInspectionCommandOptions(
       { key: "run", flag: "--run", value: "run" },
       { key: "reduce", flag: "--reduce", value: "reduce" },
       { key: "verify", flag: "--verify", value: "verify" },
+      { key: "message", flag: "--message", value: "message" },
     ],
     parsed,
     command,

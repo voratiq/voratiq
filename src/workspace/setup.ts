@@ -24,6 +24,9 @@ import {
   VORATIQ_INTERACTIVE_DIR,
   VORATIQ_INTERACTIVE_FILE,
   VORATIQ_INTERACTIVE_SESSIONS_DIR,
+  VORATIQ_MESSAGE_DIR,
+  VORATIQ_MESSAGE_FILE,
+  VORATIQ_MESSAGE_SESSIONS_DIR,
   VORATIQ_ORCHESTRATION_FILE,
   VORATIQ_REDUCTION_DIR,
   VORATIQ_REDUCTION_FILE,
@@ -149,6 +152,12 @@ const DOMAIN_STRUCTURE_DEFINITIONS: readonly WorkspaceDomainStructureDefinition[
       directorySegment: VORATIQ_REDUCTION_DIR,
       sessionsSegment: VORATIQ_REDUCTION_SESSIONS_DIR,
       indexSegment: VORATIQ_REDUCTION_FILE,
+      indexVersion: 1,
+    },
+    {
+      directorySegment: VORATIQ_MESSAGE_DIR,
+      sessionsSegment: VORATIQ_MESSAGE_SESSIONS_DIR,
+      indexSegment: VORATIQ_MESSAGE_FILE,
       indexVersion: 1,
     },
     {

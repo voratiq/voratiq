@@ -689,11 +689,93 @@ describe("prepareSharedVerificationInputs", () => {
         } as ResolvedVerificationTarget,
       });
 
+      expect(result.kind).toBe("run");
+      if (result.kind !== "run") {
+        throw new Error("expected run shared inputs");
+      }
       expect(ensureWorkspaceDependenciesMock).toHaveBeenCalledWith({
         root,
         workspacePath: result.referenceRepoAbsolute,
         environment,
       });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("stages message prompt and blinded response artifacts without creating a reference repo", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "voratiq-verify-shared-message-"),
+    );
+    const verificationId = "verify-message-artifacts";
+    const messageArtifactsDir = join(
+      root,
+      ".voratiq",
+      "message",
+      "sessions",
+      "message-123",
+      "agent-a",
+      "artifacts",
+    );
+
+    try {
+      await mkdir(messageArtifactsDir, { recursive: true });
+      await writeFile(join(messageArtifactsDir, "response.md"), "response\n");
+
+      const result = await prepareSharedVerificationInputs({
+        root,
+        verificationId,
+        environment: {},
+        resolvedTarget: {
+          competitiveCandidates: [
+            {
+              canonicalId: "agent-a",
+              forbiddenIdentityTokens: ["agent-a"],
+            },
+          ],
+          target: { kind: "message", sessionId: "message-123" },
+          messageRecord: {
+            sessionId: "message-123",
+            createdAt: "2026-04-06T00:00:00.000Z",
+            startedAt: "2026-04-06T00:00:00.000Z",
+            completedAt: "2026-04-06T00:00:05.000Z",
+            status: "succeeded",
+            prompt: "Review the response.",
+            recipients: [
+              {
+                agentId: "agent-a",
+                status: "succeeded",
+                startedAt: "2026-04-06T00:00:00.000Z",
+                completedAt: "2026-04-06T00:00:05.000Z",
+                outputPath:
+                  ".voratiq/message/sessions/message-123/agent-a/artifacts/response.md",
+                error: null,
+              },
+            ],
+            error: null,
+          },
+        } as ResolvedVerificationTarget,
+      });
+
+      expect(result.kind).toBe("message");
+      if (result.kind !== "message") {
+        throw new Error("expected message shared inputs");
+      }
+      expect(result.candidates).toEqual([{ alias: "agent-a" }]);
+      expect(result.worktreesToRemove).toEqual([]);
+      await expect(pathExists(result.promptAbsolute)).resolves.toBe(true);
+      await expect(
+        pathExists(
+          join(
+            result.sharedInputsAbsolute,
+            "candidates",
+            "agent-a",
+            "response.md",
+          ),
+        ),
+      ).resolves.toBe(true);
+      expect(ensureWorkspaceDependenciesMock).not.toHaveBeenCalled();
+      expect(removeWorktreeMock).not.toHaveBeenCalled();
     } finally {
       await rm(root, { recursive: true, force: true });
     }

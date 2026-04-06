@@ -238,6 +238,7 @@ describe("end-to-end extra-context reuse loop", () => {
         specsFilePath: join(root, ".voratiq", "spec", "index.json"),
         runsFilePath: join(root, ".voratiq", "run", "index.json"),
         reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
+        messagesFilePath: join(root, ".voratiq", "message", "index.json"),
         verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
         target: { type: "spec", id: seedSpecId },
         agentIds: ["alpha"],

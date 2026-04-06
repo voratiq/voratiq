@@ -255,6 +255,9 @@ describe("workspace bootstrap", () => {
     ]);
     expect(config.run.rubric).toEqual([{ template: "run-verification" }]);
     expect(config.reduce.rubric).toEqual([{ template: "reduce-verification" }]);
+    expect(config.message.rubric).toEqual([
+      { template: "message-verification" },
+    ]);
     expect(content).not.toContain("scope:");
   });
 
