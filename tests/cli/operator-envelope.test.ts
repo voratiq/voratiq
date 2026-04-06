@@ -1,6 +1,7 @@
 import {
   buildApplyOperatorEnvelope,
   buildFailedOperatorEnvelope,
+  buildMessageOperatorEnvelope,
   buildPruneOperatorEnvelope,
   buildReduceOperatorEnvelope,
   buildRunOperatorEnvelope,
@@ -200,6 +201,27 @@ describe("operator envelope helpers", () => {
     );
   });
 
+  it("points message-backed reductions at the message session path", () => {
+    const envelope = buildReduceOperatorEnvelope({
+      reductionId: "reduce-123",
+      target: {
+        type: "message",
+        id: "message-456",
+      },
+      status: "succeeded",
+    });
+
+    expect(envelope.artifacts).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "message",
+          role: "input",
+          path: ".voratiq/message/sessions/message-456",
+        },
+      ]),
+    );
+  });
+
   it("surfaces apply warnings without changing the succeeded status", () => {
     const envelope = buildApplyOperatorEnvelope({
       runId: "run-123",
@@ -262,6 +284,43 @@ describe("operator envelope helpers", () => {
     ]);
   });
 
+  it("includes session and output artifacts in message envelopes", () => {
+    const envelope = buildMessageOperatorEnvelope({
+      sessionId: "message-123",
+      status: "succeeded",
+      outputArtifacts: [
+        {
+          agentId: "agent-a",
+          outputPath:
+            ".voratiq/message/sessions/message-123/agent-a/artifacts/response.md",
+        },
+      ],
+    });
+
+    expect(envelope).toMatchObject({
+      operator: "message",
+      status: "succeeded",
+      ids: {
+        sessionId: "message-123",
+      },
+    });
+    expect(envelope.artifacts).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "session",
+          role: "session",
+          path: ".voratiq/message/sessions/message-123",
+        },
+        {
+          kind: "output",
+          role: "output",
+          agentId: "agent-a",
+          path: ".voratiq/message/sessions/message-123/agent-a/artifacts/response.md",
+        },
+      ]),
+    );
+  });
+
   it("builds resolvable verify envelopes with selection metadata", () => {
     const envelope = buildVerifyOperatorEnvelope({
       verificationId: "verify-456",
@@ -284,6 +343,31 @@ describe("operator envelope helpers", () => {
       },
     });
     expect(envelope.unresolvedReasons).toBeUndefined();
+  });
+
+  it("carries explicit message target metadata in verify envelopes", () => {
+    const envelope = buildVerifyOperatorEnvelope({
+      verificationId: "verify-message-123",
+      target: {
+        kind: "message",
+        sessionId: "message-123",
+      },
+      outputPath: ".voratiq/verify/sessions/verify-message-123",
+      status: "succeeded",
+    });
+
+    expect(envelope).toMatchObject({
+      operator: "verify",
+      status: "succeeded",
+      ids: {
+        sessionId: "verify-message-123",
+        messageId: "message-123",
+      },
+      target: {
+        kind: "message",
+        sessionId: "message-123",
+      },
+    });
   });
 
   it("normalizes failure envelopes and resolves json-mode operators", () => {

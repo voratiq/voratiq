@@ -38,11 +38,17 @@ run:
 reduce:
   rubric:
     - template: reduce-verification
+message:
+  rubric:
+    - template: message-verification
 `);
 
     expect(config.spec.rubric).toEqual([{ template: "spec-verification" }]);
     expect(config.run.rubric).toEqual([{ template: "run-verification" }]);
     expect(config.reduce.rubric).toEqual([{ template: "reduce-verification" }]);
+    expect(config.message.rubric).toEqual([
+      { template: "message-verification" },
+    ]);
   });
 
   it("rejects rubric scope because it is no longer a supported config field", () => {
@@ -70,6 +76,16 @@ spec:
     expect(() =>
       readVerificationConfig(`
 reduce:
+  programmatic:
+    lint: npm run lint
+`),
+    ).toThrow(VerificationConfigError);
+  });
+
+  it("rejects message programmatic checks because message verification is rubric-only", () => {
+    expect(() =>
+      readVerificationConfig(`
+message:
   programmatic:
     lint: npm run lint
 `),

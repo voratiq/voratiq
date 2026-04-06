@@ -126,6 +126,16 @@ async function flushPendingHistory(): Promise<void> {
     );
   }
   try {
+    const { flushAllMessageRecordBuffers } = await import(
+      "./domain/message/persistence/adapter.js"
+    );
+    await flushAllMessageRecordBuffers();
+  } catch (error) {
+    console.warn(
+      `[voratiq] Failed to flush message history buffers: ${(error as Error).message}`,
+    );
+  }
+  try {
     const { flushAllSpecRecordBuffers } = await import(
       "./domain/spec/persistence/adapter.js"
     );
@@ -208,6 +218,27 @@ async function terminateActiveInteractiveSafe(
   }
 }
 
+async function terminateActiveMessageSafe(
+  status: "failed" | "aborted",
+  context: string,
+): Promise<Error | null> {
+  try {
+    const { terminateActiveMessage } = await import(
+      "./commands/message/lifecycle.js"
+    );
+    await terminateActiveMessage(status);
+    return null;
+  } catch (error) {
+    const { toErrorMessage } = await import("./utils/errors.js");
+    const normalizedError =
+      error instanceof Error ? error : new Error(toErrorMessage(error));
+    console.error(
+      `[voratiq] Failed to teardown message after ${context}: ${toErrorMessage(error)}`,
+    );
+    return normalizedError;
+  }
+}
+
 async function terminateActiveSessionsSafe(
   status: "failed" | "aborted",
   context: string,
@@ -221,10 +252,14 @@ async function terminateActiveSessionsSafe(
     status,
     context,
   );
+  const messageError = await terminateActiveMessageSafe(status, context);
 
-  const errors = [runError, verificationError, interactiveError].filter(
-    (error): error is Error => error instanceof Error,
-  );
+  const errors = [
+    runError,
+    verificationError,
+    interactiveError,
+    messageError,
+  ].filter((error): error is Error => error instanceof Error);
 
   if (errors.length > 1) {
     return new AggregateError(
@@ -437,8 +472,9 @@ async function registerCommands(
     "init",
     "spec",
     "run",
-    "verify",
     "reduce",
+    "verify",
+    "message",
     "apply",
     "list",
     "prune",
@@ -461,6 +497,9 @@ async function registerCommands(
     program.addCommand((await import("./cli/run.js")).createRunCommand());
     program.addCommand((await import("./cli/reduce.js")).createReduceCommand());
     program.addCommand((await import("./cli/verify.js")).createVerifyCommand());
+    program.addCommand(
+      (await import("./cli/message.js")).createMessageCommand(),
+    );
     program.addCommand((await import("./cli/apply.js")).createApplyCommand());
     program.addCommand((await import("./cli/list.js")).createListCommand());
     program.addCommand((await import("./cli/prune.js")).createPruneCommand());
@@ -480,6 +519,11 @@ async function registerCommands(
       break;
     case "run":
       program.addCommand((await import("./cli/run.js")).createRunCommand());
+      break;
+    case "message":
+      program.addCommand(
+        (await import("./cli/message.js")).createMessageCommand(),
+      );
       break;
     case "reduce":
       program.addCommand(

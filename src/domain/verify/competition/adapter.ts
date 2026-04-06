@@ -53,6 +53,7 @@ import { buildRubricPrompt, type RubricTemplateContents } from "./prompt.js";
 import {
   attachVerifierWorkspaceMounts,
   buildStagedVerificationInputs,
+  sharedInputsUseReferenceRepo,
   type SharedVerificationInputs,
 } from "./shared-layout.js";
 import type { ResolvedVerificationTarget } from "./target.js";
@@ -215,8 +216,7 @@ export function createVerifyCompetitionAdapter(
       await attachVerifierWorkspaceMounts({
         workspacePath: workspacePaths.workspacePath,
         contextPath: workspacePaths.contextPath,
-        sharedInputsAbsolute: sharedInputs.sharedInputsAbsolute,
-        referenceRepoAbsolute: sharedInputs.referenceRepoAbsolute,
+        sharedInputs,
       });
       await ensureWorkspaceDependencies({
         root,
@@ -255,9 +255,13 @@ export function createVerifyCompetitionAdapter(
           workspacePaths.contextPath,
           join(workspacePaths.workspacePath, "context"),
           join(workspacePaths.workspacePath, "inputs"),
-          join(workspacePaths.workspacePath, "reference_repo"),
           sharedInputs.sharedInputsAbsolute,
-          sharedInputs.referenceRepoAbsolute,
+          ...(sharedInputsUseReferenceRepo(sharedInputs)
+            ? [
+                join(workspacePaths.workspacePath, "reference_repo"),
+                sharedInputs.referenceRepoAbsolute,
+              ]
+            : []),
         ],
       });
 

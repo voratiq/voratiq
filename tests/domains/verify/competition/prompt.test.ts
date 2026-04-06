@@ -37,4 +37,38 @@ describe("buildRubricPrompt", () => {
       "You are running headlessly. Do not pause for user interaction.",
     );
   });
+
+  it("builds message-target prompts from the staged prompt and response artifacts", () => {
+    const prompt = buildRubricPrompt({
+      template: {
+        template: "message-verification",
+        prompt: "Review the response artifacts.",
+        rubric: "Rank the response candidates.",
+        schema: "type: object",
+      },
+      target: {
+        kind: "message",
+        sessionId: "message-123",
+      },
+      staged: {
+        kind: "message",
+        promptPath: "inputs/prompt.md",
+        candidates: [
+          {
+            alias: "v_aaaaaaaaaa",
+            responsePath: "inputs/candidates/v_aaaaaaaaaa/response.md",
+          },
+        ],
+      },
+      extraContextFiles: [],
+    });
+
+    expect(prompt).toContain("Original message prompt: `inputs/prompt.md`");
+    expect(prompt).toContain(
+      "v_aaaaaaaaaa: `inputs/candidates/v_aaaaaaaaaa/response.md`",
+    );
+    expect(prompt).not.toContain("Base repository snapshot");
+    expect(prompt).not.toContain("diff.patch");
+    expect(prompt).not.toContain("Selected spec");
+  });
 });

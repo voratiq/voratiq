@@ -55,6 +55,7 @@ describe("reduce competition teardown", () => {
         reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
         specsFilePath: join(root, ".voratiq", "specs", "index.json"),
         runsFilePath: join(root, ".voratiq", "runs", "index.json"),
+        messagesFilePath: join(root, ".voratiq", "message", "index.json"),
         verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
         target: { type: "spec", id: "spec-123" },
         environment: {},

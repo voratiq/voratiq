@@ -502,6 +502,10 @@ export function renderVerifyTranscript(options: {
   createdAt: string;
   elapsed: string;
   workspacePath: string;
+  target?: {
+    kind: string;
+    sessionId: string;
+  };
   status: "queued" | "running" | "succeeded" | "failed" | "aborted";
   methods: readonly VerifyTranscriptMethodBlock[];
   suppressHint?: boolean;
@@ -515,6 +519,7 @@ export function renderVerifyTranscript(options: {
     createdAt,
     elapsed,
     workspacePath,
+    target,
     status,
     methods,
     suppressHint,
@@ -563,6 +568,13 @@ export function renderVerifyTranscript(options: {
 
   if (methods.length > 0) {
     sections.push(["---"]);
+  }
+
+  if (target) {
+    sections.push([`Target: ${target.kind}:${target.sessionId}`]);
+    if (methods.length > 0) {
+      sections.push(["---"]);
+    }
   }
 
   methods.forEach((method, index) => {

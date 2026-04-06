@@ -25,6 +25,7 @@ export const reductionTargetTypeSchema = z.enum([
   "run",
   "verify",
   "reduce",
+  "message",
 ]);
 
 export type ReductionTargetType = z.infer<typeof reductionTargetTypeSchema>;

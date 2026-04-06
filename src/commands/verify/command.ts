@@ -43,6 +43,7 @@ export interface VerifyCommandInput {
   specsFilePath: string;
   runsFilePath: string;
   reductionsFilePath: string;
+  messagesFilePath: string;
   verificationsFilePath: string;
   target: VerifyTargetSelection;
   agentIds?: readonly string[];
@@ -66,6 +67,7 @@ export async function executeVerifyCommand(
     specsFilePath,
     runsFilePath,
     reductionsFilePath,
+    messagesFilePath,
     verificationsFilePath,
     target,
     agentIds,
@@ -81,6 +83,7 @@ export async function executeVerifyCommand(
     specsFilePath,
     runsFilePath,
     reductionsFilePath,
+    messagesFilePath,
     verificationsFilePath,
     target,
   });

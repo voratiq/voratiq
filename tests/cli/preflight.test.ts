@@ -45,6 +45,9 @@ function buildValidWorkspaceTree(
     [`${root}/.voratiq/run`]: null,
     [`${root}/.voratiq/run/sessions`]: null,
     [`${root}/.voratiq/run/index.json`]: '{"version":2,"sessions":[]}\n',
+    [`${root}/.voratiq/message`]: null,
+    [`${root}/.voratiq/message/sessions`]: null,
+    [`${root}/.voratiq/message/index.json`]: '{"version":1,"sessions":[]}\n',
     [`${root}/.voratiq/reduce`]: null,
     [`${root}/.voratiq/reduce/sessions`]: null,
     [`${root}/.voratiq/reduce/index.json`]: '{"version":1,"sessions":[]}\n',
@@ -59,7 +62,7 @@ function buildValidWorkspaceTree(
     [`${root}/.voratiq/environment.yaml`]: "\n",
     [`${root}/.voratiq/sandbox.yaml`]: "providers: {}\n",
     [`${root}/.voratiq/orchestration.yaml`]:
-      "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    reduce:\n      agents: []\n    verify:\n      agents: []\n",
+      "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    reduce:\n      agents: []\n    verify:\n      agents: []\n    message:\n      agents: []\n",
   };
 }
 
@@ -73,6 +76,9 @@ describe("CLI Context", () => {
         recursive: true,
       });
       await fs.promises.mkdir(`${root}/.voratiq/run/sessions`, {
+        recursive: true,
+      });
+      await fs.promises.mkdir(`${root}/.voratiq/message/sessions`, {
         recursive: true,
       });
       await fs.promises.mkdir(`${root}/.voratiq/reduce/sessions`, {
@@ -92,6 +98,10 @@ describe("CLI Context", () => {
       await fs.promises.writeFile(
         `${root}/.voratiq/run/index.json`,
         '{"version":2,"sessions":[]}\n',
+      );
+      await fs.promises.writeFile(
+        `${root}/.voratiq/message/index.json`,
+        '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
         `${root}/.voratiq/reduce/index.json`,
@@ -117,7 +127,7 @@ describe("CLI Context", () => {
       );
       await fs.promises.writeFile(
         `${root}/.voratiq/orchestration.yaml`,
-        "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    reduce:\n      agents: []\n    verify:\n      agents: []\n",
+        "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    reduce:\n      agents: []\n    verify:\n      agents: []\n    message:\n      agents: []\n",
       );
 
       return {

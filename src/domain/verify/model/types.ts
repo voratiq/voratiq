@@ -33,7 +33,12 @@ export type {
 } from "../rubric-result.js";
 export type { VerificationStatus };
 
-const VERIFICATION_TARGET_KIND_VALUES = ["spec", "run", "reduce"] as const;
+const VERIFICATION_TARGET_KIND_VALUES = [
+  "spec",
+  "run",
+  "reduce",
+  "message",
+] as const;
 const VERIFICATION_METHOD_KIND_VALUES = ["programmatic", "rubric"] as const;
 const VERIFICATION_SCOPE_KIND_VALUES = ["target", "run", "candidate"] as const;
 const RUBRIC_FINDING_SEVERITY_VALUES = ["info", "warning", "error"] as const;
@@ -87,10 +92,18 @@ export const reduceVerificationTargetSchema = z
   })
   .strict();
 
+export const messageVerificationTargetSchema = z
+  .object({
+    kind: z.literal("message"),
+    sessionId: z.string().min(1),
+  })
+  .strict();
+
 export const verificationTargetSchema = z.discriminatedUnion("kind", [
   specVerificationTargetSchema,
   runVerificationTargetSchema,
   reduceVerificationTargetSchema,
+  messageVerificationTargetSchema,
 ]);
 
 export type VerificationTarget = z.infer<typeof verificationTargetSchema>;
@@ -223,6 +236,7 @@ export const programmaticResultArtifactSchema = z.discriminatedUnion("scope", [
       target: z.union([
         specVerificationTargetSchema,
         reduceVerificationTargetSchema,
+        messageVerificationTargetSchema,
       ]),
       scope: z.literal("target"),
       results: z.array(programmaticCheckResultSchema),
@@ -357,7 +371,7 @@ export const verificationRecordSchema = z
           code: z.ZodIssueCode.custom,
           path: ["methods"],
           message:
-            "spec and reduce verification refs must use `target` scope only",
+            "spec, reduce, and message verification refs must use `target` scope only",
         });
       }
     }

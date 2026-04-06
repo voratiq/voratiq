@@ -1,0 +1,305 @@
+import { verifyAgentProviders } from "../../agents/runtime/auth.js";
+import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
+import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
+import { createTeardownController } from "../../competition/shared/teardown.js";
+import { AgentNotFoundError } from "../../configs/agents/errors.js";
+import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
+import {
+  createMessageCompetitionAdapter,
+  type MessageCompetitionExecution,
+} from "../../domain/message/competition/adapter.js";
+import { createMessageRecordMutators } from "../../domain/message/model/mutators.js";
+import {
+  deriveMessageStatusFromRecipients,
+  type MessageRecipientEntry,
+  type MessageRecord,
+} from "../../domain/message/model/types.js";
+import {
+  appendMessageRecord,
+  flushMessageRecordBuffer,
+} from "../../domain/message/persistence/adapter.js";
+import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
+import type { MessageProgressRenderer } from "../../render/transcripts/message.js";
+import { toErrorMessage } from "../../utils/errors.js";
+import { getHeadRevision } from "../../utils/git.js";
+import {
+  VORATIQ_MESSAGE_DIR,
+  VORATIQ_REDUCTION_DIR,
+  VORATIQ_RUN_DIR,
+  VORATIQ_SPEC_DIR,
+  VORATIQ_VERIFICATION_DIR,
+} from "../../workspace/structure.js";
+import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
+import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
+import { generateSessionId } from "../shared/session-id.js";
+import {
+  MessageAgentNotFoundError,
+  MessageGenerationFailedError,
+  MessageInvocationContextError,
+} from "./errors.js";
+import { finalizeActiveMessage, registerActiveMessage } from "./lifecycle.js";
+
+export interface ExecuteMessageCommandInput {
+  root: string;
+  messagesFilePath: string;
+  prompt: string;
+  agentIds?: readonly string[];
+  agentOverrideFlag?: string;
+  profileName?: string;
+  maxParallel?: number;
+  extraContextFiles?: readonly ResolvedExtraContextFile[];
+  sourceInteractiveSessionId?: string;
+  renderer?: MessageProgressRenderer;
+}
+
+export interface ExecuteMessageCommandResult {
+  messageId: string;
+  record: MessageRecord;
+  recipients: readonly MessageRecipientEntry[];
+  executions: readonly MessageCompetitionExecution[];
+}
+
+export async function executeMessageCommand(
+  input: ExecuteMessageCommandInput,
+): Promise<ExecuteMessageCommandResult> {
+  assertMessageInvocationContext();
+
+  const {
+    root,
+    messagesFilePath,
+    prompt,
+    agentIds,
+    agentOverrideFlag,
+    profileName,
+    maxParallel: requestedMaxParallel,
+    extraContextFiles = [],
+    sourceInteractiveSessionId,
+    renderer,
+  } = input;
+
+  let competitors;
+  try {
+    const resolution = resolveStageCompetitors({
+      root,
+      stageId: "message",
+      cliAgentIds: agentIds,
+      cliOverrideFlag: agentOverrideFlag,
+      profileName,
+    });
+    competitors = resolution.competitors;
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) {
+      throw new MessageAgentNotFoundError(error.agentId);
+    }
+    throw error;
+  }
+
+  await assertMessagePreflight(competitors);
+
+  const environment = loadEnvironmentConfig({ root });
+  const baseRevisionSha = await getHeadRevision(root);
+  const messageId = generateSessionId();
+  const createdAt = new Date().toISOString();
+  const startedAt = createdAt;
+  const effectiveMaxParallel = resolveEffectiveMaxParallel({
+    competitorCount: competitors.length,
+    requestedMaxParallel,
+  });
+
+  const initialRecipients: MessageRecipientEntry[] = competitors.map(
+    (agent) => ({
+      agentId: agent.id,
+      status: "queued",
+    }),
+  );
+
+  await appendMessageRecord({
+    root,
+    messagesFilePath,
+    record: {
+      sessionId: messageId,
+      createdAt,
+      startedAt,
+      status: "running",
+      baseRevisionSha,
+      prompt,
+      recipients: initialRecipients,
+      ...buildPersistedExtraContextFields(extraContextFiles),
+      ...(sourceInteractiveSessionId ? { sourceInteractiveSessionId } : {}),
+    },
+  });
+
+  renderer?.begin({
+    messageId,
+    createdAt,
+    startedAt,
+    workspacePath: `.voratiq/message/sessions/${messageId}`,
+    status: "running",
+  });
+
+  const teardown = createTeardownController(`message \`${messageId}\``);
+  registerActiveMessage({
+    root,
+    messagesFilePath,
+    messageId,
+    teardown,
+  });
+
+  const mutators = createMessageRecordMutators({
+    root,
+    messagesFilePath,
+    messageId,
+  });
+
+  let executions: MessageCompetitionExecution[];
+  try {
+    const baseAdapter = createMessageCompetitionAdapter({
+      root,
+      messageId,
+      prompt,
+      environment,
+      extraContextFiles,
+      teardown,
+    });
+
+    executions = await executeCompetitionWithAdapter({
+      candidates: [...competitors],
+      maxParallel: effectiveMaxParallel,
+      adapter: {
+        ...baseAdapter,
+        onPreparationFailure: async (result) => {
+          const recipient = toRecipientEntry(result);
+          await mutators.recordRecipientSnapshot(recipient);
+          renderer?.update(recipient);
+        },
+        onCandidateRunning: async (prepared) => {
+          const runningAt = new Date().toISOString();
+          const recipient: MessageRecipientEntry = {
+            agentId: prepared.candidate.id,
+            status: "running",
+            startedAt: runningAt,
+          };
+          await mutators.recordRecipientRunning(recipient);
+          renderer?.update(recipient);
+        },
+        onCandidateCompleted: async (_prepared, result) => {
+          const recipient = toRecipientEntry(result);
+          await mutators.recordRecipientSnapshot(recipient);
+          renderer?.update(recipient);
+        },
+      },
+    });
+    const persistedRecord = await mutators.readRecord();
+    if (!persistedRecord) {
+      throw new MessageGenerationFailedError([
+        `Message session \`${messageId}\` record not found after execution.`,
+      ]);
+    }
+
+    const status = deriveMessageStatusFromRecipients(
+      persistedRecord.recipients.map((recipient) => recipient.status),
+    );
+    const completedRecord = await mutators.completeMessage({
+      status,
+      error:
+        status === "failed"
+          ? collectRecipientErrors(persistedRecord.recipients)
+          : undefined,
+    });
+
+    await flushMessageRecordBuffer({
+      messagesFilePath,
+      sessionId: messageId,
+    });
+    renderer?.complete(completedRecord.status, {
+      startedAt: completedRecord.startedAt,
+      completedAt: completedRecord.completedAt,
+    });
+
+    return {
+      messageId,
+      record: completedRecord,
+      recipients: completedRecord.recipients,
+      executions,
+    };
+  } catch (error) {
+    await mutators
+      .completeMessage({
+        status: "failed",
+        error: toErrorMessage(error),
+      })
+      .then((failedRecord) => {
+        renderer?.complete(failedRecord.status, {
+          startedAt: failedRecord.startedAt,
+          completedAt: failedRecord.completedAt,
+        });
+      })
+      .catch(() => {
+        renderer?.complete("failed");
+      });
+    await flushMessageRecordBuffer({
+      messagesFilePath,
+      sessionId: messageId,
+    }).catch(() => {});
+    throw new MessageGenerationFailedError([toErrorMessage(error)]);
+  } finally {
+    await finalizeActiveMessage(messageId);
+  }
+}
+
+function toRecipientEntry(
+  execution: MessageCompetitionExecution,
+): MessageRecipientEntry {
+  return {
+    agentId: execution.agentId,
+    status: execution.status,
+    startedAt: execution.startedAt,
+    completedAt: execution.completedAt,
+    outputPath: execution.outputPath,
+    stdoutPath: execution.stdoutPath,
+    stderrPath: execution.stderrPath,
+    tokenUsage: execution.tokenUsage,
+    error: execution.error ?? null,
+  };
+}
+
+async function assertMessagePreflight(
+  agents: readonly { id: string; provider: string }[],
+): Promise<void> {
+  const providerIssues = await verifyAgentProviders(
+    agents.map((agent) => ({ id: agent.id, provider: agent.provider })),
+  );
+  if (providerIssues.length > 0) {
+    throw new MessageGenerationFailedError(
+      providerIssues.map((issue) => `${issue.agentId}: ${issue.message}`),
+    );
+  }
+}
+
+function assertMessageInvocationContext(): void {
+  const cwd = process.cwd().replace(/\\/gu, "/");
+  const batchDomains = [
+    VORATIQ_SPEC_DIR,
+    VORATIQ_RUN_DIR,
+    VORATIQ_REDUCTION_DIR,
+    VORATIQ_VERIFICATION_DIR,
+    VORATIQ_MESSAGE_DIR,
+  ];
+  const batchWorkspacePattern = new RegExp(
+    `/\\.voratiq/(?:${batchDomains.join("|")})/sessions/[^/]+/[^/]+/workspace(?:/|$)`,
+    "u",
+  );
+
+  if (batchWorkspacePattern.test(cwd)) {
+    throw new MessageInvocationContextError();
+  }
+}
+
+function collectRecipientErrors(
+  recipients: readonly MessageRecipientEntry[],
+): string | undefined {
+  const details = recipients
+    .filter((recipient) => recipient.error)
+    .map((recipient) => `${recipient.agentId}: ${recipient.error}`);
+  return details.length > 0 ? details.join("; ") : undefined;
+}

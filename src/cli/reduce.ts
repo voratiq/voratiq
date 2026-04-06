@@ -37,6 +37,7 @@ import {
 import { parsePositiveInteger } from "../utils/validators.js";
 import {
   resolveWorkspacePath,
+  VORATIQ_MESSAGE_FILE,
   VORATIQ_REDUCTION_FILE,
   VORATIQ_VERIFICATION_FILE,
 } from "../workspace/structure.js";
@@ -122,6 +123,9 @@ export async function runReduceCommand(
     runsFilePath: workspacePaths.runsFile,
     reductionsFilePath:
       workspacePaths.reductionsFile ?? resolveReductionIndexPath(root),
+    messagesFilePath:
+      workspacePaths.messagesFile ??
+      resolveWorkspacePath(root, VORATIQ_MESSAGE_FILE),
     verificationsFilePath:
       workspacePaths.verificationsFile ??
       resolveWorkspacePath(root, VORATIQ_VERIFICATION_FILE),
@@ -258,6 +262,7 @@ interface ReduceCommandActionOptions {
   run?: string;
   verify?: string;
   reduce?: string;
+  message?: string;
   agent?: string[];
   profile?: string;
   maxParallel?: number;
@@ -291,6 +296,9 @@ export function createReduceCommand(): Command {
     .addOption(new Option("--run <run-id>", "Run to reduce"))
     .addOption(new Option("--verify <verify-id>", "Verification to reduce"))
     .addOption(new Option("--reduce <reduce-id>", "Reduction to reduce"))
+    .addOption(
+      new Option("--message <message-id>", "Message session to reduce"),
+    )
     .addOption(
       new Option(
         "--agent <agent-id>",

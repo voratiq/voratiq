@@ -1,4 +1,4 @@
-export type StageRendererId = "spec" | "run" | "reduce" | "verify";
+export type StageRendererId = "spec" | "run" | "reduce" | "verify" | "message";
 
 export type StageProgressStatus =
   | "queued"

@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const listOperators = ["spec", "run", "reduce", "verify"] as const;
+export const listOperators = [
+  "spec",
+  "run",
+  "reduce",
+  "verify",
+  "message",
+] as const;
 export const listModes = ["table", "detail"] as const;
 
 export type ListOperator = (typeof listOperators)[number];
@@ -29,10 +35,15 @@ export interface TargetedListJsonTableRecord extends ListJsonRecordBase {
   target: ListJsonTargetRef;
 }
 
+export interface MessageListJsonTableRecord extends ListJsonRecordBase {
+  promptPreview: string | null;
+}
+
 export type ListJsonTableRecord =
   | RunListJsonTableRecord
   | SpecListJsonTableRecord
-  | TargetedListJsonTableRecord;
+  | TargetedListJsonTableRecord
+  | MessageListJsonTableRecord;
 
 export interface RunListJsonRow {
   agentId: string;
@@ -60,11 +71,18 @@ export interface VerifyListJsonRow {
   duration: string;
 }
 
+export interface MessageListJsonRow {
+  agentId: string;
+  status: string;
+  duration: string;
+}
+
 export type ListJsonRow =
   | RunListJsonRow
   | SpecListJsonRow
   | ReduceListJsonRow
-  | VerifyListJsonRow;
+  | VerifyListJsonRow
+  | MessageListJsonRow;
 
 export interface SpecListJsonArtifact {
   kind: "spec";
@@ -85,10 +103,17 @@ export interface VerificationListJsonArtifact {
   path: string | null;
 }
 
+export interface MessageListJsonArtifact {
+  kind: "output";
+  agentId: string;
+  path: string | null;
+}
+
 export type ListJsonArtifact =
   | SpecListJsonArtifact
   | ReductionListJsonArtifact
-  | VerificationListJsonArtifact;
+  | VerificationListJsonArtifact
+  | MessageListJsonArtifact;
 
 export interface ListJsonTableOutput {
   operator: ListOperator;
@@ -107,6 +132,7 @@ export interface ListJsonDetailOutput {
     createdAt: string;
     elapsed?: string;
     workspacePath: string;
+    target?: ListJsonTargetRef;
     rows: ListJsonRow[];
     artifacts: ListJsonArtifact[];
   } | null;
@@ -151,6 +177,12 @@ const targetedListJsonTableRecordSchema = listJsonRecordBaseSchema
   })
   .passthrough();
 
+const messageListJsonTableRecordSchema = listJsonRecordBaseSchema
+  .extend({
+    promptPreview: z.string().nullable(),
+  })
+  .passthrough();
+
 const runListJsonRowSchema = z
   .object({
     agentId: z.string(),
@@ -172,6 +204,14 @@ const verifyListJsonRowSchema = z
   .object({
     agentId: z.string().nullable(),
     verifier: z.string(),
+    status: z.string(),
+    duration: z.string(),
+  })
+  .passthrough();
+
+const messageListJsonRowSchema = z
+  .object({
+    agentId: z.string(),
     status: z.string(),
     duration: z.string(),
   })
@@ -202,6 +242,14 @@ const verificationListJsonArtifactSchema = z
   })
   .passthrough();
 
+const messageListJsonArtifactSchema = z
+  .object({
+    kind: z.literal("output"),
+    agentId: z.string(),
+    path: z.string().nullable(),
+  })
+  .passthrough();
+
 const listJsonDetailSessionSchema = z
   .object({
     id: z.string(),
@@ -209,11 +257,13 @@ const listJsonDetailSessionSchema = z
     createdAt: z.string(),
     elapsed: z.string().optional(),
     workspacePath: z.string(),
+    target: listJsonTargetRefSchema.optional(),
     rows: z.array(
       z.union([
         runListJsonRowSchema,
         stageListJsonRowSchema,
         verifyListJsonRowSchema,
+        messageListJsonRowSchema,
       ]),
     ),
     artifacts: z.array(
@@ -221,6 +271,7 @@ const listJsonDetailSessionSchema = z
         specListJsonArtifactSchema,
         reductionListJsonArtifactSchema,
         verificationListJsonArtifactSchema,
+        messageListJsonArtifactSchema,
       ]),
     ),
   })
@@ -235,6 +286,7 @@ const listJsonTableOutputSchema = z
         runListJsonTableRecordSchema,
         specListJsonTableRecordSchema,
         targetedListJsonTableRecordSchema,
+        messageListJsonTableRecordSchema,
       ]),
     ),
     warnings: z.array(z.string()),

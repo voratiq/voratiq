@@ -1,4 +1,8 @@
+import { basename } from "node:path";
+
 import { CliError, RunNotFoundCliError } from "../../cli/errors.js";
+import { TERMINAL_MESSAGE_STATUSES } from "../../domain/message/model/types.js";
+import { readMessageRecords } from "../../domain/message/persistence/adapter.js";
 import type { ReductionRecord } from "../../domain/reduce/model/types.js";
 import { TERMINAL_REDUCTION_STATUSES } from "../../domain/reduce/model/types.js";
 import { readReductionRecords } from "../../domain/reduce/persistence/adapter.js";
@@ -14,8 +18,9 @@ import type {
 } from "../../domain/verify/competition/target.js";
 import { readVerificationRecords } from "../../domain/verify/persistence/adapter.js";
 import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
+import { MESSAGE_RESPONSE_FILENAME } from "../../workspace/structure.js";
 
-export type VerifyTargetKind = "spec" | "run" | "reduce";
+export type VerifyTargetKind = "spec" | "run" | "reduce" | "message";
 
 export interface VerifyTargetSelection {
   kind: VerifyTargetKind;
@@ -27,6 +32,7 @@ export interface ResolveVerifyTargetInput {
   specsFilePath: string;
   runsFilePath: string;
   reductionsFilePath: string;
+  messagesFilePath: string;
   verificationsFilePath: string;
   target: VerifyTargetSelection;
 }
@@ -47,6 +53,8 @@ export async function resolveVerifyTarget(
       return resolveRunVerifyTarget(input);
     case "reduce":
       return resolveReductionVerifyTarget(input);
+    case "message":
+      return resolveMessageVerifyTarget(input);
   }
 }
 
@@ -192,22 +200,98 @@ async function resolveReductionVerifyTarget(
     );
   }
 
-  return {
-    baseRevisionSha: await resolveReductionBaseRevisionSha({
-      ...input,
+  const referenceRepo = await resolveReductionReferenceRepo({
+    ...input,
+    reductionRecord: record,
+  });
+  const competitiveCandidates = record.reducers
+    .filter((reducer) => reducer.status === "succeeded" && reducer.outputPath)
+    .map((reducer) => ({
+      canonicalId: reducer.agentId,
+      forbiddenIdentityTokens: [reducer.agentId],
+    }));
+
+  if (referenceRepo.kind === "git") {
+    return {
+      baseRevisionSha: referenceRepo.baseRevisionSha,
+      competitiveCandidates,
+      target: {
+        kind: "reduce",
+        sessionId: record.sessionId,
+      },
       reductionRecord: record,
-    }),
-    competitiveCandidates: record.reducers
-      .filter((reducer) => reducer.status === "succeeded" && reducer.outputPath)
-      .map((reducer) => ({
-        canonicalId: reducer.agentId,
-        forbiddenIdentityTokens: [reducer.agentId],
-      })),
+    };
+  }
+
+  return {
+    competitiveCandidates,
     target: {
       kind: "reduce",
       sessionId: record.sessionId,
     },
     reductionRecord: record,
+    referenceRepoUnavailable: {
+      reason: "message-lineage",
+      messageSessionId: referenceRepo.messageSessionId,
+    },
+  };
+}
+
+async function resolveMessageVerifyTarget(
+  input: ResolveVerifyTargetInput,
+): Promise<ResolvedVerifyTarget> {
+  const { root, messagesFilePath, target } = input;
+
+  const [record] = await readMessageRecords({
+    root,
+    messagesFilePath,
+    limit: 1,
+    predicate: (entry) => entry.sessionId === target.sessionId,
+  });
+
+  if (!record) {
+    throw new CliError(
+      `Message session \`${target.sessionId}\` not found.`,
+      [],
+      [
+        "Re-run `voratiq message` or confirm the session id in `.voratiq/message/index.json`.",
+      ],
+    );
+  }
+
+  if (!TERMINAL_MESSAGE_STATUSES.includes(record.status)) {
+    throw new CliError(
+      `Message session \`${target.sessionId}\` is not complete.`,
+      [`Status: \`${record.status}\`.`],
+      [
+        "Wait for the message session to finish before running `voratiq verify`.",
+      ],
+    );
+  }
+
+  const recipients = resolveVerifiableMessageRecipients(record);
+  if (recipients.length === 0) {
+    throw new CliError(
+      `Message session \`${target.sessionId}\` has no verifiable message responses.`,
+      [
+        "Verification requires at least one succeeded recipient with a durable `response.md` artifact.",
+      ],
+      [
+        "Re-run `voratiq message` to capture at least one succeeded response before running `voratiq verify`.",
+      ],
+    );
+  }
+
+  return {
+    competitiveCandidates: recipients.map((recipient) => ({
+      canonicalId: recipient.agentId,
+      forbiddenIdentityTokens: [recipient.agentId],
+    })),
+    target: {
+      kind: "message",
+      sessionId: record.sessionId,
+    },
+    messageRecord: record,
   };
 }
 
@@ -230,20 +314,32 @@ function collectRunCandidateIdentityTokens(options: {
   return Array.from(tokens);
 }
 
-async function resolveReductionBaseRevisionSha(options: {
+type ReductionReferenceRepoResolution =
+  | {
+      kind: "git";
+      baseRevisionSha: string;
+    }
+  | {
+      kind: "none";
+      messageSessionId: string;
+    };
+
+async function resolveReductionReferenceRepo(options: {
   root: string;
   specsFilePath: string;
   runsFilePath: string;
   reductionsFilePath: string;
+  messagesFilePath: string;
   verificationsFilePath: string;
   reductionRecord: ReductionRecord;
   seenReductionIds?: Set<string>;
-}): Promise<string> {
+}): Promise<ReductionReferenceRepoResolution> {
   const {
     root,
     specsFilePath,
     runsFilePath,
     reductionsFilePath,
+    messagesFilePath,
     verificationsFilePath,
     reductionRecord,
     seenReductionIds = new Set<string>(),
@@ -273,9 +369,12 @@ async function resolveReductionBaseRevisionSha(options: {
           `Spec session \`${reductionRecord.target.id}\` referenced by reduction \`${reductionRecord.sessionId}\` was not found.`,
         );
       }
-      return resolveSpecBaseRevisionSha(record, {
-        ownerLabel: `reduction \`${reductionRecord.sessionId}\``,
-      });
+      return {
+        kind: "git",
+        baseRevisionSha: resolveSpecBaseRevisionSha(record, {
+          ownerLabel: `reduction \`${reductionRecord.sessionId}\``,
+        }),
+      };
     }
     case "run": {
       const { records } = await fetchRunsSafely({
@@ -293,7 +392,10 @@ async function resolveReductionBaseRevisionSha(options: {
       if (!runRecord) {
         throw new RunNotFoundCliError(reductionRecord.target.id);
       }
-      return runRecord.baseRevisionSha;
+      return {
+        kind: "git",
+        baseRevisionSha: runRecord.baseRevisionSha,
+      };
     }
     case "verify": {
       const [verificationRecord] = await readVerificationRecords({
@@ -327,7 +429,10 @@ async function resolveReductionBaseRevisionSha(options: {
           if (!runRecord) {
             throw new RunNotFoundCliError(verificationRecord.target.sessionId);
           }
-          return runRecord.baseRevisionSha;
+          return {
+            kind: "git",
+            baseRevisionSha: runRecord.baseRevisionSha,
+          };
         }
         case "spec": {
           const [record] = await readSpecRecords({
@@ -342,9 +447,12 @@ async function resolveReductionBaseRevisionSha(options: {
               `Spec session \`${verificationRecord.target.sessionId}\` referenced by verification \`${verificationRecord.sessionId}\` was not found.`,
             );
           }
-          return resolveSpecBaseRevisionSha(record, {
-            ownerLabel: `verification \`${verificationRecord.sessionId}\``,
-          });
+          return {
+            kind: "git",
+            baseRevisionSha: resolveSpecBaseRevisionSha(record, {
+              ownerLabel: `verification \`${verificationRecord.sessionId}\``,
+            }),
+          };
         }
         case "reduce": {
           const [parentReduction] = await readReductionRecords({
@@ -359,15 +467,39 @@ async function resolveReductionBaseRevisionSha(options: {
               `Reduction session \`${verificationRecord.target.sessionId}\` referenced by verification \`${verificationRecord.sessionId}\` was not found.`,
             );
           }
-          return await resolveReductionBaseRevisionSha({
+          return await resolveReductionReferenceRepo({
             root,
             specsFilePath,
             runsFilePath,
             reductionsFilePath,
+            messagesFilePath,
             verificationsFilePath,
             reductionRecord: parentReduction,
             seenReductionIds,
           });
+        }
+        case "message": {
+          const [messageRecord] = await readMessageRecords({
+            root,
+            messagesFilePath,
+            limit: 1,
+            predicate: (entry) =>
+              entry.sessionId === verificationRecord.target.sessionId,
+          });
+          if (!messageRecord) {
+            throw new CliError(
+              `Message session \`${verificationRecord.target.sessionId}\` referenced by verification \`${verificationRecord.sessionId}\` was not found.`,
+            );
+          }
+          return messageRecord.baseRevisionSha
+            ? {
+                kind: "git",
+                baseRevisionSha: messageRecord.baseRevisionSha,
+              }
+            : {
+                kind: "none",
+                messageSessionId: messageRecord.sessionId,
+              };
         }
       }
       throw new CliError(
@@ -386,17 +518,71 @@ async function resolveReductionBaseRevisionSha(options: {
           `Reduction session \`${reductionRecord.target.id}\` referenced by reduction \`${reductionRecord.sessionId}\` was not found.`,
         );
       }
-      return await resolveReductionBaseRevisionSha({
+      return await resolveReductionReferenceRepo({
         root,
         specsFilePath,
         runsFilePath,
         reductionsFilePath,
+        messagesFilePath,
         verificationsFilePath,
         reductionRecord: parentReduction,
         seenReductionIds,
       });
     }
+    case "message": {
+      const [messageRecord] = await readMessageRecords({
+        root,
+        messagesFilePath,
+        limit: 1,
+        predicate: (entry) => entry.sessionId === reductionRecord.target.id,
+      });
+      if (!messageRecord) {
+        throw new CliError(
+          `Message session \`${reductionRecord.target.id}\` referenced by reduction \`${reductionRecord.sessionId}\` was not found.`,
+        );
+      }
+      return messageRecord.baseRevisionSha
+        ? {
+            kind: "git",
+            baseRevisionSha: messageRecord.baseRevisionSha,
+          }
+        : {
+            kind: "none",
+            messageSessionId: messageRecord.sessionId,
+          };
+    }
   }
+}
+
+function resolveVerifiableMessageRecipients(record: {
+  recipients: ReadonlyArray<{
+    agentId: string;
+    status: string;
+    outputPath?: string;
+  }>;
+}): Array<{
+  agentId: string;
+  outputPath: string;
+}> {
+  return record.recipients.flatMap((recipient) => {
+    if (
+      recipient.status !== "succeeded" ||
+      typeof recipient.outputPath !== "string" ||
+      !isCanonicalMessageResponseArtifact(recipient.outputPath)
+    ) {
+      return [];
+    }
+    return [
+      {
+        agentId: recipient.agentId,
+        outputPath: recipient.outputPath,
+      },
+    ];
+  });
+}
+
+function isCanonicalMessageResponseArtifact(outputPath: string): boolean {
+  return basename(outputPath) === MESSAGE_RESPONSE_FILENAME;
 }
 
 function resolveSpecBaseRevisionSha(

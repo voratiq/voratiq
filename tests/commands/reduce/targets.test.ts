@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 
 import { assertReductionTargetEligible } from "../../../src/commands/reduce/targets.js";
+import { appendMessageRecord } from "../../../src/domain/message/persistence/adapter.js";
 import { appendRunRecord } from "../../../src/domain/run/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 import {
@@ -62,6 +63,7 @@ describe("assertReductionTargetEligible (run target)", () => {
           specsFilePath: join(root, ".voratiq", "spec", "index.json"),
           runsFilePath,
           reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
+          messagesFilePath: join(root, ".voratiq", "message", "index.json"),
           verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
           target: { type: "run", id: runId },
         }),
@@ -122,8 +124,114 @@ describe("assertReductionTargetEligible (run target)", () => {
           specsFilePath: join(root, ".voratiq", "spec", "index.json"),
           runsFilePath,
           reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
+          messagesFilePath: join(root, ".voratiq", "message", "index.json"),
           verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
           target: { type: "run", id: runId },
+        }),
+      ).rejects.toThrow(/missing required artifacts/iu);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("assertReductionTargetEligible (message target)", () => {
+  it("allows succeeded message sessions with durable outputs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-reduce-message-"));
+
+    try {
+      await createWorkspace(root);
+
+      const messageId = "message-succeeded";
+      const outputPath = `.voratiq/message/sessions/${messageId}/agent-a/artifacts/response.md`;
+      await seedMessageArtifact({ root, outputPath });
+
+      await appendMessageRecord({
+        root,
+        messagesFilePath: join(root, ".voratiq", "message", "index.json"),
+        record: {
+          sessionId: messageId,
+          createdAt: "2026-04-06T00:00:00.000Z",
+          startedAt: "2026-04-06T00:00:00.000Z",
+          completedAt: "2026-04-06T00:00:05.000Z",
+          status: "succeeded",
+          baseRevisionSha: "base-sha",
+          prompt: "Review the session.",
+          recipients: [
+            {
+              agentId: "agent-a",
+              status: "succeeded",
+              startedAt: "2026-04-06T00:00:00.000Z",
+              completedAt: "2026-04-06T00:00:05.000Z",
+              outputPath,
+              error: null,
+            },
+          ],
+          error: null,
+        },
+      });
+
+      await expect(
+        assertReductionTargetEligible({
+          root,
+          specsFilePath: join(root, ".voratiq", "spec", "index.json"),
+          runsFilePath: join(root, ".voratiq", "run", "index.json"),
+          reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
+          messagesFilePath: join(root, ".voratiq", "message", "index.json"),
+          verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
+          target: { type: "message", id: messageId },
+        }),
+      ).resolves.toBeUndefined();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails succeeded message sessions when durable outputs are missing", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "voratiq-reduce-message-missing-"),
+    );
+
+    try {
+      await createWorkspace(root);
+
+      const messageId = "message-missing";
+      const outputPath = `.voratiq/message/sessions/${messageId}/agent-a/artifacts/response.md`;
+
+      await appendMessageRecord({
+        root,
+        messagesFilePath: join(root, ".voratiq", "message", "index.json"),
+        record: {
+          sessionId: messageId,
+          createdAt: "2026-04-06T00:00:00.000Z",
+          startedAt: "2026-04-06T00:00:00.000Z",
+          completedAt: "2026-04-06T00:00:05.000Z",
+          status: "succeeded",
+          baseRevisionSha: "base-sha",
+          prompt: "Review the session.",
+          recipients: [
+            {
+              agentId: "agent-a",
+              status: "succeeded",
+              startedAt: "2026-04-06T00:00:00.000Z",
+              completedAt: "2026-04-06T00:00:05.000Z",
+              outputPath,
+              error: null,
+            },
+          ],
+          error: null,
+        },
+      });
+
+      await expect(
+        assertReductionTargetEligible({
+          root,
+          specsFilePath: join(root, ".voratiq", "spec", "index.json"),
+          runsFilePath: join(root, ".voratiq", "run", "index.json"),
+          reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
+          messagesFilePath: join(root, ".voratiq", "message", "index.json"),
+          verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
+          target: { type: "message", id: messageId },
         }),
       ).rejects.toThrow(/missing required artifacts/iu);
     } finally {
@@ -165,4 +273,13 @@ async function seedRunArtifacts(options: {
   if (includeSummary) {
     await writeFile(join(artifactsDir, "summary.txt"), "summary\n", "utf8");
   }
+}
+
+async function seedMessageArtifact(options: {
+  root: string;
+  outputPath: string;
+}): Promise<void> {
+  const absolutePath = join(options.root, options.outputPath);
+  await mkdir(join(absolutePath, ".."), { recursive: true });
+  await writeFile(absolutePath, "# response\n", "utf8");
 }

@@ -13,6 +13,7 @@ Top-level keys match the stages that `verify` can target:
 - `spec` (optional): rubric verification for spec drafts
 - `run` (optional): programmatic + rubric verification for run candidates
 - `reduce` (optional): rubric verification for reductions
+- `message` (optional): rubric verification for message responses
 
 Each stage block has:
 
@@ -38,6 +39,10 @@ run:
 reduce:
   rubric:
     - template: reduce-verification
+
+message:
+  rubric:
+    - template: message-verification
 ```
 
 ## Templates

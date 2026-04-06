@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import {
   externalApplyExecutionInputSchema,
+  externalMessageExecutionInputSchema,
   externalReduceExecutionInputSchema,
   externalRunExecutionInputSchema,
   externalSpecExecutionInputSchema,
@@ -85,11 +86,12 @@ describe("bundled MCP server", () => {
     process.env.PATH = originalPath;
   });
 
-  it("exposes exactly seven tool definitions with contract-derived schemas", () => {
+  it("exposes exactly eight tool definitions with contract-derived schemas", () => {
     const definitions = getVoratiqMcpToolDefinitions();
     expect(definitions.map((definition) => definition.name)).toEqual([
       "voratiq_spec",
       "voratiq_run",
+      "voratiq_message",
       "voratiq_reduce",
       "voratiq_verify",
       "voratiq_apply",
@@ -100,6 +102,7 @@ describe("bundled MCP server", () => {
     const expectedInputSchemas = {
       voratiq_spec: toInputSchema(externalSpecExecutionInputSchema),
       voratiq_run: toInputSchema(externalRunExecutionInputSchema),
+      voratiq_message: toInputSchema(externalMessageExecutionInputSchema),
       voratiq_reduce: toInputSchema(externalReduceExecutionInputSchema),
       voratiq_verify: toInputSchema(externalVerifyExecutionInputSchema),
       voratiq_apply: toInputSchema(externalApplyExecutionInputSchema),
@@ -132,7 +135,7 @@ describe("bundled MCP server", () => {
         properties: {
           operator: {
             type: "string",
-            enum: ["spec", "run", "reduce", "verify"],
+            enum: ["spec", "run", "reduce", "verify", "message"],
           },
           mode: {
             type: "string",
@@ -209,6 +212,7 @@ describe("bundled MCP server", () => {
     expect(tools.tools.map((tool) => tool.name)).toEqual([
       "voratiq_spec",
       "voratiq_run",
+      "voratiq_message",
       "voratiq_reduce",
       "voratiq_verify",
       "voratiq_apply",
@@ -253,7 +257,7 @@ describe("bundled MCP server", () => {
       params: {},
     });
     const tools = expectSuccess<ToolListResult>(toolsResponse);
-    expect(tools.tools).toHaveLength(7);
+    expect(tools.tools).toHaveLength(8);
     expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
   });
 
@@ -283,7 +287,7 @@ describe("bundled MCP server", () => {
       params: {},
     });
     const tools = expectSuccess<ToolListResult>(toolsResponse);
-    expect(tools.tools).toHaveLength(7);
+    expect(tools.tools).toHaveLength(8);
     expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
   });
 
@@ -363,7 +367,7 @@ describe("bundled MCP server", () => {
       jsonrpc: "2.0",
       method: "notifications/tools/list_changed",
     });
-    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(7);
+    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(8);
     expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
   });
 
@@ -414,7 +418,7 @@ describe("bundled MCP server", () => {
       jsonrpc: "2.0",
       method: "notifications/tools/list_changed",
     });
-    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(7);
+    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(8);
   });
 
   it("accepts newline-delimited JSON-RPC requests and replies with newline-delimited JSON", async () => {
@@ -458,7 +462,7 @@ describe("bundled MCP server", () => {
       jsonrpc: "2.0",
       method: "notifications/tools/list_changed",
     });
-    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(7);
+    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(8);
   });
 
   it("routes execution tools through voratiq <operator> --json and returns envelope output", async () => {
@@ -526,6 +530,129 @@ describe("bundled MCP server", () => {
         text: JSON.stringify(envelope),
       },
     ]);
+  });
+
+  it("routes voratiq_message through voratiq message --json", async () => {
+    const envelope: OperatorResultEnvelope = {
+      version: 1,
+      operator: "message",
+      status: "succeeded",
+      timestamp: "2026-03-31T12:01:00.000Z",
+      ids: {
+        sessionId: "message-123",
+      },
+      artifacts: [
+        {
+          kind: "session",
+          role: "session",
+          path: ".voratiq/message/sessions/message-123",
+        },
+      ],
+    };
+    const invokeCliJsonContractMock =
+      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>;
+    invokeCliJsonContractMock.mockResolvedValue({
+      kind: "success",
+      exitCode: 0,
+      stdout: JSON.stringify(envelope),
+      stderr: "",
+    });
+    const handler = await createInitializedHandler(invokeCliJsonContractMock);
+
+    const response = await handler.handleRequest({
+      jsonrpc: "2.0",
+      id: 31,
+      method: "tools/call",
+      params: {
+        name: "voratiq_message",
+        arguments: {
+          prompt: "Review task",
+          agentIds: ["agent-a", "agent-b"],
+          profile: "default",
+          maxParallel: 2,
+          extraContext: ["docs/context.md"],
+        },
+      },
+    });
+    const result = expectSuccess<CallToolResult>(response);
+
+    expect(invokeCliJsonContractMock).toHaveBeenCalledWith({
+      operator: "message",
+      args: [
+        "message",
+        "--prompt",
+        "Review task",
+        "--agent",
+        "agent-a",
+        "--agent",
+        "agent-b",
+        "--profile",
+        "default",
+        "--max-parallel",
+        "2",
+        "--extra-context",
+        "docs/context.md",
+        "--json",
+      ],
+    });
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toEqual(envelope);
+  });
+
+  it("routes voratiq_verify message targets through voratiq verify --message --json", async () => {
+    const envelope: OperatorResultEnvelope = {
+      version: 1,
+      operator: "verify",
+      status: "succeeded",
+      timestamp: "2026-03-31T12:02:00.000Z",
+      ids: {
+        sessionId: "verify-123",
+        messageId: "message-123",
+      },
+      target: {
+        kind: "message",
+        sessionId: "message-123",
+      },
+      artifacts: [
+        {
+          kind: "session",
+          role: "session",
+          path: ".voratiq/verify/sessions/verify-123",
+        },
+      ],
+    };
+    const invokeCliJsonContractMock =
+      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>;
+    invokeCliJsonContractMock.mockResolvedValue({
+      kind: "success",
+      exitCode: 0,
+      stdout: JSON.stringify(envelope),
+      stderr: "",
+    });
+    const handler = await createInitializedHandler(invokeCliJsonContractMock);
+
+    const response = await handler.handleRequest({
+      jsonrpc: "2.0",
+      id: 32,
+      method: "tools/call",
+      params: {
+        name: "voratiq_verify",
+        arguments: {
+          target: {
+            kind: "message",
+            sessionId: "message-123",
+          },
+        },
+      },
+    });
+    const result = expectSuccess<CallToolResult>(response);
+
+    expect(invokeCliJsonContractMock).toHaveBeenCalledWith({
+      operator: "verify",
+      args: ["verify", "--message", "message-123", "--json"],
+    });
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toEqual(envelope);
   });
 
   it("marks valid envelopes with non-zero exits as tool errors while preserving envelope payload", async () => {

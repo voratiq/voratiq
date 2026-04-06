@@ -2,6 +2,8 @@ import { dirname } from "node:path";
 
 import { CliError } from "../../cli/errors.js";
 import { RunNotFoundCliError } from "../../cli/errors.js";
+import { TERMINAL_MESSAGE_STATUSES } from "../../domain/message/model/types.js";
+import { readMessageRecords } from "../../domain/message/persistence/adapter.js";
 import {
   type ReductionTarget,
   TERMINAL_REDUCTION_STATUSES,
@@ -29,6 +31,7 @@ export interface ReductionTargetValidationInput {
   specsFilePath: string;
   runsFilePath: string;
   reductionsFilePath: string;
+  messagesFilePath: string;
   verificationsFilePath: string;
   target: ReductionTarget;
 }
@@ -50,6 +53,9 @@ export async function assertReductionTargetEligible(
       return;
     case "reduce":
       await assertReductionTargetEligibleInternal(input);
+      return;
+    case "message":
+      await assertMessageTargetEligible(input);
       return;
   }
 }
@@ -302,6 +308,67 @@ async function assertReductionTargetEligibleInternal(
   }
 }
 
+async function assertMessageTargetEligible(
+  input: ReductionTargetValidationInput,
+): Promise<void> {
+  const { root, messagesFilePath, target } = input;
+
+  const [record] = await readMessageRecords({
+    root,
+    messagesFilePath,
+    limit: 1,
+    predicate: (entry) => entry.sessionId === target.id,
+  });
+
+  if (!record) {
+    throw new CliError(
+      `Message session \`${target.id}\` not found.`,
+      [],
+      [
+        "Re-run `voratiq message` or confirm the session id in `.voratiq/message/index.json`.",
+      ],
+    );
+  }
+
+  if (!TERMINAL_MESSAGE_STATUSES.includes(record.status)) {
+    throw new CliError(
+      `Message session \`${target.id}\` is not complete.`,
+      [`Status: \`${record.status}\`.`],
+      ["Wait for the message to finish before reducing."],
+    );
+  }
+
+  if (record.status !== "succeeded") {
+    throw new CliError(
+      `Message session \`${target.id}\` did not complete.`,
+      [`Status: \`${record.status}\`.`],
+      ["Re-run `voratiq message` to generate a complete artifact set."],
+    );
+  }
+
+  const generatedRecipients = record.recipients.filter(
+    (recipient): recipient is typeof recipient & { outputPath: string } =>
+      recipient.status === "succeeded" &&
+      typeof recipient.outputPath === "string",
+  );
+  if (generatedRecipients.length === 0) {
+    throw new CliError(
+      `Message session \`${target.id}\` has no generated artifacts.`,
+      [],
+      ["Re-run `voratiq message` to regenerate the message artifacts."],
+    );
+  }
+
+  const missing = await findMissingMessageArtifacts(root, generatedRecipients);
+  if (missing.length > 0) {
+    throw new CliError(
+      `Message session \`${target.id}\` is missing required artifacts.`,
+      missing.map((path) => `Missing: \`${path}\`.`),
+      ["Re-run `voratiq message` to regenerate the message artifacts."],
+    );
+  }
+}
+
 async function findMissingVerificationArtifacts(
   root: string,
   methods: ReadonlyArray<{ artifactPath?: string }>,
@@ -348,6 +415,24 @@ async function findMissingReductionArtifacts(
     const dataAbsolute = resolvePath(root, dataPath);
     if (!(await pathExists(dataAbsolute))) {
       registerMissing(missing, seen, dataPath);
+    }
+  }
+
+  return missing;
+}
+
+async function findMissingMessageArtifacts(
+  root: string,
+  recipients: ReadonlyArray<{ outputPath: string }>,
+): Promise<string[]> {
+  const missing: string[] = [];
+  const seen = new Set<string>();
+
+  for (const recipient of recipients) {
+    const outputPath = recipient.outputPath;
+    const outputAbsolute = resolvePath(root, outputPath);
+    if (!(await pathExists(outputAbsolute))) {
+      registerMissing(missing, seen, outputPath);
     }
   }
 

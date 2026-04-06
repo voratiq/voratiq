@@ -1,3 +1,4 @@
+import type { MessageRecord } from "../../message/model/types.js";
 import type { ReductionRecord } from "../../reduce/model/types.js";
 import type { RunRecord } from "../../run/model/types.js";
 import type { SpecRecord } from "../../spec/model/types.js";
@@ -26,4 +27,18 @@ export type ResolvedVerificationTarget =
       competitiveCandidates: readonly VerificationCompetitiveCandidate[];
       target: Extract<VerificationTarget, { kind: "reduce" }>;
       reductionRecord: ReductionRecord;
+    }
+  | {
+      competitiveCandidates: readonly VerificationCompetitiveCandidate[];
+      target: Extract<VerificationTarget, { kind: "reduce" }>;
+      reductionRecord: ReductionRecord;
+      referenceRepoUnavailable: {
+        reason: "message-lineage";
+        messageSessionId: string;
+      };
+    }
+  | {
+      competitiveCandidates: readonly VerificationCompetitiveCandidate[];
+      target: Extract<VerificationTarget, { kind: "message" }>;
+      messageRecord: MessageRecord;
     };

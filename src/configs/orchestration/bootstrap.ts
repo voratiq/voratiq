@@ -10,6 +10,7 @@ const ORCHESTRATION_BOOTSTRAP_STAGE_IDS = [
   "run",
   "reduce",
   "verify",
+  "message",
 ] as const;
 
 export interface ResolvedPresetAgent {

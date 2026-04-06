@@ -1,5 +1,6 @@
 import { copyFile, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import {
+  basename,
   dirname,
   join,
   relative as relativePath,
@@ -15,7 +16,10 @@ import {
   type AgentWorkspacePaths,
   buildAgentWorkspacePaths,
 } from "../../../workspace/layout.js";
-import { VORATIQ_VERIFICATION_SESSIONS_DIR } from "../../../workspace/structure.js";
+import {
+  MESSAGE_RESPONSE_FILENAME,
+  VORATIQ_VERIFICATION_SESSIONS_DIR,
+} from "../../../workspace/structure.js";
 import { aliasForCandidate } from "./blinding.js";
 import type { ResolvedVerificationTarget } from "./target.js";
 
@@ -78,6 +82,29 @@ export type SharedVerificationInputs =
       candidates: readonly {
         alias: string;
       }[];
+    }
+  | {
+      kind: "reduce-no-reference";
+      sharedRootAbsolute: string;
+      sharedInputsAbsolute: string;
+      worktreesToRemove: readonly string[];
+      referenceRepoUnavailable: {
+        reason: "message-lineage";
+        messageSessionId: string;
+      };
+      candidates: readonly {
+        alias: string;
+      }[];
+    }
+  | {
+      kind: "message";
+      sharedRootAbsolute: string;
+      sharedInputsAbsolute: string;
+      worktreesToRemove: readonly string[];
+      promptAbsolute: string;
+      candidates: readonly {
+        alias: string;
+      }[];
     };
 
 export type StagedVerificationInputs =
@@ -108,6 +135,25 @@ export type StagedVerificationInputs =
         alias: string;
         reductionPath: string;
       }[];
+    }
+  | {
+      kind: "reduce-no-reference";
+      referenceRepoUnavailable: {
+        reason: "message-lineage";
+        messageSessionId: string;
+      };
+      candidates: readonly {
+        alias: string;
+        reductionPath: string;
+      }[];
+    }
+  | {
+      kind: "message";
+      promptPath: string;
+      candidates: readonly {
+        alias: string;
+        responsePath: string;
+      }[];
     };
 
 export async function prepareSharedVerificationInputs(options: {
@@ -134,21 +180,23 @@ export async function prepareSharedVerificationInputs(options: {
   );
 
   await mkdir(sharedInputsAbsolute, { recursive: true });
-  await mkdir(dirname(referenceRepoAbsolute), { recursive: true });
 
   let detachedWorktreeCreated = false;
   try {
-    await createDetachedWorktree({
-      root,
-      worktreePath: referenceRepoAbsolute,
-      baseRevision: resolvedTarget.baseRevisionSha,
-    });
-    detachedWorktreeCreated = true;
-    await ensureWorkspaceDependencies({
-      root,
-      workspacePath: referenceRepoAbsolute,
-      environment,
-    });
+    if ("baseRevisionSha" in resolvedTarget) {
+      await mkdir(dirname(referenceRepoAbsolute), { recursive: true });
+      await createDetachedWorktree({
+        root,
+        worktreePath: referenceRepoAbsolute,
+        baseRevision: resolvedTarget.baseRevisionSha,
+      });
+      detachedWorktreeCreated = true;
+      await ensureWorkspaceDependencies({
+        root,
+        workspacePath: referenceRepoAbsolute,
+        environment,
+      });
+    }
 
     if ("specRecord" in resolvedTarget) {
       const descriptionAbsolute = resolve(
@@ -271,6 +319,55 @@ export async function prepareSharedVerificationInputs(options: {
       };
     }
 
+    if ("messageRecord" in resolvedTarget) {
+      const promptAbsolute = resolve(sharedInputsAbsolute, "prompt.md");
+      await writeFile(
+        promptAbsolute,
+        `${resolvedTarget.messageRecord.prompt.trimEnd()}\n`,
+        "utf8",
+      );
+
+      const candidatesDir = resolve(sharedInputsAbsolute, "candidates");
+      await mkdir(candidatesDir, { recursive: true });
+
+      const candidates = await Promise.all(
+        resolvedTarget.messageRecord.recipients
+          .filter(
+            (
+              recipient,
+            ): recipient is typeof recipient & { outputPath: string } =>
+              recipient.status === "succeeded" &&
+              typeof recipient.outputPath === "string" &&
+              basename(recipient.outputPath) === MESSAGE_RESPONSE_FILENAME,
+          )
+          .map(async (recipient) => {
+            const alias = aliasForCandidate(recipient.agentId, aliasMap);
+            const dir = resolve(candidatesDir, alias);
+            await mkdir(dir, { recursive: true });
+
+            await copyRetainedVerificationArtifact({
+              root,
+              sourceRelativePath: recipient.outputPath,
+              destinationAbsolute: resolve(dir, "response.md"),
+              ownerLabel: `Message \`${resolvedTarget.target.sessionId}\` recipient \`${recipient.agentId}\``,
+              artifactLabel: "response.md",
+              required: true,
+            });
+
+            return { alias };
+          }),
+      );
+
+      return {
+        kind: "message",
+        sharedRootAbsolute,
+        sharedInputsAbsolute,
+        worktreesToRemove: [],
+        promptAbsolute,
+        candidates,
+      };
+    }
+
     const candidatesDir = resolve(sharedInputsAbsolute, "candidates");
     await mkdir(candidatesDir, { recursive: true });
 
@@ -296,6 +393,17 @@ export async function prepareSharedVerificationInputs(options: {
           return { alias };
         }),
     );
+
+    if ("referenceRepoUnavailable" in resolvedTarget) {
+      return {
+        kind: "reduce-no-reference",
+        sharedRootAbsolute,
+        sharedInputsAbsolute,
+        worktreesToRemove: [],
+        referenceRepoUnavailable: resolvedTarget.referenceRepoUnavailable,
+        candidates,
+      };
+    }
 
     return {
       kind: "reduce",
@@ -407,6 +515,37 @@ export function buildStagedVerificationInputs(options: {
     };
   }
 
+  if (sharedInputs.kind === "message") {
+    return {
+      kind: "message",
+      promptPath: toWorkspaceRelative(
+        workspacePaths.workspacePath,
+        resolve(inputsRoot, "prompt.md"),
+      ),
+      candidates: sharedInputs.candidates.map((candidate) => ({
+        alias: candidate.alias,
+        responsePath: toWorkspaceRelative(
+          workspacePaths.workspacePath,
+          resolve(inputsRoot, "candidates", candidate.alias, "response.md"),
+        ),
+      })),
+    };
+  }
+
+  if (sharedInputs.kind === "reduce-no-reference") {
+    return {
+      kind: "reduce-no-reference",
+      referenceRepoUnavailable: sharedInputs.referenceRepoUnavailable,
+      candidates: sharedInputs.candidates.map((candidate) => ({
+        alias: candidate.alias,
+        reductionPath: toWorkspaceRelative(
+          workspacePaths.workspacePath,
+          resolve(inputsRoot, "candidates", candidate.alias, "reduction.md"),
+        ),
+      })),
+    };
+  }
+
   return {
     kind: "reduce",
     referenceRepoPath: "reference_repo",
@@ -420,27 +559,36 @@ export function buildStagedVerificationInputs(options: {
   };
 }
 
+export function sharedInputsUseReferenceRepo(
+  sharedInputs: SharedVerificationInputs,
+): sharedInputs is Extract<
+  SharedVerificationInputs,
+  { kind: "spec" | "run" | "reduce" }
+> {
+  return (
+    sharedInputs.kind === "spec" ||
+    sharedInputs.kind === "run" ||
+    sharedInputs.kind === "reduce"
+  );
+}
+
 export async function attachVerifierWorkspaceMounts(options: {
   workspacePath: string;
   contextPath: string;
-  sharedInputsAbsolute: string;
-  referenceRepoAbsolute: string;
+  sharedInputs: SharedVerificationInputs;
 }): Promise<void> {
-  const {
-    workspacePath,
-    contextPath,
-    sharedInputsAbsolute,
-    referenceRepoAbsolute,
-  } = options;
+  const { workspacePath, contextPath, sharedInputs } = options;
   await attachSharedInputsToVerifierWorkspace({
     workspacePath,
-    sharedInputsAbsolute,
+    sharedInputsAbsolute: sharedInputs.sharedInputsAbsolute,
   });
-  await attachWorkspaceDirectorySymlink({
-    workspacePath,
-    mountName: "reference_repo",
-    targetAbsolutePath: referenceRepoAbsolute,
-  });
+  if (sharedInputsUseReferenceRepo(sharedInputs)) {
+    await attachWorkspaceDirectorySymlink({
+      workspacePath,
+      mountName: "reference_repo",
+      targetAbsolutePath: sharedInputs.referenceRepoAbsolute,
+    });
+  }
   await attachWorkspaceDirectorySymlink({
     workspacePath,
     mountName: "context",

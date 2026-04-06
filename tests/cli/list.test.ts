@@ -35,6 +35,8 @@ describe("voratiq list command options", () => {
         specsFile: "/repo/.voratiq/spec/index.json",
         runsDir: "/repo/.voratiq/run",
         runsFile: "/repo/.voratiq/run/index.json",
+        messagesDir: "/repo/.voratiq/message",
+        messagesFile: "/repo/.voratiq/message/index.json",
         reductionsDir: "/repo/.voratiq/reduce",
         reductionsFile: "/repo/.voratiq/reduce/index.json",
         verificationsDir: "/repo/.voratiq/verify",
@@ -69,7 +71,7 @@ describe("voratiq list command options", () => {
     await expect(
       program.parseAsync(["node", "voratiq", "list"]),
     ).rejects.toThrow(
-      /exactly one operator flag is required: `--spec`, `--run`, `--reduce`, or `--verify`/u,
+      /exactly one operator flag is required: `--spec`, `--run`, `--reduce`, `--verify`, or `--message`/u,
     );
   });
 
@@ -88,7 +90,7 @@ describe("voratiq list command options", () => {
     await expect(
       program.parseAsync(["node", "voratiq", "list", "--run", "--spec"]),
     ).rejects.toThrow(
-      /exactly one operator flag is required: `--spec`, `--run`, `--reduce`, or `--verify`/u,
+      /exactly one operator flag is required: `--spec`, `--run`, `--reduce`, `--verify`, or `--message`/u,
     );
   });
 
@@ -104,6 +106,7 @@ describe("voratiq list command options", () => {
       root: "/repo",
       specsFilePath: "/repo/.voratiq/spec/index.json",
       runsFilePath: "/repo/.voratiq/run/index.json",
+      messagesFilePath: "/repo/.voratiq/message/index.json",
       reductionsFilePath: "/repo/.voratiq/reduce/index.json",
       verificationsFilePath: "/repo/.voratiq/verify/index.json",
       operator: "run",
@@ -156,6 +159,7 @@ describe("voratiq list command options", () => {
       root: "/repo",
       specsFilePath: "/repo/.voratiq/spec/index.json",
       runsFilePath: "/repo/.voratiq/run/index.json",
+      messagesFilePath: "/repo/.voratiq/message/index.json",
       reductionsFilePath: "/repo/.voratiq/reduce/index.json",
       verificationsFilePath: "/repo/.voratiq/verify/index.json",
       operator: "verify",

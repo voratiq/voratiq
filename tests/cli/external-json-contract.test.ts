@@ -13,6 +13,7 @@ import { createConfirmationWorkflow } from "../../src/cli/confirmation.js";
 import { executeApplyCommand } from "../../src/commands/apply/command.js";
 import { ApplyBaseMismatchError } from "../../src/commands/apply/errors.js";
 import { executeListCommand } from "../../src/commands/list/command.js";
+import { executeMessageCommand } from "../../src/commands/message/command.js";
 import { executePruneAllCommand } from "../../src/commands/prune/command.js";
 import { executeReduceCommand } from "../../src/commands/reduce/command.js";
 import { executeRunCommand } from "../../src/commands/run/command.js";
@@ -105,6 +106,10 @@ jest.mock("../../src/commands/list/command.js", () => ({
   executeListCommand: jest.fn(),
 }));
 
+jest.mock("../../src/commands/message/command.js", () => ({
+  executeMessageCommand: jest.fn(),
+}));
+
 const checkPlatformSupportMock = jest.mocked(checkPlatformSupport);
 const resolveExtraContextFilesMock = jest.mocked(resolveExtraContextFiles);
 const resolveCliContextMock = jest.mocked(resolveCliContext);
@@ -124,6 +129,7 @@ const executeApplyCommandMock = jest.mocked(executeApplyCommand);
 const executePruneAllCommandMock = jest.mocked(executePruneAllCommand);
 const createConfirmationWorkflowMock = jest.mocked(createConfirmationWorkflow);
 const executeListCommandMock = jest.mocked(executeListCommand);
+const executeMessageCommandMock = jest.mocked(executeMessageCommand);
 
 interface CapturedCliResult {
   stdout: string;
@@ -320,6 +326,57 @@ describe("external CLI JSON contract", () => {
       },
     },
     {
+      operator: "message",
+      argv: ["message", "--prompt", "Review task", "--json"],
+      setup: () => {
+        executeMessageCommandMock.mockResolvedValue({
+          messageId: "message-123",
+          record: {
+            sessionId: "message-123",
+            createdAt: "2026-03-31T10:02:00.000Z",
+            startedAt: "2026-03-31T10:02:00.000Z",
+            completedAt: "2026-03-31T10:02:30.000Z",
+            status: "succeeded",
+            prompt: "Review task",
+            recipients: [
+              {
+                agentId: "agent-a",
+                status: "failed",
+                startedAt: "2026-03-31T10:02:05.000Z",
+                completedAt: "2026-03-31T10:02:30.000Z",
+                error: "boom",
+              },
+            ],
+          },
+          recipients: [
+            {
+              agentId: "agent-a",
+              status: "failed",
+              startedAt: "2026-03-31T10:02:05.000Z",
+              completedAt: "2026-03-31T10:02:30.000Z",
+              error: "boom",
+            },
+          ],
+          executions: [],
+        });
+      },
+      expected: {
+        version: 1,
+        operator: "message",
+        status: "succeeded",
+        ids: {
+          sessionId: "message-123",
+        },
+        artifacts: [
+          {
+            kind: "session",
+            role: "session",
+            path: ".voratiq/message/sessions/message-123",
+          },
+        ],
+      },
+    },
+    {
       operator: "reduce",
       argv: ["reduce", "--run", "run-123", "--json"],
       setup: () => {
@@ -398,11 +455,57 @@ describe("external CLI JSON contract", () => {
           sessionId: "verify-123",
           runId: "run-123",
         },
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+          candidateIds: ["agent-a"],
+        },
         artifacts: [
           {
             kind: "session",
             role: "session",
             path: ".voratiq/verify/sessions/verify-123",
+          },
+        ],
+      },
+    },
+    {
+      operator: "verify",
+      argv: ["verify", "--message", "message-123", "--json"],
+      setup: () => {
+        executeVerifyCommandMock.mockResolvedValue({
+          verificationId: "verify-message-123",
+          record: {
+            sessionId: "verify-message-123",
+            createdAt: "2026-03-31T10:06:00.000Z",
+            startedAt: "2026-03-31T10:06:00.000Z",
+            completedAt: "2026-03-31T10:07:00.000Z",
+            status: "succeeded",
+            target: {
+              kind: "message",
+              sessionId: "message-123",
+            },
+            methods: [],
+          },
+        });
+      },
+      expected: {
+        version: 1,
+        operator: "verify",
+        status: "succeeded",
+        ids: {
+          sessionId: "verify-message-123",
+          messageId: "message-123",
+        },
+        target: {
+          kind: "message",
+          sessionId: "message-123",
+        },
+        artifacts: [
+          {
+            kind: "session",
+            role: "session",
+            path: ".voratiq/verify/sessions/verify-message-123",
           },
         ],
       },
@@ -549,6 +652,11 @@ describe("external CLI JSON contract", () => {
       ids: {
         sessionId: "verify-unresolved",
         runId: "run-123",
+      },
+      target: {
+        kind: "run",
+        sessionId: "run-123",
+        candidateIds: ["agent-a", "agent-b"],
       },
       artifacts: [
         {

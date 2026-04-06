@@ -4,6 +4,8 @@ import type {
   ListJsonTableRecord,
   ListMode,
   ListOperator,
+  MessageListJsonArtifact,
+  MessageListJsonRow,
   ReduceListJsonRow,
   ReductionListJsonArtifact,
   RunListJsonRow,
@@ -12,6 +14,11 @@ import type {
   VerificationListJsonArtifact,
   VerifyListJsonRow,
 } from "../../contracts/list.js";
+import type { MessageRecord } from "../../domain/message/model/types.js";
+import {
+  type MessageRecordWarning,
+  readMessageRecords,
+} from "../../domain/message/persistence/adapter.js";
 import type { ReductionRecord } from "../../domain/reduce/model/types.js";
 import {
   readReductionRecords,
@@ -38,11 +45,17 @@ import {
 } from "../../domain/verify/persistence/adapter.js";
 import {
   renderListTableTranscript,
+  renderMessageList,
   renderReduceList,
   renderRunList,
   renderSpecList,
   renderVerifyList,
 } from "../../render/transcripts/list.js";
+import {
+  formatMessageElapsed,
+  formatMessageRecipientDuration,
+  renderMessageTranscript,
+} from "../../render/transcripts/message.js";
 import {
   formatReduceElapsed,
   formatReducerDuration,
@@ -66,6 +79,7 @@ import { formatRenderLifecycleDuration } from "../../render/utils/duration.js";
 import { formatCompactDiffStatistics } from "../../utils/diff.js";
 import { pathExists } from "../../utils/fs.js";
 import {
+  getMessageSessionDirectoryPath,
   getReductionSessionDirectoryPath,
   getRunDirectoryPath,
   getSpecSessionDirectoryPath,
@@ -80,6 +94,7 @@ export interface ListCommandInput {
   specsFilePath: string;
   runsFilePath: string;
   reductionsFilePath: string;
+  messagesFilePath: string;
   verificationsFilePath: string;
   operator: ListOperator;
   sessionId?: string;
@@ -196,9 +211,11 @@ function renderTableOutput(
       ? renderRunList(records as readonly RunRecord[])
       : operator === "spec"
         ? renderSpecList(records as readonly SpecRecord[])
-        : operator === "reduce"
-          ? renderReduceList(records as readonly ReductionRecord[])
-          : renderVerifyList(records as readonly VerificationRecord[]);
+        : operator === "message"
+          ? renderMessageList(records as readonly MessageRecord[])
+          : operator === "reduce"
+            ? renderReduceList(records as readonly ReductionRecord[])
+            : renderVerifyList(records as readonly VerificationRecord[]);
 
   return renderListTableTranscript(table);
 }
@@ -288,6 +305,35 @@ function renderDetailOutput(operator: ListOperator, record: OperatorRecord) {
     });
   }
 
+  if (operator === "message") {
+    const messageRecord = record as MessageRecord;
+    return renderMessageTranscript({
+      messageId: messageRecord.sessionId,
+      createdAt: messageRecord.createdAt,
+      elapsed:
+        formatMessageElapsed({
+          status: messageRecord.status,
+          startedAt: messageRecord.startedAt,
+          completedAt: messageRecord.completedAt,
+        }) ?? DASH,
+      workspacePath: getMessageSessionDirectoryPath(messageRecord.sessionId),
+      status: messageRecord.status,
+      recipients: messageRecord.recipients.map((recipient) => ({
+        agentId: recipient.agentId,
+        status: recipient.status,
+        duration:
+          formatMessageRecipientDuration({
+            status: recipient.status,
+            startedAt: recipient.startedAt,
+            completedAt: recipient.completedAt,
+          }) ?? DASH,
+        outputPath: recipient.outputPath,
+        errorLine: recipient.error ?? undefined,
+      })),
+      isTty: process.stdout.isTTY,
+    });
+  }
+
   const verificationRecord = record as VerificationRecord;
   return renderVerifyTranscript({
     verificationId: verificationRecord.sessionId,
@@ -301,6 +347,7 @@ function renderDetailOutput(operator: ListOperator, record: OperatorRecord) {
     workspacePath: getVerificationSessionDirectoryPath(
       verificationRecord.sessionId,
     ),
+    target: verificationRecord.target,
     status: verificationRecord.status,
     methods: verificationRecord.methods.map((method) => ({
       verifierLabel:
@@ -352,6 +399,16 @@ function toJsonTableRecord(
         kind: reductionRecord.target.type,
         id: reductionRecord.target.id,
       },
+    };
+  }
+
+  if (operator === "message") {
+    const messageRecord = record as MessageRecord;
+    return {
+      id: messageRecord.sessionId,
+      status: messageRecord.status,
+      createdAt: messageRecord.createdAt,
+      promptPreview: normalizePreviewText(messageRecord.prompt),
     };
   }
 
@@ -407,8 +464,25 @@ function toJsonDetailSession(
       workspacePath: getReductionSessionDirectoryPath(
         reductionRecord.sessionId,
       ),
+      target: {
+        kind: reductionRecord.target.type,
+        id: reductionRecord.target.id,
+      },
       rows: reductionRecord.reducers.map(toReductionJsonRow),
       artifacts: reductionRecord.reducers.map(toReductionArtifact),
+    };
+  }
+
+  if (operator === "message") {
+    const messageRecord = record as MessageRecord;
+    return {
+      id: messageRecord.sessionId,
+      status: messageRecord.status,
+      createdAt: messageRecord.createdAt,
+      elapsed: formatMessageRecordElapsed(messageRecord),
+      workspacePath: getMessageSessionDirectoryPath(messageRecord.sessionId),
+      rows: messageRecord.recipients.map(toMessageJsonRow),
+      artifacts: messageRecord.recipients.flatMap(toMessageArtifacts),
     };
   }
 
@@ -421,6 +495,10 @@ function toJsonDetailSession(
     workspacePath: getVerificationSessionDirectoryPath(
       verificationRecord.sessionId,
     ),
+    target: {
+      kind: verificationRecord.target.kind,
+      id: verificationRecord.target.sessionId,
+    },
     rows: verificationRecord.methods.map(toVerificationJsonRow),
     artifacts: verificationRecord.methods.map(toVerificationArtifact),
   };
@@ -450,6 +528,23 @@ function formatReductionRecordElapsed(
     startedAt: record.startedAt,
     completedAt: record.completedAt,
   });
+}
+
+function formatMessageRecordElapsed(record: MessageRecord): string | undefined {
+  return formatMessageElapsed({
+    status: record.status,
+    startedAt: record.startedAt,
+    completedAt: record.completedAt,
+  });
+}
+
+function normalizePreviewText(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.replace(/\s+/gu, " ").trim();
+  return normalized.length > 0 ? normalized : null;
 }
 
 function formatVerificationRecordElapsed(
@@ -537,6 +632,33 @@ function toReductionArtifact(
   };
 }
 
+function toMessageJsonRow(
+  recipient: MessageRecord["recipients"][number],
+): MessageListJsonRow {
+  return {
+    agentId: recipient.agentId,
+    status: recipient.status,
+    duration:
+      formatMessageRecipientDuration({
+        status: recipient.status,
+        startedAt: recipient.startedAt,
+        completedAt: recipient.completedAt,
+      }) ?? DASH,
+  };
+}
+
+function toMessageArtifacts(
+  recipient: MessageRecord["recipients"][number],
+): MessageListJsonArtifact[] {
+  return [
+    {
+      kind: "output",
+      agentId: recipient.agentId,
+      path: recipient.outputPath ?? null,
+    },
+  ];
+}
+
 function getVerificationMethodLabel(
   method: VerificationRecord["methods"][number],
 ): string {
@@ -585,6 +707,7 @@ function shouldIncludeInDefaultTable(
 type OperatorRecord =
   | RunRecord
   | SpecRecord
+  | MessageRecord
   | ReductionRecord
   | VerificationRecord;
 
@@ -593,6 +716,7 @@ interface ReadOperatorRecordsInput {
   specsFilePath: string;
   runsFilePath: string;
   reductionsFilePath: string;
+  messagesFilePath: string;
   verificationsFilePath: string;
   operator: ListOperator;
   limit?: number;
@@ -675,6 +799,28 @@ async function readOperatorRecords(
     };
   }
 
+  if (operator === "message") {
+    if (!(await pathExists(input.messagesFilePath))) {
+      return { records: [], warnings: [] };
+    }
+
+    const warnings: MessageRecordWarning[] = [];
+    const records = await readMessageRecords({
+      root,
+      messagesFilePath: input.messagesFilePath,
+      limit: input.limit,
+      predicate: input.predicate as
+        | ((record: MessageRecord) => boolean)
+        | undefined,
+      onWarning: (warning) => warnings.push(warning),
+    });
+
+    return {
+      records,
+      warnings: warnings.map(formatSessionWarning),
+    };
+  }
+
   if (!(await pathExists(input.verificationsFilePath))) {
     return { records: [], warnings: [] };
   }
@@ -707,8 +853,9 @@ function getRecordId(operator: ListOperator, record: OperatorRecord): string {
   if (operator === "run") {
     return (record as RunRecord).runId;
   }
-  return (record as SpecRecord | ReductionRecord | VerificationRecord)
-    .sessionId;
+  return (
+    record as SpecRecord | MessageRecord | ReductionRecord | VerificationRecord
+  ).sessionId;
 }
 
 function formatSessionWarning(warning: { displayPath: string }): string {

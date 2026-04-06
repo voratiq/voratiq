@@ -98,7 +98,7 @@ describe("voratiq verify", () => {
     await expect(
       program.parseAsync(["node", "voratiq", "verify"]),
     ).rejects.toThrow(
-      /exactly one target flag is required: `--spec`, `--run`, or `--reduce`/iu,
+      /exactly one target flag is required: `--spec`, `--run`, `--reduce`, or `--message`/iu,
     );
   });
 
@@ -129,6 +129,27 @@ describe("voratiq verify", () => {
       "verifier-a",
       "verifier-b",
     ]);
+  });
+
+  it("parses --message target selection", async () => {
+    let received: unknown;
+    const verifyCommand = silenceCommander(createVerifyCommand());
+    verifyCommand.exitOverride().action((options) => {
+      received = options;
+    });
+
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(verifyCommand);
+
+    await program.parseAsync([
+      "node",
+      "voratiq",
+      "verify",
+      "--message",
+      "message-123",
+    ]);
+
+    expect((received as { message?: string }).message).toBe("message-123");
   });
 
   it("returns verification id and transcript for run-target verification", async () => {

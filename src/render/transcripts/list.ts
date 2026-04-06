@@ -1,3 +1,4 @@
+import type { MessageRecord } from "../../domain/message/model/types.js";
 import type { ReductionRecord } from "../../domain/reduce/model/types.js";
 import type { RunRecord } from "../../domain/run/model/types.js";
 import type { SpecRecord } from "../../domain/spec/model/types.js";
@@ -8,6 +9,7 @@ import { renderTranscript } from "../utils/transcript.js";
 
 const DASH = "—";
 const SPEC_DESCRIPTION_PREVIEW_LENGTH = 32;
+const MESSAGE_PROMPT_PREVIEW_LENGTH = 32;
 
 export function renderRunList(records: readonly RunRecord[]): string {
   const rows = records.map((record) => ({
@@ -80,6 +82,31 @@ export function renderReduceList(records: readonly ReductionRecord[]): string {
       {
         header: "TARGET",
         accessor: (record) => `${record.target.type}:${record.target.id}`,
+      },
+      {
+        header: "STATUS",
+        accessor: (record) => record.status.toUpperCase(),
+      },
+      {
+        header: "CREATED",
+        accessor: (record) => formatRunTimestamp(record.createdAt),
+      },
+    ],
+    rows: records,
+  }).join("\n");
+}
+
+export function renderMessageList(records: readonly MessageRecord[]): string {
+  return renderTable({
+    columns: [
+      {
+        header: "MESSAGE",
+        accessor: (record) => record.sessionId,
+      },
+      {
+        header: "PROMPT",
+        accessor: (record) =>
+          truncatePreview(record.prompt, MESSAGE_PROMPT_PREVIEW_LENGTH),
       },
       {
         header: "STATUS",

@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { executeListCommand } from "../../../src/commands/list/command.js";
+import type { MessageRecord } from "../../../src/domain/message/model/types.js";
+import { appendMessageRecord } from "../../../src/domain/message/persistence/adapter.js";
 import type { ReductionRecord } from "../../../src/domain/reduce/model/types.js";
 import { appendReductionRecord } from "../../../src/domain/reduce/persistence/adapter.js";
 import type { RunRecord } from "../../../src/domain/run/model/types.js";
@@ -17,6 +19,7 @@ describe("executeListCommand", () => {
   let testDir: string;
   let specsFilePath: string;
   let runsFilePath: string;
+  let messagesFilePath: string;
   let reductionsFilePath: string;
   let verificationsFilePath: string;
 
@@ -24,6 +27,7 @@ describe("executeListCommand", () => {
     testDir = await mkdtemp(join(tmpdir(), "voratiq-list-test-"));
     specsFilePath = join(testDir, ".voratiq", "spec", "index.json");
     runsFilePath = join(testDir, ".voratiq", "run", "index.json");
+    messagesFilePath = join(testDir, ".voratiq", "message", "index.json");
     reductionsFilePath = join(testDir, ".voratiq", "reduce", "index.json");
     verificationsFilePath = join(testDir, ".voratiq", "verify", "index.json");
   });
@@ -568,6 +572,132 @@ describe("executeListCommand", () => {
     });
   });
 
+  it("renders message table with a prompt preview and without a recipients column", async () => {
+    await appendMessageRecord({
+      root: testDir,
+      messagesFilePath,
+      record: buildMessageRecord({
+        sessionId: "message-visible",
+        status: "succeeded",
+      }),
+    });
+    await appendMessageRecord({
+      root: testDir,
+      messagesFilePath,
+      record: buildMessageRecord({
+        sessionId: "message-aborted",
+        status: "aborted",
+      }),
+    });
+
+    const defaultResult = await executeListCommand(
+      buildInput({
+        operator: "message",
+      }),
+    );
+    expect(defaultResult.output).toContain("MESSAGE");
+    expect(defaultResult.output).toContain("PROMPT");
+    expect(defaultResult.output).toContain("STATUS");
+    expect(defaultResult.output).toContain("CREATED");
+    expect(defaultResult.output).not.toContain("RECIPIENTS");
+    expect(defaultResult.output).toContain("message-visible");
+    expect(defaultResult.output).toContain("Review this change.");
+    expect(defaultResult.output).not.toContain("message-aborted");
+    expect(defaultResult.json).toMatchObject({
+      operator: "message",
+      mode: "table",
+      records: [
+        expect.objectContaining({
+          id: "message-visible",
+          promptPreview: "Review this change.",
+        }),
+      ],
+    });
+
+    const verboseResult = await executeListCommand(
+      buildInput({
+        operator: "message",
+        verbose: true,
+      }),
+    );
+    expect(verboseResult.output).toContain("message-aborted");
+  });
+
+  it("renders message detail like other operator detail views", async () => {
+    await appendMessageRecord({
+      root: testDir,
+      messagesFilePath,
+      record: buildMessageRecord({
+        sessionId: "message-detail",
+        status: "succeeded",
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "message",
+        sessionId: "message-detail",
+      }),
+    );
+
+    expect(result.output).toContain("message-detail");
+    expect(result.output).toContain("AGENT");
+    expect(result.output).toContain("Agent: agent-a");
+    expect(result.output).toContain("Output:");
+    expect(result.output).not.toContain("Request:");
+    expect(result.output).not.toContain("Response:");
+    expect(result.output).not.toContain("Response data:");
+    expect(result.output).not.toContain("\nStatus: ");
+    expect(result.output).not.toContain("\nDuration: ");
+    expect(result.output).toContain("\n---\n");
+    expect(result.output?.trimEnd().endsWith("---")).toBe(false);
+  });
+
+  it("keeps message detail rows summary-only and includes only generated artifacts", async () => {
+    await appendMessageRecord({
+      root: testDir,
+      messagesFilePath,
+      record: buildMessageRecord({
+        sessionId: "message-detail-json",
+        status: "succeeded",
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "message",
+        sessionId: "message-detail-json",
+      }),
+    );
+
+    expect(result.json).toMatchObject({
+      operator: "message",
+      mode: "detail",
+      sessionId: "message-detail-json",
+    });
+    if (result.json.mode !== "detail" || !result.json.session) {
+      throw new Error("Expected detail-mode message json output");
+    }
+    expect(result.json.session.id).toBe("message-detail-json");
+    expect(result.json.session.rows).toHaveLength(1);
+    const [firstRow] = result.json.session.rows;
+    expect(firstRow).toBeDefined();
+    expect(firstRow).toMatchObject({
+      agentId: "agent-a",
+      status: "succeeded",
+    });
+    expect(typeof firstRow?.duration).toBe("string");
+    expect(firstRow).not.toHaveProperty("outputPath");
+    expect(firstRow).not.toHaveProperty("responseDataPath");
+    expect(result.json.session.artifacts).toEqual([
+      {
+        kind: "output",
+        agentId: "agent-a",
+        path: ".voratiq/message/sessions/message-detail-json/agent-a/artifacts/response.md",
+      },
+    ]);
+  });
+
   it("renders verify table with TARGET column and aborted filtering", async () => {
     await appendVerificationRecord({
       root: testDir,
@@ -639,6 +769,7 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("VERIFIER");
     expect(result.output).toContain("programmatic");
     expect(result.output).toContain("Agent: —");
+    expect(result.output).toContain("Target: run:run-123");
     expect(result.output).toContain("Output:");
     expect(result.output).not.toContain("\nRun");
     expect(result.json).toMatchObject({
@@ -647,6 +778,10 @@ describe("executeListCommand", () => {
       sessionId: "verify-detail",
       session: {
         id: "verify-detail",
+        target: {
+          kind: "run",
+          id: "run-123",
+        },
         rows: [
           expect.objectContaining({
             agentId: null,
@@ -662,6 +797,40 @@ describe("executeListCommand", () => {
           }),
         ],
       },
+    });
+  });
+
+  it("renders message-target verify detail without mislabeling it as a reduction", async () => {
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: {
+        ...buildVerificationRecord({
+          sessionId: "verify-message-detail",
+          status: "succeeded",
+        }),
+        target: {
+          kind: "message",
+          sessionId: "message-123",
+        },
+      },
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-message-detail",
+      }),
+    );
+
+    expect(result.output).toContain("Target: message:message-123");
+    expect(result.output).not.toContain("Target: reduce:message-123");
+    if (result.json.mode !== "detail" || !result.json.session) {
+      throw new Error("Expected detail-mode verify json output");
+    }
+    expect(result.json.session.target).toEqual({
+      kind: "message",
+      id: "message-123",
     });
   });
 
@@ -683,7 +852,7 @@ describe("executeListCommand", () => {
   });
 
   function buildInput(params: {
-    operator: "spec" | "run" | "reduce" | "verify";
+    operator: "spec" | "run" | "reduce" | "verify" | "message";
     sessionId?: string;
     limit?: number;
     verbose?: boolean;
@@ -692,6 +861,7 @@ describe("executeListCommand", () => {
       root: testDir,
       specsFilePath,
       runsFilePath,
+      messagesFilePath,
       reductionsFilePath,
       verificationsFilePath,
       operator: params.operator,
@@ -798,6 +968,51 @@ function buildReductionRecord(params: {
         startedAt,
         ...(reducerCompletedAt ? { completedAt: reducerCompletedAt } : {}),
         error: reducerStatus === "failed" ? "failed" : null,
+      },
+    ],
+    error: params.status === "failed" ? "failed" : null,
+  };
+}
+
+function buildMessageRecord(params: {
+  sessionId: string;
+  status: MessageRecord["status"];
+  recipients?: MessageRecord["recipients"];
+}): MessageRecord {
+  const createdAt = "2026-03-01T00:00:00.000Z";
+  const completedAt =
+    params.status === "queued" || params.status === "running"
+      ? undefined
+      : "2026-03-01T00:05:00.000Z";
+
+  return {
+    sessionId: params.sessionId,
+    createdAt,
+    startedAt: createdAt,
+    ...(completedAt ? { completedAt } : {}),
+    status: params.status,
+    prompt: "Review this change.",
+    recipients: params.recipients ?? [
+      {
+        agentId: "agent-a",
+        status:
+          params.status === "aborted"
+            ? "aborted"
+            : params.status === "failed"
+              ? "failed"
+              : params.status === "queued"
+                ? "queued"
+                : params.status === "running"
+                  ? "running"
+                  : "succeeded",
+        startedAt: createdAt,
+        ...(completedAt ? { completedAt } : {}),
+        ...(params.status === "succeeded"
+          ? {
+              outputPath: `.voratiq/message/sessions/${params.sessionId}/agent-a/artifacts/response.md`,
+            }
+          : {}),
+        error: params.status === "failed" ? "failed" : null,
       },
     ],
     error: params.status === "failed" ? "failed" : null,

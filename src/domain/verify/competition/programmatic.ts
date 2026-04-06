@@ -418,6 +418,10 @@ function resolveProgrammaticMethodPlan(options: {
     };
   }
 
+  if (resolvedTarget.target.kind === "message") {
+    return { kind: "none" };
+  }
+
   const configuredChecks = extractUnsupportedProgrammaticChecks(
     resolvedTarget.target.kind === "spec"
       ? verificationConfig.spec
