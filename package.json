@@ -1,6 +1,6 @@
 {
   "name": "voratiq",
-  "version": "0.1.0-beta.20",
+  "version": "0.1.0-beta.21",
   "description": "Agent ensembles to design, generate, and select the best code for every task.",
   "keywords": [
     "agent-ensembles",
