@@ -38,25 +38,25 @@ function buildValidWorkspaceTree(
   return {
     [`${root}/.git`]: "",
     [`${root}/.voratiq`]: null,
+    [`${root}/.voratiq/spec`]: null,
+    [`${root}/.voratiq/spec/sessions`]: null,
+    [`${root}/.voratiq/spec/index.json`]: '{"version":1,"sessions":[]}\n',
+    [`${root}/.voratiq/run`]: null,
+    [`${root}/.voratiq/run/sessions`]: null,
+    [`${root}/.voratiq/run/index.json`]: '{"version":2,"sessions":[]}\n',
+    [`${root}/.voratiq/reduce`]: null,
+    [`${root}/.voratiq/reduce/sessions`]: null,
+    [`${root}/.voratiq/reduce/index.json`]: '{"version":1,"sessions":[]}\n',
+    [`${root}/.voratiq/verify`]: null,
+    [`${root}/.voratiq/verify/sessions`]: null,
+    [`${root}/.voratiq/verify/index.json`]: '{"version":1,"sessions":[]}\n',
+    [`${root}/.voratiq/message`]: null,
+    [`${root}/.voratiq/message/sessions`]: null,
+    [`${root}/.voratiq/message/index.json`]: '{"version":1,"sessions":[]}\n',
     [`${root}/.voratiq/interactive`]: null,
     [`${root}/.voratiq/interactive/sessions`]: null,
     [`${root}/.voratiq/interactive/index.json`]:
       '{"version":1,"sessions":[]}\n',
-    [`${root}/.voratiq/run`]: null,
-    [`${root}/.voratiq/run/sessions`]: null,
-    [`${root}/.voratiq/run/index.json`]: '{"version":2,"sessions":[]}\n',
-    [`${root}/.voratiq/message`]: null,
-    [`${root}/.voratiq/message/sessions`]: null,
-    [`${root}/.voratiq/message/index.json`]: '{"version":1,"sessions":[]}\n',
-    [`${root}/.voratiq/reduce`]: null,
-    [`${root}/.voratiq/reduce/sessions`]: null,
-    [`${root}/.voratiq/reduce/index.json`]: '{"version":1,"sessions":[]}\n',
-    [`${root}/.voratiq/spec`]: null,
-    [`${root}/.voratiq/spec/sessions`]: null,
-    [`${root}/.voratiq/spec/index.json`]: '{"version":1,"sessions":[]}\n',
-    [`${root}/.voratiq/verify`]: null,
-    [`${root}/.voratiq/verify/sessions`]: null,
-    [`${root}/.voratiq/verify/index.json`]: '{"version":1,"sessions":[]}\n',
     [`${root}/.voratiq/agents.yaml`]: "agents: []\n",
     [`${root}/.voratiq/verification.yaml`]: "\n",
     [`${root}/.voratiq/environment.yaml`]: "\n",
@@ -72,27 +72,27 @@ describe("CLI Context", () => {
     jest.spyOn(process, "cwd").mockReturnValue("/app/voratiq");
     executeInitCommandMock.mockReset();
     executeInitCommandMock.mockImplementation(async ({ root }) => {
-      await fs.promises.mkdir(`${root}/.voratiq/interactive/sessions`, {
+      await fs.promises.mkdir(`${root}/.voratiq/spec/sessions`, {
         recursive: true,
       });
       await fs.promises.mkdir(`${root}/.voratiq/run/sessions`, {
         recursive: true,
       });
-      await fs.promises.mkdir(`${root}/.voratiq/message/sessions`, {
-        recursive: true,
-      });
       await fs.promises.mkdir(`${root}/.voratiq/reduce/sessions`, {
-        recursive: true,
-      });
-      await fs.promises.mkdir(`${root}/.voratiq/spec/sessions`, {
         recursive: true,
       });
       await fs.promises.mkdir(`${root}/.voratiq/verify/sessions`, {
         recursive: true,
       });
+      await fs.promises.mkdir(`${root}/.voratiq/message/sessions`, {
+        recursive: true,
+      });
+      await fs.promises.mkdir(`${root}/.voratiq/interactive/sessions`, {
+        recursive: true,
+      });
 
       await fs.promises.writeFile(
-        `${root}/.voratiq/interactive/index.json`,
+        `${root}/.voratiq/spec/index.json`,
         '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
@@ -100,19 +100,19 @@ describe("CLI Context", () => {
         '{"version":2,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
-        `${root}/.voratiq/message/index.json`,
-        '{"version":1,"sessions":[]}\n',
-      );
-      await fs.promises.writeFile(
         `${root}/.voratiq/reduce/index.json`,
         '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
-        `${root}/.voratiq/spec/index.json`,
+        `${root}/.voratiq/verify/index.json`,
         '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
-        `${root}/.voratiq/verify/index.json`,
+        `${root}/.voratiq/message/index.json`,
+        '{"version":1,"sessions":[]}\n',
+      );
+      await fs.promises.writeFile(
+        `${root}/.voratiq/interactive/index.json`,
         '{"version":1,"sessions":[]}\n',
       );
       await fs.promises.writeFile(
@@ -365,10 +365,10 @@ describe("CLI Context", () => {
     });
 
     it.each([
-      ["/app/voratiq/.voratiq/run/index.json", ".voratiq/run/index.json"],
-      ["/app/voratiq/.voratiq/verify/index.json", ".voratiq/verify/index.json"],
       ["/app/voratiq/.voratiq/spec/index.json", ".voratiq/spec/index.json"],
+      ["/app/voratiq/.voratiq/run/index.json", ".voratiq/run/index.json"],
       ["/app/voratiq/.voratiq/reduce/index.json", ".voratiq/reduce/index.json"],
+      ["/app/voratiq/.voratiq/verify/index.json", ".voratiq/verify/index.json"],
     ])(
       "fails preflight when %s is malformed even with no missing entries",
       async (indexPath, displayPath) => {

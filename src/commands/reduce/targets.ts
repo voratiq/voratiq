@@ -48,11 +48,11 @@ export async function assertReductionTargetEligible(
     case "run":
       await assertRunTargetEligible(input);
       return;
-    case "verify":
-      await assertVerificationTargetEligible(input);
-      return;
     case "reduce":
       await assertReductionTargetEligibleInternal(input);
+      return;
+    case "verify":
+      await assertVerificationTargetEligible(input);
       return;
     case "message":
       await assertMessageTargetEligible(input);

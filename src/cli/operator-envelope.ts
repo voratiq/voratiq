@@ -596,12 +596,12 @@ function getReductionSourcePath(target: ReductionTarget): string {
       return `.voratiq/spec/sessions/${target.id}`;
     case "run":
       return `.voratiq/run/sessions/${target.id}`;
-    case "message":
-      return `.voratiq/message/sessions/${target.id}`;
-    case "verify":
-      return `.voratiq/verify/sessions/${target.id}`;
     case "reduce":
       return `.voratiq/reduce/sessions/${target.id}`;
+    case "verify":
+      return `.voratiq/verify/sessions/${target.id}`;
+    case "message":
+      return `.voratiq/message/sessions/${target.id}`;
   }
 }
 

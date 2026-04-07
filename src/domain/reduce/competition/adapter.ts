@@ -615,10 +615,10 @@ async function prepareReductionTargetContext(options: {
       return await prepareSpecTargetContext(options);
     case "run":
       return await prepareRunTargetContext(options);
-    case "verify":
-      return await prepareVerificationTargetContext(options);
     case "reduce":
       return await prepareReductionTargetContextInternal(options);
+    case "verify":
+      return await prepareVerificationTargetContext(options);
     case "message":
       return await prepareMessageTargetContext(options);
   }

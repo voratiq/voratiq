@@ -96,6 +96,16 @@ async function handleSignal(signal: NodeJS.Signals): Promise<void> {
 
 async function flushPendingHistory(): Promise<void> {
   try {
+    const { flushAllSpecRecordBuffers } = await import(
+      "./domain/spec/persistence/adapter.js"
+    );
+    await flushAllSpecRecordBuffers();
+  } catch (error) {
+    console.warn(
+      `[voratiq] Failed to flush spec history buffers: ${(error as Error).message}`,
+    );
+  }
+  try {
     const { flushAllRunRecordBuffers } = await import(
       "./domain/run/persistence/adapter.js"
     );
@@ -103,6 +113,16 @@ async function flushPendingHistory(): Promise<void> {
   } catch (error) {
     console.warn(
       `[voratiq] Failed to flush run history buffers: ${(error as Error).message}`,
+    );
+  }
+  try {
+    const { flushAllReductionRecordBuffers } = await import(
+      "./domain/reduce/persistence/adapter.js"
+    );
+    await flushAllReductionRecordBuffers();
+  } catch (error) {
+    console.warn(
+      `[voratiq] Failed to flush reduction history buffers: ${(error as Error).message}`,
     );
   }
   try {
@@ -116,16 +136,6 @@ async function flushPendingHistory(): Promise<void> {
     );
   }
   try {
-    const { flushAllInteractiveSessionBuffers } = await import(
-      "./domain/interactive/persistence/adapter.js"
-    );
-    await flushAllInteractiveSessionBuffers();
-  } catch (error) {
-    console.warn(
-      `[voratiq] Failed to flush interactive history buffers: ${(error as Error).message}`,
-    );
-  }
-  try {
     const { flushAllMessageRecordBuffers } = await import(
       "./domain/message/persistence/adapter.js"
     );
@@ -136,23 +146,13 @@ async function flushPendingHistory(): Promise<void> {
     );
   }
   try {
-    const { flushAllSpecRecordBuffers } = await import(
-      "./domain/spec/persistence/adapter.js"
+    const { flushAllInteractiveSessionBuffers } = await import(
+      "./domain/interactive/persistence/adapter.js"
     );
-    await flushAllSpecRecordBuffers();
+    await flushAllInteractiveSessionBuffers();
   } catch (error) {
     console.warn(
-      `[voratiq] Failed to flush spec history buffers: ${(error as Error).message}`,
-    );
-  }
-  try {
-    const { flushAllReductionRecordBuffers } = await import(
-      "./domain/reduce/persistence/adapter.js"
-    );
-    await flushAllReductionRecordBuffers();
-  } catch (error) {
-    console.warn(
-      `[voratiq] Failed to flush reduction history buffers: ${(error as Error).message}`,
+      `[voratiq] Failed to flush interactive history buffers: ${(error as Error).message}`,
     );
   }
 }
@@ -468,13 +468,13 @@ async function registerCommands(
   const wantsHelp = argv.includes("--help") || argv.includes("-h");
   const wantsVersion = argv.includes("--version") || argv.includes("-v");
   const knownCommandNames = new Set([
-    "auto",
     "init",
     "spec",
     "run",
     "reduce",
     "verify",
     "message",
+    "auto",
     "apply",
     "list",
     "prune",
@@ -491,7 +491,6 @@ async function registerCommands(
   }
 
   if (loadAll) {
-    program.addCommand((await import("./cli/auto.js")).createAutoCommand());
     program.addCommand((await import("./cli/init.js")).createInitCommand());
     program.addCommand((await import("./cli/spec.js")).createSpecCommand());
     program.addCommand((await import("./cli/run.js")).createRunCommand());
@@ -500,6 +499,7 @@ async function registerCommands(
     program.addCommand(
       (await import("./cli/message.js")).createMessageCommand(),
     );
+    program.addCommand((await import("./cli/auto.js")).createAutoCommand());
     program.addCommand((await import("./cli/apply.js")).createApplyCommand());
     program.addCommand((await import("./cli/list.js")).createListCommand());
     program.addCommand((await import("./cli/prune.js")).createPruneCommand());
@@ -511,19 +511,11 @@ async function registerCommands(
     case "init":
       program.addCommand((await import("./cli/init.js")).createInitCommand());
       break;
-    case "list":
-      program.addCommand((await import("./cli/list.js")).createListCommand());
-      break;
     case "spec":
       program.addCommand((await import("./cli/spec.js")).createSpecCommand());
       break;
     case "run":
       program.addCommand((await import("./cli/run.js")).createRunCommand());
-      break;
-    case "message":
-      program.addCommand(
-        (await import("./cli/message.js")).createMessageCommand(),
-      );
       break;
     case "reduce":
       program.addCommand(
@@ -535,11 +527,19 @@ async function registerCommands(
         (await import("./cli/verify.js")).createVerifyCommand(),
       );
       break;
+    case "message":
+      program.addCommand(
+        (await import("./cli/message.js")).createMessageCommand(),
+      );
+      break;
     case "auto":
       program.addCommand((await import("./cli/auto.js")).createAutoCommand());
       break;
     case "apply":
       program.addCommand((await import("./cli/apply.js")).createApplyCommand());
+      break;
+    case "list":
+      program.addCommand((await import("./cli/list.js")).createListCommand());
       break;
     case "prune":
       program.addCommand((await import("./cli/prune.js")).createPruneCommand());

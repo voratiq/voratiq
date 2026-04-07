@@ -69,7 +69,7 @@ describe("orchestration bootstrap generator", () => {
     );
   });
 
-  test("manual preset seeds empty run/verify/spec/reduce/message", () => {
+  test("manual preset seeds empty spec/run/reduce/verify/message", () => {
     const config: AgentsConfig = {
       agents: [
         {

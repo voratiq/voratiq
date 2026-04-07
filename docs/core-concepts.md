@@ -18,14 +18,15 @@ Five ideas shape the design:
 
 ## Composable Operators
 
-The core workflow is supported by four agentic operators:
+The core workflow is supported by five agentic operators:
 
-| Operator   | Purpose                                                           |
-| ---------- | ----------------------------------------------------------------- |
-| **spec**   | Draft a Markdown specification from a task description            |
-| **run**    | Execute agents against a spec; collect diffs and artifacts        |
-| **reduce** | Synthesize artifact sets into a structured summary                |
-| **verify** | Evaluate candidates with programmatic checks and rubric verifiers |
+| Operator    | Purpose                                                           |
+| ----------- | ----------------------------------------------------------------- |
+| **spec**    | Draft a Markdown specification from a task description            |
+| **run**     | Execute agents against a spec; collect diffs and artifacts        |
+| **reduce**  | Synthesize artifact sets into a structured summary                |
+| **verify**  | Evaluate candidates with programmatic checks and rubric verifiers |
+| **message** | Send an isolated prompt to one or more agents                     |
 
 Two additional operators handle non-agentic work: `apply` merges a selected agent's diff into the working tree, and `prune` cleans up worktrees and artifacts from past sessions.
 
@@ -36,9 +37,9 @@ The full sequence is **spec → run → reduce → verify → apply**. `voratiq 
 Operators are composable beyond this sequence:
 
 - **Verify is a cross-stage gate.** It can target spec, run, reduce, or message sessions. You can verify a spec before running agents against it, verify run outputs before reduction, verify the reduction itself, or verify persisted message responses directly.
-- **Reduce targets multiple operator outputs.** It can consume artifacts from spec, run, verify, or a prior reduction.
+- **Reduce targets multiple operator outputs.** It can consume artifacts from spec, run, a prior reduction, or verify.
 
-Each operator can be invoked on its own from the CLI (`voratiq spec`, `voratiq run`, `voratiq reduce`, `voratiq verify`, `voratiq apply`, `voratiq prune`) or composed with others in any order.
+Each operator can be invoked on its own from the CLI (`voratiq spec`, `voratiq run`, `voratiq reduce`, `voratiq verify`, `voratiq message`, `voratiq apply`, `voratiq prune`) or composed with others in any order.
 
 See [CLI Reference](cli-reference.md) for operator usage. Configuration lives in plain text (YAML, JSON, Markdown) under `.voratiq/`.
 
@@ -112,4 +113,4 @@ Example run session after teardown:
 
 Agent worktrees persist on disk until you run `voratiq prune`. Run records are permanent.
 
-Spec, verification, and reduction sessions follow the same structure under `.voratiq/spec/`, `.voratiq/verify/`, and `.voratiq/reduce/`.
+Spec, reduction, and verification sessions follow the same structure under `.voratiq/spec/`, `.voratiq/reduce/`, and `.voratiq/verify/`.

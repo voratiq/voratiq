@@ -91,12 +91,12 @@ describe("bundled MCP binary smoke", () => {
     expect(toolList.result.tools.map((tool) => tool.name)).toEqual([
       "voratiq_spec",
       "voratiq_run",
-      "voratiq_message",
       "voratiq_reduce",
       "voratiq_verify",
+      "voratiq_message",
       "voratiq_apply",
-      "voratiq_prune",
       "voratiq_list",
+      "voratiq_prune",
     ]);
   }, 120_000);
 });

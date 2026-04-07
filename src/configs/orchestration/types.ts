@@ -3,10 +3,10 @@ import { z } from "zod";
 import { agentIdSchema } from "../agents/types.js";
 
 export const ORCHESTRATION_STAGE_IDS = [
-  "run",
-  "verify",
   "spec",
+  "run",
   "reduce",
+  "verify",
   "message",
 ] as const;
 export type OrchestrationStageId = (typeof ORCHESTRATION_STAGE_IDS)[number];
@@ -44,10 +44,10 @@ export const orchestrationStageSchema = z
 export type OrchestrationStageConfig = z.infer<typeof orchestrationStageSchema>;
 
 const orchestrationProfileShape = {
-  run: orchestrationStageSchema,
-  verify: orchestrationStageSchema,
   spec: orchestrationStageSchema,
+  run: orchestrationStageSchema,
   reduce: orchestrationStageSchema,
+  verify: orchestrationStageSchema,
   message: orchestrationStageSchema.default({ agents: [] }),
 } satisfies Record<OrchestrationStageId, z.ZodTypeAny>;
 

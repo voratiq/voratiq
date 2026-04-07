@@ -9,7 +9,7 @@ import {
 } from "../../../competition/shared/prompt-helpers.js";
 
 export interface BuildReducePromptOptions {
-  targetOperator: "spec" | "run" | "verify" | "reduce" | "message";
+  targetOperator: "spec" | "run" | "reduce" | "verify" | "message";
   targetId: string;
   artifactInfoPath: string;
   repoRootPath: string;

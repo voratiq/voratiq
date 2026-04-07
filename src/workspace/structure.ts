@@ -6,22 +6,22 @@ import {
 import type { ChatArtifactFormat } from "./chat/types.js";
 
 export const VORATIQ_DIR = ".voratiq";
+export const VORATIQ_SPEC_DIR = "spec";
+export const VORATIQ_SPEC_FILE = "spec/index.json";
+export const VORATIQ_SPEC_SESSIONS_DIR = "spec/sessions";
 export const VORATIQ_RUN_DIR = "run";
 export const VORATIQ_RUN_FILE = "run/index.json";
 export const VORATIQ_RUN_SESSIONS_DIR = "run/sessions";
 export const VORATIQ_REDUCTION_DIR = "reduce";
 export const VORATIQ_REDUCTION_FILE = "reduce/index.json";
 export const VORATIQ_REDUCTION_SESSIONS_DIR = "reduce/sessions";
-export const VORATIQ_MESSAGE_DIR = "message";
-export const VORATIQ_MESSAGE_FILE = "message/index.json";
-export const VORATIQ_MESSAGE_SESSIONS_DIR = "message/sessions";
-export const VORATIQ_SPEC_DIR = "spec";
-export const VORATIQ_SPEC_FILE = "spec/index.json";
-export const VORATIQ_SPEC_SESSIONS_DIR = "spec/sessions";
 export const VORATIQ_VERIFICATION_DIR = "verify";
 export const VORATIQ_VERIFICATION_FILE = "verify/index.json";
 export const VORATIQ_VERIFICATION_SESSIONS_DIR = "verify/sessions";
 export const VORATIQ_VERIFICATION_TEMPLATES_DIR = "verify/templates";
+export const VORATIQ_MESSAGE_DIR = "message";
+export const VORATIQ_MESSAGE_FILE = "message/index.json";
+export const VORATIQ_MESSAGE_SESSIONS_DIR = "message/sessions";
 export const VORATIQ_INTERACTIVE_DIR = "interactive";
 export const VORATIQ_INTERACTIVE_FILE = "interactive/index.json";
 export const VORATIQ_INTERACTIVE_SESSIONS_DIR = "interactive/sessions";
@@ -166,18 +166,6 @@ export function getSpecSessionsDirectoryPath(): string {
   return getDomainSessionsDirectoryPath(VORATIQ_SPEC_DIR);
 }
 
-export function getVerificationDirectoryPath(): string {
-  return getDomainDirectoryPath(VORATIQ_VERIFICATION_DIR);
-}
-
-export function getVerificationIndexPath(): string {
-  return getDomainIndexPath(VORATIQ_VERIFICATION_DIR);
-}
-
-export function getVerificationSessionsDirectoryPath(): string {
-  return getDomainSessionsDirectoryPath(VORATIQ_VERIFICATION_DIR);
-}
-
 export function getReductionDirectoryPath(): string {
   return getDomainDirectoryPath(VORATIQ_REDUCTION_DIR);
 }
@@ -188,6 +176,18 @@ export function getReductionIndexPath(): string {
 
 export function getReductionSessionsDirectoryPath(): string {
   return getDomainSessionsDirectoryPath(VORATIQ_REDUCTION_DIR);
+}
+
+export function getVerificationDirectoryPath(): string {
+  return getDomainDirectoryPath(VORATIQ_VERIFICATION_DIR);
+}
+
+export function getVerificationIndexPath(): string {
+  return getDomainIndexPath(VORATIQ_VERIFICATION_DIR);
+}
+
+export function getVerificationSessionsDirectoryPath(): string {
+  return getDomainSessionsDirectoryPath(VORATIQ_VERIFICATION_DIR);
 }
 
 export function getMessageDirectoryPath(): string {
