@@ -6,6 +6,7 @@ import {
   listEnabledAgentIdsForOrchestrationBootstrap,
   listPresetStageAgentsForOrchestrationBootstrap,
 } from "../../../src/configs/orchestration/bootstrap.js";
+import { readOrchestrationConfig } from "../../../src/configs/orchestration/loader.js";
 
 describe("orchestration bootstrap generator", () => {
   test("seeds all stages from preset, with run-only agents only in run", () => {
@@ -44,34 +45,37 @@ describe("orchestration bootstrap generator", () => {
     ).toEqual([{ id: "zeta" }, { id: "alpha", runOnly: true }]);
 
     const yaml = buildDefaultOrchestrationTemplate(config, "pro");
-    expect(yaml).toBe(
-      [
-        "profiles:",
-        "  default:",
-        "    spec:",
-        "      agents:",
-        "        - id: zeta",
-        "    run:",
-        "      agents:",
-        "        - id: zeta",
-        "        - id: alpha",
-        "    reduce:",
-        "      agents:",
-        "        - id: zeta",
-        "    verify:",
-        "      agents:",
-        "        - id: zeta",
-        "    message:",
-        "      agents:",
-        "        - id: zeta",
-        "",
-      ].join("\n"),
+    const orchestration = readOrchestrationConfig(yaml);
+
+    expect(orchestration.profiles.default.run.agents.map((a) => a.id)).toEqual([
+      "zeta",
+      "alpha",
+    ]);
+    expect(orchestration.profiles.default.spec.agents.map((a) => a.id)).toEqual(
+      ["zeta"],
     );
+    expect(orchestration.profiles.pro.run.agents.map((a) => a.id)).toEqual([
+      "zeta",
+      "alpha",
+    ]);
+    expect(orchestration.profiles.lite.run.agents.map((a) => a.id)).toEqual([
+      "zeta",
+      "alpha",
+    ]);
+    expect(yaml).toContain("      agents:\n        - id: zeta\n\n  pro:");
+    expect(yaml).toContain("      agents:\n        - id: zeta\n\n  lite:");
   });
 
-  test("manual preset seeds empty spec/run/reduce/verify/message", () => {
+  test("manual preset keeps default empty while exposing pro and lite profiles", () => {
     const config: AgentsConfig = {
       agents: [
+        {
+          id: "claude-haiku-4-5-20251001",
+          provider: "claude",
+          model: "claude-haiku-4-5-20251001",
+          enabled: true,
+          binary: "/usr/local/bin/claude",
+        },
         {
           id: "codex",
           provider: "codex",
@@ -79,29 +83,31 @@ describe("orchestration bootstrap generator", () => {
           enabled: true,
           binary: "/usr/local/bin/codex",
         },
+        {
+          id: "gemini",
+          provider: "gemini",
+          model: "gemini-2.5-pro",
+          enabled: true,
+          binary: "/usr/local/bin/gemini",
+        },
       ],
     };
 
     expect(
       listPresetStageAgentsForOrchestrationBootstrap(config, "manual"),
     ).toEqual([]);
-    expect(buildDefaultOrchestrationTemplate(config, "manual")).toBe(
-      [
-        "profiles:",
-        "  default:",
-        "    spec:",
-        "      agents: []",
-        "    run:",
-        "      agents: []",
-        "    reduce:",
-        "      agents: []",
-        "    verify:",
-        "      agents: []",
-        "    message:",
-        "      agents: []",
-        "",
-      ].join("\n"),
+
+    const orchestration = readOrchestrationConfig(
+      buildDefaultOrchestrationTemplate(config, "manual"),
     );
+
+    expect(orchestration.profiles.default.spec.agents).toEqual([]);
+    expect(orchestration.profiles.default.run.agents).toEqual([]);
+    expect(orchestration.profiles.default.reduce.agents).toEqual([]);
+    expect(orchestration.profiles.default.verify.agents).toEqual([]);
+    expect(orchestration.profiles.default.message.agents).toEqual([]);
+    expect(orchestration.profiles.pro.run.agents).toHaveLength(3);
+    expect(orchestration.profiles.lite.run.agents).toHaveLength(3);
   });
 
   test("run-stage seeding ignores enabled entries without binaries", () => {
