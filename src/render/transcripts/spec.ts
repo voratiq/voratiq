@@ -88,11 +88,10 @@ interface SpecRendererOptions {
   suppressTrailingBlankLine?: boolean;
 }
 
-export interface SpecProgressRenderer
-  extends StageProgressEventConsumer<
-    SpecProgressContext,
-    SpecProgressAgentRecord
-  > {
+export interface SpecProgressRenderer extends StageProgressEventConsumer<
+  SpecProgressContext,
+  SpecProgressAgentRecord
+> {
   begin(context?: SpecProgressContext): void;
   update(record: SpecProgressAgentRecord): void;
   complete(

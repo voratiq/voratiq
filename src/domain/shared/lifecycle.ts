@@ -18,8 +18,9 @@ export interface LifecycleExecutionDurationInput<TStatus extends string> {
   completedAt?: string;
 }
 
-interface RecordTimestampLifecycle<TStatus extends string>
-  extends TimestampLifecycleRecord<TStatus> {
+interface RecordTimestampLifecycle<
+  TStatus extends string,
+> extends TimestampLifecycleRecord<TStatus> {
   createdAt: string;
 }
 

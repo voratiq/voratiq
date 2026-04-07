@@ -95,11 +95,10 @@ interface VerifyRendererOptions {
   suppressTrailingBlankLine?: boolean;
 }
 
-export interface VerifyProgressRenderer
-  extends StageProgressEventConsumer<
-    VerifyProgressContext,
-    VerifyProgressMethodRecord
-  > {
+export interface VerifyProgressRenderer extends StageProgressEventConsumer<
+  VerifyProgressContext,
+  VerifyProgressMethodRecord
+> {
   begin(context?: VerifyProgressContext): void;
   update(record: VerifyProgressMethodRecord): void;
   complete(

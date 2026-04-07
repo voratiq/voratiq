@@ -41,12 +41,10 @@ export interface LoadSandboxConfigurationOptions {
   disableCache?: boolean;
 }
 
-export interface LoadSandboxNetworkConfigOptions
-  extends LoadSandboxConfigurationOptions {
+export interface LoadSandboxNetworkConfigOptions extends LoadSandboxConfigurationOptions {
   providerId: string;
 }
 
-export interface LoadSandboxProviderConfigOptions
-  extends LoadSandboxConfigurationOptions {
+export interface LoadSandboxProviderConfigOptions extends LoadSandboxConfigurationOptions {
   providerId: string;
 }
