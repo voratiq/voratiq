@@ -53,7 +53,7 @@ let abortTimestamp: string;
 beforeEach(() => {
   jest.useFakeTimers();
   const abortInstant = new Date("2025-11-04T19:00:00.000Z");
-  jest.setSystemTime(abortInstant);
+  jest.setSystemTime(abortInstant.getTime());
   abortTimestamp = abortInstant.toISOString();
   jest.clearAllMocks();
   getRunRecordSnapshotMock.mockResolvedValue(undefined);

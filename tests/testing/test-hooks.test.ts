@@ -24,18 +24,16 @@ describe("test hook opt-in: run records persistence", () => {
   });
 
   it("requires enabling the shared test hook guard before registration", async () => {
-    const persistence = await import(
-      "../../src/domain/run/persistence/adapter.js"
-    );
+    const persistence =
+      await import("../../src/domain/run/persistence/adapter.js");
     expect(() => persistence.enableRunRecordsTestHooks()).toThrow(
       /enableTestHookRegistration/,
     );
   });
 
   it("registers hooks once tests explicitly opt in", async () => {
-    const persistence = await import(
-      "../../src/domain/run/persistence/adapter.js"
-    );
+    const persistence =
+      await import("../../src/domain/run/persistence/adapter.js");
     const testHooks = await import("../../src/testing/test-hooks.js");
     testHooks.enableTestHookRegistration();
     persistence.enableRunRecordsTestHooks();

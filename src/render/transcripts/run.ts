@@ -47,11 +47,10 @@ interface RunRendererOptions {
   suppressTrailingBlankLine?: boolean;
 }
 
-interface RunProgressRenderer
-  extends StageProgressEventConsumer<
-    RunProgressContext,
-    AgentInvocationRecord
-  > {
+interface RunProgressRenderer extends StageProgressEventConsumer<
+  RunProgressContext,
+  AgentInvocationRecord
+> {
   begin(context?: RunProgressContext): void;
   update(record: AgentInvocationRecord): void;
   complete(report: RunReport, options?: { suppressHint?: boolean }): string;

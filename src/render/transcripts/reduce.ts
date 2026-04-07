@@ -51,11 +51,10 @@ interface ReduceRendererOptions {
   suppressTrailingBlankLine?: boolean;
 }
 
-export interface ReduceProgressRenderer
-  extends StageProgressEventConsumer<
-    ReduceProgressContext,
-    ReduceProgressReducerRecord
-  > {
+export interface ReduceProgressRenderer extends StageProgressEventConsumer<
+  ReduceProgressContext,
+  ReduceProgressReducerRecord
+> {
   begin(context?: ReduceProgressContext): void;
   update(record: ReduceProgressReducerRecord): void;
   complete(

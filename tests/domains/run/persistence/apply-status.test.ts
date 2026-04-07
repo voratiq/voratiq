@@ -41,7 +41,7 @@ describe("run applyStatus persistence", () => {
 
   it("preserves applyStatus from disk when aborting with a buffered record", async () => {
     jest.useFakeTimers();
-    jest.setSystemTime(new Date("2026-01-27T17:10:00.000Z"));
+    jest.setSystemTime(new Date("2026-01-27T17:10:00.000Z").getTime());
 
     const root = await mkdtemp(join(tmpdir(), "voratiq-apply-status-"));
     tempRoots.push(root);
@@ -114,7 +114,7 @@ describe("run applyStatus persistence", () => {
 
   it("forces an immediate flush for running runs when requested", async () => {
     jest.useFakeTimers();
-    jest.setSystemTime(new Date("2026-01-27T18:00:00.000Z"));
+    jest.setSystemTime(new Date("2026-01-27T18:00:00.000Z").getTime());
 
     const root = await mkdtemp(join(tmpdir(), "voratiq-apply-flush-"));
     tempRoots.push(root);

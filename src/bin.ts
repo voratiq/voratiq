@@ -96,9 +96,8 @@ async function handleSignal(signal: NodeJS.Signals): Promise<void> {
 
 async function flushPendingHistory(): Promise<void> {
   try {
-    const { flushAllSpecRecordBuffers } = await import(
-      "./domain/spec/persistence/adapter.js"
-    );
+    const { flushAllSpecRecordBuffers } =
+      await import("./domain/spec/persistence/adapter.js");
     await flushAllSpecRecordBuffers();
   } catch (error) {
     console.warn(
@@ -106,9 +105,8 @@ async function flushPendingHistory(): Promise<void> {
     );
   }
   try {
-    const { flushAllRunRecordBuffers } = await import(
-      "./domain/run/persistence/adapter.js"
-    );
+    const { flushAllRunRecordBuffers } =
+      await import("./domain/run/persistence/adapter.js");
     await flushAllRunRecordBuffers();
   } catch (error) {
     console.warn(
@@ -116,9 +114,8 @@ async function flushPendingHistory(): Promise<void> {
     );
   }
   try {
-    const { flushAllReductionRecordBuffers } = await import(
-      "./domain/reduce/persistence/adapter.js"
-    );
+    const { flushAllReductionRecordBuffers } =
+      await import("./domain/reduce/persistence/adapter.js");
     await flushAllReductionRecordBuffers();
   } catch (error) {
     console.warn(
@@ -126,9 +123,8 @@ async function flushPendingHistory(): Promise<void> {
     );
   }
   try {
-    const { flushAllVerificationRecordBuffers } = await import(
-      "./domain/verify/persistence/adapter.js"
-    );
+    const { flushAllVerificationRecordBuffers } =
+      await import("./domain/verify/persistence/adapter.js");
     await flushAllVerificationRecordBuffers();
   } catch (error) {
     console.warn(
@@ -136,9 +132,8 @@ async function flushPendingHistory(): Promise<void> {
     );
   }
   try {
-    const { flushAllMessageRecordBuffers } = await import(
-      "./domain/message/persistence/adapter.js"
-    );
+    const { flushAllMessageRecordBuffers } =
+      await import("./domain/message/persistence/adapter.js");
     await flushAllMessageRecordBuffers();
   } catch (error) {
     console.warn(
@@ -146,9 +141,8 @@ async function flushPendingHistory(): Promise<void> {
     );
   }
   try {
-    const { flushAllInteractiveSessionBuffers } = await import(
-      "./domain/interactive/persistence/adapter.js"
-    );
+    const { flushAllInteractiveSessionBuffers } =
+      await import("./domain/interactive/persistence/adapter.js");
     await flushAllInteractiveSessionBuffers();
   } catch (error) {
     console.warn(
@@ -181,9 +175,8 @@ async function terminateActiveVerificationSafe(
   context: string,
 ): Promise<Error | null> {
   try {
-    const { terminateActiveVerification } = await import(
-      "./commands/verify/lifecycle.js"
-    );
+    const { terminateActiveVerification } =
+      await import("./commands/verify/lifecycle.js");
     await terminateActiveVerification(status);
     return null;
   } catch (error) {
@@ -202,9 +195,8 @@ async function terminateActiveInteractiveSafe(
   context: string,
 ): Promise<Error | null> {
   try {
-    const { terminateActiveInteractive } = await import(
-      "./commands/interactive/lifecycle.js"
-    );
+    const { terminateActiveInteractive } =
+      await import("./commands/interactive/lifecycle.js");
     await terminateActiveInteractive(status, context);
     return null;
   } catch (error) {
@@ -223,9 +215,8 @@ async function terminateActiveMessageSafe(
   context: string,
 ): Promise<Error | null> {
   try {
-    const { terminateActiveMessage } = await import(
-      "./commands/message/lifecycle.js"
-    );
+    const { terminateActiveMessage } =
+      await import("./commands/message/lifecycle.js");
     await terminateActiveMessage(status);
     return null;
   } catch (error) {
@@ -279,9 +270,8 @@ export async function runCli(
   const { Command, CommanderError } = await import("commander");
   const program = new Command();
   const effectiveArgv = argv;
-  const { resolveJsonEnvelopeOperator } = await import(
-    "./cli/operator-envelope.js"
-  );
+  const { resolveJsonEnvelopeOperator } =
+    await import("./cli/operator-envelope.js");
   const jsonEnvelopeOperator = resolveJsonEnvelopeOperator(effectiveArgv);
   activeJsonEnvelopeOperator = jsonEnvelopeOperator;
   const commandName = findCommandName(effectiveArgv);
@@ -327,9 +317,8 @@ export async function runCli(
       const updateNotice = updateHandle?.peekNotice();
       if (updateNotice) {
         const { showUpdatePrompt } = await import("./update-check/prompt.js");
-        const { createConfirmationInteractor } = await import(
-          "./render/interactions/confirmation.js"
-        );
+        const { createConfirmationInteractor } =
+          await import("./render/interactions/confirmation.js");
         const { writeCommandOutput } = await import("./cli/output.js");
 
         const interactor = createConfirmationInteractor();
@@ -356,12 +345,10 @@ export async function runCli(
     const { shouldStartRootLauncher } = await import("./cli/root-launcher.js");
     if (shouldStartRootLauncher(effectiveArgv)) {
       try {
-        const { runInteractiveRootLauncher } = await import(
-          "./cli/root-launcher.js"
-        );
-        const { createEntrypointVoratiqCliTarget } = await import(
-          "./utils/voratiq-cli-target.js"
-        );
+        const { runInteractiveRootLauncher } =
+          await import("./cli/root-launcher.js");
+        const { createEntrypointVoratiqCliTarget } =
+          await import("./utils/voratiq-cli-target.js");
         await runInteractiveRootLauncher({
           selfCliTarget: createEntrypointVoratiqCliTarget({
             cliEntrypoint: effectiveArgv[1],
@@ -412,9 +399,8 @@ export async function runCli(
           );
           return;
         }
-        const { commanderAlreadyRendered } = await import(
-          "./cli/commander-utils.js"
-        );
+        const { commanderAlreadyRendered } =
+          await import("./cli/commander-utils.js");
         if (commanderAlreadyRendered(error)) {
           process.exitCode = error.exitCode ?? 0;
           return;
