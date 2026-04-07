@@ -1,5 +1,7 @@
 import {
   assertAgentCatalogGuardrails,
+  getAgentDefaultId,
+  getSupportedAgentDefaults,
   sanitizeAgentIdFromModel,
 } from "../../../src/configs/agents/defaults.js";
 
@@ -52,5 +54,43 @@ describe("assertAgentCatalogGuardrails", () => {
         ],
       }),
     ).toThrow(/is not present in SUPPORTED_AGENT_CATALOG/u);
+  });
+});
+
+describe("getSupportedAgentDefaults", () => {
+  it("returns the launcher catalog in the expected curated order", () => {
+    expect(
+      getSupportedAgentDefaults().map((entry) => getAgentDefaultId(entry)),
+    ).toEqual([
+      "claude-haiku-4-5-20251001",
+      "claude-sonnet-4-5-20250929",
+      "claude-sonnet-4-6",
+      "claude-opus-4-5-20251101",
+      "claude-opus-4-6",
+      "gpt-5-codex",
+      "gpt-5-1-codex-mini",
+      "gpt-5-1-codex",
+      "gpt-5-1-codex-max",
+      "gpt-5-1-codex-max-xhigh",
+      "gpt-5-2",
+      "gpt-5-2-high",
+      "gpt-5-2-xhigh",
+      "gpt-5-2-codex",
+      "gpt-5-2-codex-high",
+      "gpt-5-2-codex-xhigh",
+      "gpt-5-3-codex-spark",
+      "gpt-5-3-codex",
+      "gpt-5-3-codex-high",
+      "gpt-5-3-codex-xhigh",
+      "gpt-5-4-mini",
+      "gpt-5-4",
+      "gpt-5-4-high",
+      "gpt-5-4-xhigh",
+      "gemini-2-5-flash",
+      "gemini-2-5-flash-lite",
+      "gemini-3-flash-preview",
+      "gemini-2-5-pro",
+      "gemini-3-1-pro-preview",
+    ]);
   });
 });

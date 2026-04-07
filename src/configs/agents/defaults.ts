@@ -173,28 +173,6 @@ const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     extraArgs: ["--config", "model_reasoning_effort=xhigh"],
   },
   {
-    id: "gpt-5-4-mini",
-    provider: "codex",
-    model: "gpt-5.4-mini",
-  },
-  {
-    id: "gpt-5-4",
-    provider: "codex",
-    model: "gpt-5.4",
-  },
-  {
-    id: "gpt-5-4-high",
-    provider: "codex",
-    model: "gpt-5.4",
-    extraArgs: ["--config", "model_reasoning_effort=high"],
-  },
-  {
-    id: "gpt-5-4-xhigh",
-    provider: "codex",
-    model: "gpt-5.4",
-    extraArgs: ["--config", "model_reasoning_effort=xhigh"],
-  },
-  {
     id: "gpt-5-2-codex",
     provider: "codex",
     model: "gpt-5.2-codex",
@@ -234,14 +212,36 @@ const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     extraArgs: ["--config", "model_reasoning_effort=xhigh"],
   },
   {
-    id: "gemini-2-5-flash-lite",
-    provider: "gemini",
-    model: "gemini-2.5-flash-lite",
+    id: "gpt-5-4-mini",
+    provider: "codex",
+    model: "gpt-5.4-mini",
+  },
+  {
+    id: "gpt-5-4",
+    provider: "codex",
+    model: "gpt-5.4",
+  },
+  {
+    id: "gpt-5-4-high",
+    provider: "codex",
+    model: "gpt-5.4",
+    extraArgs: ["--config", "model_reasoning_effort=high"],
+  },
+  {
+    id: "gpt-5-4-xhigh",
+    provider: "codex",
+    model: "gpt-5.4",
+    extraArgs: ["--config", "model_reasoning_effort=xhigh"],
   },
   {
     id: "gemini-2-5-flash",
     provider: "gemini",
     model: "gemini-2.5-flash",
+  },
+  {
+    id: "gemini-2-5-flash-lite",
+    provider: "gemini",
+    model: "gemini-2.5-flash-lite",
   },
   {
     id: "gemini-3-flash-preview",
