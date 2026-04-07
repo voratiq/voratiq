@@ -12,10 +12,17 @@ const ORCHESTRATION_BOOTSTRAP_STAGE_IDS = [
   "verify",
   "message",
 ] as const;
+const ORCHESTRATION_BOOTSTRAP_PRESET_PROFILES = ["pro", "lite"] as const;
 
 export interface ResolvedPresetAgent {
   readonly id: string;
   readonly runOnly?: true;
+}
+
+export interface BootstrapOrchestrationProfiles {
+  readonly default: readonly ResolvedPresetAgent[];
+  readonly pro: readonly ResolvedPresetAgent[];
+  readonly lite: readonly ResolvedPresetAgent[];
 }
 
 export function collectEnabledAgentIdsForBootstrap(
@@ -41,9 +48,31 @@ export function collectEnabledAgentIdsForBootstrap(
 }
 
 export function serializeDefaultOrchestrationYaml(
-  presetAgents: readonly ResolvedPresetAgent[],
+  profiles: BootstrapOrchestrationProfiles,
 ): string {
-  const lines = ["profiles:", "  default:"];
+  const lines = ["profiles:"];
+  const profileNames = [
+    "default",
+    ...ORCHESTRATION_BOOTSTRAP_PRESET_PROFILES,
+  ] as const;
+
+  for (const [index, profileName] of profileNames.entries()) {
+    if (index > 0) {
+      lines.push("");
+    }
+    appendProfileYaml(lines, profileName, profiles[profileName]);
+  }
+
+  lines.push("");
+  return lines.join("\n");
+}
+
+function appendProfileYaml(
+  lines: string[],
+  profileName: string,
+  presetAgents: readonly ResolvedPresetAgent[],
+): void {
+  lines.push(`  ${profileName}:`);
 
   for (const stageId of ORCHESTRATION_BOOTSTRAP_STAGE_IDS) {
     lines.push(`    ${stageId}:`);
@@ -60,9 +89,6 @@ export function serializeDefaultOrchestrationYaml(
       }
     }
   }
-
-  lines.push("");
-  return lines.join("\n");
 }
 
 function formatYamlScalar(value: string): string {
@@ -147,9 +173,20 @@ export function buildDefaultOrchestrationTemplate(
   config: AgentsConfig,
   preset: AgentPreset = "pro",
 ): string {
-  const stageAgents = listPresetStageAgentsForOrchestrationBootstrap(
+  const proAgents = listPresetStageAgentsForOrchestrationBootstrap(
     config,
-    preset,
+    "pro",
   );
-  return serializeDefaultOrchestrationYaml(stageAgents);
+  const liteAgents = listPresetStageAgentsForOrchestrationBootstrap(
+    config,
+    "lite",
+  );
+  const defaultAgents =
+    preset === "lite" ? liteAgents : preset === "manual" ? [] : proAgents;
+
+  return serializeDefaultOrchestrationYaml({
+    default: defaultAgents,
+    pro: proAgents,
+    lite: liteAgents,
+  });
 }
