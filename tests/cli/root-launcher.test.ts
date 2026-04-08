@@ -106,9 +106,6 @@ describe("root interactive launcher", () => {
       "Using agent: codex-main (codex / gpt-5.4)",
     );
     expect(output.text()).toContain(
-      "claude-blocked (claude / claude-opus-4-6): binary `/usr/local/bin/claude` is not executable (ENOENT)",
-    );
-    expect(output.text()).toContain(
       "Launching codex-main (codex / gpt-5.4)...",
     );
   });

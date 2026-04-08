@@ -40,7 +40,7 @@ describe("voratiq init preset application", () => {
 
     const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
     const content = await readFile(agentsPath, "utf8");
-    expect(content).toBe(buildAgentsTemplate("lite"));
+    expect(content).toBe(buildUndetectedPresetTemplate("lite"));
   });
 
   it.each(["pro", "lite", "manual"] as const)(
@@ -77,7 +77,7 @@ describe("voratiq init preset application", () => {
     });
 
     const content = await readFile(agentsPath, "utf8");
-    expect(content).toBe(buildAgentsTemplate("lite"));
+    expect(content).toBe(buildUndetectedPresetTemplate("lite"));
   });
 
   it("does not overwrite customized agent configs when applying presets", async () => {
@@ -118,7 +118,7 @@ describe("voratiq init preset application", () => {
 
     const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
     const content = await readFile(agentsPath, "utf8");
-    expect(content).toBe(buildAgentsTemplate("lite"));
+    expect(content).toBe(buildUndetectedPresetTemplate("lite"));
     expect(prompt).toHaveBeenCalled();
 
     const firstPromptCall = prompt.mock.calls[0]?.[0];
@@ -146,7 +146,7 @@ describe("voratiq init preset application", () => {
     });
 
     const content = await readFile(agentsPath, "utf8");
-    expect(content).toBe(buildAgentsTemplate("lite"));
+    expect(content).toBe(buildUndetectedPresetTemplate("lite"));
     expect(prompt).not.toHaveBeenCalled();
   });
 
@@ -286,7 +286,7 @@ describe("voratiq init preset application", () => {
 
     const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
     const content = await readFile(agentsPath, "utf8");
-    expect(content).toBe(buildAgentsTemplate("lite"));
+    expect(content).toBe(buildUndetectedPresetTemplate("lite"));
     expect(prompt).not.toHaveBeenCalled();
   });
 });
@@ -296,5 +296,17 @@ function createPromptMock(
 ): jest.Mock<Promise<string>, [PromptOptions]> {
   return jest.fn<Promise<string>, [PromptOptions]>(() =>
     Promise.resolve(response),
+  );
+}
+
+function buildUndetectedPresetTemplate(
+  preset: "pro" | "lite" | "manual",
+): string {
+  const parsed = readAgentsConfig(buildAgentsTemplate(preset));
+  return serializeAgentsConfigEntries(
+    parsed.agents.map((entry) => ({
+      ...entry,
+      enabled: false,
+    })),
   );
 }

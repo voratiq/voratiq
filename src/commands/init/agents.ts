@@ -132,7 +132,9 @@ function scanWorkspaceForAgentDefaults(
     const baseEntry = existing ?? buildEntryFromTemplate(template, templateId);
     const entry = cloneAgentEntry(baseEntry);
     entry.binary = detectedBinary ?? "";
-    entry.enabled = entry.enabled !== false;
+    entry.enabled = existing
+      ? entry.enabled !== false
+      : hasBinary(detectedBinary);
 
     templateStates.push({
       templateId,
