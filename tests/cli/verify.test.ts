@@ -261,6 +261,7 @@ describe("voratiq verify", () => {
 
     const result = await runVerifyCommand({
       target: { kind: "run", sessionId: "run-123" },
+      stdout: { write: () => true, isTTY: false },
     } satisfies VerifyCommandOptions);
 
     expect(result.verificationId).toBe("verify-123");
