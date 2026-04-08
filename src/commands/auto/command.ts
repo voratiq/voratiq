@@ -437,6 +437,16 @@ export async function executeAutoCommand(
         });
       }
 
+      if (
+        options.apply === true &&
+        (verifyResult.selectionWarnings?.length ?? 0) > 0
+      ) {
+        const warningDetail =
+          "Verification reported warnings for the selected candidate; automatic apply halted. Review the verify output and apply manually if appropriate.";
+        verifyDetail = warningDetail;
+        markActionRequired(warningDetail);
+      }
+
       if (verifySelection?.state === "unresolved") {
         const verifySelectionDisposition = classifyAutoVerificationSelection({
           targetKind: "run",

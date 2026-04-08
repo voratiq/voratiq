@@ -6,7 +6,7 @@ import { isFileSystemError } from "../utils/fs.js";
 import { resolvePath } from "../utils/path.js";
 import { WorkspaceSetupError } from "./errors.js";
 
-const SHIM_RELATIVE_PATH = [
+export const WORKSPACE_SHIM_RELATIVE_PATH = [
   "dist",
   "commands",
   "run",
@@ -24,8 +24,14 @@ export async function ensureWorkspaceShim(options: {
 }): Promise<void> {
   const { workspacePath, cliInstallRoot = resolveCliInstallRoot() } = options;
 
-  const sourcePath = resolvePath(cliInstallRoot, ...SHIM_RELATIVE_PATH);
-  const targetPath = resolvePath(workspacePath, ...SHIM_RELATIVE_PATH);
+  const sourcePath = resolvePath(
+    cliInstallRoot,
+    ...WORKSPACE_SHIM_RELATIVE_PATH,
+  );
+  const targetPath = resolvePath(
+    workspacePath,
+    ...WORKSPACE_SHIM_RELATIVE_PATH,
+  );
 
   try {
     await access(sourcePath);

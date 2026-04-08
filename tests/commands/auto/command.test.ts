@@ -514,7 +514,7 @@ describe("executeAutoCommand", () => {
     );
   });
 
-  it("applies the selected candidate when selection carries programmatic warnings", async () => {
+  it("halts auto-apply when verification returns warnings", async () => {
     const runApplyStage = jest
       .fn<AutoCommandDependencies["runApplyStage"]>()
       .mockResolvedValue(createApplyStageResult());
@@ -550,16 +550,18 @@ describe("executeAutoCommand", () => {
       dependencies,
     );
 
-    expect(runApplyStage).toHaveBeenCalledWith({
-      runId: "run-1",
-      agentId: "alpha",
-      commit: false,
-    });
-    expect(result.auto.status).toBe("succeeded");
-    expect(result.apply.status).toBe("succeeded");
+    expect(runApplyStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("action_required");
+    expect(result.apply.status).toBe("skipped");
     expect(result.summary.verify.detail).toBe(
-      "No run candidate passed programmatic verification; proceeding with run-verification consensus.",
+      "Verification reported warnings for the selected candidate; automatic apply halted. Review the verify output and apply manually if appropriate.",
     );
+    expect(result.events).toContainEqual({
+      kind: "action_required",
+      detail:
+        "Verification reported warnings for the selected candidate; automatic apply halted. Review the verify output and apply manually if appropriate.",
+      separateWithDivider: true,
+    });
   });
 
   it("uses the generic unresolved fallback for verify(run)", async () => {
