@@ -169,6 +169,12 @@ describe("root interactive launcher", () => {
       message: "[1-2]",
       prefaceLines: undefined,
     });
+    expect(output.payloads()[0]).toMatchObject({
+      body: expect.stringContaining(
+        "Start a native agent session from this repository.",
+      ),
+      leadingNewline: false,
+    });
     expect(prompt).toHaveBeenNthCalledWith(2, {
       message: "[1-2]",
       prefaceLines: undefined,
@@ -367,6 +373,18 @@ describe("root interactive launcher", () => {
     expect(resolveContext.mock.calls[0]?.[0]).toEqual({
       requireWorkspace: true,
       workspaceAutoInitMode: "when-missing",
+    });
+    expect(output.payloads()[0]).toMatchObject({
+      alerts: [
+        { severity: "info", message: "Voratiq initialized (.voratiq/)." },
+      ],
+      leadingNewline: true,
+    });
+    expect(output.payloads()[1]).toMatchObject({
+      body: expect.stringContaining(
+        "Start a native agent session from this repository.",
+      ),
+      leadingNewline: false,
     });
     expect(output.text()).toContain("Voratiq initialized (.voratiq/).");
   });

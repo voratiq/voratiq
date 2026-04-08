@@ -10,7 +10,7 @@ import { renderTable } from "../utils/table.js";
 import { renderTranscript } from "../utils/transcript.js";
 
 export function renderSyncTranscript(result: SyncCommandResult): string {
-  const sections: string[][] = [["Syncing workspace…"]];
+  const sections: string[][] = [];
 
   sections.push(
     renderTable({

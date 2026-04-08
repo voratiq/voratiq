@@ -47,9 +47,7 @@ export function renderInitTranscript(
   const sections: string[][] = [];
 
   if (includeConfigurationHeading) {
-    sections.push([
-      mode === "repair" ? "Repairing workspace…" : "Configuring workspace…",
-    ]);
+    sections.push(["Configuring workspace…"]);
   }
   sections.push(
     buildConfigurationSummaryTable({
@@ -77,12 +75,8 @@ export function renderInitTranscript(
     "Configuration docs:",
     "  https://github.com/voratiq/voratiq/tree/main/docs/configs",
   ]);
-  sections.push([buildWorkspaceInitializedSection(mode)]);
-  if (mode === "repair") {
-    sections.push(["Sync managed config:", "  voratiq sync"]);
-  } else {
-    sections.push(["Run end-to-end:", '  voratiq auto --description "<task>"']);
-  }
+  sections.push([buildWorkspaceInitializedSection()]);
+  sections.push(["Run end-to-end:", '  voratiq auto --description "<task>"']);
 
   return renderTranscript({ sections });
 }
@@ -109,13 +103,8 @@ function buildConfigurationSummaryTable(paths: {
   });
 }
 
-function buildWorkspaceInitializedSection(
-  mode: InitCommandResult["mode"],
-): string {
-  return colorize(
-    mode === "repair" ? "Voratiq workspace repaired." : "Voratiq initialized.",
-    "green",
-  );
+function buildWorkspaceInitializedSection(): string {
+  return colorize("Voratiq initialized.", "green");
 }
 
 interface ConditionalInitNoteOptions {

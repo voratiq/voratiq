@@ -107,11 +107,13 @@ describe("renderInitTranscript", () => {
       syncRecommended: true,
     });
 
-    expect(output).toContain("Repairing workspace…");
-    expect(output).toContain(colorize("Voratiq workspace repaired.", "green"));
-    expect(output).toContain("Sync managed config:");
+    expect(output).toContain("Configuring workspace…");
+    expect(output).toContain(colorize("Voratiq initialized.", "green"));
+    expect(output).toContain(
+      "Workspace already exists. `voratiq init` repaired missing structure only.",
+    );
     expect(output).toContain("voratiq sync");
-    expect(output).not.toContain('voratiq auto --description "<task>"');
+    expect(output).toContain('voratiq auto --description "<task>"');
   });
 
   it("renders no-supported-provider note when no supported CLIs are detected", () => {
