@@ -262,6 +262,46 @@ async function terminateActiveSessionsSafe(
   return errors[0] ?? null;
 }
 
+function renderRootLauncherGitGuidance(options: {
+  cwd: string;
+  reason: "no_repository" | "not_repository_root";
+  repositoryRoot?: string;
+}): string {
+  const lines: string[] = [];
+
+  if (options.reason === "not_repository_root") {
+    lines.push(
+      "Bare `voratiq` launches an interactive session from a repository root.",
+      "",
+      `Current directory: ${options.cwd}`,
+    );
+    if (options.repositoryRoot) {
+      lines.push(`Repository root: ${options.repositoryRoot}`);
+    }
+    lines.push(
+      "",
+      "Next step:",
+      options.repositoryRoot
+        ? `  cd ${options.repositoryRoot} && voratiq`
+        : "  Switch to the repository root and rerun `voratiq`.",
+    );
+    return lines.join("\n");
+  }
+
+  lines.push(
+    "Bare `voratiq` launches an interactive session from a git repository root.",
+    "",
+    `Current directory: ${options.cwd}`,
+    "",
+    "Next steps:",
+    "  git init",
+    "  voratiq",
+    "",
+    "Or switch to an existing repository root and rerun `voratiq`.",
+  );
+  return lines.join("\n");
+}
+
 export async function runCli(
   argv: readonly string[] = process.argv,
 ): Promise<void> {
@@ -362,7 +402,13 @@ export async function runCli(
             error.reason === "not_repository_root")
         ) {
           const { writeCommandOutput } = await import("./cli/output.js");
-          writeCommandOutput({ body: program.helpInformation() });
+          writeCommandOutput({
+            body: renderRootLauncherGitGuidance({
+              cwd: process.cwd(),
+              reason: error.reason,
+              repositoryRoot: error.repositoryRoot,
+            }),
+          });
           return;
         }
         const { toCliError } = await import("./cli/errors.js");

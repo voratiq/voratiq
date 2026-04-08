@@ -35,8 +35,9 @@ export async function assertGitRepository(root: string): Promise<void> {
     if (repoRoot !== null) {
       // We're in a repo but not at the root
       throw new GitRepositoryError(
-        "Run `voratiq init` from the repository root.",
+        "Run `voratiq` from the repository root.",
         "not_repository_root",
+        repoRoot,
       );
     }
     // No git repository exists at all

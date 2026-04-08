@@ -198,7 +198,7 @@ describe("CLI Context", () => {
 
       await expect(resolveCliContext()).rejects.toThrow(GitRepositoryError);
       await expect(resolveCliContext()).rejects.toThrow(
-        "Run `voratiq init` from the repository root.",
+        "Run `voratiq` from the repository root.",
       );
     });
 
