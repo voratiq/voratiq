@@ -186,6 +186,174 @@ describe("preserveProviderChatTranscripts", () => {
     expect(contents).not.toContain('"step":"stale"');
   });
 
+  it("captures only the Codex transcript whose session metadata matches the interactive cwd", async () => {
+    const agentRoot = await mkdtemp(join(tmpdir(), TEMP_PREFIX));
+    const homeRoot = await mkdtemp(join(tmpdir(), `${TEMP_PREFIX}home-`));
+    tempRoots.push(agentRoot, homeRoot);
+
+    const codexSessionsDir = join(homeRoot, ".codex", "sessions", "2026-04-08");
+    await mkdir(codexSessionsDir, { recursive: true });
+
+    const launchedAt = "2026-04-08T00:21:42.485Z";
+    const targetCwd = "/Users/qa/Documents/voratiq-isolation-repro-localfix-3";
+    const otherCwd = "/Users/qa/Documents/New project";
+
+    const wrongTranscript = join(codexSessionsDir, "wrong.jsonl");
+    await writeFile(
+      wrongTranscript,
+      [
+        JSON.stringify({
+          type: "session_meta",
+          payload: {
+            payload: {
+              cwd: otherCwd,
+              timestamp: "2026-04-08T00:21:50.000Z",
+            },
+          },
+        }),
+        JSON.stringify({ type: "message", payload: { text: "wrong" } }),
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const matchingTranscript = join(codexSessionsDir, "matching.jsonl");
+    await writeFile(
+      matchingTranscript,
+      [
+        JSON.stringify({
+          type: "session_meta",
+          payload: {
+            payload: {
+              cwd: targetCwd,
+              timestamp: "2026-04-08T00:21:50.000Z",
+            },
+          },
+        }),
+        JSON.stringify({ type: "message", payload: { text: "matching" } }),
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = await preserveProviderChatTranscripts({
+      providerId: "codex",
+      agentRoot,
+      searchEnv: { HOME: homeRoot },
+      selectionHint: {
+        strategy: "codex-session-meta",
+        cwd: targetCwd,
+        minStartedAt: launchedAt,
+      },
+    });
+
+    expect(result.status).toBe("captured");
+    expect(result.format).toBe("jsonl");
+    expect(result.sourceCount).toBe(1);
+
+    const artifactPath = join(agentRoot, "artifacts", "chat.jsonl");
+    const contents = await readFile(artifactPath, "utf8");
+    expect(contents).toContain('"text":"matching"');
+    expect(contents).not.toContain('"text":"wrong"');
+  });
+
+  it("captures Codex transcripts when session metadata uses the direct payload shape emitted by the CLI", async () => {
+    const agentRoot = await mkdtemp(join(tmpdir(), TEMP_PREFIX));
+    const homeRoot = await mkdtemp(join(tmpdir(), `${TEMP_PREFIX}home-`));
+    tempRoots.push(agentRoot, homeRoot);
+
+    const codexSessionsDir = join(homeRoot, ".codex", "sessions", "2026-04-08");
+    await mkdir(codexSessionsDir, { recursive: true });
+
+    const targetCwd = "/Users/qa/Documents/voratiq-followup/voratiq";
+    const transcript = join(codexSessionsDir, "matching-flat-payload.jsonl");
+    await writeFile(
+      transcript,
+      [
+        JSON.stringify({
+          type: "session_meta",
+          payload: {
+            cwd: targetCwd,
+            timestamp: "2026-04-08T03:44:10.645Z",
+          },
+        }),
+        JSON.stringify({ type: "message", payload: { text: "matching-flat" } }),
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = await preserveProviderChatTranscripts({
+      providerId: "codex",
+      agentRoot,
+      searchEnv: { HOME: homeRoot },
+      selectionHint: {
+        strategy: "codex-session-meta",
+        cwd: targetCwd,
+        minStartedAt: "2026-04-08T03:44:09.399Z",
+      },
+    });
+
+    expect(result.status).toBe("captured");
+    expect(result.format).toBe("jsonl");
+    expect(result.sourceCount).toBe(1);
+
+    const artifactPath = join(agentRoot, "artifacts", "chat.jsonl");
+    const contents = await readFile(artifactPath, "utf8");
+    expect(contents).toContain('"text":"matching-flat"');
+  });
+
+  it("refuses Codex transcript capture when multiple fresh transcripts match the same interactive cwd", async () => {
+    const agentRoot = await mkdtemp(join(tmpdir(), TEMP_PREFIX));
+    const homeRoot = await mkdtemp(join(tmpdir(), `${TEMP_PREFIX}home-`));
+    tempRoots.push(agentRoot, homeRoot);
+
+    const codexSessionsDir = join(homeRoot, ".codex", "sessions", "2026-04-08");
+    await mkdir(codexSessionsDir, { recursive: true });
+
+    const targetCwd = "/Users/qa/Documents/voratiq-isolation-repro-localfix-3";
+
+    for (const name of ["one", "two"]) {
+      await writeFile(
+        join(codexSessionsDir, `${name}.jsonl`),
+        [
+          JSON.stringify({
+            type: "session_meta",
+            payload: {
+              payload: {
+                cwd: targetCwd,
+                timestamp: "2026-04-08T00:21:50.000Z",
+              },
+            },
+          }),
+          JSON.stringify({ type: "message", payload: { text: name } }),
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+    }
+
+    const result = await preserveProviderChatTranscripts({
+      providerId: "codex",
+      agentRoot,
+      searchEnv: { HOME: homeRoot },
+      selectionHint: {
+        strategy: "codex-session-meta",
+        cwd: targetCwd,
+        minStartedAt: "2026-04-08T00:21:42.485Z",
+      },
+    });
+
+    expect(result.status).toBe("error");
+    expect(result.error).toBeInstanceOf(Error);
+    expect((result.error as Error).message).toContain(
+      "Ambiguous Codex transcript provenance",
+    );
+    await expect(
+      pathExists(join(agentRoot, "artifacts", "chat.jsonl")),
+    ).resolves.toBe(false);
+  });
+
   it("captures only new Claude transcripts from a concrete ambient provider home", async () => {
     const agentRoot = await mkdtemp(join(tmpdir(), TEMP_PREFIX));
     const homeRoot = await mkdtemp(join(tmpdir(), `${TEMP_PREFIX}home-`));

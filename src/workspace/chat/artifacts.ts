@@ -32,6 +32,7 @@ export interface PreserveChatArtifactsOptions {
   agentRoot: string;
   searchEnv?: NodeJS.ProcessEnv;
   baseline?: ProviderTranscriptBaseline;
+  selectionHint?: ProviderTranscriptSelectionHint;
 }
 
 export interface ProviderTranscriptSnapshotEntry {
@@ -42,6 +43,14 @@ export interface ProviderTranscriptSnapshotEntry {
 
 export type ProviderTranscriptBaseline =
   readonly ProviderTranscriptSnapshotEntry[];
+
+export interface CodexSessionMetaSelectionHint {
+  strategy: "codex-session-meta";
+  cwd: string;
+  minStartedAt?: string;
+}
+
+export type ProviderTranscriptSelectionHint = CodexSessionMetaSelectionHint;
 
 export async function snapshotProviderTranscripts(
   options: Omit<PreserveChatArtifactsOptions, "baseline">,
@@ -90,8 +99,19 @@ export async function preserveProviderChatTranscripts(
   const existing: { path: string; format: ChatArtifactFormat } | undefined =
     await locateExistingChatArtifact(agentRoot);
 
-  const selection: TranscriptSelection | undefined =
-    selectTranscriptFiles(candidatePaths);
+  let selection: TranscriptSelection | undefined;
+  try {
+    selection = await selectTranscriptFiles({
+      providerId,
+      transcriptPaths: candidatePaths,
+      selectionHint: options.selectionHint,
+    });
+  } catch (error) {
+    return {
+      status: "error",
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+  }
   if (!selection) {
     if (existing !== undefined) {
       return {
@@ -164,14 +184,27 @@ interface TranscriptSelection {
   files: readonly string[];
 }
 
-function selectTranscriptFiles(
-  transcriptPaths: readonly string[],
-): TranscriptSelection | undefined {
+async function selectTranscriptFiles(options: {
+  providerId: string;
+  transcriptPaths: readonly string[];
+  selectionHint?: ProviderTranscriptSelectionHint;
+}): Promise<TranscriptSelection | undefined> {
+  const { providerId, transcriptPaths, selectionHint } = options;
   const jsonlFiles = transcriptPaths.filter((path) =>
     path.toLowerCase().endsWith(".jsonl"),
   );
   if (jsonlFiles.length > 0) {
-    return { format: "jsonl", files: [...jsonlFiles].sort() };
+    const selectedJsonlFiles = await filterJsonlTranscriptFilesByHint({
+      providerId,
+      files: jsonlFiles,
+      selectionHint,
+    });
+    if (selectedJsonlFiles.length > 0) {
+      return { format: "jsonl", files: selectedJsonlFiles };
+    }
+    if (selectionHint) {
+      return undefined;
+    }
   }
 
   const jsonFiles = transcriptPaths
@@ -179,6 +212,109 @@ function selectTranscriptFiles(
     .sort();
   if (jsonFiles.length > 0) {
     return { format: "json", files: jsonFiles };
+  }
+
+  return undefined;
+}
+
+async function filterJsonlTranscriptFilesByHint(options: {
+  providerId: string;
+  files: readonly string[];
+  selectionHint?: ProviderTranscriptSelectionHint;
+}): Promise<readonly string[]> {
+  const sortedFiles = [...options.files].sort();
+  const hint = options.selectionHint;
+  if (!hint) {
+    return sortedFiles;
+  }
+
+  if (
+    options.providerId !== "codex" ||
+    hint.strategy !== "codex-session-meta"
+  ) {
+    return sortedFiles;
+  }
+
+  const matchingFiles: string[] = [];
+  for (const file of sortedFiles) {
+    const metadata = await readCodexSessionMetadata(file);
+    if (!metadata) {
+      continue;
+    }
+    if (metadata.cwd !== hint.cwd) {
+      continue;
+    }
+    if (
+      hint.minStartedAt &&
+      metadata.startedAt &&
+      metadata.startedAt < hint.minStartedAt
+    ) {
+      continue;
+    }
+    matchingFiles.push(file);
+  }
+
+  if (matchingFiles.length === 1) {
+    return matchingFiles;
+  }
+  if (matchingFiles.length > 1) {
+    throw new Error(
+      `Ambiguous Codex transcript provenance for cwd \`${hint.cwd}\`: ${matchingFiles.join(", ")}`,
+    );
+  }
+  return [];
+}
+
+interface CodexSessionMetadata {
+  cwd?: string;
+  startedAt?: string;
+}
+
+async function readCodexSessionMetadata(
+  path: string,
+): Promise<CodexSessionMetadata | undefined> {
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch {
+    return undefined;
+  }
+
+  const lines = raw.split(/\r?\n/u);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed) as unknown;
+    } catch {
+      continue;
+    }
+
+    const record = parsed as {
+      type?: unknown;
+      payload?: {
+        cwd?: unknown;
+        timestamp?: unknown;
+        payload?: {
+          cwd?: unknown;
+          timestamp?: unknown;
+        };
+      };
+    };
+    if (record.type !== "session_meta") {
+      continue;
+    }
+
+    const payload = record.payload?.payload ?? record.payload;
+    return {
+      cwd: typeof payload?.cwd === "string" ? payload.cwd : undefined,
+      startedAt:
+        typeof payload?.timestamp === "string" ? payload.timestamp : undefined,
+    };
   }
 
   return undefined;

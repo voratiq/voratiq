@@ -22,6 +22,7 @@ import {
 import { collectProviderArtifacts } from "../../src/agents/launch/chat.js";
 import {
   finalizeActiveInteractive,
+  getActiveInteractiveTerminationStatus,
   registerActiveInteractive,
 } from "../../src/commands/interactive/lifecycle.js";
 import { FIRST_PARTY_ATTACHED_LAUNCH_PROMPT } from "../../src/domain/interactive/prompt.js";
@@ -38,11 +39,15 @@ jest.mock("../../src/agents/launch/chat.js", () => ({
 jest.mock("../../src/commands/interactive/lifecycle.js", () => ({
   clearActiveInteractive: jest.fn(),
   finalizeActiveInteractive: jest.fn(() => Promise.resolve()),
+  getActiveInteractiveTerminationStatus: jest.fn(),
   registerActiveInteractive: jest.fn(),
 }));
 
 const collectProviderArtifactsMock = jest.mocked(collectProviderArtifacts);
 const finalizeActiveInteractiveMock = jest.mocked(finalizeActiveInteractive);
+const getActiveInteractiveTerminationStatusMock = jest.mocked(
+  getActiveInteractiveTerminationStatus,
+);
 const registerActiveInteractiveMock = jest.mocked(registerActiveInteractive);
 
 const tempRoots: string[] = [];
@@ -51,6 +56,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   collectProviderArtifactsMock.mockResolvedValue({ captured: false });
   finalizeActiveInteractiveMock.mockResolvedValue(undefined);
+  getActiveInteractiveTerminationStatusMock.mockReturnValue(undefined);
 });
 
 afterEach(async () => {
@@ -549,6 +555,85 @@ describe("interactive native launch substrate", () => {
     });
     await expect(access(prepared.prepared.runtimePath)).rejects.toMatchObject({
       code: "ENOENT",
+    });
+  });
+
+  it("treats signal-terminated providers as succeeded when interactive teardown was user-aborted", async () => {
+    const fixture = await createWorkspaceFixture();
+    const sessionId = "20260401-120003-abortsig";
+    await writeFile(
+      fixture.binaryPath,
+      ["#!/usr/bin/env bash", "kill -TERM $$", ""].join("\n"),
+      "utf8",
+    );
+    await chmod(fixture.binaryPath, 0o755);
+
+    const prepared = await prepareNativeInteractiveSession({
+      root: fixture.root,
+      agentId: "codex-test",
+      sessionId,
+    });
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) {
+      return;
+    }
+
+    getActiveInteractiveTerminationStatusMock.mockReturnValue("aborted");
+
+    const launch = await spawnPreparedInteractiveSession(prepared.prepared, {
+      stdio: "ignore",
+    });
+    expect(launch.ok).toBe(true);
+    if (!launch.ok) {
+      return;
+    }
+
+    const completed = await launch.completion;
+    expect(completed.status).toBe("succeeded");
+    expect(completed.error).toBeUndefined();
+
+    const storedRecord = await readJson(prepared.prepared.recordPath);
+    expect(storedRecord).toMatchObject({
+      sessionId,
+      status: "succeeded",
+    });
+  });
+
+  it("keeps signal-terminated providers failed when teardown was not user-aborted", async () => {
+    const fixture = await createWorkspaceFixture();
+    const sessionId = "20260401-120003-failsig";
+    await writeFile(
+      fixture.binaryPath,
+      ["#!/usr/bin/env bash", "kill -TERM $$", ""].join("\n"),
+      "utf8",
+    );
+    await chmod(fixture.binaryPath, 0o755);
+
+    const prepared = await prepareNativeInteractiveSession({
+      root: fixture.root,
+      agentId: "codex-test",
+      sessionId,
+    });
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) {
+      return;
+    }
+
+    getActiveInteractiveTerminationStatusMock.mockReturnValue("failed");
+
+    const launch = await spawnPreparedInteractiveSession(prepared.prepared, {
+      stdio: "ignore",
+    });
+    expect(launch.ok).toBe(true);
+    if (!launch.ok) {
+      return;
+    }
+
+    const completed = await launch.completion;
+    expect(completed.status).toBe("failed");
+    expect(completed.error).toMatchObject({
+      code: "provider_launch_failed",
+      message: "Provider process terminated by signal SIGTERM",
     });
   });
 

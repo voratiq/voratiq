@@ -13,6 +13,7 @@ import { resolveAgentProviderForDefinition } from "../agents/launch/provider-sta
 import {
   clearActiveInteractive,
   finalizeActiveInteractive,
+  getActiveInteractiveTerminationStatus,
   registerActiveInteractive,
 } from "../commands/interactive/lifecycle.js";
 import {
@@ -293,6 +294,14 @@ export async function prepareNativeInteractiveSession(
         providerId,
         sessionRoot: paths.sessionRoot,
         searchEnv: invocationEnv,
+        selectionHint:
+          providerId === "codex"
+            ? {
+                strategy: "codex-session-meta",
+                cwd: cwd.path,
+                minStartedAt: createdAt,
+              }
+            : undefined,
       });
     } catch {
       artifactCaptureContext = undefined;
@@ -468,9 +477,14 @@ function createProcessCompletionPromise(
       }
       finalized = true;
 
+      const terminationStatus = getActiveInteractiveTerminationStatus(
+        prepared.sessionId,
+      );
+      const signalCountsAsSuccess =
+        terminationStatus === "aborted" && options.signal !== null;
       const runtimeFailureMessage = options.spawnError
         ? `Failed during provider execution: ${options.spawnError.message}`
-        : options.signal
+        : options.signal && !signalCountsAsSuccess
           ? `Provider process terminated by signal ${options.signal}`
           : options.exitCode && options.exitCode !== 0
             ? `Provider process exited with code ${options.exitCode}`
