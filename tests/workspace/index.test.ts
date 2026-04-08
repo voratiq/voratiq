@@ -12,7 +12,10 @@ import {
   createWorkspace,
   validateWorkspace,
 } from "../../src/workspace/setup.js";
-import { resolveWorkspacePath } from "../../src/workspace/structure.js";
+import {
+  resolveWorkspacePath,
+  VORATIQ_MANAGED_STATE_FILE,
+} from "../../src/workspace/structure.js";
 import type { CreateWorkspaceResult } from "../../src/workspace/types.js";
 
 async function createTempRepo(): Promise<string> {
@@ -109,6 +112,7 @@ describe("workspace bootstrap", () => {
         normalizeForAssertion(join(".voratiq", "environment.yaml")),
         normalizeForAssertion(join(".voratiq", "sandbox.yaml")),
         normalizeForAssertion(join(".voratiq", "orchestration.yaml")),
+        normalizeForAssertion(join(".voratiq", VORATIQ_MANAGED_STATE_FILE)),
       ]),
     );
     expect(
@@ -130,6 +134,28 @@ describe("workspace bootstrap", () => {
     ]);
 
     await expect(validateWorkspace(repoRoot)).resolves.toBeUndefined();
+  });
+
+  it("seeds managed-state metadata when bootstrap creates managed config", async () => {
+    await createWorkspace(repoRoot);
+
+    const managedStatePath = resolveWorkspacePath(
+      repoRoot,
+      VORATIQ_MANAGED_STATE_FILE,
+    );
+    const content = JSON.parse(await readFile(managedStatePath, "utf8")) as {
+      version: number;
+      configs: {
+        agents?: { fingerprint: string; managedEntriesFingerprint: string };
+        orchestration?: { fingerprint: string; preset: string };
+      };
+    };
+
+    expect(content.version).toBe(1);
+    expect(content.configs.agents?.fingerprint).toBeTruthy();
+    expect(content.configs.agents?.managedEntriesFingerprint).toBeTruthy();
+    expect(content.configs.orchestration?.fingerprint).toBeTruthy();
+    expect(content.configs.orchestration?.preset).toBe("pro");
   });
 
   it("seeds local git excludes for volatile .voratiq runtime state", async () => {

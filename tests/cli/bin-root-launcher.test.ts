@@ -104,19 +104,23 @@ describe("CLI root launcher wiring", () => {
     await runCli(["node", "voratiq"]);
 
     expect(stdout.join("")).toContain(
-      "Agent ensembles to design, generate, and select the best code for every task.",
+      "Bare `voratiq` launches an interactive session from a git repository root.",
     );
-    expect(stdout.join("")).not.toContain("No git repository found.");
+    expect(stdout.join("")).toContain("Current directory:");
+    expect(stdout.join("")).toContain("Next steps:");
+    expect(stdout.join("")).toContain("git init");
+    expect(stdout.join("")).toContain("voratiq");
     expect(stderr.join("")).toHaveLength(0);
     expect(process.exitCode).toBeUndefined();
   });
 
-  it("falls back to help when bare voratiq is used from a repo subdirectory", async () => {
+  it("prints an explicit repo-root recovery path when bare voratiq is used from a repo subdirectory", async () => {
     shouldStartRootLauncherMock.mockReturnValue(true);
     runInteractiveRootLauncherMock.mockRejectedValue(
       new GitRepositoryError(
-        "Run `voratiq init` from the repository root.",
+        "Run `voratiq` from the repository root.",
         "not_repository_root",
+        "/repo",
       ),
     );
 
@@ -139,11 +143,11 @@ describe("CLI root launcher wiring", () => {
     await runCli(["node", "voratiq"]);
 
     expect(stdout.join("")).toContain(
-      "Agent ensembles to design, generate, and select the best code for every task.",
+      "Bare `voratiq` launches an interactive session from a repository root.",
     );
-    expect(stdout.join("")).not.toContain(
-      "Run `voratiq init` from the repository root.",
-    );
+    expect(stdout.join("")).toContain("Current directory:");
+    expect(stdout.join("")).toContain("Repository root: /repo");
+    expect(stdout.join("")).toContain("cd /repo && voratiq");
     expect(stderr.join("")).toHaveLength(0);
     expect(process.exitCode).toBeUndefined();
   });

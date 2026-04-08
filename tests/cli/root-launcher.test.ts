@@ -106,9 +106,6 @@ describe("root interactive launcher", () => {
       "Using agent: codex-main (codex / gpt-5.4)",
     );
     expect(output.text()).toContain(
-      "claude-blocked (claude / claude-opus-4-6): binary `/usr/local/bin/claude` is not executable (ENOENT)",
-    );
-    expect(output.text()).toContain(
       "Launching codex-main (codex / gpt-5.4)...",
     );
   });
@@ -171,6 +168,12 @@ describe("root interactive launcher", () => {
     expect(prompt).toHaveBeenNthCalledWith(1, {
       message: "[1-2]",
       prefaceLines: undefined,
+    });
+    expect(output.payloads()[0]).toMatchObject({
+      body: expect.stringContaining(
+        "Start a native agent session from this repository.",
+      ),
+      leadingNewline: false,
     });
     expect(prompt).toHaveBeenNthCalledWith(2, {
       message: "[1-2]",
@@ -370,6 +373,18 @@ describe("root interactive launcher", () => {
     expect(resolveContext.mock.calls[0]?.[0]).toEqual({
       requireWorkspace: true,
       workspaceAutoInitMode: "when-missing",
+    });
+    expect(output.payloads()[0]).toMatchObject({
+      alerts: [
+        { severity: "info", message: "Voratiq initialized (.voratiq/)." },
+      ],
+      leadingNewline: true,
+    });
+    expect(output.payloads()[1]).toMatchObject({
+      body: expect.stringContaining(
+        "Start a native agent session from this repository.",
+      ),
+      leadingNewline: false,
     });
     expect(output.text()).toContain("Voratiq initialized (.voratiq/).");
   });

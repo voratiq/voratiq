@@ -4,13 +4,15 @@ import { colorize } from "../../src/utils/colors.js";
 
 describe("renderInitTranscript", () => {
   const noSupportedCliNote =
-    "No agent CLIs detected on PATH. Install providers, then update `agents.yaml`.";
+    "No agent CLIs detected on PATH. Install providers, then run `voratiq sync`.";
   const manualPresetNote =
     "Manual preset leaves stages empty. Add agents to `orchestration.yaml`.";
   const partialPresetNote =
-    "Some providers not found on PATH. Only detected providers were configured. Install missing ones, then update `agents.yaml`.";
+    "Some providers not found on PATH. Only detected providers were configured. Install missing ones, then run `voratiq sync`.";
 
   const baseResult: InitCommandResult = {
+    mode: "bootstrap",
+    syncRecommended: false,
     preset: "pro",
     workspaceResult: {
       createdDirectories: [],
@@ -29,6 +31,7 @@ describe("renderInitTranscript", () => {
       providerEnablementPrompted: true,
       configCreated: false,
       configUpdated: true,
+      managed: true,
     },
     orchestrationSummary: {
       configPath: ".voratiq/orchestration.yaml",
@@ -95,6 +98,22 @@ describe("renderInitTranscript", () => {
     expect(normalizedIncludes(output, noSupportedCliNote)).toBe(false);
     expect(normalizedIncludes(output, manualPresetNote)).toBe(false);
     expect(normalizedIncludes(output, partialPresetNote)).toBe(false);
+  });
+
+  it("renders repair guidance that points users to sync", () => {
+    const output = renderInitTranscript({
+      ...baseResult,
+      mode: "repair",
+      syncRecommended: true,
+    });
+
+    expect(output).toContain("Configuring workspace…");
+    expect(output).toContain(colorize("Voratiq initialized.", "green"));
+    expect(output).toContain(
+      "Workspace already exists. `voratiq init` repaired missing structure only.",
+    );
+    expect(output).toContain("voratiq sync");
+    expect(output).toContain('voratiq auto --description "<task>"');
   });
 
   it("renders no-supported-provider note when no supported CLIs are detected", () => {

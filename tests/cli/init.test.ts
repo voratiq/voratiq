@@ -34,6 +34,8 @@ describe("voratiq init (cli)", () => {
       },
     });
     executeInitCommandMock.mockResolvedValue({
+      mode: "bootstrap",
+      syncRecommended: false,
       preset: "pro",
       workspaceResult: { createdDirectories: [], createdFiles: [] },
       agentSummary: {
@@ -45,6 +47,7 @@ describe("voratiq init (cli)", () => {
         providerEnablementPrompted: false,
         configCreated: false,
         configUpdated: false,
+        managed: true,
       },
       orchestrationSummary: {
         configPath: ".voratiq/orchestration.yaml",
@@ -89,6 +92,8 @@ describe("voratiq init (cli)", () => {
     executeInitCommandMock.mockImplementation((input) => {
       input.onPresetResolved?.("lite");
       const result: InitCommandResult = {
+        mode: "bootstrap",
+        syncRecommended: false,
         preset: "lite",
         workspaceResult: { createdDirectories: [], createdFiles: [] },
         agentSummary: {
@@ -100,6 +105,7 @@ describe("voratiq init (cli)", () => {
           providerEnablementPrompted: false,
           configCreated: false,
           configUpdated: false,
+          managed: true,
         },
         orchestrationSummary: {
           configPath: ".voratiq/orchestration.yaml",

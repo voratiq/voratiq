@@ -13,6 +13,7 @@ export function renderRootLauncherSelectionScreen(options: {
   launchable: readonly RootLauncherAvailableAgentLine[];
   unavailable: readonly RootLauncherUnavailableAgentLine[];
 }): string {
+  void options.unavailable;
   const lines = [
     "Start a native agent session from this repository.",
     "",
@@ -22,13 +23,6 @@ export function renderRootLauncherSelectionScreen(options: {
     ),
   ];
 
-  if (options.unavailable.length > 0) {
-    lines.push("", "Unavailable enabled agents:");
-    for (const agent of options.unavailable) {
-      lines.push(`  - ${agent.label}: ${agent.reasons.join("; ")}`);
-    }
-  }
-
   lines.push("", "Choose one agent to launch.");
   return lines.join("\n");
 }
@@ -37,14 +31,8 @@ export function renderRootLauncherSingleAgentScreen(options: {
   selected: string;
   unavailable: readonly RootLauncherUnavailableAgentLine[];
 }): string {
+  void options.unavailable;
   const lines = ["Start a native agent session from this repository.", ""];
-
-  if (options.unavailable.length > 0) {
-    lines.push("", "Unavailable enabled agents:");
-    for (const agent of options.unavailable) {
-      lines.push(`  - ${agent.label}: ${agent.reasons.join("; ")}`);
-    }
-  }
 
   lines.push(`Using agent: ${options.selected}`);
   return lines.join("\n");

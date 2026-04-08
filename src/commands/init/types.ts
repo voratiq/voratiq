@@ -18,6 +18,8 @@ export interface InitCommandInput {
 }
 
 export interface InitCommandResult {
+  mode: "bootstrap" | "repair";
+  syncRecommended: boolean;
   preset: AgentPreset;
   workspaceResult: CreateWorkspaceResult;
   agentSummary: AgentInitSummary;
@@ -35,6 +37,7 @@ export interface AgentInitSummary {
   providerEnablementPrompted: boolean;
   configCreated: boolean;
   configUpdated: boolean;
+  managed: boolean;
 }
 
 export interface DetectedProviderSummary {
@@ -58,6 +61,7 @@ export interface SandboxInitSummary {
 export interface OrchestrationInitSummary {
   configPath: string;
   configCreated: boolean;
+  configUpdated?: boolean;
 }
 
 export type InitConfirmationHandler = (

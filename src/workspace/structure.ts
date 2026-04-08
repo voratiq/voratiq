@@ -33,6 +33,7 @@ export const VORATIQ_VERIFICATION_CONFIG_FILE = "verification.yaml";
 export const VORATIQ_ENVIRONMENT_FILE = "environment.yaml";
 export const VORATIQ_SANDBOX_FILE = "sandbox.yaml";
 export const VORATIQ_ORCHESTRATION_FILE = "orchestration.yaml";
+export const VORATIQ_MANAGED_STATE_FILE = "managed-state.json";
 
 export const WORKSPACE_DIRNAME = "workspace";
 export const CONTEXT_DIRNAME = "context";

@@ -258,6 +258,34 @@ describe("interactive providers", () => {
     expect(mcpCommandRunner).toHaveBeenCalledTimes(1);
   });
 
+  it("accepts equivalent codex MCP entries that use a different node binary path", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "voratiq-interactive-providers-"),
+    );
+    tempRoots.push(root);
+    const mcpCommandRunner = jest.fn<ProviderMcpCommandRunner>(() =>
+      Promise.resolve({
+        exitCode: 0,
+        stdout: JSON.stringify({
+          name: "voratiq",
+          command: "/Users/qa/.volta/tools/image/node/24.14.1/bin/node",
+          args: ["/repo/dist/bin.js", "mcp", "--stdio"],
+        }),
+        stderr: "",
+      }),
+    );
+
+    const result = await resolveFirstPartyMcpStatus({
+      providerId: "codex",
+      root,
+      toolDeclarations: [buildTool("voratiq", "/usr/local/bin/node")],
+      mcpCommandRunner,
+    });
+
+    expect(result.toolAttachmentStatus).toBe("attached");
+    expect(mcpCommandRunner).toHaveBeenCalledTimes(1);
+  });
+
   it("fails when an effective claude MCP entry conflicts with the expected command", async () => {
     const root = await mkdtemp(
       join(tmpdir(), "voratiq-interactive-providers-"),
@@ -788,10 +816,10 @@ describe("interactive providers", () => {
   });
 });
 
-function buildTool(name: string): NativeToolDeclaration {
+function buildTool(name: string, command = "node"): NativeToolDeclaration {
   return {
     name,
-    command: "node",
+    command,
     args: ["/repo/dist/bin.js", "mcp", "--stdio"],
   };
 }

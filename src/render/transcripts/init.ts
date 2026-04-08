@@ -33,6 +33,8 @@ interface RenderInitTranscriptOptions {
 
 export function renderInitTranscript(
   {
+    mode,
+    syncRecommended,
     preset,
     agentSummary,
     orchestrationSummary,
@@ -57,6 +59,8 @@ export function renderInitTranscript(
     }),
   );
   const conditionalNote = resolveConditionalInitNote({
+    mode,
+    syncRecommended,
     preset,
     agentSummary,
   });
@@ -104,16 +108,24 @@ function buildWorkspaceInitializedSection(): string {
 }
 
 interface ConditionalInitNoteOptions {
+  mode: InitCommandResult["mode"];
+  syncRecommended: boolean;
   preset: InitCommandResult["preset"];
   agentSummary: InitCommandResult["agentSummary"];
 }
 
 function resolveConditionalInitNote({
+  mode,
+  syncRecommended,
   preset,
   agentSummary,
 }: ConditionalInitNoteOptions): string | undefined {
+  if (mode === "repair" || syncRecommended) {
+    return "Workspace already exists. `voratiq init` repaired missing structure only. Run `voratiq sync` to rescan providers and reconcile managed config.";
+  }
+
   if (agentSummary.zeroDetections) {
-    return "No agent CLIs detected on PATH. Install providers, then update `agents.yaml`.";
+    return "No agent CLIs detected on PATH. Install providers, then run `voratiq sync`.";
   }
 
   if (preset === "manual") {
@@ -130,7 +142,7 @@ function resolveConditionalInitNote({
   );
   for (const presetProvider of presetProviders) {
     if (!detectedProviders.has(presetProvider)) {
-      return "Some providers not found on PATH. Only detected providers were configured. Install missing ones, then update `agents.yaml`.";
+      return "Some providers not found on PATH. Only detected providers were configured. Install missing ones, then run `voratiq sync`.";
     }
   }
 

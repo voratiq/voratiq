@@ -11,8 +11,12 @@ import { detectBinary } from "../../utils/binaries.js";
 import {
   isDefaultYamlTemplate,
   loadYamlConfig,
-  persistYamlConfig,
+  writeConfigIfChanged,
 } from "../../utils/yaml.js";
+import {
+  isManagedAgentsFingerprintMatch,
+  readManagedState,
+} from "../../workspace/managed-state.js";
 import {
   formatWorkspacePath,
   resolveWorkspacePath,
@@ -40,23 +44,50 @@ export async function configureAgents(
 ): Promise<AgentInitSummary> {
   void preset;
   void options;
-  const filePath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const defaultTemplate = buildDefaultAgentsTemplate();
 
+  return configureAgentsWithMode(root, defaultTemplate, "init");
+}
+
+export async function syncManagedAgents(
+  root: string,
+): Promise<AgentInitSummary> {
+  const defaultTemplate = buildDefaultAgentsTemplate();
+  return configureAgentsWithMode(root, defaultTemplate, "sync");
+}
+
+async function configureAgentsWithMode(
+  root: string,
+  defaultTemplate: string,
+  mode: "init" | "sync",
+): Promise<AgentInitSummary> {
+  const filePath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const loadResult = await loadYamlConfig(filePath, readAgentsConfig);
   const defaultStatus = isDefaultYamlTemplate(
     loadResult.snapshot,
     defaultTemplate,
   );
   const configCreated = !loadResult.snapshot.exists;
+  const managedState =
+    mode === "sync" ? await readManagedState(root) : undefined;
+  const managed =
+    mode === "sync"
+      ? !loadResult.snapshot.exists ||
+        isManagedAgentsFingerprintMatch(
+          managedState?.configs.agents,
+          loadResult.snapshot.content,
+        ) ||
+        defaultStatus
+      : defaultStatus;
+
   const lifecycle = scanWorkspaceForAgentDefaults(
     loadResult.config,
-    defaultStatus,
+    mode,
     getSupportedAgentDefaults(),
   );
   const detectedProviders = collectDetectedProviders(lifecycle.templates);
 
-  if (!defaultStatus && loadResult.snapshot.exists) {
+  if (!managed && loadResult.snapshot.exists) {
     return buildAgentSummary({
       entries: loadResult.config.agents,
       zeroDetections: detectedProviders.length === 0,
@@ -64,18 +95,19 @@ export async function configureAgents(
       providerEnablementPrompted: false,
       configCreated,
       configUpdated: false,
+      managed: false,
     });
   }
 
   const snapshotResult = finalizeAgentConfigSnapshot(lifecycle);
-
-  const updated = await persistYamlConfig({
+  const previousNormalized = loadResult.snapshot.exists
+    ? loadResult.snapshot.normalized
+    : "__missing__";
+  const updated = await writeConfigIfChanged(
     filePath,
-    serialized: snapshotResult.serialized,
-    original: loadResult.snapshot,
-    defaultTemplate,
-    isDefaultTemplate: defaultStatus,
-  });
+    snapshotResult.serialized,
+    previousNormalized,
+  );
 
   return buildAgentSummary({
     entries: snapshotResult.entries,
@@ -84,6 +116,7 @@ export async function configureAgents(
     providerEnablementPrompted: false,
     configCreated,
     configUpdated: updated,
+    managed: true,
   });
 }
 
@@ -102,7 +135,7 @@ interface AgentTemplateState {
 
 function scanWorkspaceForAgentDefaults(
   config: AgentsConfig,
-  isDefaultTemplate: boolean,
+  mode: "init" | "sync",
   templates: readonly VendorTemplate[],
 ): AgentLifecycleState {
   const templatesById = new Map<string, AgentConfigEntry>();
@@ -121,9 +154,7 @@ function scanWorkspaceForAgentDefaults(
   for (const { template, templateId } of templateEntries) {
     templateIds.add(templateId);
 
-    const existing = isDefaultTemplate
-      ? undefined
-      : templatesById.get(templateId);
+    const existing = templatesById.get(templateId);
     let detectedBinary = detectedBinaryByProvider.get(template.provider);
     if (!detectedBinaryByProvider.has(template.provider)) {
       detectedBinary = detectBinary(template.provider);
@@ -131,8 +162,13 @@ function scanWorkspaceForAgentDefaults(
     }
     const baseEntry = existing ?? buildEntryFromTemplate(template, templateId);
     const entry = cloneAgentEntry(baseEntry);
-    entry.binary = detectedBinary ?? "";
-    entry.enabled = entry.enabled !== false;
+    if (hasBinary(detectedBinary)) {
+      entry.binary = detectedBinary ?? "";
+      entry.enabled = true;
+    } else if (!existing || mode === "init") {
+      entry.binary = "";
+      entry.enabled = false;
+    }
 
     templateStates.push({
       templateId,
@@ -247,6 +283,7 @@ function buildAgentSummary(options: {
   providerEnablementPrompted: boolean;
   configCreated: boolean;
   configUpdated: boolean;
+  managed: boolean;
 }): AgentInitSummary {
   const {
     entries,
@@ -255,6 +292,7 @@ function buildAgentSummary(options: {
     providerEnablementPrompted,
     configCreated,
     configUpdated,
+    managed,
   } = options;
 
   const enabledAgents = entries
@@ -270,6 +308,7 @@ function buildAgentSummary(options: {
     providerEnablementPrompted,
     configCreated,
     configUpdated,
+    managed,
   };
 }
 

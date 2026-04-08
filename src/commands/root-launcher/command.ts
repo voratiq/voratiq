@@ -202,7 +202,9 @@ async function setupRootLauncher(options: {
   });
 
   if (context.workspaceAutoInitialized) {
-    writeLauncherNotice(writeOutput, renderWorkspaceAutoInitializedNotice());
+    writeLauncherNotice(writeOutput, renderWorkspaceAutoInitializedNotice(), {
+      leadingNewline: true,
+    });
   }
 
   const diagnostics = loadDiagnostics({ root: context.root });
@@ -286,7 +288,7 @@ async function promptForLaunchPlan(options: {
         });
 
   if (availability.launchable.length === 1) {
-    writeLauncherNotice(
+    writeLauncherScreen(
       writeOutput,
       renderRootLauncherSingleAgentScreen({
         selected: formatAgentLabel(selected.entry),
@@ -307,7 +309,7 @@ async function promptForAgentSelection(options: {
   writeOutput: CommandOutputWriter;
 }): Promise<LaunchableAgent> {
   const { launchable, unavailable, prompt, writeOutput } = options;
-  writeLauncherNotice(
+  writeLauncherScreen(
     writeOutput,
     renderRootLauncherSelectionScreen({
       launchable: launchable.map((agent) => ({
@@ -404,6 +406,16 @@ function writeLauncherNotice(
   writeOutput({
     alerts: [{ severity: "info", message: message.trimEnd() }],
     leadingNewline: options.leadingNewline ?? false,
+  });
+}
+
+function writeLauncherScreen(
+  writeOutput: CommandOutputWriter,
+  message: string,
+): void {
+  writeOutput({
+    body: message.trimEnd(),
+    leadingNewline: false,
   });
 }
 

@@ -29,6 +29,20 @@ const GEMINI_DEFAULT_ID = getDefaultAgentIdByProvider("gemini") ?? "gemini";
 const FULL_CATALOG_IDS = getSupportedAgentDefaults().map((entry) =>
   getAgentDefaultId(entry),
 );
+const ENABLED_IDS_BY_PROVIDER = new Map<string, string[]>(
+  ["claude", "codex", "gemini"].map((provider) => [
+    provider,
+    getSupportedAgentDefaults()
+      .filter((entry) => entry.provider === provider)
+      .map((entry) => getAgentDefaultId(entry)),
+  ]),
+);
+
+function enabledIdsForProviders(...providers: string[]): string[] {
+  return providers.flatMap(
+    (provider) => ENABLED_IDS_BY_PROVIDER.get(provider) ?? [],
+  );
+}
 describe("configureAgents", () => {
   let repoRoot: string;
   let originalPath: string | undefined;
@@ -72,6 +86,7 @@ describe("configureAgents", () => {
       providerEnablementPrompted: false,
       configCreated: false,
       configUpdated: false,
+      managed: false,
     });
 
     const updated = await readFile(configPath, "utf8");
@@ -143,7 +158,7 @@ describe("configureAgents", () => {
     expect(claude?.binary).toBe(detectedBinaries.claude);
     expect(codex?.enabled).toBe(true);
     expect(codex?.binary).toBe(detectedBinaries.codex);
-    expect(gemini?.enabled).toBe(true);
+    expect(gemini?.enabled).toBe(false);
     expect(gemini?.binary).toBe("");
     for (const entry of parsed.agents) {
       const expectedBinary =
@@ -151,12 +166,14 @@ describe("configureAgents", () => {
           ? detectedBinaries[entry.provider]
           : "";
       expect(entry.binary).toBe(expectedBinary);
-      expect(entry.enabled).toBe(true);
+      expect(entry.enabled).toBe(
+        entry.provider === "claude" || entry.provider === "codex",
+      );
     }
 
     expect(summary).toEqual({
       configPath: ".voratiq/agents.yaml",
-      enabledAgents: FULL_CATALOG_IDS,
+      enabledAgents: enabledIdsForProviders("claude", "codex"),
       agentCount: FULL_CATALOG_IDS.length,
       zeroDetections: false,
       detectedProviders: [
@@ -166,6 +183,7 @@ describe("configureAgents", () => {
       providerEnablementPrompted: false,
       configCreated: false,
       configUpdated: true,
+      managed: true,
     });
   });
 
@@ -222,7 +240,9 @@ describe("configureAgents", () => {
 
     expect(confirm).not.toHaveBeenCalled();
     expect(summary.providerEnablementPrompted).toBe(false);
-    expect(summary.enabledAgents).toEqual(FULL_CATALOG_IDS);
+    expect(summary.enabledAgents).toEqual(
+      enabledIdsForProviders("claude", "codex"),
+    );
   });
 
   it("reports zero detections and skips provider prompt when no CLIs are found", async () => {
@@ -239,13 +259,13 @@ describe("configureAgents", () => {
     });
 
     expect(confirm).not.toHaveBeenCalled();
-    expect(summary.enabledAgents).toEqual(FULL_CATALOG_IDS);
+    expect(summary.enabledAgents).toEqual([]);
     expect(summary.agentCount).toBe(FULL_CATALOG_IDS.length);
     expect(summary.zeroDetections).toBe(true);
     expect(summary.detectedProviders).toEqual([]);
     expect(summary.providerEnablementPrompted).toBe(false);
     expect(summary.configCreated).toBe(false);
-    expect(summary.configUpdated).toBe(false);
+    expect(summary.configUpdated).toBe(true);
   });
 
   it("skips prompting when preset is manual", async () => {
@@ -264,18 +284,19 @@ describe("configureAgents", () => {
     expect(confirm).not.toHaveBeenCalled();
     expect(summary).toEqual({
       configPath: ".voratiq/agents.yaml",
-      enabledAgents: FULL_CATALOG_IDS,
+      enabledAgents: [],
       agentCount: FULL_CATALOG_IDS.length,
       zeroDetections: true,
       detectedProviders: [],
       providerEnablementPrompted: false,
       configCreated: false,
-      configUpdated: false,
+      configUpdated: true,
+      managed: true,
     });
 
     const updated = readAgentsConfig(await readFile(configPath, "utf8"));
     expect(updated.agents).toHaveLength(FULL_CATALOG_IDS.length);
-    expect(updated.agents.every((entry) => entry.enabled)).toBe(true);
+    expect(updated.agents.every((entry) => entry.enabled === false)).toBe(true);
   });
 
   it("reports supported provider detections for manual preset", async () => {
@@ -291,7 +312,9 @@ describe("configureAgents", () => {
       interactive: false,
     });
 
-    expect(summary.enabledAgents).toEqual(FULL_CATALOG_IDS);
+    expect(summary.enabledAgents).toEqual(
+      enabledIdsForProviders("claude", "codex"),
+    );
     expect(summary.agentCount).toBe(FULL_CATALOG_IDS.length);
     expect(summary.zeroDetections).toBe(false);
     expect(summary.detectedProviders).toEqual([
@@ -304,7 +327,9 @@ describe("configureAgents", () => {
     const parsed = readAgentsConfig(updated);
     expect(parsed.agents).toHaveLength(FULL_CATALOG_IDS.length);
     for (const entry of parsed.agents) {
-      expect(entry.enabled).toBe(true);
+      expect(entry.enabled).toBe(
+        entry.provider === "claude" || entry.provider === "codex",
+      );
       const expectedBinary =
         entry.provider === "claude"
           ? detectedBinaries.claude

@@ -17,6 +17,7 @@ import {
   WorkspaceSetupError,
   WorkspaceWrongTypeEntryError,
 } from "./errors.js";
+import { updateManagedState } from "./managed-state.js";
 import {
   resolveWorkspacePath,
   VORATIQ_AGENTS_FILE,
@@ -24,6 +25,7 @@ import {
   VORATIQ_INTERACTIVE_DIR,
   VORATIQ_INTERACTIVE_FILE,
   VORATIQ_INTERACTIVE_SESSIONS_DIR,
+  VORATIQ_MANAGED_STATE_FILE,
   VORATIQ_MESSAGE_DIR,
   VORATIQ_MESSAGE_FILE,
   VORATIQ_MESSAGE_SESSIONS_DIR,
@@ -220,6 +222,10 @@ export async function createWorkspace(
     root,
     VORATIQ_VERIFICATION_CONFIG_FILE,
   );
+  const managedStatePath = resolveWorkspacePath(
+    root,
+    VORATIQ_MANAGED_STATE_FILE,
+  );
 
   const workspaceExists = await pathExists(workspaceDir);
   const [agentsConfigExists, environmentConfigExists] = await Promise.all([
@@ -288,6 +294,21 @@ export async function createWorkspace(
       encoding: "utf8",
     });
     createdFiles.push(relativeToRoot(root, orchestrationConfigPath));
+  }
+
+  if (!agentsConfigExists || !orchestrationConfigExists) {
+    const [agentsContent, orchestrationContent] = await Promise.all([
+      readFile(agentsConfigPath, "utf8"),
+      readFile(orchestrationConfigPath, "utf8"),
+    ]);
+    const managedStateResult = await updateManagedState(root, {
+      agentsContent,
+      orchestrationContent,
+      orchestrationPreset: "pro",
+    });
+    if (managedStateResult.created) {
+      createdFiles.push(relativeToRoot(root, managedStatePath));
+    }
   }
 
   const seededVerification = await seedVerificationSurface(root, {

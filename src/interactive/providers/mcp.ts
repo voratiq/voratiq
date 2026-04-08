@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { basename } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { loadRepoSettings } from "../../configs/settings/loader.js";
@@ -526,11 +527,11 @@ function matchesDeclarationCommandAndArgs(
   declaration: NativeToolDeclaration,
   value: { command: string; args: string[] },
 ): boolean {
-  if (value.command !== declaration.command) {
+  const expectedArgs = declaration.args ? [...declaration.args] : [];
+  if (!areStringArraysEqual(value.args, expectedArgs)) {
     return false;
   }
-  const expectedArgs = declaration.args ? [...declaration.args] : [];
-  return areStringArraysEqual(value.args, expectedArgs);
+  return areEquivalentMcpCommands(value.command, declaration.command);
 }
 
 function areStringArraysEqual(left: string[], right: string[]): boolean {
@@ -543,6 +544,19 @@ function areStringArraysEqual(left: string[], right: string[]): boolean {
     }
   }
   return true;
+}
+
+function areEquivalentMcpCommands(left: string, right: string): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  return isNodeExecutableCommand(left) && isNodeExecutableCommand(right);
+}
+
+function isNodeExecutableCommand(value: string): boolean {
+  const normalized = basename(value).toLowerCase();
+  return normalized === "node" || normalized === "node.exe";
 }
 
 function buildCommandMismatchDetail(
