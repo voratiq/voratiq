@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve as resolveAbsolute } from "node:path";
 
 import { readAgentsConfig } from "../configs/agents/loader.js";
 import {
@@ -188,6 +188,15 @@ const WORKSPACE_CONFIG_SEGMENTS: readonly string[] = [
   VORATIQ_ORCHESTRATION_FILE,
 ];
 
+const VOLATILE_WORKSPACE_EXCLUDE_PATTERNS = [
+  "/.voratiq/*/index.json",
+  "/.voratiq/*/sessions/",
+  "/.voratiq/*/history.lock",
+] as const;
+
+const VOLATILE_WORKSPACE_EXCLUDE_HEADER =
+  "# voratiq runtime state (auto-managed)";
+
 export async function createWorkspace(
   root: string,
 ): Promise<CreateWorkspaceResult> {
@@ -228,6 +237,8 @@ export async function createWorkspace(
     await mkdir(workspaceDir, { recursive: true });
     createdDirectories.push(relativeToRoot(root, workspaceDir));
   }
+
+  await ensureWorkspaceGitExclude(root);
 
   for (const domain of domainStructures) {
     if (!(await pathExists(domain.directoryPath))) {
@@ -300,6 +311,7 @@ export async function repairWorkspaceStructure(
 
   const workspaceDir = resolveWorkspacePath(root);
   await ensureWorkspaceDirectoryEntry(root, workspaceDir);
+  await ensureWorkspaceGitExclude(root);
 
   // Additive repair must not mutate config semantics.
   for (const configPath of resolveWorkspaceConfigPaths(root)) {
@@ -544,6 +556,63 @@ async function detectPathKind(
     return "file";
   }
   return "other";
+}
+
+async function ensureWorkspaceGitExclude(root: string): Promise<void> {
+  const excludePath = await resolveGitExcludePath(root);
+  if (!excludePath) {
+    return;
+  }
+
+  const existing = (await pathExists(excludePath))
+    ? await readFile(excludePath, "utf8")
+    : "";
+  const lines = existing.split(/\r?\n/u);
+
+  const missingPatterns = VOLATILE_WORKSPACE_EXCLUDE_PATTERNS.filter(
+    (pattern) => !lines.includes(pattern),
+  );
+  if (missingPatterns.length === 0) {
+    return;
+  }
+
+  const nextLines =
+    existing.length > 0 && !existing.endsWith("\n")
+      ? [...lines, VOLATILE_WORKSPACE_EXCLUDE_HEADER, ...missingPatterns]
+      : [
+          ...lines.filter(
+            (line, index, all) => !(index === all.length - 1 && line === ""),
+          ),
+          VOLATILE_WORKSPACE_EXCLUDE_HEADER,
+          ...missingPatterns,
+        ];
+
+  await mkdir(dirname(excludePath), { recursive: true });
+  await writeFile(excludePath, `${nextLines.join("\n")}\n`, "utf8");
+}
+
+async function resolveGitExcludePath(
+  root: string,
+): Promise<string | undefined> {
+  const gitEntryPath = join(root, ".git");
+  const kind = await detectPathKind(gitEntryPath);
+
+  if (kind === "directory") {
+    return join(gitEntryPath, "info", "exclude");
+  }
+
+  if (kind !== "file") {
+    return undefined;
+  }
+
+  const raw = await readFile(gitEntryPath, "utf8");
+  const match = raw.match(/^gitdir:\s*(.+)\s*$/mu);
+  if (!match) {
+    return undefined;
+  }
+
+  const gitDir = resolveAbsolute(root, match[1]);
+  return join(gitDir, "info", "exclude");
 }
 
 async function validateWorkspaceIndexFile(

@@ -132,6 +132,33 @@ describe("workspace bootstrap", () => {
     await expect(validateWorkspace(repoRoot)).resolves.toBeUndefined();
   });
 
+  it("seeds local git excludes for volatile .voratiq runtime state", async () => {
+    await createWorkspace(repoRoot);
+
+    const excludePath = join(repoRoot, ".git", "info", "exclude");
+    const content = await readFile(excludePath, "utf8");
+
+    expect(content).toContain("# voratiq runtime state (auto-managed)");
+    expect(content).toContain("/.voratiq/*/index.json");
+    expect(content).toContain("/.voratiq/*/sessions/");
+    expect(content).toContain("/.voratiq/*/history.lock");
+  });
+
+  it("seeds local git excludes when .git is a worktree pointer file", async () => {
+    const gitDir = join(repoRoot, "gitdir-target");
+    await mkdir(join(gitDir, "info"), { recursive: true });
+    await rm(join(repoRoot, ".git"), { recursive: true, force: true });
+    await writeFile(join(repoRoot, ".git"), `gitdir: ${gitDir}\n`, "utf8");
+
+    await createWorkspace(repoRoot);
+
+    const excludePath = join(gitDir, "info", "exclude");
+    const content = await readFile(excludePath, "utf8");
+
+    expect(content).toContain("/.voratiq/*/index.json");
+    expect(content).toContain("/.voratiq/*/sessions/");
+  });
+
   it("fails validation when the interactive index is missing", async () => {
     await createWorkspace(repoRoot);
     const interactivePath = resolveWorkspacePath(
