@@ -94,7 +94,7 @@ describe("init orchestration bootstrap", () => {
     ]);
   });
 
-  it("recreates missing orchestration.yaml with seeding from updated preset", async () => {
+  it("recreates missing orchestration.yaml from current workspace state without provider rescan", async () => {
     expect.hasAssertions();
 
     await mkdir(join(repoRoot, ".voratiq"), { recursive: true });
@@ -120,18 +120,12 @@ describe("init orchestration bootstrap", () => {
     const orchestration = readOrchestrationConfig(
       await readFile(orchestrationPath, "utf8"),
     );
-    expectProfileToMatchPreset(orchestration, "default", "lite", [
-      "codex",
-      "gemini",
-    ]);
-    expectProfileToMatchPreset(orchestration, "pro", "pro", [
-      "codex",
-      "gemini",
-    ]);
-    expectProfileToMatchPreset(orchestration, "lite", "lite", [
-      "codex",
-      "gemini",
-    ]);
+    expect(orchestration.profiles.default.spec.agents).toEqual([]);
+    expect(orchestration.profiles.default.run.agents).toEqual([]);
+    expect(orchestration.profiles.pro.spec.agents).toEqual([]);
+    expect(orchestration.profiles.pro.run.agents).toEqual([]);
+    expect(orchestration.profiles.lite.spec.agents).toEqual([]);
+    expect(orchestration.profiles.lite.run.agents).toEqual([]);
   });
 
   it("seeds empty default stage agent lists for manual preset while keeping pro and lite available", async () => {

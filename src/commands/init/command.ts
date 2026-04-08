@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import {
   getAgentDefaultId,
   getAgentDefaultsForPreset,
@@ -8,13 +10,16 @@ import type {
   AgentConfigEntry,
   AgentsConfig,
 } from "../../configs/agents/types.js";
+import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import { buildDefaultOrchestrationTemplate } from "../../configs/orchestration/bootstrap.js";
 import { renderPresetPromptPreface } from "../../render/transcripts/init.js";
+import { pathExists } from "../../utils/fs.js";
 import {
   normalizeConfigText,
   readConfigSnapshot,
   writeConfigIfChanged,
 } from "../../utils/yaml.js";
+import { updateManagedState } from "../../workspace/managed-state.js";
 import { createWorkspace } from "../../workspace/setup.js";
 import {
   formatWorkspacePath,
@@ -52,6 +57,9 @@ export async function executeInitCommand(
     confirm,
     prompt,
   } = input;
+  const workspaceExistsBeforeInit = await pathExists(
+    resolveWorkspacePath(root),
+  );
 
   const agentsConfigPath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const agentsSnapshotBeforeInit = await readConfigSnapshot(agentsConfigPath);
@@ -65,6 +73,25 @@ export async function executeInitCommand(
   );
   const orchestrationConfigMissing = !orchestrationSnapshotBeforeInit.exists;
 
+  const workspaceResult = await createWorkspace(root);
+  if (workspaceExistsBeforeInit) {
+    const repairedOrchestrationSummary =
+      await repairExistingWorkspaceOrchestration(root, {
+        orchestrationConfigMissing,
+        preset,
+      });
+    const repairOnly = await buildRepairOnlySummaries(root, workspaceResult);
+    return {
+      mode: "repair",
+      syncRecommended: true,
+      preset,
+      workspaceResult,
+      ...repairOnly,
+      orchestrationSummary:
+        repairedOrchestrationSummary ?? repairOnly.orchestrationSummary,
+    };
+  }
+
   const resolvedPreset = await resolveAgentPreset({
     preset,
     presetProvided,
@@ -73,8 +100,6 @@ export async function executeInitCommand(
     agentsConfigMissing,
   });
   onPresetResolved?.(resolvedPreset);
-
-  const workspaceResult = await createWorkspace(root);
   await applyAgentPresetTemplate(root, resolvedPreset, {
     presetProvided: Boolean(presetProvided),
     agentsConfigMissing,
@@ -96,8 +121,11 @@ export async function executeInitCommand(
   });
 
   const sandboxSummary = buildSandboxSummary(workspaceResult);
+  await refreshManagedState(root, resolvedPreset);
 
   return {
+    mode: "bootstrap",
+    syncRecommended: false,
     preset: resolvedPreset,
     workspaceResult,
     agentSummary,
@@ -105,6 +133,90 @@ export async function executeInitCommand(
     environmentSummary,
     sandboxSummary,
   };
+}
+
+async function buildRepairOnlySummaries(
+  root: string,
+  workspaceResult: CreateWorkspaceResult,
+): Promise<
+  Pick<
+    InitCommandResult,
+    | "agentSummary"
+    | "orchestrationSummary"
+    | "environmentSummary"
+    | "sandboxSummary"
+  >
+> {
+  const createdFiles = new Set(
+    workspaceResult.createdFiles.map((value) => value.replace(/\\/g, "/")),
+  );
+  const agentsConfig = readAgentsConfig(
+    await readFile(resolveWorkspacePath(root, VORATIQ_AGENTS_FILE), "utf8"),
+  );
+  const environmentConfig = loadEnvironmentConfig({ root, optional: true });
+
+  return {
+    agentSummary: {
+      configPath: formatWorkspacePath(VORATIQ_AGENTS_FILE),
+      enabledAgents: agentsConfig.agents
+        .filter((entry) => entry.enabled !== false)
+        .map((entry) => entry.id),
+      agentCount: agentsConfig.agents.length,
+      zeroDetections: agentsConfig.agents.every(
+        (entry) => (entry.binary ?? "").trim().length === 0,
+      ),
+      detectedProviders: collectDetectedProvidersFromConfig(agentsConfig),
+      providerEnablementPrompted: false,
+      configCreated: createdFiles.has(formatWorkspacePath(VORATIQ_AGENTS_FILE)),
+      configUpdated: false,
+      managed: false,
+    },
+    orchestrationSummary: {
+      configPath: formatWorkspacePath(VORATIQ_ORCHESTRATION_FILE),
+      configCreated: createdFiles.has(
+        formatWorkspacePath(VORATIQ_ORCHESTRATION_FILE),
+      ),
+      configUpdated: false,
+    },
+    environmentSummary: {
+      configPath: formatWorkspacePath("environment.yaml"),
+      detectedEntries: Object.keys(environmentConfig),
+      configCreated: createdFiles.has(formatWorkspacePath("environment.yaml")),
+      configUpdated: false,
+      config: environmentConfig,
+    },
+    sandboxSummary: buildSandboxSummary(workspaceResult),
+  };
+}
+
+async function repairExistingWorkspaceOrchestration(
+  root: string,
+  options: {
+    orchestrationConfigMissing: boolean;
+    preset: AgentPreset;
+  },
+): Promise<OrchestrationInitSummary | undefined> {
+  if (!options.orchestrationConfigMissing) {
+    return undefined;
+  }
+
+  return reconcileOrchestrationConfig(root, options);
+}
+
+async function refreshManagedState(
+  root: string,
+  preset: AgentPreset,
+): Promise<void> {
+  const [agentsContent, orchestrationContent] = await Promise.all([
+    readFile(resolveWorkspacePath(root, VORATIQ_AGENTS_FILE), "utf8"),
+    readFile(resolveWorkspacePath(root, VORATIQ_ORCHESTRATION_FILE), "utf8"),
+  ]);
+
+  await updateManagedState(root, {
+    agentsContent,
+    orchestrationContent,
+    orchestrationPreset: preset,
+  });
 }
 
 function buildSandboxSummary(
@@ -146,9 +258,17 @@ async function reconcileOrchestrationConfig(
   const baseline = orchestrationSnapshot.exists
     ? orchestrationSnapshot.normalized
     : "__missing__";
-  await writeConfigIfChanged(orchestrationConfigPath, nextContent, baseline);
+  const updated = await writeConfigIfChanged(
+    orchestrationConfigPath,
+    nextContent,
+    baseline,
+  );
+  await updateManagedState(root, {
+    orchestrationContent: nextContent,
+    orchestrationPreset: preset,
+  });
 
-  return { configPath, configCreated: true };
+  return { configPath, configCreated: true, configUpdated: updated };
 }
 
 async function applyAgentPresetTemplate(
@@ -285,6 +405,25 @@ async function promptForPresetSelection(
 }
 
 type ManagedPreset = "pro" | "lite";
+
+function collectDetectedProvidersFromConfig(
+  config: AgentsConfig,
+): { provider: string; binary: string }[] {
+  const detected: { provider: string; binary: string }[] = [];
+  const seenProviders = new Set<string>();
+
+  for (const entry of config.agents) {
+    const binary = entry.binary?.trim();
+    if (!binary || seenProviders.has(entry.provider)) {
+      continue;
+    }
+
+    seenProviders.add(entry.provider);
+    detected.push({ provider: entry.provider, binary });
+  }
+
+  return detected;
+}
 
 function tryReadAgentsConfig(content: string): AgentsConfig | undefined {
   try {

@@ -2,7 +2,6 @@ import { execFile } from "node:child_process";
 
 import { fs, vol } from "memfs";
 
-import { executeInitCommand } from "../../src/commands/init/command.js";
 import {
   DirtyWorkingTreeError,
   SpecNotFoundError,
@@ -26,11 +25,7 @@ jest.mock("node:fs/promises", () => fs.promises);
 jest.mock("node:child_process", () => ({
   execFile: jest.fn(),
 }));
-jest.mock("../../src/commands/init/command.js", () => ({
-  executeInitCommand: jest.fn(),
-}));
 const execFileMock = jest.mocked(execFile);
-const executeInitCommandMock = jest.mocked(executeInitCommand);
 
 function buildValidWorkspaceTree(
   root = "/app/voratiq",
@@ -70,96 +65,6 @@ describe("CLI Context", () => {
   beforeEach(() => {
     vol.reset();
     jest.spyOn(process, "cwd").mockReturnValue("/app/voratiq");
-    executeInitCommandMock.mockReset();
-    executeInitCommandMock.mockImplementation(async ({ root }) => {
-      await fs.promises.mkdir(`${root}/.voratiq/spec/sessions`, {
-        recursive: true,
-      });
-      await fs.promises.mkdir(`${root}/.voratiq/run/sessions`, {
-        recursive: true,
-      });
-      await fs.promises.mkdir(`${root}/.voratiq/reduce/sessions`, {
-        recursive: true,
-      });
-      await fs.promises.mkdir(`${root}/.voratiq/verify/sessions`, {
-        recursive: true,
-      });
-      await fs.promises.mkdir(`${root}/.voratiq/message/sessions`, {
-        recursive: true,
-      });
-      await fs.promises.mkdir(`${root}/.voratiq/interactive/sessions`, {
-        recursive: true,
-      });
-
-      await fs.promises.writeFile(
-        `${root}/.voratiq/spec/index.json`,
-        '{"version":1,"sessions":[]}\n',
-      );
-      await fs.promises.writeFile(
-        `${root}/.voratiq/run/index.json`,
-        '{"version":2,"sessions":[]}\n',
-      );
-      await fs.promises.writeFile(
-        `${root}/.voratiq/reduce/index.json`,
-        '{"version":1,"sessions":[]}\n',
-      );
-      await fs.promises.writeFile(
-        `${root}/.voratiq/verify/index.json`,
-        '{"version":1,"sessions":[]}\n',
-      );
-      await fs.promises.writeFile(
-        `${root}/.voratiq/message/index.json`,
-        '{"version":1,"sessions":[]}\n',
-      );
-      await fs.promises.writeFile(
-        `${root}/.voratiq/interactive/index.json`,
-        '{"version":1,"sessions":[]}\n',
-      );
-      await fs.promises.writeFile(
-        `${root}/.voratiq/agents.yaml`,
-        "agents: []\n",
-      );
-      await fs.promises.writeFile(`${root}/.voratiq/verification.yaml`, "\n");
-      await fs.promises.writeFile(`${root}/.voratiq/environment.yaml`, "\n");
-      await fs.promises.writeFile(
-        `${root}/.voratiq/sandbox.yaml`,
-        "providers: {}\n",
-      );
-      await fs.promises.writeFile(
-        `${root}/.voratiq/orchestration.yaml`,
-        "profiles:\n  default:\n    spec:\n      agents: []\n    run:\n      agents: []\n    reduce:\n      agents: []\n    verify:\n      agents: []\n    message:\n      agents: []\n",
-      );
-
-      return {
-        preset: "pro",
-        workspaceResult: { createdDirectories: [], createdFiles: [] },
-        agentSummary: {
-          configPath: ".voratiq/agents.yaml",
-          enabledAgents: [],
-          agentCount: 0,
-          zeroDetections: true,
-          detectedProviders: [],
-          providerEnablementPrompted: false,
-          configCreated: true,
-          configUpdated: true,
-        },
-        orchestrationSummary: {
-          configPath: ".voratiq/orchestration.yaml",
-          configCreated: true,
-        },
-        environmentSummary: {
-          configPath: ".voratiq/environment.yaml",
-          detectedEntries: [],
-          configCreated: true,
-          configUpdated: true,
-          config: {},
-        },
-        sandboxSummary: {
-          configPath: ".voratiq/sandbox.yaml",
-          configCreated: true,
-        },
-      };
-    });
   });
 
   afterEach(() => {
@@ -209,7 +114,6 @@ describe("CLI Context", () => {
       await expect(resolveCliContext()).rejects.toThrow(
         WorkspaceNotInitializedError,
       );
-      expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it("should not throw an error if workspace is not required and not found", async () => {
@@ -220,13 +124,13 @@ describe("CLI Context", () => {
         requireWorkspace: false,
       });
       expect(context.root).toBe("/app/voratiq");
-      expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it("auto-initializes for forward workflows when workspace is fully missing", async () => {
       vol.fromJSON({
         "/app/voratiq/.git": "",
       });
+      const createWorkspaceSpy = jest.spyOn(workspaceSetup, "createWorkspace");
 
       const context: CliContext = await resolveCliContext({
         workspaceAutoInitMode: "when-missing",
@@ -234,15 +138,11 @@ describe("CLI Context", () => {
 
       expect(context.root).toBe("/app/voratiq");
       expect(context.workspaceAutoInitialized).toBe(true);
-      expect(executeInitCommandMock).toHaveBeenCalledTimes(1);
-      expect(executeInitCommandMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          root: "/app/voratiq",
-          preset: "pro",
-          interactive: false,
-          assumeYes: true,
-        }),
-      );
+      expect(createWorkspaceSpy).toHaveBeenCalledTimes(1);
+      await expect(
+        fs.promises.access("/app/voratiq/.voratiq/agents.yaml"),
+      ).resolves.toBeUndefined();
+      createWorkspaceSpy.mockRestore();
     });
 
     it("does not auto-initialize when workspace is partial or invalid", async () => {
@@ -257,8 +157,6 @@ describe("CLI Context", () => {
           workspaceAutoInitMode: "when-missing",
         }),
       ).rejects.toThrow(WorkspaceMissingEntryError);
-
-      expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it("repairs a legacy workspace missing one domain directory", async () => {
@@ -282,7 +180,6 @@ describe("CLI Context", () => {
           encoding: "utf8",
         }),
       ).resolves.toContain('"version": 1');
-      expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it("repairs a legacy workspace missing one domain index file", async () => {
@@ -299,7 +196,6 @@ describe("CLI Context", () => {
           encoding: "utf8",
         }),
       ).resolves.toContain('"version": 1');
-      expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it("repairs a legacy workspace missing one domain sessions directory", async () => {
@@ -315,7 +211,6 @@ describe("CLI Context", () => {
       await expect(
         fs.promises.access("/app/voratiq/.voratiq/spec/sessions"),
       ).resolves.toBeUndefined();
-      expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it("repairs multiple missing domain storage entries in one pass", async () => {
@@ -344,7 +239,6 @@ describe("CLI Context", () => {
       await expect(
         fs.promises.access("/app/voratiq/.voratiq/run/sessions"),
       ).resolves.toBeUndefined();
-      expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it("fails when a required path exists with the wrong type", async () => {
@@ -361,7 +255,6 @@ describe("CLI Context", () => {
       await expect(resolveCliContext()).rejects.toThrow(
         "Wrong workspace entry type: `.voratiq/reduce` must be a directory.",
       );
-      expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -443,7 +336,6 @@ describe("CLI Context", () => {
       await expect(resolveCliContext()).rejects.toThrow(
         "Wrong workspace entry type: `.voratiq/verification.yaml` must be a file.",
       );
-      expect(executeInitCommandMock).not.toHaveBeenCalled();
     });
 
     it("runs preflight in deterministic order: git check, init decision, validation", async () => {
@@ -457,6 +349,7 @@ describe("CLI Context", () => {
         workspaceSetup,
         "validateWorkspace",
       );
+      const createWorkspaceSpy = jest.spyOn(workspaceSetup, "createWorkspace");
 
       let gitCallOrder = -1;
       let initCallOrder = -1;
@@ -467,12 +360,12 @@ describe("CLI Context", () => {
           workspaceAutoInitMode: "when-missing",
         });
         gitCallOrder = assertGitSpy.mock.invocationCallOrder[0] ?? -1;
-        initCallOrder =
-          executeInitCommandMock.mock.invocationCallOrder[0] ?? -1;
+        initCallOrder = createWorkspaceSpy.mock.invocationCallOrder[0] ?? -1;
         validateCallOrder =
           validateWorkspaceSpy.mock.invocationCallOrder[0] ?? -1;
       } finally {
         assertGitSpy.mockRestore();
+        createWorkspaceSpy.mockRestore();
         validateWorkspaceSpy.mockRestore();
       }
 

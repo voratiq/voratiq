@@ -501,6 +501,7 @@ async function registerCommands(
   const wantsVersion = argv.includes("--version") || argv.includes("-v");
   const knownCommandNames = new Set([
     "init",
+    "sync",
     "spec",
     "run",
     "reduce",
@@ -524,6 +525,7 @@ async function registerCommands(
 
   if (loadAll) {
     program.addCommand((await import("./cli/init.js")).createInitCommand());
+    program.addCommand((await import("./cli/sync.js")).createSyncCommand());
     program.addCommand((await import("./cli/spec.js")).createSpecCommand());
     program.addCommand((await import("./cli/run.js")).createRunCommand());
     program.addCommand((await import("./cli/reduce.js")).createReduceCommand());
@@ -542,6 +544,9 @@ async function registerCommands(
   switch (commandName) {
     case "init":
       program.addCommand((await import("./cli/init.js")).createInitCommand());
+      break;
+    case "sync":
+      program.addCommand((await import("./cli/sync.js")).createSyncCommand());
       break;
     case "spec":
       program.addCommand((await import("./cli/spec.js")).createSpecCommand());

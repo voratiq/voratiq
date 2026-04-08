@@ -75,7 +75,7 @@ export function createInitCommand(): Command {
     .default("pro");
 
   return new Command("init")
-    .description("Initialize the Voratiq workspace")
+    .description("Bootstrap or repair the Voratiq workspace")
     .addOption(presetOption)
     .option("-y, --yes", "Assume yes and accept defaults")
     .allowExcessArguments(false)

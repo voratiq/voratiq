@@ -86,6 +86,7 @@ describe("configureAgents", () => {
       providerEnablementPrompted: false,
       configCreated: false,
       configUpdated: false,
+      managed: false,
     });
 
     const updated = await readFile(configPath, "utf8");
@@ -182,6 +183,7 @@ describe("configureAgents", () => {
       providerEnablementPrompted: false,
       configCreated: false,
       configUpdated: true,
+      managed: true,
     });
   });
 
@@ -289,6 +291,7 @@ describe("configureAgents", () => {
       providerEnablementPrompted: false,
       configCreated: false,
       configUpdated: true,
+      managed: true,
     });
 
     const updated = readAgentsConfig(await readFile(configPath, "utf8"));

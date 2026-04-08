@@ -1,6 +1,6 @@
 import { isAbsolute, resolve } from "node:path";
 
-import { executeInitCommand } from "../commands/init/command.js";
+import { executeSyncCommand } from "../commands/sync/command.js";
 import { ensureFileExists, pathExists } from "../utils/fs.js";
 import {
   assertGitRepository,
@@ -89,13 +89,7 @@ export async function resolveCliContext(
   if (requireWorkspace) {
     let workspaceMissing = !initialWorkspaceExists;
     if (workspaceAutoInitMode === "when-missing" && workspaceMissing) {
-      await executeInitCommand({
-        root,
-        preset: "pro",
-        presetProvided: false,
-        assumeYes: true,
-        interactive: false,
-      });
+      await executeSyncCommand({ root });
       workspaceAutoInitialized = true;
       workspaceMissing = false;
     }

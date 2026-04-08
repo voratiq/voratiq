@@ -33,6 +33,8 @@ interface RenderInitTranscriptOptions {
 
 export function renderInitTranscript(
   {
+    mode,
+    syncRecommended,
     preset,
     agentSummary,
     orchestrationSummary,
@@ -45,7 +47,9 @@ export function renderInitTranscript(
   const sections: string[][] = [];
 
   if (includeConfigurationHeading) {
-    sections.push(["Configuring workspace…"]);
+    sections.push([
+      mode === "repair" ? "Repairing workspace…" : "Configuring workspace…",
+    ]);
   }
   sections.push(
     buildConfigurationSummaryTable({
@@ -57,6 +61,8 @@ export function renderInitTranscript(
     }),
   );
   const conditionalNote = resolveConditionalInitNote({
+    mode,
+    syncRecommended,
     preset,
     agentSummary,
   });
@@ -71,8 +77,12 @@ export function renderInitTranscript(
     "Configuration docs:",
     "  https://github.com/voratiq/voratiq/tree/main/docs/configs",
   ]);
-  sections.push([buildWorkspaceInitializedSection()]);
-  sections.push(["Run end-to-end:", '  voratiq auto --description "<task>"']);
+  sections.push([buildWorkspaceInitializedSection(mode)]);
+  if (mode === "repair") {
+    sections.push(["Sync managed config:", "  voratiq sync"]);
+  } else {
+    sections.push(["Run end-to-end:", '  voratiq auto --description "<task>"']);
+  }
 
   return renderTranscript({ sections });
 }
@@ -99,21 +109,34 @@ function buildConfigurationSummaryTable(paths: {
   });
 }
 
-function buildWorkspaceInitializedSection(): string {
-  return colorize("Voratiq initialized.", "green");
+function buildWorkspaceInitializedSection(
+  mode: InitCommandResult["mode"],
+): string {
+  return colorize(
+    mode === "repair" ? "Voratiq workspace repaired." : "Voratiq initialized.",
+    "green",
+  );
 }
 
 interface ConditionalInitNoteOptions {
+  mode: InitCommandResult["mode"];
+  syncRecommended: boolean;
   preset: InitCommandResult["preset"];
   agentSummary: InitCommandResult["agentSummary"];
 }
 
 function resolveConditionalInitNote({
+  mode,
+  syncRecommended,
   preset,
   agentSummary,
 }: ConditionalInitNoteOptions): string | undefined {
+  if (mode === "repair" || syncRecommended) {
+    return "Workspace already exists. `voratiq init` repaired missing structure only. Run `voratiq sync` to rescan providers and reconcile managed config.";
+  }
+
   if (agentSummary.zeroDetections) {
-    return "No agent CLIs detected on PATH. Install providers, then update `agents.yaml`.";
+    return "No agent CLIs detected on PATH. Install providers, then run `voratiq sync`.";
   }
 
   if (preset === "manual") {
@@ -130,7 +153,7 @@ function resolveConditionalInitNote({
   );
   for (const presetProvider of presetProviders) {
     if (!detectedProviders.has(presetProvider)) {
-      return "Some providers not found on PATH. Only detected providers were configured. Install missing ones, then update `agents.yaml`.";
+      return "Some providers not found on PATH. Only detected providers were configured. Install missing ones, then run `voratiq sync`.";
     }
   }
 

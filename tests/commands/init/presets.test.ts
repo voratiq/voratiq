@@ -64,10 +64,11 @@ describe("voratiq init preset application", () => {
     },
   );
 
-  it("switches from pro template to lite when safe", async () => {
+  it("does not switch existing workspace agents when preset is provided", async () => {
     await mkdir(join(repoRoot, ".voratiq"), { recursive: true });
     const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
-    await writeFile(agentsPath, buildAgentsTemplate("pro"), "utf8");
+    const initial = buildAgentsTemplate("pro");
+    await writeFile(agentsPath, initial, "utf8");
 
     await executeInitCommand({
       root: repoRoot,
@@ -77,7 +78,7 @@ describe("voratiq init preset application", () => {
     });
 
     const content = await readFile(agentsPath, "utf8");
-    expect(content).toBe(buildUndetectedPresetTemplate("lite"));
+    expect(content).toBe(initial);
   });
 
   it("does not overwrite customized agent configs when applying presets", async () => {
@@ -146,11 +147,11 @@ describe("voratiq init preset application", () => {
     });
 
     const content = await readFile(agentsPath, "utf8");
-    expect(content).toBe(buildUndetectedPresetTemplate("lite"));
+    expect(content).toBe(buildAgentsTemplate("lite"));
     expect(prompt).not.toHaveBeenCalled();
   });
 
-  it("switches managed pro to lite without forcing enablement changes", async () => {
+  it("preserves managed agent config on existing workspaces", async () => {
     await mkdir(join(repoRoot, ".voratiq"), { recursive: true });
     const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
 
@@ -202,7 +203,7 @@ describe("voratiq init preset application", () => {
     );
   });
 
-  it("preserves provider-disabled intent when migrating old managed preset files", async () => {
+  it("does not migrate old managed preset files during init on existing workspaces", async () => {
     await mkdir(join(repoRoot, ".voratiq"), { recursive: true });
     const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
 
@@ -232,20 +233,8 @@ describe("voratiq init preset application", () => {
       interactive: false,
     });
 
-    const updated = readAgentsConfig(await readFile(agentsPath, "utf8"));
-    const priorIds = new Set(legacyManagedProEntries.map((entry) => entry.id));
-    const codexEntries = updated.agents.filter(
-      (entry) => entry.provider === "codex",
-    );
-    const migratedCodexVariants = codexEntries.filter(
-      (entry) => !priorIds.has(entry.id),
-    );
-
-    expect(codexEntries.length).toBeGreaterThan(0);
-    expect(migratedCodexVariants.length).toBeGreaterThan(0);
-    for (const entry of codexEntries) {
-      expect(entry.enabled).toBe(false);
-    }
+    const updated = await readFile(agentsPath, "utf8");
+    expect(updated).toBe(serializeAgentsConfigEntries(legacyManagedProEntries));
   });
 
   it("does not overwrite when a managed agent's provider/model is customized", async () => {
