@@ -54,6 +54,55 @@ describe("interactive providers", () => {
     });
   });
 
+  it("uses the configured provider binary for codex MCP inspection when supplied", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "voratiq-interactive-providers-"),
+    );
+    tempRoots.push(root);
+    const mcpCommandRunner = jest.fn<ProviderMcpCommandRunner>(() =>
+      Promise.resolve({
+        exitCode: 0,
+        stdout: JSON.stringify({
+          name: "voratiq",
+          command: "node",
+          args: ["/repo/dist/bin.js", "mcp", "--stdio"],
+        }),
+        stderr: "",
+      }),
+    );
+
+    const result = await resolveFirstPartyMcpStatus({
+      providerId: "codex",
+      providerBinary: "/opt/custom/bin/codex",
+      root,
+      toolDeclarations: [buildTool("voratiq")],
+      mcpCommandRunner,
+    });
+
+    expect(result.toolAttachmentStatus).toBe("attached");
+    expect(mcpCommandRunner).toHaveBeenCalledWith({
+      command: "/opt/custom/bin/codex",
+      args: ["mcp", "get", "--json", "voratiq"],
+      cwd: root,
+    });
+  });
+
+  it("surfaces missing provider binaries as inspection failures instead of uncaught exceptions", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "voratiq-interactive-providers-"),
+    );
+    tempRoots.push(root);
+
+    await expect(
+      resolveFirstPartyMcpStatus({
+        providerId: "codex",
+        providerBinary: join(root, "missing-codex"),
+        root,
+        toolDeclarations: [buildTool("voratiq")],
+      }),
+    ).rejects.toThrow(/failed to inspect codex mcp configuration:/i);
+  });
+
   it("installs missing codex MCP servers and verifies the effective config", async () => {
     const root = await mkdtemp(
       join(tmpdir(), "voratiq-interactive-providers-"),

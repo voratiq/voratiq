@@ -1,6 +1,7 @@
 import {
   preserveProviderChatTranscripts,
   type ProviderTranscriptBaseline,
+  type ProviderTranscriptSelectionHint,
   snapshotProviderTranscripts,
 } from "../../workspace/chat/artifacts.js";
 import type { ChatArtifactFormat } from "../../workspace/chat/types.js";
@@ -16,12 +17,14 @@ export interface LaunchArtifactCaptureResult {
 export interface LaunchArtifactCaptureContext {
   readonly searchEnv?: NodeJS.ProcessEnv;
   readonly baseline?: ProviderTranscriptBaseline;
+  readonly selectionHint?: ProviderTranscriptSelectionHint;
 }
 
 export async function prepareProviderArtifactCaptureContext(options: {
   providerId: string | undefined;
   sessionRoot: string;
   searchEnv?: NodeJS.ProcessEnv;
+  selectionHint?: ProviderTranscriptSelectionHint;
 }): Promise<LaunchArtifactCaptureContext | undefined> {
   const providerId = options.providerId ?? "";
   if (!providerId) {
@@ -35,6 +38,7 @@ export async function prepareProviderArtifactCaptureContext(options: {
       agentRoot: options.sessionRoot,
       searchEnv: options.searchEnv,
     }),
+    selectionHint: options.selectionHint,
   };
 }
 
@@ -53,6 +57,7 @@ export async function collectProviderArtifacts(options: {
     agentRoot: options.sessionRoot,
     searchEnv: options.captureContext?.searchEnv,
     baseline: options.captureContext?.baseline,
+    selectionHint: options.captureContext?.selectionHint,
   });
 
   const format: ChatArtifactFormat | undefined = result.format;

@@ -24,6 +24,7 @@ interface FirstPartyMcpAdapter {
   installPromptMessage: string;
   inspectHintCommand(toolName: string): string;
   inspectTools(options: {
+    providerBinary: string;
     root: string;
     toolDeclarations: readonly NativeToolDeclaration[];
     runCommand: ProviderMcpCommandRunner;
@@ -50,6 +51,7 @@ interface FirstPartyMcpInspectionSummary {
 
 interface VerifiedFirstPartyMcpStatusOptions {
   adapter: FirstPartyMcpAdapter;
+  providerBinary: string;
   root: string;
   toolDeclarations: readonly NativeToolDeclaration[];
   runCommand: ProviderMcpCommandRunner;
@@ -88,6 +90,7 @@ const firstPartyMcpAdapters: Record<
 
 export async function resolveFirstPartyMcpStatus(options: {
   providerId: FirstPartyProviderId;
+  providerBinary?: string;
   root: string;
   toolDeclarations: readonly NativeToolDeclaration[];
   promptForMcpInstall?: PromptForMcpInstall;
@@ -110,9 +113,14 @@ export async function resolveFirstPartyMcpStatus(options: {
 
   const runCommand = options.mcpCommandRunner ?? runProviderMcpCommand;
   const adapter = firstPartyMcpAdapters[options.providerId];
+  const providerBinary = resolveProviderBinary(
+    options.providerBinary,
+    adapter.providerCommand,
+  );
   const initialInspection = summarizeFirstPartyMcpInspection({
     toolDeclarations: options.toolDeclarations,
     inspections: await adapter.inspectTools({
+      providerBinary,
       root: options.root,
       toolDeclarations: options.toolDeclarations,
       runCommand,
@@ -155,6 +163,7 @@ export async function resolveFirstPartyMcpStatus(options: {
 
   await installVoratiqMcpForProvider({
     adapter,
+    providerBinary,
     root: options.root,
     toolDeclarations: initialInspection.missingToolDeclarations,
     runCommand,
@@ -162,6 +171,7 @@ export async function resolveFirstPartyMcpStatus(options: {
 
   const verifiedInspection = await verifyFirstPartyMcpStatus({
     adapter,
+    providerBinary,
     root: options.root,
     toolDeclarations: options.toolDeclarations,
     runCommand,
@@ -227,6 +237,7 @@ async function verifyFirstPartyMcpStatus(
     lastSummary = summarizeFirstPartyMcpInspection({
       toolDeclarations: options.toolDeclarations,
       inspections: await options.adapter.inspectTools({
+        providerBinary: options.providerBinary,
         root: options.root,
         toolDeclarations: options.toolDeclarations,
         runCommand: options.runCommand,
@@ -272,6 +283,7 @@ function buildFirstPartyMcpInstallVerificationMessage(options: {
 }
 
 async function inspectGeminiMcpTools(options: {
+  providerBinary: string;
   root: string;
   toolDeclarations: readonly NativeToolDeclaration[];
   runCommand: ProviderMcpCommandRunner;
@@ -281,7 +293,7 @@ async function inspectGeminiMcpTools(options: {
     return inspections;
   }
   const result = await options.runCommand({
-    command: "gemini",
+    command: options.providerBinary,
     args: ["mcp", "list"],
     cwd: options.root,
   });
@@ -313,6 +325,7 @@ async function inspectGeminiMcpTools(options: {
 }
 
 async function inspectCliMcpToolsViaGet(options: {
+  providerBinary: string;
   providerCommand: "codex" | "claude";
   root: string;
   toolDeclarations: readonly NativeToolDeclaration[];
@@ -323,6 +336,7 @@ async function inspectCliMcpToolsViaGet(options: {
     inspections.set(
       tool.name,
       await inspectCliMcpTool({
+        providerBinary: options.providerBinary,
         providerCommand: options.providerCommand,
         root: options.root,
         declaration: tool,
@@ -334,11 +348,13 @@ async function inspectCliMcpToolsViaGet(options: {
 }
 
 async function inspectCodexMcpTools(options: {
+  providerBinary: string;
   root: string;
   toolDeclarations: readonly NativeToolDeclaration[];
   runCommand: ProviderMcpCommandRunner;
 }): Promise<Map<string, FirstPartyMcpToolInspection>> {
   return await inspectCliMcpToolsViaGet({
+    providerBinary: options.providerBinary,
     providerCommand: "codex",
     root: options.root,
     toolDeclarations: options.toolDeclarations,
@@ -347,11 +363,13 @@ async function inspectCodexMcpTools(options: {
 }
 
 async function inspectClaudeMcpTools(options: {
+  providerBinary: string;
   root: string;
   toolDeclarations: readonly NativeToolDeclaration[];
   runCommand: ProviderMcpCommandRunner;
 }): Promise<Map<string, FirstPartyMcpToolInspection>> {
   return await inspectCliMcpToolsViaGet({
+    providerBinary: options.providerBinary,
     providerCommand: "claude",
     root: options.root,
     toolDeclarations: options.toolDeclarations,
@@ -360,6 +378,7 @@ async function inspectClaudeMcpTools(options: {
 }
 
 async function inspectCliMcpTool(options: {
+  providerBinary: string;
   providerCommand: "codex" | "claude";
   root: string;
   declaration: NativeToolDeclaration;
@@ -367,7 +386,7 @@ async function inspectCliMcpTool(options: {
 }): Promise<FirstPartyMcpToolInspection> {
   if (options.providerCommand === "codex") {
     const result = await options.runCommand({
-      command: "codex",
+      command: options.providerBinary,
       args: ["mcp", "get", "--json", options.declaration.name],
       cwd: options.root,
     });
@@ -402,7 +421,7 @@ async function inspectCliMcpTool(options: {
   }
 
   const result = await options.runCommand({
-    command: "claude",
+    command: options.providerBinary,
     args: ["mcp", "get", options.declaration.name],
     cwd: options.root,
   });
@@ -617,13 +636,14 @@ function splitCommandLine(value: string): { command: string; args: string[] } {
 
 async function installVoratiqMcpForProvider(options: {
   adapter: FirstPartyMcpAdapter;
+  providerBinary: string;
   root: string;
   toolDeclarations: readonly NativeToolDeclaration[];
   runCommand: ProviderMcpCommandRunner;
 }): Promise<void> {
   for (const toolDeclaration of options.toolDeclarations) {
     const result = await options.runCommand({
-      command: options.adapter.providerCommand,
+      command: options.providerBinary,
       args: options.adapter.buildAddArgs(toolDeclaration),
       cwd: options.root,
     });
@@ -755,7 +775,22 @@ async function runProviderMcpCommand(
   });
 
   const exitCode = await new Promise<number | null>((resolve) => {
+    let settled = false;
+    child.on("error", (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (stderr.trim().length === 0) {
+        stderr = error.message;
+      }
+      resolve(null);
+    });
     child.on("close", (code) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       resolve(typeof code === "number" ? code : null);
     });
   });
@@ -764,4 +799,12 @@ async function runProviderMcpCommand(
     stdout,
     stderr,
   };
+}
+
+function resolveProviderBinary(
+  candidate: string | undefined,
+  fallback: string,
+): string {
+  const normalized = candidate?.trim();
+  return normalized && normalized.length > 0 ? normalized : fallback;
 }

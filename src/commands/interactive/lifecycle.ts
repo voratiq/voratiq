@@ -18,6 +18,7 @@ interface ActiveInteractiveContext {
   process?: ChildProcess;
   completion?: Promise<InteractiveSessionRecord>;
   teardown?: TeardownController;
+  terminationStatus?: "failed" | "aborted";
 }
 
 let activeInteractive: ActiveInteractiveContext | undefined;
@@ -39,6 +40,15 @@ export function clearActiveInteractive(sessionId: string): void {
   }
 }
 
+export function getActiveInteractiveTerminationStatus(
+  sessionId: string,
+): "failed" | "aborted" | undefined {
+  if (activeInteractive?.sessionId !== sessionId) {
+    return undefined;
+  }
+  return activeInteractive.terminationStatus;
+}
+
 export async function terminateActiveInteractive(
   status: "failed" | "aborted",
   reason?: string,
@@ -49,6 +59,7 @@ export async function terminateActiveInteractive(
 
   terminationInFlight = true;
   const context = activeInteractive;
+  context.terminationStatus = status;
   let persistenceError: Error | undefined;
 
   try {
@@ -90,6 +101,7 @@ export async function terminateActiveInteractive(
     try {
       await runTeardown(context.teardown);
     } finally {
+      context.terminationStatus = undefined;
       terminationInFlight = false;
       activeInteractive = undefined;
     }

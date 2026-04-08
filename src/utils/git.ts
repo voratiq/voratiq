@@ -139,8 +139,26 @@ export async function removeWorktree(options: {
   });
 }
 
-export async function gitAddAll(cwd: string): Promise<void> {
+export async function gitAddAll(
+  cwd: string,
+  excludedPaths?: readonly string[],
+): Promise<void> {
   await runGitCommand(["add", "-A"], { cwd });
+
+  const existingExcludedPaths = await resolveExistingGitPaths(
+    cwd,
+    excludedPaths,
+  );
+  if (existingExcludedPaths.length === 0) {
+    return;
+  }
+
+  await runGitCommand(
+    ["reset", "--quiet", "HEAD", "--", ...existingExcludedPaths],
+    {
+      cwd,
+    },
+  );
 }
 
 export async function gitHasStagedChanges(cwd: string): Promise<boolean> {
@@ -250,4 +268,25 @@ function isHeadMissing(error: unknown): boolean {
   const isHeadExitCode = code === 128 || code === "128";
 
   return headMissingMessage || (isHeadExitCode && normalized.includes("head"));
+}
+
+async function resolveExistingGitPaths(
+  cwd: string,
+  paths?: readonly string[],
+): Promise<string[]> {
+  if (!paths || paths.length === 0) {
+    return [];
+  }
+
+  const existing: string[] = [];
+  for (const path of paths) {
+    try {
+      await access(join(cwd, path), F_OK);
+      existing.push(path);
+    } catch {
+      // Ignore missing excluded paths so git add works across repos and tests.
+    }
+  }
+
+  return existing;
 }

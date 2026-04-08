@@ -1487,7 +1487,7 @@ describe("voratiq auto", () => {
     expect(output).toContain("Auto SUCCEEDED");
   });
 
-  it("surfaces verify warnings and still applies the resolved winner", async () => {
+  it("surfaces verify warnings and halts automatic apply", async () => {
     const stdout: string[] = [];
 
     stdoutSpy = jest
@@ -1527,25 +1527,21 @@ describe("voratiq auto", () => {
         apply: true,
       });
 
-      expect(result.auto.status).toBe("succeeded");
-      expect(result.apply.status).toBe("succeeded");
-      expect(result.exitCode).toBe(0);
+      expect(result.auto.status).toBe("action_required");
+      expect(result.apply.status).toBe("skipped");
+      expect(result.exitCode).toBe(1);
     });
 
-    expect(runApplyCommandMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        runId: "run-123",
-        agentId: "agent-good",
-        commit: false,
-      }),
-    );
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
 
     const output = stripAnsi(stdout.join(""));
     expect(output).toContain(
       "Warning: No run candidate passed programmatic verification; proceeding with run-verification consensus.",
     );
-    expect(output).toContain("APPLY BODY");
-    expect(output).toContain("Auto SUCCEEDED");
+    expect(output).toContain(
+      "Action required: Verification reported warnings for the selected candidate; automatic apply halted. Review the verify output and apply manually if appropriate.",
+    );
+    expect(output).toContain("Auto ACTION_REQUIRED");
   });
 
   it("auto-applies when multiple verifiers unanimously select the same agent", async () => {

@@ -34,6 +34,7 @@ import {
   runGitCommand,
 } from "../../../src/utils/git.js";
 import * as workspaceDependencies from "../../../src/workspace/dependencies.js";
+import { WORKSPACE_SHIM_RELATIVE_PATH } from "../../../src/workspace/shim.js";
 
 jest.mock("../../../src/utils/git.js", () => ({
   gitAddAll: jest.fn(),
@@ -67,7 +68,6 @@ describe("collectAgentArtifacts", () => {
   let artifactsPath: string;
   let workspacePaths: RunAgentWorkspacePaths;
   let gitAddNodeModulesPresent: boolean;
-  let gitAddCwd: string | undefined;
   const environment: EnvironmentConfig = {
     node: { dependencyRoots: ["node_modules"] },
   };
@@ -111,8 +111,6 @@ describe("collectAgentArtifacts", () => {
     );
 
     gitAddNodeModulesPresent = true;
-    gitAddCwd = undefined;
-
     mockedGitHasStagedChanges.mockResolvedValue(true);
     mockedGitCommitAll.mockResolvedValue(undefined);
     mockedRunGitCommand.mockResolvedValue("abc123");
@@ -124,7 +122,6 @@ describe("collectAgentArtifacts", () => {
     });
     mockedGitDiffShortStat.mockResolvedValue("1 file changed");
     mockedGitAddAll.mockImplementation(async (cwd) => {
-      gitAddCwd = cwd;
       gitAddNodeModulesPresent = await pathExists(join(cwd, "node_modules"));
     });
   });
@@ -144,7 +141,12 @@ describe("collectAgentArtifacts", () => {
 
     expect(result.diffCaptured).toBe(true);
     expect(mockedGitAddAll).toHaveBeenCalledTimes(2);
-    expect(gitAddCwd).toBe(workspacePath);
+    expect(mockedGitAddAll).toHaveBeenNthCalledWith(1, workspacePath, [
+      WORKSPACE_SHIM_RELATIVE_PATH.join("/"),
+    ]);
+    expect(mockedGitAddAll).toHaveBeenNthCalledWith(2, workspacePath, [
+      WORKSPACE_SHIM_RELATIVE_PATH.join("/"),
+    ]);
     expect(gitAddNodeModulesPresent).toBe(false);
     expect(await readFile(diffPath, "utf8")).not.toContain("node_modules");
     expect(

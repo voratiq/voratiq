@@ -13,6 +13,7 @@ import { resolveAgentProviderForDefinition } from "../agents/launch/provider-sta
 import {
   clearActiveInteractive,
   finalizeActiveInteractive,
+  getActiveInteractiveTerminationStatus,
   registerActiveInteractive,
 } from "../commands/interactive/lifecycle.js";
 import {
@@ -30,6 +31,7 @@ import { resolveFirstPartyLaunchPrompt } from "../domain/interactive/prompt.js";
 import { toErrorMessage } from "../utils/errors.js";
 import { isMissing } from "../utils/fs.js";
 import { generateSessionId } from "../utils/session-id.js";
+import { normalizeInteractiveTerm } from "../utils/terminal.js";
 import { resolveVoratiqCliTarget } from "../utils/voratiq-cli-target.js";
 import {
   createBundledVoratiqToolDeclaration,
@@ -201,6 +203,7 @@ export async function prepareNativeInteractiveSession(
       try {
         firstPartyMcpResolution = await resolveFirstPartyMcpStatus({
           providerId,
+          providerBinary: agent.binary,
           root: options.root,
           toolDeclarations,
           promptForMcpInstall: options.promptForMcpInstall,
@@ -291,6 +294,14 @@ export async function prepareNativeInteractiveSession(
         providerId,
         sessionRoot: paths.sessionRoot,
         searchEnv: invocationEnv,
+        selectionHint:
+          providerId === "codex"
+            ? {
+                strategy: "codex-session-meta",
+                cwd: cwd.path,
+                minStartedAt: createdAt,
+              }
+            : undefined,
       });
     } catch {
       artifactCaptureContext = undefined;
@@ -368,9 +379,17 @@ export async function spawnPreparedInteractiveSession(
     process.stdout.write("\n");
   }
 
+  const spawnEnv =
+    stdio === "inherit"
+      ? {
+          ...prepared.invocation.env,
+          TERM: normalizeInteractiveTerm(prepared.invocation.env),
+        }
+      : prepared.invocation.env;
+
   const child = spawn(prepared.invocation.command, prepared.invocation.args, {
     cwd: prepared.invocation.cwd,
-    env: prepared.invocation.env,
+    env: spawnEnv,
     stdio,
   });
 
@@ -458,9 +477,14 @@ function createProcessCompletionPromise(
       }
       finalized = true;
 
+      const terminationStatus = getActiveInteractiveTerminationStatus(
+        prepared.sessionId,
+      );
+      const signalCountsAsSuccess =
+        terminationStatus === "aborted" && options.signal !== null;
       const runtimeFailureMessage = options.spawnError
         ? `Failed during provider execution: ${options.spawnError.message}`
-        : options.signal
+        : options.signal && !signalCountsAsSuccess
           ? `Provider process terminated by signal ${options.signal}`
           : options.exitCode && options.exitCode !== 0
             ? `Provider process exited with code ${options.exitCode}`

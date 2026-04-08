@@ -25,10 +25,13 @@ import {
   type WorkspaceDependencyCleanupResult,
 } from "../../../../workspace/dependencies.js";
 import { promoteWorkspaceFile } from "../../../../workspace/promotion.js";
+import { WORKSPACE_SHIM_RELATIVE_PATH } from "../../../../workspace/shim.js";
 import {
   type RunAgentWorkspacePaths,
   WORKSPACE_SUMMARY_FILENAME,
 } from "./workspace.js";
+
+const EXPORT_EXCLUDED_PATHS = [WORKSPACE_SHIM_RELATIVE_PATH.join("/")];
 
 export interface ArtifactCollectionResult {
   summaryCaptured: boolean;
@@ -73,7 +76,9 @@ export async function collectAgentArtifacts(options: {
   let artifactResult: ArtifactCollectionResult | undefined;
   let dependencyRestoreError: AgentProcessError | undefined;
   try {
-    await runGitStep("Git add failed", async () => gitAddAll(workspacePath));
+    await runGitStep("Git add failed", async () =>
+      gitAddAll(workspacePath, EXPORT_EXCLUDED_PATHS),
+    );
 
     const hasChangesBeforeSummary = await gitHasStagedChanges(workspacePath);
 
@@ -89,7 +94,9 @@ export async function collectAgentArtifacts(options: {
       summaryPath,
     });
 
-    await runGitStep("Git add failed", async () => gitAddAll(workspacePath));
+    await runGitStep("Git add failed", async () =>
+      gitAddAll(workspacePath, EXPORT_EXCLUDED_PATHS),
+    );
 
     const hasChanges = await gitHasStagedChanges(workspacePath);
 
