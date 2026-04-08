@@ -30,6 +30,7 @@ import { resolveFirstPartyLaunchPrompt } from "../domain/interactive/prompt.js";
 import { toErrorMessage } from "../utils/errors.js";
 import { isMissing } from "../utils/fs.js";
 import { generateSessionId } from "../utils/session-id.js";
+import { normalizeInteractiveTerm } from "../utils/terminal.js";
 import { resolveVoratiqCliTarget } from "../utils/voratiq-cli-target.js";
 import {
   createBundledVoratiqToolDeclaration,
@@ -201,6 +202,7 @@ export async function prepareNativeInteractiveSession(
       try {
         firstPartyMcpResolution = await resolveFirstPartyMcpStatus({
           providerId,
+          providerBinary: agent.binary,
           root: options.root,
           toolDeclarations,
           promptForMcpInstall: options.promptForMcpInstall,
@@ -368,9 +370,17 @@ export async function spawnPreparedInteractiveSession(
     process.stdout.write("\n");
   }
 
+  const spawnEnv =
+    stdio === "inherit"
+      ? {
+          ...prepared.invocation.env,
+          TERM: normalizeInteractiveTerm(prepared.invocation.env),
+        }
+      : prepared.invocation.env;
+
   const child = spawn(prepared.invocation.command, prepared.invocation.args, {
     cwd: prepared.invocation.cwd,
-    env: prepared.invocation.env,
+    env: spawnEnv,
     stdio,
   });
 

@@ -81,14 +81,22 @@ describe("interactive native launch substrate", () => {
       }),
     );
 
-    const prepared = await prepareNativeInteractiveSession({
-      root: fixture.root,
-      agentId: "codex-test",
-      sessionId,
-      launchMode: "first-party",
-      voratiqCliTarget,
-      mcpCommandRunner,
-    });
+    const previousHome = process.env.HOME;
+    process.env.HOME = fixture.root;
+
+    let prepared;
+    try {
+      prepared = await prepareNativeInteractiveSession({
+        root: fixture.root,
+        agentId: "codex-test",
+        sessionId,
+        launchMode: "first-party",
+        voratiqCliTarget,
+        mcpCommandRunner,
+      });
+    } finally {
+      process.env.HOME = previousHome;
+    }
 
     expect(prepared.ok).toBe(true);
     if (!prepared.ok) {
@@ -108,9 +116,14 @@ describe("interactive native launch substrate", () => {
     await expect(
       readFile(prepared.prepared.promptPath ?? "", "utf8"),
     ).resolves.toBe(FIRST_PARTY_ATTACHED_LAUNCH_PROMPT);
-    expect(prepared.prepared.invocation.env.HOME).toBe(process.env.HOME);
+    expect(prepared.prepared.invocation.env.HOME).toBe(fixture.root);
     expect(prepared.prepared.invocation.env.CODEX_HOME).toBeUndefined();
     expect(prepared.prepared.invocation.args).not.toContain("--config");
+    expect(mcpCommandRunner).toHaveBeenCalledWith({
+      command: fixture.binaryPath,
+      args: ["mcp", "get", "--json", "voratiq"],
+      cwd: fixture.root,
+    });
 
     const record = await readJson(prepared.prepared.recordPath);
     expect(record).toMatchObject({
@@ -130,6 +143,73 @@ describe("interactive native launch substrate", () => {
         },
       ],
     });
+  });
+
+  it("normalizes TERM for inherit-stdio launches when the parent shell reports dumb", async () => {
+    const fixture = await createWorkspaceFixture();
+    const previousTerm = process.env.TERM;
+    const stdinDescriptor = Object.getOwnPropertyDescriptor(
+      process.stdin,
+      "isTTY",
+    );
+    const stdoutDescriptor = Object.getOwnPropertyDescriptor(
+      process.stdout,
+      "isTTY",
+    );
+    const termCapturePath = join(fixture.root, "term.txt");
+    await writeFile(
+      fixture.binaryPath,
+      [
+        "#!/usr/bin/env bash",
+        `printf '%s' "$TERM" > ${JSON.stringify(termCapturePath)}`,
+        "exit 0",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await chmod(fixture.binaryPath, 0o755);
+    process.env.TERM = "dumb";
+    Object.defineProperty(process.stdin, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    Object.defineProperty(process.stdout, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+
+    try {
+      const prepared = await prepareNativeInteractiveSession({
+        root: fixture.root,
+        agentId: "codex-test",
+        sessionId: "20260408-030500-termd",
+      });
+
+      expect(prepared.ok).toBe(true);
+      if (!prepared.ok) {
+        return;
+      }
+
+      const launch = await spawnPreparedInteractiveSession(prepared.prepared, {
+        stdio: "inherit",
+      });
+      expect(launch.ok).toBe(true);
+      if (launch.ok) {
+        await launch.completion;
+      }
+
+      await expect(readFile(termCapturePath, "utf8")).resolves.toBe(
+        "xterm-256color",
+      );
+    } finally {
+      process.env.TERM = previousTerm;
+      if (stdinDescriptor) {
+        Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
+      }
+      if (stdoutDescriptor) {
+        Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
+      }
+    }
   });
 
   it("uses fallback launch notice when gemini bundled MCP is unavailable", async () => {
@@ -221,12 +301,12 @@ describe("interactive native launch substrate", () => {
       readFile(prepared.prepared.promptPath ?? "", "utf8"),
     ).resolves.toBe(FIRST_PARTY_ATTACHED_LAUNCH_PROMPT);
     expect(mcpCommandRunner).toHaveBeenNthCalledWith(1, {
-      command: "gemini",
+      command: fixture.binaryPath,
       args: ["mcp", "list"],
       cwd: fixture.root,
     });
     expect(mcpCommandRunner).toHaveBeenNthCalledWith(2, {
-      command: "gemini",
+      command: fixture.binaryPath,
       args: [
         "mcp",
         "add",
@@ -242,7 +322,7 @@ describe("interactive native launch substrate", () => {
       cwd: fixture.root,
     });
     expect(mcpCommandRunner).toHaveBeenNthCalledWith(3, {
-      command: "gemini",
+      command: fixture.binaryPath,
       args: ["mcp", "list"],
       cwd: fixture.root,
     });
