@@ -3,12 +3,13 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { load } from "js-yaml";
+import { z } from "zod";
 
+import { agentIdSchema } from "../../configs/agents/types.js";
 import type {
   RunSpecSourceDescriptor,
   RunSpecTarget,
 } from "../../domain/run/model/types.js";
-import { runSpecSourceDescriptorSchema } from "../../domain/run/model/types.js";
 import type { SpecAgentEntry } from "../../domain/spec/model/types.js";
 import { readSpecRecords } from "../../domain/spec/persistence/adapter.js";
 import { pathExists } from "../../utils/fs.js";
@@ -26,12 +27,25 @@ interface ParsedFrontmatterBlock {
 
 interface ParsedVoratiqFrontmatter {
   readonly bodyContent: string;
-  readonly source?: RunSpecSourceDescriptor;
+  readonly source?: ParsedVoratiqSourceMetadata;
   readonly invalidProvenance?: Extract<
     RunSpecTarget,
     { kind: "file" }
   >["provenance"];
 }
+
+interface ParsedVoratiqSourceMetadata {
+  readonly sessionId: string;
+  readonly agentId: string;
+}
+
+const voratiqFrontmatterSourceSchema = z
+  .object({
+    operator: z.literal("spec"),
+    sessionId: z.string().min(1),
+    agentId: agentIdSchema,
+  })
+  .strict();
 
 export interface ResolveRunSpecTargetInput {
   root: string;
@@ -177,7 +191,10 @@ async function readExactSpecArtifact(options: {
     };
   }
 
-  const source = toRecordedSpecSourceDescriptor(record.sessionId, agent);
+  const source = toRecordedSpecSourceDescriptor({
+    sessionId: record.sessionId,
+    agent,
+  });
   if (!source) {
     return {
       kind: "spec",
@@ -217,7 +234,7 @@ async function readExactSpecArtifact(options: {
 async function resolveDerivedSpecTarget(options: {
   root: string;
   specsFilePath: string;
-  source: RunSpecSourceDescriptor;
+  source: ParsedVoratiqSourceMetadata;
   bodyContent: string;
 }): Promise<RunSpecTarget> {
   const { root, specsFilePath, source, bodyContent } = options;
@@ -236,45 +253,52 @@ async function resolveDerivedSpecTarget(options: {
       provenance: {
         lineage: "invalid",
         issueCode: "stale_source",
-        source,
+        source: toRunSpecSourceHint(source),
         currentContentHash,
       },
     };
   }
 
-  const matchesDeclaredSource = record.agents.some(
-    (agent) =>
-      agent.agentId === source.agentId &&
-      typeof agent.outputPath === "string" &&
-      normalizePathForDisplay(agent.outputPath) ===
-        normalizePathForDisplay(source.outputPath),
-  );
+  const agent = record.agents.find((entry) => entry.agentId === source.agentId);
+  const resolvedSource = agent
+    ? toRecordedSpecSourceDescriptor({
+        sessionId: source.sessionId,
+        agent,
+      })
+    : undefined;
 
-  if (!matchesDeclaredSource) {
+  if (!agent) {
     return {
       kind: "spec",
       sessionId: source.sessionId,
       provenance: {
         lineage: "invalid",
         issueCode: "stale_source",
-        source,
+        source: toRunSpecSourceHint(source),
         currentContentHash,
       },
+    };
+  }
+
+  if (!resolvedSource) {
+    return {
+      kind: "spec",
+      sessionId: source.sessionId,
     };
   }
 
   const sourceContentHash = await readSourceArtifactHash({
     root,
-    source,
+    source: resolvedSource,
   });
-  if (sourceContentHash !== source.contentHash) {
+  if (sourceContentHash !== resolvedSource.contentHash) {
     return {
       kind: "spec",
       sessionId: source.sessionId,
       provenance: {
         lineage: "invalid",
         issueCode: "stale_source",
-        source,
+        source: resolvedSource,
         currentContentHash,
       },
     };
@@ -285,10 +309,10 @@ async function resolveDerivedSpecTarget(options: {
     sessionId: source.sessionId,
     provenance: {
       lineage:
-        currentContentHash === source.contentHash
+        currentContentHash === resolvedSource.contentHash
           ? "derived"
           : "derived_modified",
-      source,
+      source: resolvedSource,
       currentContentHash,
     },
   };
@@ -349,7 +373,7 @@ function parseVoratiqMetadata(
     };
   }
 
-  const parsedSource = runSpecSourceDescriptorSchema.safeParse(
+  const parsedSource = voratiqFrontmatterSourceSchema.safeParse(
     voratiqBlock.source,
   );
   if (!parsedSource.success) {
@@ -364,8 +388,8 @@ function parseVoratiqMetadata(
 
   return {
     source: {
-      ...parsedSource.data,
-      outputPath: normalizePathForDisplay(parsedSource.data.outputPath),
+      sessionId: parsedSource.data.sessionId,
+      agentId: parsedSource.data.agentId,
     },
   };
 }
@@ -439,10 +463,11 @@ function hashSpecBody(content: string): `sha256:${string}` {
   return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
 }
 
-function toRecordedSpecSourceDescriptor(
-  sessionId: string,
-  agent: SpecAgentEntry,
-): RunSpecSourceDescriptor | undefined {
+function toRecordedSpecSourceDescriptor(options: {
+  sessionId: string;
+  agent: SpecAgentEntry;
+}): RunSpecSourceDescriptor | undefined {
+  const { sessionId, agent } = options;
   if (
     typeof agent.outputPath !== "string" ||
     typeof agent.contentHash !== "string"
@@ -456,6 +481,18 @@ function toRecordedSpecSourceDescriptor(
     agentId: agent.agentId,
     outputPath: normalizePathForDisplay(agent.outputPath),
     contentHash: agent.contentHash,
+  };
+}
+
+function toRunSpecSourceHint(
+  source: ParsedVoratiqSourceMetadata,
+): NonNullable<
+  Extract<RunSpecTarget, { kind: "file" }>["provenance"]
+>["source"] {
+  return {
+    kind: "spec",
+    sessionId: source.sessionId,
+    agentId: source.agentId,
   };
 }
 
