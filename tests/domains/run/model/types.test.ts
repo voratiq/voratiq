@@ -23,8 +23,84 @@ const baseRunRecord = {
 } as const;
 
 describe("runRecordSchema", () => {
+  it("parses legacy path-only spec descriptors", () => {
+    expect(() => runRecordSchema.parse(baseRunRecord)).not.toThrow();
+  });
+
   it("parses records without applyStatus", () => {
     expect(() => runRecordSchema.parse(baseRunRecord)).not.toThrow();
+  });
+
+  it("parses session-backed spec descriptors", () => {
+    const parsed = runRecordSchema.parse({
+      ...baseRunRecord,
+      spec: {
+        path: "specs/sample.md",
+        target: {
+          kind: "spec",
+          sessionId: "spec-123",
+          provenance: {
+            lineage: "derived",
+            source: {
+              kind: "spec",
+              sessionId: "spec-123",
+              agentId: "agent-1",
+              outputPath: ".voratiq/spec/sessions/spec-123/agent-1/spec.md",
+              contentHash:
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            },
+            currentContentHash:
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          },
+        },
+      },
+    });
+
+    expect(parsed.spec.target).toEqual({
+      kind: "spec",
+      sessionId: "spec-123",
+      provenance: {
+        lineage: "derived",
+        source: {
+          kind: "spec",
+          sessionId: "spec-123",
+          agentId: "agent-1",
+          outputPath: ".voratiq/spec/sessions/spec-123/agent-1/spec.md",
+          contentHash:
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+        currentContentHash:
+          "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      },
+    });
+  });
+
+  it("parses invalid file-backed provenance descriptors", () => {
+    const parsed = runRecordSchema.parse({
+      ...baseRunRecord,
+      spec: {
+        path: "specs/sample.md",
+        target: {
+          kind: "file",
+          provenance: {
+            lineage: "invalid",
+            issueCode: "malformed_frontmatter",
+            currentContentHash:
+              "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          },
+        },
+      },
+    });
+
+    expect(parsed.spec.target).toEqual({
+      kind: "file",
+      provenance: {
+        lineage: "invalid",
+        issueCode: "malformed_frontmatter",
+        currentContentHash:
+          "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      },
+    });
   });
 
   it("parses records with applyStatus", () => {

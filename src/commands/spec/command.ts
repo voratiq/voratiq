@@ -346,6 +346,7 @@ async function persistSpecAgentCompletion(options: {
             ...completeFields,
             outputPath: result.outputPath,
             dataPath: result.dataPath,
+            contentHash: result.contentHash,
             tokenUsage: result.tokenUsage,
             error: null,
           };
@@ -426,6 +427,7 @@ function mapExecutionResultsToSpecAgents(
         status: "succeeded",
         outputPath: result.outputPath,
         dataPath: result.dataPath,
+        contentHash: result.contentHash,
         tokenUsage: result.tokenUsage,
       };
     }

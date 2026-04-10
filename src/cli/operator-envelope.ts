@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { ReductionTarget } from "../domain/reduce/model/types.js";
+import type { RunSpecTarget } from "../domain/run/model/types.js";
 import type { SelectionDecision } from "../policy/index.js";
 import type {
   ReductionStatus,
@@ -27,6 +28,21 @@ export interface EnvelopeArtifactRef {
   agentId?: string;
 }
 
+export interface EnvelopeTargetRef {
+  kind: string;
+  sessionId: string;
+  lineage?: string;
+  issueCode?: string;
+  currentContentHash?: string;
+  source?: {
+    kind?: string;
+    sessionId?: string;
+    agentId?: string;
+    outputPath?: string;
+    contentHash?: string;
+  };
+}
+
 export interface OperatorResultEnvelope {
   version: 1;
   operator: EnvelopeOperator;
@@ -40,10 +56,7 @@ export interface OperatorResultEnvelope {
     messageId?: string;
     agentId?: string;
   };
-  target?: {
-    kind: string;
-    sessionId: string;
-  };
+  target?: EnvelopeTargetRef;
   artifacts: EnvelopeArtifactRef[];
   selection?: {
     state: "resolvable" | "unresolved";
@@ -262,8 +275,12 @@ export function buildSpecOperatorEnvelope(options: {
 export function buildRunOperatorEnvelope(options: {
   runId: string;
   specPath: string;
+  specTarget?: RunSpecTarget;
   status: RunStatus;
 }): OperatorResultEnvelope {
+  const target = buildRunEnvelopeTarget(options.specTarget);
+  const alerts = buildRunEnvelopeAlerts(options.specTarget);
+
   return buildOperatorEnvelope({
     operator: "run",
     status: normalizeTerminalStatus(options.status),
@@ -282,6 +299,8 @@ export function buildRunOperatorEnvelope(options: {
         path: options.specPath,
       },
     ],
+    target,
+    alerts,
   });
 }
 
@@ -488,6 +507,74 @@ export function buildPruneOperatorEnvelope(
         ]
       : [],
   });
+}
+
+function buildRunEnvelopeTarget(
+  specTarget: RunSpecTarget | undefined,
+): EnvelopeTargetRef | undefined {
+  if (specTarget?.kind === "spec") {
+    return {
+      kind: "spec",
+      sessionId: specTarget.sessionId,
+      ...(specTarget.provenance
+        ? buildRunEnvelopeProvenanceFields(specTarget.provenance)
+        : {}),
+    };
+  }
+
+  if (
+    specTarget?.kind === "file" &&
+    specTarget.provenance?.source?.sessionId &&
+    specTarget.provenance.lineage === "invalid"
+  ) {
+    return {
+      kind: "spec",
+      sessionId: specTarget.provenance.source.sessionId,
+      ...buildRunEnvelopeProvenanceFields(specTarget.provenance),
+    };
+  }
+
+  return undefined;
+}
+
+function buildRunEnvelopeAlerts(
+  specTarget: RunSpecTarget | undefined,
+): OperatorResultEnvelope["alerts"] | undefined {
+  if (specTarget?.provenance?.lineage !== "invalid") {
+    return undefined;
+  }
+
+  return [
+    {
+      level: "warn",
+      message:
+        specTarget.provenance.issueCode === "stale_source"
+          ? "Run spec ancestry metadata referenced a stale or mismatched spec artifact."
+          : "Run spec ancestry metadata was malformed and was ignored.",
+    },
+  ];
+}
+
+function buildRunEnvelopeProvenanceFields(
+  provenance: NonNullable<RunSpecTarget["provenance"]>,
+): Omit<EnvelopeTargetRef, "kind" | "sessionId"> {
+  return {
+    lineage: provenance.lineage,
+    ...(provenance.lineage === "invalid"
+      ? { issueCode: provenance.issueCode }
+      : {}),
+    ...("currentContentHash" in provenance &&
+    typeof provenance.currentContentHash === "string"
+      ? { currentContentHash: provenance.currentContentHash }
+      : {}),
+    ...(provenance.source
+      ? {
+          source: {
+            ...provenance.source,
+          },
+        }
+      : {}),
+  };
 }
 
 export function writeOperatorResultEnvelope(

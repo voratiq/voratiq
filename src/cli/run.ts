@@ -124,6 +124,7 @@ export async function runRunCommand(
   const report = await executeRunCommand({
     root,
     runsFilePath: workspacePaths.runsFile,
+    specsFilePath: workspacePaths.specsFile,
     specAbsolutePath: absolutePath,
     specDisplayPath: displayPath,
     agentIds,
@@ -235,6 +236,7 @@ export function createRunCommand(): Command {
           buildRunOperatorEnvelope({
             runId: result.report.runId,
             specPath: result.report.spec.path,
+            specTarget: result.report.spec.target,
             status: result.report.status,
           }),
           result.exitCode,

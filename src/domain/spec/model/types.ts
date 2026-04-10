@@ -31,6 +31,11 @@ export {
 const IN_PROGRESS_SPEC_STATUSES = [
   "running",
 ] as const satisfies readonly SpecRecordStatus[];
+const SPEC_CONTENT_HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
+
+export const specContentHashSchema = z
+  .string()
+  .regex(SPEC_CONTENT_HASH_PATTERN);
 
 export const specAgentEntrySchema = z
   .object({
@@ -40,6 +45,7 @@ export const specAgentEntrySchema = z
     completedAt: z.string().optional(),
     outputPath: repoRelativeRecordPathSchema.optional(),
     dataPath: repoRelativeRecordPathSchema.optional(),
+    contentHash: specContentHashSchema.optional(),
     tokenUsage: extractedTokenUsageSchema.optional(),
     error: z.string().nullable().optional(),
   })
