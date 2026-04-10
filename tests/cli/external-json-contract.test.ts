@@ -686,6 +686,60 @@ describe("external CLI JSON contract", () => {
     });
   });
 
+  it("emits run target lineage in json mode when the input spec came from a spec session", async () => {
+    executeRunCommandMock.mockResolvedValue({
+      runId: "run-session-backed",
+      spec: {
+        path: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+        target: {
+          kind: "spec",
+          sessionId: "spec-123",
+        },
+      },
+      status: "succeeded",
+      createdAt: "2026-03-31T10:01:00.000Z",
+      startedAt: "2026-03-31T10:01:00.000Z",
+      completedAt: "2026-03-31T10:02:00.000Z",
+      baseRevisionSha: "abc123",
+      agents: [],
+      hadAgentFailure: false,
+    });
+
+    const result = await invokeCli([
+      "run",
+      "--spec",
+      ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+      "--json",
+    ]);
+    const envelope = normalizeEnvelope(parseJson<JsonEnvelope>(result));
+
+    expect(result.exitCode).toBe(0);
+    expect(envelope).toMatchObject({
+      version: 1,
+      operator: "run",
+      status: "succeeded",
+      ids: {
+        runId: "run-session-backed",
+      },
+      target: {
+        kind: "spec",
+        sessionId: "spec-123",
+      },
+      artifacts: [
+        {
+          kind: "session",
+          role: "session",
+          path: ".voratiq/run/sessions/run-session-backed",
+        },
+        {
+          kind: "spec",
+          role: "input",
+          path: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+        },
+      ],
+    });
+  });
+
   it("emits a failed apply envelope when the repository is dirty", async () => {
     ensureCleanWorkingTreeMock.mockRejectedValue(
       new DirtyWorkingTreeError(

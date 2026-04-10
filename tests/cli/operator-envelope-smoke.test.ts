@@ -88,6 +88,10 @@ interface CapturedEnvelope {
     runId?: string;
     verificationId?: string;
   };
+  target?: {
+    kind: string;
+    sessionId: string;
+  };
   artifacts: Array<{
     kind: string;
     path: string;
@@ -207,7 +211,13 @@ describe("operator envelope json smoke chain", () => {
     executeRunCommandMock.mockImplementation((input) =>
       Promise.resolve({
         runId: "run-456",
-        spec: { path: input.specDisplayPath },
+        spec: {
+          path: input.specDisplayPath,
+          target: {
+            kind: "spec",
+            sessionId: "spec-123",
+          },
+        },
         status: "succeeded",
         createdAt: "2026-03-27T12:01:00.000Z",
         startedAt: "2026-03-27T12:01:00.000Z",
@@ -272,6 +282,10 @@ describe("operator envelope json smoke chain", () => {
     expect(runEnvelope.status).toBe("succeeded");
     expect(runEnvelope.ids?.runId).toBe("run-456");
     expect(runSpecArtifact?.path).toBe(specArtifact?.path);
+    expect(runEnvelope.target).toEqual({
+      kind: "spec",
+      sessionId: "spec-123",
+    });
 
     const verifyResult = await invokeCli([
       "verify",

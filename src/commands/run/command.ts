@@ -41,6 +41,7 @@ import { validateAndPrepare } from "./validation.js";
 export interface RunCommandInput {
   root: string;
   runsFilePath: string;
+  specsFilePath?: string;
   specAbsolutePath: string;
   specDisplayPath: string;
   agentIds?: readonly string[];
@@ -60,6 +61,7 @@ export async function executeRunCommand(
   const {
     root,
     runsFilePath,
+    specsFilePath,
     specAbsolutePath,
     specDisplayPath,
     agentIds,
@@ -82,6 +84,8 @@ export async function executeRunCommand(
   const validation = await validateAndPrepare({
     root,
     specAbsolutePath,
+    specDisplayPath,
+    specsFilePath,
     resolvedAgentIds: resolution.agentIds,
     maxParallel: requestedMaxParallel,
   });
@@ -90,7 +94,6 @@ export async function executeRunCommand(
   const startedAt = new Date().toISOString();
   const createdAt = startedAt;
   const repoDisplayPath = normalizePathForDisplay(relativeToRoot(root, root));
-
   const { runWorkspace } = await prepareRunWorkspace({
     root,
     runId,
@@ -103,6 +106,7 @@ export async function executeRunCommand(
     runsFilePath,
     runId,
     specDisplayPath,
+    specTarget: validation.specTarget,
     baseRevisionSha: validation.baseRevisionSha,
     repoDisplayPath,
     createdAt,

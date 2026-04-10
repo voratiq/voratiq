@@ -77,6 +77,109 @@ describe("operator envelope helpers", () => {
     );
   });
 
+  it("includes the upstream spec session when a run is session-backed", () => {
+    const envelope = buildRunOperatorEnvelope({
+      runId: "run-123",
+      specPath: ".voratiq/spec/sessions/spec-456/agent-a/spec.md",
+      specTarget: {
+        kind: "spec",
+        sessionId: "spec-456",
+        provenance: {
+          lineage: "exact",
+          source: {
+            kind: "spec",
+            sessionId: "spec-456",
+            agentId: "agent-a",
+            outputPath: ".voratiq/spec/sessions/spec-456/agent-a/spec.md",
+            contentHash:
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          },
+        },
+      },
+      status: "succeeded",
+    });
+
+    expect(envelope.target).toEqual({
+      kind: "spec",
+      sessionId: "spec-456",
+      lineage: "exact",
+      source: {
+        kind: "spec",
+        sessionId: "spec-456",
+        agentId: "agent-a",
+        outputPath: ".voratiq/spec/sessions/spec-456/agent-a/spec.md",
+        contentHash:
+          "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      },
+    });
+  });
+
+  it("surfaces derived spec lineage in run envelopes", () => {
+    const envelope = buildRunOperatorEnvelope({
+      runId: "run-123",
+      specPath: ".voratiq/spec/copied.md",
+      specTarget: {
+        kind: "spec",
+        sessionId: "spec-456",
+        provenance: {
+          lineage: "derived_modified",
+          source: {
+            kind: "spec",
+            sessionId: "spec-456",
+            agentId: "agent-a",
+            outputPath: ".voratiq/spec/sessions/spec-456/agent-a/spec.md",
+            contentHash:
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          },
+          currentContentHash:
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        },
+      },
+      status: "succeeded",
+    });
+
+    expect(envelope.target).toEqual({
+      kind: "spec",
+      sessionId: "spec-456",
+      lineage: "derived_modified",
+      source: {
+        kind: "spec",
+        sessionId: "spec-456",
+        agentId: "agent-a",
+        outputPath: ".voratiq/spec/sessions/spec-456/agent-a/spec.md",
+        contentHash:
+          "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      },
+      currentContentHash:
+        "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    });
+  });
+
+  it("warns when run input carries malformed spec provenance metadata", () => {
+    const envelope = buildRunOperatorEnvelope({
+      runId: "run-123",
+      specPath: "specs/task.md",
+      specTarget: {
+        kind: "file",
+        provenance: {
+          lineage: "invalid",
+          issueCode: "malformed_frontmatter",
+          currentContentHash:
+            "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        },
+      },
+      status: "succeeded",
+    });
+
+    expect(envelope.target).toBeUndefined();
+    expect(envelope.alerts).toEqual([
+      {
+        level: "warn",
+        message: "Run spec ancestry metadata was malformed and was ignored.",
+      },
+    ]);
+  });
+
   it("builds an unresolved verify envelope from selection state", () => {
     const envelope = buildVerifyOperatorEnvelope({
       verificationId: "verify-123",

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -57,6 +58,7 @@ export interface SpecCompetitionExecution {
   readonly agentId: string;
   readonly outputPath?: string;
   readonly dataPath?: string;
+  readonly contentHash?: `sha256:${string}`;
   readonly status: "succeeded" | "failed";
   readonly tokenUsage?: ExtractedTokenUsage;
   readonly tokenUsageResult: TokenUsageResult;
@@ -234,7 +236,7 @@ export function createSpecCompetitionAdapter(
           workspacePaths.workspacePath,
           SPEC_DATA_FILENAME,
         );
-        await readFile(stagedMarkdownPath, "utf8");
+        const markdownContent = await readFile(stagedMarkdownPath, "utf8");
         const specData = parseSpecData(await readFile(stagedDataPath, "utf8"));
         const artifactBasename = slugify(specData.title, "spec");
         const artifactMarkdownFilename = `${artifactBasename}.md`;
@@ -263,6 +265,7 @@ export function createSpecCompetitionAdapter(
           dataPath: normalizePathForDisplay(
             relativeToRoot(root, dataPromoteResult.artifactPath),
           ),
+          contentHash: hashSpecContent(markdownContent),
           status: "succeeded",
           tokenUsage,
           tokenUsageResult,
@@ -303,4 +306,8 @@ function compareSpecExecutionsByAgentId(
   right: SpecCompetitionExecution,
 ): number {
   return left.agentId.localeCompare(right.agentId);
+}
+
+function hashSpecContent(content: string): `sha256:${string}` {
+  return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
 }

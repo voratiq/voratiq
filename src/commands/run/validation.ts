@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import { verifyAgentProviders } from "../../agents/runtime/auth.js";
 import { loadAgentCatalogDiagnostics } from "../../configs/agents/loader.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
@@ -19,20 +17,25 @@ import {
   RunPreflightError,
 } from "../../domain/run/competition/errors.js";
 import { RunOptionValidationError } from "../../domain/run/model/errors.js";
+import type { RunSpecTarget } from "../../domain/run/model/types.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { WorkspaceMissingEntryError } from "../../workspace/errors.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
+import { loadRunSpecInput } from "./spec-provenance.js";
 
 export interface ValidationInput {
   readonly root: string;
   readonly specAbsolutePath: string;
+  readonly specDisplayPath?: string;
+  readonly specsFilePath?: string;
   readonly resolvedAgentIds?: readonly string[];
   readonly maxParallel?: number;
 }
 
 export interface ValidationResult {
   readonly specContent: string;
+  readonly specTarget: RunSpecTarget;
   readonly baseRevisionSha: string;
   readonly agents: readonly AgentDefinition[];
   readonly effectiveMaxParallel: number;
@@ -48,6 +51,8 @@ export async function validateAndPrepare(
   const {
     root,
     specAbsolutePath,
+    specDisplayPath,
+    specsFilePath,
     resolvedAgentIds,
     maxParallel: requestedMaxParallel,
   } = input;
@@ -62,7 +67,12 @@ export async function validateAndPrepare(
     );
   }
 
-  const specContent = await readFile(specAbsolutePath, "utf8");
+  const { specContent, specTarget } = await loadRunSpecInput({
+    root,
+    specAbsolutePath,
+    specDisplayPath: specDisplayPath ?? specAbsolutePath,
+    specsFilePath,
+  });
 
   const baseRevisionSha = await getHeadRevision(root);
   const preflightIssues: PreflightIssue[] = [];
@@ -145,6 +155,7 @@ export async function validateAndPrepare(
 
   return {
     specContent,
+    specTarget,
     baseRevisionSha,
     agents,
     effectiveMaxParallel,

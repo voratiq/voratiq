@@ -29,8 +29,120 @@ export {
   TERMINAL_AGENT_STATUSES,
 };
 
+const RUN_SPEC_TARGET_KIND_VALUES = ["file", "spec"] as const;
+const RUN_SPEC_PROVENANCE_LINEAGE_VALUES = [
+  "exact",
+  "derived",
+  "derived_modified",
+  "invalid",
+] as const;
+const RUN_SPEC_PROVENANCE_ISSUE_VALUES = [
+  "malformed_frontmatter",
+  "stale_source",
+] as const;
+
+export const runSpecTargetKindSchema = z.enum(RUN_SPEC_TARGET_KIND_VALUES);
+export const runSpecProvenanceLineageSchema = z.enum(
+  RUN_SPEC_PROVENANCE_LINEAGE_VALUES,
+);
+export const runSpecProvenanceIssueSchema = z.enum(
+  RUN_SPEC_PROVENANCE_ISSUE_VALUES,
+);
+
+export const runSpecContentHashSchema = z
+  .string()
+  .regex(/^sha256:[a-f0-9]{64}$/u);
+
+export const runSpecSourceDescriptorSchema = z
+  .object({
+    kind: z.literal("spec"),
+    sessionId: z.string().min(1),
+    agentId: agentIdSchema,
+    outputPath: repoRelativeRecordPathSchema,
+    contentHash: runSpecContentHashSchema,
+  })
+  .strict();
+
+export type RunSpecSourceDescriptor = z.infer<
+  typeof runSpecSourceDescriptorSchema
+>;
+
+export const runSpecSourceHintSchema = z
+  .object({
+    kind: z.literal("spec").optional(),
+    sessionId: z.string().min(1).optional(),
+    agentId: agentIdSchema.optional(),
+    outputPath: repoRelativeRecordPathSchema.optional(),
+    contentHash: runSpecContentHashSchema.optional(),
+  })
+  .strict();
+
+export const exactRunSpecProvenanceSchema = z
+  .object({
+    lineage: z.literal("exact"),
+    source: runSpecSourceDescriptorSchema.optional(),
+  })
+  .strict();
+
+export const derivedRunSpecProvenanceSchema = z
+  .object({
+    lineage: z.literal("derived"),
+    source: runSpecSourceDescriptorSchema,
+    currentContentHash: runSpecContentHashSchema,
+  })
+  .strict();
+
+export const derivedModifiedRunSpecProvenanceSchema = z
+  .object({
+    lineage: z.literal("derived_modified"),
+    source: runSpecSourceDescriptorSchema,
+    currentContentHash: runSpecContentHashSchema,
+  })
+  .strict();
+
+export const invalidRunSpecProvenanceSchema = z
+  .object({
+    lineage: z.literal("invalid"),
+    issueCode: runSpecProvenanceIssueSchema,
+    source: runSpecSourceHintSchema.optional(),
+    currentContentHash: runSpecContentHashSchema.optional(),
+  })
+  .strict();
+
+export const runSpecProvenanceSchema = z.union([
+  exactRunSpecProvenanceSchema,
+  derivedRunSpecProvenanceSchema,
+  derivedModifiedRunSpecProvenanceSchema,
+  invalidRunSpecProvenanceSchema,
+]);
+
+export type RunSpecProvenance = z.infer<typeof runSpecProvenanceSchema>;
+
+export const fileRunSpecTargetSchema = z
+  .object({
+    kind: z.literal("file"),
+    provenance: invalidRunSpecProvenanceSchema.optional(),
+  })
+  .strict();
+
+export const sessionRunSpecTargetSchema = z
+  .object({
+    kind: z.literal("spec"),
+    sessionId: z.string().min(1),
+    provenance: runSpecProvenanceSchema.optional(),
+  })
+  .strict();
+
+export const runSpecTargetSchema = z.union([
+  fileRunSpecTargetSchema,
+  sessionRunSpecTargetSchema,
+]);
+
+export type RunSpecTarget = z.infer<typeof runSpecTargetSchema>;
+
 export const runSpecDescriptorSchema = z.object({
   path: repoRelativeRecordPathSchema,
+  target: runSpecTargetSchema.optional(),
 });
 
 export type RunSpecDescriptor = z.infer<typeof runSpecDescriptorSchema>;
