@@ -86,6 +86,68 @@ describe("resolveRunSpecTarget", () => {
     }
   });
 
+  it("falls back to a session target for canonical spec artifacts without a persisted source hash", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-run-spec-target-"));
+
+    try {
+      await createWorkspace(root);
+      const body = "# Canonical spec\n";
+      const artifactPath = join(
+        root,
+        ".voratiq",
+        "spec",
+        "sessions",
+        "spec-legacy",
+        "agent-a",
+        "spec.md",
+      );
+      await mkdir(
+        join(root, ".voratiq", "spec", "sessions", "spec-legacy", "agent-a"),
+        {
+          recursive: true,
+        },
+      );
+      await writeFile(artifactPath, body, "utf8");
+
+      await appendSpecRecord({
+        root,
+        specsFilePath: join(root, ".voratiq", "spec", "index.json"),
+        record: {
+          sessionId: "spec-legacy",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:01:00.000Z",
+          status: "succeeded",
+          description: "Generate a spec",
+          agents: [
+            {
+              agentId: "agent-a",
+              status: "succeeded",
+              startedAt: "2026-01-01T00:00:00.000Z",
+              completedAt: "2026-01-01T00:01:00.000Z",
+              outputPath: ".voratiq/spec/sessions/spec-legacy/agent-a/spec.md",
+              dataPath: ".voratiq/spec/sessions/spec-legacy/agent-a/spec.json",
+            },
+          ],
+        },
+      });
+
+      await expect(
+        resolveRunSpecTarget({
+          root,
+          specsFilePath: join(root, ".voratiq", "spec", "index.json"),
+          specAbsolutePath: artifactPath,
+          specDisplayPath: ".voratiq/spec/sessions/spec-legacy/agent-a/spec.md",
+        }),
+      ).resolves.toEqual({
+        kind: "spec",
+        sessionId: "spec-legacy",
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("marks in-place edits to canonical spec artifacts as derived_modified lineage", async () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-run-spec-target-"));
 
@@ -168,7 +230,6 @@ describe("resolveRunSpecTarget", () => {
     try {
       await createWorkspace(root);
       const body = "# Derived spec\n";
-      const contentHash = hashBody(body);
       const copiedPath = join(root, ".voratiq", "spec", "copied.md");
       const artifactPath = join(
         root,
@@ -198,6 +259,7 @@ describe("resolveRunSpecTarget", () => {
               completedAt: "2026-01-01T00:01:00.000Z",
               outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
               dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+              contentHash: hashBody(body),
             },
           ],
         },
@@ -218,11 +280,9 @@ describe("resolveRunSpecTarget", () => {
           "---",
           "voratiq:",
           "  source:",
-          "    kind: spec",
+          "    operator: spec",
           "    sessionId: spec-123",
           "    agentId: agent-a",
-          "    outputPath: .voratiq/spec/sessions/spec-123/agent-a/spec.md",
-          `    contentHash: ${contentHash}`,
           "---",
           body,
         ].join("\n"),
@@ -246,9 +306,9 @@ describe("resolveRunSpecTarget", () => {
             sessionId: "spec-123",
             agentId: "agent-a",
             outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
-            contentHash,
+            contentHash: hashBody(body),
           },
-          currentContentHash: contentHash,
+          currentContentHash: hashBody(body),
         },
       });
     } finally {
@@ -292,6 +352,7 @@ describe("resolveRunSpecTarget", () => {
               completedAt: "2026-01-01T00:01:00.000Z",
               outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
               dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+              contentHash: hashBody(originalBody),
             },
           ],
         },
@@ -312,11 +373,9 @@ describe("resolveRunSpecTarget", () => {
           "---",
           "voratiq:",
           "  source:",
-          "    kind: spec",
+          "    operator: spec",
           "    sessionId: spec-123",
           "    agentId: agent-a",
-          "    outputPath: .voratiq/spec/sessions/spec-123/agent-a/spec.md",
-          `    contentHash: ${hashBody(originalBody)}`,
           "---",
           copiedBody,
         ].join("\n"),
@@ -350,20 +409,19 @@ describe("resolveRunSpecTarget", () => {
     }
   });
 
-  it("marks copied descendants with mismatched source hashes as stale provenance metadata", async () => {
+  it("falls back to a session target for copied descendants when the source session lacks a persisted hash", async () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-run-spec-target-"));
 
     try {
       await createWorkspace(root);
-      const sourceBody = "# Canonical spec\n";
-      const copiedBody = "# Canonical spec\n";
+      const body = "# Derived spec\n";
       const copiedPath = join(root, ".voratiq", "spec", "copied.md");
       const artifactPath = join(
         root,
         ".voratiq",
         "spec",
         "sessions",
-        "spec-123",
+        "spec-legacy",
         "agent-a",
         "spec.md",
       );
@@ -372,7 +430,7 @@ describe("resolveRunSpecTarget", () => {
         root,
         specsFilePath: join(root, ".voratiq", "spec", "index.json"),
         record: {
-          sessionId: "spec-123",
+          sessionId: "spec-legacy",
           createdAt: "2026-01-01T00:00:00.000Z",
           startedAt: "2026-01-01T00:00:00.000Z",
           completedAt: "2026-01-01T00:01:00.000Z",
@@ -384,20 +442,20 @@ describe("resolveRunSpecTarget", () => {
               status: "succeeded",
               startedAt: "2026-01-01T00:00:00.000Z",
               completedAt: "2026-01-01T00:01:00.000Z",
-              outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
-              dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+              outputPath: ".voratiq/spec/sessions/spec-legacy/agent-a/spec.md",
+              dataPath: ".voratiq/spec/sessions/spec-legacy/agent-a/spec.json",
             },
           ],
         },
       });
 
       await mkdir(
-        join(root, ".voratiq", "spec", "sessions", "spec-123", "agent-a"),
+        join(root, ".voratiq", "spec", "sessions", "spec-legacy", "agent-a"),
         {
           recursive: true,
         },
       );
-      await writeFile(artifactPath, sourceBody, "utf8");
+      await writeFile(artifactPath, body, "utf8");
 
       await mkdir(join(root, ".voratiq", "spec"), { recursive: true });
       await writeFile(
@@ -406,7 +464,47 @@ describe("resolveRunSpecTarget", () => {
           "---",
           "voratiq:",
           "  source:",
-          "    kind: spec",
+          "    operator: spec",
+          "    sessionId: spec-legacy",
+          "    agentId: agent-a",
+          "---",
+          body,
+        ].join("\n"),
+        "utf8",
+      );
+
+      await expect(
+        resolveRunSpecTarget({
+          root,
+          specsFilePath: join(root, ".voratiq", "spec", "index.json"),
+          specAbsolutePath: copiedPath,
+          specDisplayPath: ".voratiq/spec/copied.md",
+        }),
+      ).resolves.toEqual({
+        kind: "spec",
+        sessionId: "spec-legacy",
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("treats unexpected expanded source fields as malformed frontmatter", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-run-spec-target-"));
+
+    try {
+      await createWorkspace(root);
+      const copiedBody = "# Canonical spec\n";
+      const copiedPath = join(root, ".voratiq", "spec", "copied.md");
+
+      await mkdir(join(root, ".voratiq", "spec"), { recursive: true });
+      await writeFile(
+        copiedPath,
+        [
+          "---",
+          "voratiq:",
+          "  source:",
+          "    operator: spec",
           "    sessionId: spec-123",
           "    agentId: agent-a",
           "    outputPath: .voratiq/spec/sessions/spec-123/agent-a/spec.md",
@@ -425,18 +523,10 @@ describe("resolveRunSpecTarget", () => {
           specDisplayPath: ".voratiq/spec/copied.md",
         }),
       ).resolves.toEqual({
-        kind: "spec",
-        sessionId: "spec-123",
+        kind: "file",
         provenance: {
           lineage: "invalid",
-          issueCode: "stale_source",
-          source: {
-            kind: "spec",
-            sessionId: "spec-123",
-            agentId: "agent-a",
-            outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
-            contentHash: hashBody("# Different source body\n"),
-          },
+          issueCode: "malformed_frontmatter",
           currentContentHash: hashBody(copiedBody),
         },
       });
@@ -480,7 +570,7 @@ describe("resolveRunSpecTarget", () => {
           "---",
           "voratiq:",
           "  source:",
-          "    kind: spec",
+          "    operator: spec",
           "    sessionId:",
           "---",
           strippedBody,
@@ -523,11 +613,9 @@ describe("resolveRunSpecTarget", () => {
           "---",
           "voratiq:",
           "  source:",
-          "    kind: spec",
+          "    operator: spec",
           "    sessionId: spec-missing",
           "    agentId: agent-a",
-          "    outputPath: .voratiq/spec/sessions/spec-missing/agent-a/spec.md",
-          `    contentHash: ${hashBody(body)}`,
           "---",
           body,
         ].join("\n"),
@@ -551,8 +639,6 @@ describe("resolveRunSpecTarget", () => {
             kind: "spec",
             sessionId: "spec-missing",
             agentId: "agent-a",
-            outputPath: ".voratiq/spec/sessions/spec-missing/agent-a/spec.md",
-            contentHash: hashBody(body),
           },
           currentContentHash: hashBody(body),
         },
@@ -600,11 +686,9 @@ describe("resolveRunSpecTarget", () => {
           "---",
           "voratiq:",
           "  source:",
-          "    kind: spec",
+          "    operator: spec",
           "    sessionId: spec-123",
           "    agentId: agent-a",
-          "    outputPath: .voratiq/spec/sessions/spec-123/agent-a/spec.md",
-          `    contentHash: ${hashBody(body)}`,
           "---",
           body,
         ].join("\n"),
@@ -695,11 +779,9 @@ describe("resolveRunSpecTarget", () => {
           expectedFrontmatter,
           "voratiq:",
           "  source:",
-          "    kind: spec",
+          "    operator: spec",
           "    sessionId: spec-123",
           "    agentId: agent-a",
-          "    outputPath: .voratiq/spec/sessions/spec-123/agent-a/spec.md",
-          `    contentHash: ${hashBody(sourceBody)}`,
           "---",
           body,
         ].join("\n"),
