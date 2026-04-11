@@ -120,6 +120,7 @@ export interface ReduceTranscriptOptions {
   elapsed: string;
   workspacePath: string;
   status: "queued" | "succeeded" | "failed" | "aborted" | "running";
+  targetDisplay?: string;
   reducers: readonly ReduceTranscriptReducerBlock[];
   nextCommandLines?: readonly string[];
   suppressHint?: boolean;
@@ -133,6 +134,7 @@ function buildReduceStageShell(options: {
   elapsed: string;
   workspacePath: string;
   status: "queued" | "succeeded" | "failed" | "aborted" | "running";
+  targetDisplay?: string;
   tableLines?: string[];
   style?: TranscriptShellStyleOptions;
 }): {
@@ -150,6 +152,7 @@ function buildReduceStageShell(options: {
       elapsed: options.elapsed,
       createdAt: options.createdAt,
       workspacePath: options.workspacePath,
+      targetDisplay: options.targetDisplay,
       style: options.style,
     }),
     statusTableLines: options.tableLines ?? [],
@@ -484,6 +487,7 @@ export function renderReduceTranscript(
     elapsed,
     workspacePath,
     status,
+    targetDisplay,
     reducers,
     nextCommandLines,
     suppressHint,
@@ -502,6 +506,7 @@ export function renderReduceTranscript(
       elapsed,
       workspacePath,
       status,
+      targetDisplay,
       tableLines:
         reducers.length > 0
           ? renderTranscriptStatusTable({

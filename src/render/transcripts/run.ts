@@ -6,6 +6,7 @@ import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
 import { formatCompactDiffStatistics } from "../../utils/diff.js";
 import {
   formatAgentDuration,
+  formatAgentErrorLine,
   formatAgentStatusLabelWithStyle,
 } from "../utils/agents.js";
 import { formatAgentBadge } from "../utils/badges.js";
@@ -17,6 +18,7 @@ import {
   buildStageFrameLines,
   renderStageFinalFrame,
 } from "../utils/stage-output.js";
+import { renderTranscript } from "../utils/transcript.js";
 import type { TranscriptShellStyleOptions } from "../utils/transcript-shell.js";
 import {
   renderTranscriptStatusTable,
@@ -69,6 +71,8 @@ export interface RunTranscriptAgentRecord {
   startedAt?: string;
   completedAt?: string;
   diffStatistics?: string;
+  outputPath?: string;
+  errorLine?: string;
 }
 
 export interface RunTranscriptOptions {
@@ -78,6 +82,7 @@ export interface RunTranscriptOptions {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
+  targetDisplay?: string;
   agents: readonly RunTranscriptAgentRecord[];
   isTty?: boolean;
   now?: number;
@@ -122,6 +127,7 @@ export function renderRunTranscript(options: RunTranscriptOptions): string {
             options.now,
           ) ?? DASH,
         createdAt: formatRunTimestamp(options.createdAt),
+        targetDisplay: options.targetDisplay,
       },
       style,
     ),
@@ -147,10 +153,41 @@ export function renderRunTranscript(options: RunTranscriptOptions): string {
           }),
   };
 
-  return renderStageFinalFrame({
-    metadataLines: shell.metadataLines,
-    statusTableLines: shell.statusTableLines,
+  if (options.agents.length === 0) {
+    return renderStageFinalFrame({
+      metadataLines: shell.metadataLines,
+      statusTableLines: shell.statusTableLines,
+    });
+  }
+
+  const sections: string[][] = [
+    [
+      ...shell.metadataLines,
+      ...(shell.statusTableLines.length > 0
+        ? ["", ...shell.statusTableLines]
+        : []),
+    ],
+    ["---"],
+  ];
+
+  options.agents.forEach((agent, index) => {
+    const block: string[] = [`Agent: ${agent.agentId}`];
+
+    if (agent.errorLine) {
+      const inlineError = agent.errorLine.replace(/\s+/gu, " ").trim();
+      block.push("", formatAgentErrorLine(inlineError, style));
+    }
+
+    block.push("", `Output: ${agent.outputPath ?? DASH}`);
+
+    if (index < options.agents.length - 1) {
+      block.push("", "---");
+    }
+
+    sections.push(block);
   });
+
+  return renderTranscript({ sections });
 }
 
 function formatErrorDetail(error: unknown): string {

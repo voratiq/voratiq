@@ -3,6 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { executeListCommand } from "../../../src/commands/list/command.js";
+import {
+  formatTargetTablePreview,
+  TARGET_TABLE_PREVIEW_LENGTH,
+} from "../../../src/commands/list/normalization.js";
+import type { InteractiveSessionRecord } from "../../../src/domain/interactive/model/types.js";
+import { appendInteractiveSessionRecord } from "../../../src/domain/interactive/persistence/adapter.js";
 import type { MessageRecord } from "../../../src/domain/message/model/types.js";
 import { appendMessageRecord } from "../../../src/domain/message/persistence/adapter.js";
 import type { ReductionRecord } from "../../../src/domain/reduce/model/types.js";
@@ -13,6 +19,7 @@ import type { SpecRecord } from "../../../src/domain/spec/model/types.js";
 import { appendSpecRecord } from "../../../src/domain/spec/persistence/adapter.js";
 import type { VerificationRecord } from "../../../src/domain/verify/model/types.js";
 import { appendVerificationRecord } from "../../../src/domain/verify/persistence/adapter.js";
+import { formatRunTimestamp } from "../../../src/render/utils/records.js";
 import { createRunRecord } from "../../support/factories/run-records.js";
 
 describe("executeListCommand", () => {
@@ -22,6 +29,7 @@ describe("executeListCommand", () => {
   let messagesFilePath: string;
   let reductionsFilePath: string;
   let verificationsFilePath: string;
+  let interactiveFilePath: string;
 
   beforeEach(async () => {
     testDir = await mkdtemp(join(tmpdir(), "voratiq-list-test-"));
@@ -30,6 +38,12 @@ describe("executeListCommand", () => {
     messagesFilePath = join(testDir, ".voratiq", "message", "index.json");
     reductionsFilePath = join(testDir, ".voratiq", "reduce", "index.json");
     verificationsFilePath = join(testDir, ".voratiq", "verify", "index.json");
+    interactiveFilePath = join(
+      testDir,
+      ".voratiq",
+      "interactive",
+      "index.json",
+    );
   });
 
   afterEach(async () => {
@@ -74,16 +88,25 @@ describe("executeListCommand", () => {
 
     expect(result.mode).toBe("table");
     expect(result.output).toContain("RUN");
-    expect(result.output).toContain("SPEC");
+    expect(result.output).toContain("TARGET");
     expect(result.output).toContain("STATUS");
     expect(result.output).toContain("CREATED");
     expect(result.output).toContain("run-visible");
+    expect(result.output).toContain("file:specs/task.md");
     expect(result.output).not.toContain("run-pruned");
     expect(result.output).not.toContain("run-aborted");
     expect(result.json).toMatchObject({
       operator: "run",
-      mode: "table",
-      records: [{ id: "run-visible", specPath: "specs/task.md" }],
+      mode: "list",
+      sessions: [
+        {
+          sessionId: "run-visible",
+          target: {
+            kind: "file",
+            path: "specs/task.md",
+          },
+        },
+      ],
     });
   });
 
@@ -128,11 +151,11 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("ABORTED");
     expect(result.json).toMatchObject({
       operator: "run",
-      mode: "table",
-      records: [
-        { id: "run-aborted" },
-        { id: "run-pruned" },
-        { id: "run-visible" },
+      mode: "list",
+      sessions: [
+        { sessionId: "run-aborted" },
+        { sessionId: "run-pruned" },
+        { sessionId: "run-visible" },
       ],
     });
   });
@@ -178,8 +201,8 @@ describe("executeListCommand", () => {
     expect(result.output).not.toContain("run-hidden-aborted");
     expect(result.json).toMatchObject({
       operator: "run",
-      mode: "table",
-      records: [{ id: "run-visible-newest" }],
+      mode: "list",
+      sessions: [{ sessionId: "run-visible-newest" }],
     });
   });
 
@@ -206,22 +229,254 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("run-pruned");
     expect(result.output).toContain("PRUNED");
     expect(result.output).toContain("Workspace");
+    expect(result.output).toContain("Target");
+    expect(result.output).toContain("file:specs/task.md");
+    expect(result.output).toContain("Agent: agent-a");
+    expect(result.output).toContain(
+      "Output: .voratiq/run/sessions/run-pruned/agent-a/artifacts/diff.patch",
+    );
     expect(result.output).not.toContain("Base Revision");
     expect(result.output).not.toContain("\nSpec");
     expect(result.json).toMatchObject({
       operator: "run",
       mode: "detail",
-      sessionId: "run-pruned",
       session: {
-        id: "run-pruned",
-        rows: [
+        sessionId: "run-pruned",
+        target: {
+          kind: "file",
+          path: "specs/task.md",
+        },
+        agents: [
           expect.objectContaining({
             agentId: "agent-a",
             status: "succeeded",
+            artifacts: [
+              expect.objectContaining({
+                kind: "diff",
+                role: "output",
+                path: ".voratiq/run/sessions/run-pruned/agent-a/artifacts/diff.patch",
+              }),
+            ],
           }),
         ],
-        artifacts: [],
       },
+    });
+  });
+
+  it("normalizes run spec-session lineage to a session target", async () => {
+    await appendRunRecord({
+      root: testDir,
+      runsFilePath,
+      record: {
+        ...buildRunRecord({
+          runId: "run-from-spec-session",
+          status: "succeeded",
+        }),
+        spec: {
+          path: ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
+          target: {
+            kind: "spec",
+            sessionId: "spec-123",
+          },
+        },
+      },
+    });
+
+    const tableResult = await executeListCommand(
+      buildInput({
+        operator: "run",
+      }),
+    );
+
+    expect(tableResult.output).toContain("spec:spec-123");
+    expect(tableResult.json).toMatchObject({
+      operator: "run",
+      mode: "list",
+      sessions: [
+        expect.objectContaining({
+          sessionId: "run-from-spec-session",
+          target: {
+            kind: "spec",
+            sessionId: "spec-123",
+          },
+        }),
+      ],
+    });
+
+    const detailResult = await executeListCommand(
+      buildInput({
+        operator: "run",
+        sessionId: "run-from-spec-session",
+      }),
+    );
+
+    expect(detailResult.output).toContain("Target");
+    expect(detailResult.output).toContain("spec:spec-123");
+    expect(detailResult.output).toContain(
+      "Output: .voratiq/run/sessions/run-from-spec-session/agent-a/artifacts/diff.patch",
+    );
+    expect(detailResult.json).toMatchObject({
+      operator: "run",
+      mode: "detail",
+      session: {
+        sessionId: "run-from-spec-session",
+        target: {
+          kind: "spec",
+          sessionId: "spec-123",
+        },
+        agents: [
+          expect.objectContaining({
+            agentId: "agent-a",
+            artifacts: [
+              expect.objectContaining({
+                kind: "diff",
+                role: "output",
+                path: ".voratiq/run/sessions/run-from-spec-session/agent-a/artifacts/diff.patch",
+              }),
+            ],
+          }),
+        ],
+      },
+    });
+  });
+
+  it("renders missing run diff artifacts as '-' and null in detail output", async () => {
+    await appendRunRecord({
+      root: testDir,
+      runsFilePath,
+      record: {
+        ...buildRunRecord({
+          runId: "run-without-diff-artifact",
+          status: "succeeded",
+        }),
+        agents: [
+          {
+            agentId: "agent-a",
+            model: "model",
+            status: "succeeded",
+            startedAt: "2026-03-01T00:00:00.000Z",
+            completedAt: "2026-03-01T00:05:00.000Z",
+            artifacts: {
+              diffAttempted: true,
+              diffCaptured: false,
+            },
+          },
+        ],
+      },
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "run",
+        sessionId: "run-without-diff-artifact",
+      }),
+    );
+
+    expect(result.output).toContain("Agent: agent-a");
+    expect(result.output).toContain("Output: —");
+    expect(result.json).toMatchObject({
+      operator: "run",
+      mode: "detail",
+      session: {
+        sessionId: "run-without-diff-artifact",
+        agents: [
+          expect.objectContaining({
+            agentId: "agent-a",
+            artifacts: [],
+          }),
+        ],
+      },
+    });
+  });
+
+  it("keeps run file lineage as a file target", async () => {
+    await appendRunRecord({
+      root: testDir,
+      runsFilePath,
+      record: {
+        ...buildRunRecord({
+          runId: "run-from-file-target",
+          status: "succeeded",
+        }),
+        spec: {
+          path: "specs/manual-review.md",
+          target: {
+            kind: "file",
+          },
+        },
+      },
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "run",
+      }),
+    );
+
+    expect(result.output).toContain("file:specs/manual-review.md");
+    expect(result.output).not.toContain("spec:run-from-file-target");
+    expect(result.json).toMatchObject({
+      operator: "run",
+      mode: "list",
+      sessions: [
+        expect.objectContaining({
+          sessionId: "run-from-file-target",
+          target: {
+            kind: "file",
+            path: "specs/manual-review.md",
+          },
+        }),
+      ],
+    });
+  });
+
+  it("middle-elides long run TARGET values to a 32-character preview", async () => {
+    const longSpecPath =
+      ".voratiq/spec/sessions/20260327-043019-uatir/gpt-5-4-high/artifacts/clean-up-stale-review-terminology-in-auto-verify-test-surface.md";
+    await appendRunRecord({
+      root: testDir,
+      runsFilePath,
+      record: {
+        ...buildRunRecord({
+          runId: "run-long-target",
+          status: "succeeded",
+        }),
+        spec: {
+          path: longSpecPath,
+        },
+      },
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "run",
+      }),
+    );
+
+    const expectedPreview = formatTargetTablePreview({
+      kind: "file",
+      path: longSpecPath,
+    });
+    const lines = result.output?.split("\n") ?? [];
+
+    expect(lines).toHaveLength(2);
+    expect(expectedPreview.length).toBe(TARGET_TABLE_PREVIEW_LENGTH);
+    expect(expectedPreview.startsWith("file:")).toBe(true);
+    expect(expectedPreview.includes("...")).toBe(true);
+    expect(expectedPreview.endsWith("surface.md")).toBe(true);
+    expect(lines[1]).toContain(expectedPreview);
+    expect(result.json).toMatchObject({
+      operator: "run",
+      mode: "list",
+      sessions: [
+        expect.objectContaining({
+          sessionId: "run-long-target",
+          target: {
+            kind: "file",
+            path: longSpecPath,
+          },
+        }),
+      ],
     });
   });
 
@@ -265,20 +520,20 @@ describe("executeListCommand", () => {
     expect(verboseResult.output).toContain("ABORTED");
     expect(verboseResult.json).toMatchObject({
       operator: "spec",
-      mode: "table",
+      mode: "list",
     });
-    expect(verboseResult.json.mode).toBe("table");
-    if (verboseResult.json.mode !== "table") {
-      throw new Error("Expected table-mode JSON output");
+    expect(verboseResult.json.mode).toBe("list");
+    if (verboseResult.json.mode !== "list") {
+      throw new Error("Expected list-mode JSON output");
     }
-    expect(verboseResult.json.records).toEqual(
+    expect(verboseResult.json.sessions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: "spec-visible",
+          sessionId: "spec-visible",
           description: "Generate task spec",
         }),
         expect.objectContaining({
-          id: "spec-aborted",
+          sessionId: "spec-aborted",
           description: "Generate task spec",
         }),
       ]),
@@ -315,15 +570,15 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("—");
     expect(result.json).toMatchObject({
       operator: "spec",
-      mode: "table",
+      mode: "list",
     });
-    if (result.json.mode !== "table") {
-      throw new Error("Expected table-mode JSON output");
+    if (result.json.mode !== "list") {
+      throw new Error("Expected list-mode JSON output");
     }
-    expect(result.json.records).toEqual(
+    expect(result.json.sessions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: "spec-running",
+          sessionId: "spec-running",
           description: null,
         }),
       ]),
@@ -364,24 +619,21 @@ describe("executeListCommand", () => {
     expect(result.json).toMatchObject({
       operator: "spec",
       mode: "detail",
-      sessionId: "spec-aborted",
       session: {
-        id: "spec-aborted",
-        rows: [
+        sessionId: "spec-aborted",
+        agents: [
           expect.objectContaining({
             agentId: "agent-a",
             status: "failed",
-          }),
-        ],
-        artifacts: [
-          expect.objectContaining({
-            kind: "spec",
-            agentId: "agent-a",
-            path: null,
+            artifacts: [],
           }),
         ],
       },
     });
+    if (result.json.mode !== "detail" || !result.json.session) {
+      throw new Error("Expected detail-mode spec json output");
+    }
+    expect(result.json.session).not.toHaveProperty("target");
   });
 
   it("normalizes spec description text in table json", async () => {
@@ -405,15 +657,15 @@ describe("executeListCommand", () => {
 
     expect(result.json).toMatchObject({
       operator: "spec",
-      mode: "table",
+      mode: "list",
     });
-    if (result.json.mode !== "table") {
-      throw new Error("Expected table-mode JSON output");
+    if (result.json.mode !== "list") {
+      throw new Error("Expected list-mode JSON output");
     }
-    expect(result.json.records).toEqual(
+    expect(result.json.sessions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: "spec-messy",
+          sessionId: "spec-messy",
           description: "Generalize No runs recorded.",
         }),
       ]),
@@ -440,19 +692,24 @@ describe("executeListCommand", () => {
     expect(result.json).toMatchObject({
       operator: "spec",
       mode: "detail",
-      sessionId: "spec-detail-json",
       session: {
-        id: "spec-detail-json",
-        rows: [
+        sessionId: "spec-detail-json",
+        agents: [
           expect.objectContaining({
             agentId: "agent-a",
             status: "succeeded",
-          }),
-        ],
-        artifacts: [
-          expect.objectContaining({
-            kind: "spec",
-            path: ".voratiq/spec/sessions/spec-detail-json/agent-a/artifacts/spec.md",
+            artifacts: [
+              expect.objectContaining({
+                kind: "spec",
+                role: "output",
+                path: ".voratiq/spec/sessions/spec-detail-json/agent-a/artifacts/spec.md",
+              }),
+              expect.objectContaining({
+                kind: "spec",
+                role: "data",
+                path: ".voratiq/spec/sessions/spec-detail-json/agent-a/artifacts/spec.json",
+              }),
+            ],
           }),
         ],
       },
@@ -547,37 +804,59 @@ describe("executeListCommand", () => {
 
     expect(result.output).toContain("reduce-detail");
     expect(result.output).toContain("AGENT");
+    expect(result.output).toMatch(/Target\s+run:run-123/u);
     expect(result.output).toContain("Agent: agent-a");
     expect(result.output).toContain("Output:");
     expect(result.output).not.toContain("\nRun");
     expect(result.json).toMatchObject({
       operator: "reduce",
       mode: "detail",
-      sessionId: "reduce-detail",
       session: {
-        id: "reduce-detail",
-        rows: [
+        sessionId: "reduce-detail",
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+        },
+        agents: [
           expect.objectContaining({
             agentId: "agent-a",
             status: "succeeded",
-          }),
-        ],
-        artifacts: [
-          expect.objectContaining({
-            kind: "reduction",
-            path: ".voratiq/reduce/sessions/reduce-detail/agent-a/reduction.md",
+            artifacts: [
+              expect.objectContaining({
+                kind: "reduction",
+                role: "output",
+                path: ".voratiq/reduce/sessions/reduce-detail/agent-a/reduction.md",
+              }),
+              expect.objectContaining({
+                kind: "reduction",
+                role: "data",
+                path: ".voratiq/reduce/sessions/reduce-detail/agent-a/reduction.json",
+              }),
+            ],
           }),
         ],
       },
     });
   });
 
-  it("renders message table with a prompt preview and without a recipients column", async () => {
+  it("renders message table with TARGET values and without a recipients column", async () => {
     await appendMessageRecord({
       root: testDir,
       messagesFilePath,
       record: buildMessageRecord({
         sessionId: "message-visible",
+        status: "succeeded",
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+        },
+      }),
+    });
+    await appendMessageRecord({
+      root: testDir,
+      messagesFilePath,
+      record: buildMessageRecord({
+        sessionId: "message-no-target",
         status: "succeeded",
       }),
     });
@@ -595,24 +874,48 @@ describe("executeListCommand", () => {
         operator: "message",
       }),
     );
+    const defaultLines = defaultResult.output?.split("\n") ?? [];
+    const noTargetLine = defaultLines.find((line) =>
+      line.includes("message-no-target"),
+    );
+
     expect(defaultResult.output).toContain("MESSAGE");
-    expect(defaultResult.output).toContain("PROMPT");
+    expect(defaultResult.output).toContain("TARGET");
     expect(defaultResult.output).toContain("STATUS");
     expect(defaultResult.output).toContain("CREATED");
     expect(defaultResult.output).not.toContain("RECIPIENTS");
     expect(defaultResult.output).toContain("message-visible");
-    expect(defaultResult.output).toContain("Review this change.");
+    expect(defaultResult.output).toContain("run:run-123");
+    expect(noTargetLine).toBeDefined();
+    expect(noTargetLine).toContain("—");
     expect(defaultResult.output).not.toContain("message-aborted");
+    expect(defaultResult.output).not.toContain("PROMPT");
     expect(defaultResult.json).toMatchObject({
       operator: "message",
-      mode: "table",
-      records: [
-        expect.objectContaining({
-          id: "message-visible",
-          promptPreview: "Review this change.",
-        }),
-      ],
+      mode: "list",
     });
+    if (defaultResult.json.mode !== "list") {
+      throw new Error("Expected list-mode message json output");
+    }
+    const targetedRecord = defaultResult.json.sessions.find(
+      (entry) => entry.sessionId === "message-visible",
+    );
+    const noTargetRecord = defaultResult.json.sessions.find(
+      (entry) => entry.sessionId === "message-no-target",
+    );
+    expect(targetedRecord).toBeDefined();
+    expect(targetedRecord).toMatchObject({
+      sessionId: "message-visible",
+      target: {
+        kind: "run",
+        sessionId: "run-123",
+      },
+    });
+    expect(noTargetRecord).toBeDefined();
+    expect(noTargetRecord).toMatchObject({
+      sessionId: "message-no-target",
+    });
+    expect(noTargetRecord).not.toHaveProperty("target");
 
     const verboseResult = await executeListCommand(
       buildInput({
@@ -621,6 +924,55 @@ describe("executeListCommand", () => {
       }),
     );
     expect(verboseResult.output).toContain("message-aborted");
+  });
+
+  it("middle-elides long message TARGET values to a 32-character preview", async () => {
+    const longTargetSessionId =
+      "20260327-043019-uatir-very-long-message-target-session-id";
+    await appendMessageRecord({
+      root: testDir,
+      messagesFilePath,
+      record: buildMessageRecord({
+        sessionId: "message-long-target",
+        status: "succeeded",
+        target: {
+          kind: "interactive",
+          sessionId: longTargetSessionId,
+        },
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "message",
+      }),
+    );
+
+    const expectedPreview = formatTargetTablePreview({
+      kind: "interactive",
+      sessionId: longTargetSessionId,
+    });
+    const lines = result.output?.split("\n") ?? [];
+
+    expect(lines).toHaveLength(2);
+    expect(expectedPreview.length).toBe(TARGET_TABLE_PREVIEW_LENGTH);
+    expect(expectedPreview.startsWith("interactive:")).toBe(true);
+    expect(expectedPreview.includes("...")).toBe(true);
+    expect(expectedPreview.endsWith("target-session-id")).toBe(true);
+    expect(lines[1]).toContain(expectedPreview);
+    expect(result.json).toMatchObject({
+      operator: "message",
+      mode: "list",
+      sessions: [
+        expect.objectContaining({
+          sessionId: "message-long-target",
+          target: {
+            kind: "interactive",
+            sessionId: longTargetSessionId,
+          },
+        }),
+      ],
+    });
   });
 
   it("renders message detail like other operator detail views", async () => {
@@ -649,8 +1001,101 @@ describe("executeListCommand", () => {
     expect(result.output).not.toContain("Response data:");
     expect(result.output).not.toContain("\nStatus: ");
     expect(result.output).not.toContain("\nDuration: ");
+    expect(result.output).not.toContain("Target:");
     expect(result.output).toContain("\n---\n");
     expect(result.output?.trimEnd().endsWith("---")).toBe(false);
+  });
+
+  it("renders persisted message targets in detail transcript and json", async () => {
+    await appendMessageRecord({
+      root: testDir,
+      messagesFilePath,
+      record: buildMessageRecord({
+        sessionId: "message-target-detail",
+        status: "succeeded",
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+        },
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "message",
+        sessionId: "message-target-detail",
+      }),
+    );
+
+    expect(result.output).toMatch(/Target\s+run:run-123/u);
+    expect(result.json).toMatchObject({
+      operator: "message",
+      mode: "detail",
+      session: {
+        sessionId: "message-target-detail",
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+        },
+      },
+    });
+  });
+
+  it("renders persisted message lane targets in table and detail json", async () => {
+    await appendMessageRecord({
+      root: testDir,
+      messagesFilePath,
+      record: buildMessageRecord({
+        sessionId: "message-lane-target",
+        status: "succeeded",
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+          agentId: "gpt-5-4-high",
+        },
+      }),
+    });
+
+    const tableResult = await executeListCommand(
+      buildInput({
+        operator: "message",
+      }),
+    );
+    const detailResult = await executeListCommand(
+      buildInput({
+        operator: "message",
+        sessionId: "message-lane-target",
+      }),
+    );
+
+    expect(tableResult.output).toContain("run:run-123:gpt-5-4-high");
+    expect(tableResult.json).toMatchObject({
+      operator: "message",
+      mode: "list",
+      sessions: [
+        expect.objectContaining({
+          sessionId: "message-lane-target",
+          target: {
+            kind: "run",
+            sessionId: "run-123",
+            agentId: "gpt-5-4-high",
+          },
+        }),
+      ],
+    });
+    expect(detailResult.output).toMatch(/Target\s+run:run-123:gpt-5-4-high/u);
+    expect(detailResult.json).toMatchObject({
+      operator: "message",
+      mode: "detail",
+      session: {
+        sessionId: "message-lane-target",
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+          agentId: "gpt-5-4-high",
+        },
+      },
+    });
   });
 
   it("keeps message detail rows summary-only and includes only generated artifacts", async () => {
@@ -673,29 +1118,26 @@ describe("executeListCommand", () => {
     expect(result.json).toMatchObject({
       operator: "message",
       mode: "detail",
-      sessionId: "message-detail-json",
     });
     if (result.json.mode !== "detail" || !result.json.session) {
       throw new Error("Expected detail-mode message json output");
     }
-    expect(result.json.session.id).toBe("message-detail-json");
-    expect(result.json.session.rows).toHaveLength(1);
-    const [firstRow] = result.json.session.rows;
-    expect(firstRow).toBeDefined();
-    expect(firstRow).toMatchObject({
+    expect(result.json.session).not.toHaveProperty("target");
+    expect(result.json.session.sessionId).toBe("message-detail-json");
+    expect(result.json.session.agents).toHaveLength(1);
+    const [firstAgent] = result.json.session.agents;
+    expect(firstAgent).toBeDefined();
+    expect(firstAgent).toMatchObject({
       agentId: "agent-a",
       status: "succeeded",
+      artifacts: [
+        {
+          kind: "response",
+          role: "output",
+          path: ".voratiq/message/sessions/message-detail-json/agent-a/artifacts/response.md",
+        },
+      ],
     });
-    expect(typeof firstRow?.duration).toBe("string");
-    expect(firstRow).not.toHaveProperty("outputPath");
-    expect(firstRow).not.toHaveProperty("responseDataPath");
-    expect(result.json.session.artifacts).toEqual([
-      {
-        kind: "output",
-        agentId: "agent-a",
-        path: ".voratiq/message/sessions/message-detail-json/agent-a/artifacts/response.md",
-      },
-    ]);
   });
 
   it("renders verify table with TARGET column and aborted filtering", async () => {
@@ -769,31 +1211,30 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("VERIFIER");
     expect(result.output).toContain("programmatic");
     expect(result.output).toContain("Agent: —");
-    expect(result.output).toContain("Target: run:run-123");
+    expect(result.output).toMatch(/Target\s+run:run-123/u);
     expect(result.output).toContain("Output:");
     expect(result.output).not.toContain("\nRun");
     expect(result.json).toMatchObject({
       operator: "verify",
       mode: "detail",
-      sessionId: "verify-detail",
       session: {
-        id: "verify-detail",
+        sessionId: "verify-detail",
         target: {
           kind: "run",
-          id: "run-123",
+          sessionId: "run-123",
         },
-        rows: [
+        agents: [
           expect.objectContaining({
             agentId: null,
             verifier: "programmatic",
             status: "succeeded",
-          }),
-        ],
-        artifacts: [
-          expect.objectContaining({
-            kind: "result",
-            verifier: "programmatic",
-            path: ".voratiq/verify/sessions/verify-detail/programmatic/artifacts/result.json",
+            artifacts: [
+              expect.objectContaining({
+                kind: "verification-result",
+                role: "output",
+                path: ".voratiq/verify/sessions/verify-detail/programmatic/artifacts/result.json",
+              }),
+            ],
           }),
         ],
       },
@@ -823,14 +1264,14 @@ describe("executeListCommand", () => {
       }),
     );
 
-    expect(result.output).toContain("Target: message:message-123");
-    expect(result.output).not.toContain("Target: reduce:message-123");
+    expect(result.output).toMatch(/Target\s+message:message-123/u);
+    expect(result.output).not.toMatch(/Target\s+reduce:message-123/u);
     if (result.json.mode !== "detail" || !result.json.session) {
       throw new Error("Expected detail-mode verify json output");
     }
     expect(result.json.session.target).toEqual({
       kind: "message",
-      id: "message-123",
+      sessionId: "message-123",
     });
   });
 
@@ -846,13 +1287,242 @@ describe("executeListCommand", () => {
     expect(result.json).toMatchObject({
       operator: "spec",
       mode: "detail",
-      sessionId: "spec-missing",
       session: null,
     });
   });
 
+  it("renders interactive table output through the shared list pipeline", async () => {
+    await appendInteractiveSessionRecord({
+      root: testDir,
+      record: buildInteractiveRecord({
+        sessionId: "interactive-visible",
+        status: "succeeded",
+        createdAt: "2026-03-01T00:01:00.000Z",
+      }),
+    });
+    await appendInteractiveSessionRecord({
+      root: testDir,
+      record: buildInteractiveRecord({
+        sessionId: "interactive-running",
+        status: "running",
+        createdAt: "2026-03-01T00:02:00.000Z",
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "interactive",
+      }),
+    );
+
+    expect(result.output).toContain("INTERACTIVE");
+    expect(result.output).toContain("STATUS");
+    expect(result.output).toContain("CREATED");
+    expect(result.output).not.toContain("TARGET");
+    expect(result.output).toContain("interactive-running");
+    expect(result.output).toContain("interactive-visible");
+    expect(result.json).toEqual({
+      operator: "interactive",
+      mode: "list",
+      sessions: [
+        {
+          operator: "interactive",
+          sessionId: "interactive-running",
+          status: "running",
+          createdAt: "2026-03-01T00:02:00.000Z",
+        },
+        {
+          operator: "interactive",
+          sessionId: "interactive-visible",
+          status: "succeeded",
+          createdAt: "2026-03-01T00:01:00.000Z",
+        },
+      ],
+      warnings: [],
+    });
+  });
+
+  it("applies interactive default filtering, verbose, and limit in table mode", async () => {
+    await appendInteractiveSessionRecord({
+      root: testDir,
+      record: buildInteractiveRecord({
+        sessionId: "interactive-oldest",
+        status: "succeeded",
+        createdAt: "2026-03-01T00:00:00.000Z",
+      }),
+    });
+    await appendInteractiveSessionRecord({
+      root: testDir,
+      record: buildInteractiveRecord({
+        sessionId: "interactive-failed",
+        status: "failed",
+        createdAt: "2026-03-01T00:01:00.000Z",
+      }),
+    });
+    await appendInteractiveSessionRecord({
+      root: testDir,
+      record: buildInteractiveRecord({
+        sessionId: "interactive-newest",
+        status: "running",
+        createdAt: "2026-03-01T00:02:00.000Z",
+      }),
+    });
+
+    const defaultResult = await executeListCommand(
+      buildInput({
+        operator: "interactive",
+        limit: 2,
+      }),
+    );
+
+    expect(defaultResult.json).toMatchObject({
+      operator: "interactive",
+      mode: "list",
+      sessions: [
+        { sessionId: "interactive-newest" },
+        { sessionId: "interactive-failed" },
+      ],
+    });
+
+    const verboseResult = await executeListCommand(
+      buildInput({
+        operator: "interactive",
+        verbose: true,
+      }),
+    );
+
+    expect(verboseResult.output).toContain("interactive-oldest");
+    expect(verboseResult.output).toContain("interactive-failed");
+    expect(verboseResult.output).toContain("interactive-newest");
+  });
+
+  it("renders interactive detail output and json without target metadata", async () => {
+    const createdAt = "2026-03-01T00:00:00.000Z";
+    await appendInteractiveSessionRecord({
+      root: testDir,
+      record: buildInteractiveRecord({
+        sessionId: "interactive-detail",
+        status: "succeeded",
+        createdAt,
+        chat: {
+          captured: true,
+          format: "jsonl",
+          artifactPath:
+            ".voratiq/interactive/sessions/interactive-detail/artifacts/chat.jsonl",
+        },
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "interactive",
+        sessionId: "interactive-detail",
+      }),
+    );
+
+    expect(result.output).toContain("interactive-detail");
+    expect(result.output).toContain("SUCCEEDED");
+    expect(result.output).toMatch(/Elapsed\s+—/u);
+    expect(result.output).toContain(
+      `Created    ${formatRunTimestamp(createdAt)}`,
+    );
+    expect(result.output).toMatch(
+      /Workspace\s+\.voratiq\/interactive\/sessions\/interactive-detail/u,
+    );
+    expect(result.output).not.toContain("Target");
+    expect(result.output).toContain("AGENT");
+    expect(result.output).toContain("agent-a");
+    expect(result.output).toContain(
+      "Output: .voratiq/interactive/sessions/interactive-detail/artifacts/chat.jsonl",
+    );
+    expect(result.json).toEqual({
+      operator: "interactive",
+      mode: "detail",
+      session: {
+        operator: "interactive",
+        sessionId: "interactive-detail",
+        status: "succeeded",
+        createdAt: "2026-03-01T00:00:00.000Z",
+        workspacePath: ".voratiq/interactive/sessions/interactive-detail",
+        agents: [
+          {
+            agentId: "agent-a",
+            status: "succeeded",
+            artifacts: [
+              {
+                kind: "chat",
+                role: "output",
+                path: ".voratiq/interactive/sessions/interactive-detail/artifacts/chat.jsonl",
+              },
+            ],
+          },
+        ],
+      },
+      warnings: [],
+    });
+    if (result.json.mode !== "detail" || !result.json.session) {
+      throw new Error("Expected detail-mode interactive json output");
+    }
+    expect(result.json.session).not.toHaveProperty("target");
+    expect(result.json.session).not.toHaveProperty("elapsed");
+  });
+
+  it("renders interactive detail without a captured chat artifact as dash and null", async () => {
+    await appendInteractiveSessionRecord({
+      root: testDir,
+      record: buildInteractiveRecord({
+        sessionId: "interactive-no-chat",
+        status: "failed",
+        chat: {
+          captured: false,
+          errorMessage: "capture unavailable",
+        },
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "interactive",
+        sessionId: "interactive-no-chat",
+      }),
+    );
+
+    expect(result.output).toContain("Output: —");
+    expect(result.json).toMatchObject({
+      operator: "interactive",
+      mode: "detail",
+      session: {
+        agents: [
+          {
+            agentId: "agent-a",
+            artifacts: [],
+          },
+        ],
+      },
+    });
+  });
+
+  it("returns the standard not-found detail payload for missing interactive sessions", async () => {
+    const result = await executeListCommand(
+      buildInput({
+        operator: "interactive",
+        sessionId: "interactive-missing",
+      }),
+    );
+
+    expect(result.output).toBe(
+      "interactive session `interactive-missing` not found.",
+    );
+    expect(result.json).toEqual({
+      operator: "interactive",
+      mode: "detail",
+      session: null,
+      warnings: [],
+    });
+  });
+
   function buildInput(params: {
-    operator: "spec" | "run" | "reduce" | "verify" | "message";
+    operator: "spec" | "run" | "reduce" | "verify" | "message" | "interactive";
     sessionId?: string;
     limit?: number;
     verbose?: boolean;
@@ -864,6 +1534,7 @@ describe("executeListCommand", () => {
       messagesFilePath,
       reductionsFilePath,
       verificationsFilePath,
+      interactiveFilePath,
       operator: params.operator,
       sessionId: params.sessionId,
       limit: params.limit,
@@ -891,10 +1562,35 @@ function buildRunRecord(params: {
         startedAt: "2026-03-01T00:00:00.000Z",
         completedAt:
           params.status === "running" ? undefined : "2026-03-01T00:05:00.000Z",
+        artifacts:
+          params.status === "running"
+            ? undefined
+            : {
+                diffAttempted: true,
+                diffCaptured: true,
+              },
       },
     ],
     deletedAt: params.deletedAt ?? null,
   });
+}
+
+function buildInteractiveRecord(
+  params: Partial<InteractiveSessionRecord> & {
+    sessionId: string;
+    status: InteractiveSessionRecord["status"];
+  },
+): InteractiveSessionRecord {
+  return {
+    sessionId: params.sessionId,
+    createdAt: params.createdAt ?? "2026-03-01T00:00:00.000Z",
+    status: params.status,
+    agentId: params.agentId ?? "agent-a",
+    toolAttachmentStatus: params.toolAttachmentStatus ?? "attached",
+    ...(params.task ? { task: params.task } : {}),
+    ...(params.chat ? { chat: params.chat } : {}),
+    ...(params.error ? { error: params.error } : {}),
+  };
 }
 
 function buildSpecRecord(params: {
@@ -977,6 +1673,8 @@ function buildReductionRecord(params: {
 function buildMessageRecord(params: {
   sessionId: string;
   status: MessageRecord["status"];
+  target?: MessageRecord["target"];
+  sourceInteractiveSessionId?: string;
   recipients?: MessageRecord["recipients"];
 }): MessageRecord {
   const createdAt = "2026-03-01T00:00:00.000Z";
@@ -992,6 +1690,10 @@ function buildMessageRecord(params: {
     ...(completedAt ? { completedAt } : {}),
     status: params.status,
     prompt: "Review this change.",
+    ...(params.target ? { target: params.target } : {}),
+    ...(params.sourceInteractiveSessionId
+      ? { sourceInteractiveSessionId: params.sourceInteractiveSessionId }
+      : {}),
     recipients: params.recipients ?? [
       {
         agentId: "agent-a",

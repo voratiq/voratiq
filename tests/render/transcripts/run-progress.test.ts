@@ -4,7 +4,10 @@ import type {
   AgentInvocationRecord,
   RunReport,
 } from "../../../src/domain/run/model/types.js";
-import { createRunRenderer } from "../../../src/render/transcripts/run.js";
+import {
+  createRunRenderer,
+  renderRunTranscript,
+} from "../../../src/render/transcripts/run.js";
 import { formatCliOutput } from "../../../src/utils/output.js";
 import { createRunReport } from "../../support/factories/run-records.js";
 
@@ -301,6 +304,60 @@ describe("createRunRenderer", () => {
     expect(plain).toContain("55s");
     expect(plain).toContain("2f +5");
     expect(plain).not.toContain("EVALS");
+  });
+
+  it("renders per-agent output artifact lines in the final transcript", () => {
+    const transcript = renderRunTranscript({
+      runId: "run-123",
+      status: "succeeded",
+      workspacePath: ".voratiq/run/sessions/run-123",
+      createdAt: "2025-11-05T12:00:00.000Z",
+      startedAt: "2025-11-05T12:00:00.000Z",
+      completedAt: "2025-11-05T12:00:03.000Z",
+      agents: [
+        {
+          agentId: "test-agent",
+          status: "succeeded",
+          startedAt: "2025-11-05T12:00:00.000Z",
+          completedAt: "2025-11-05T12:00:03.000Z",
+          diffStatistics: "2 files changed, 5 insertions(+)",
+          outputPath:
+            ".voratiq/run/sessions/run-123/test-agent/artifacts/diff.patch",
+        },
+      ],
+      isTty: false,
+    });
+
+    const plain = stripAnsi(transcript);
+    expect(plain).toContain("Agent: test-agent");
+    expect(plain).toContain(
+      "Output: .voratiq/run/sessions/run-123/test-agent/artifacts/diff.patch",
+    );
+  });
+
+  it("renders formatted error lines and '-' when no run output artifact exists", () => {
+    const transcript = renderRunTranscript({
+      runId: "run-123",
+      status: "failed",
+      workspacePath: ".voratiq/run/sessions/run-123",
+      createdAt: "2025-11-05T12:00:00.000Z",
+      startedAt: "2025-11-05T12:00:00.000Z",
+      completedAt: "2025-11-05T12:00:03.000Z",
+      agents: [
+        {
+          agentId: "test-agent",
+          status: "failed",
+          startedAt: "2025-11-05T12:00:00.000Z",
+          completedAt: "2025-11-05T12:00:03.000Z",
+          errorLine: "first line\nsecond line",
+        },
+      ],
+      isTty: false,
+    });
+
+    const plain = stripAnsi(transcript);
+    expect(plain).toContain("Error: first line second line");
+    expect(plain).toContain("Output: —");
   });
 
   it("shows live elapsed while keeping running table duration frozen", () => {

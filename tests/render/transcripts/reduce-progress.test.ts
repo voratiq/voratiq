@@ -273,4 +273,30 @@ describe("reduce live progress renderer", () => {
     expect(transcript).toContain("Agent: reducer-a");
     expect(transcript).toContain("Output: —");
   });
+
+  it("renders the target row inside the summary shell when provided", () => {
+    const transcript = renderReduceTranscript({
+      reductionId: "reduce-123",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      elapsed: "3s",
+      workspacePath: ".voratiq/reduce/sessions/reduce-123",
+      status: "succeeded",
+      targetDisplay: "run:run-123",
+      reducers: [
+        {
+          reducerAgentId: "reducer-a",
+          outputPath: "reduction.md",
+          duration: "3s",
+          status: "succeeded",
+        },
+      ],
+      suppressHint: true,
+      isTty: false,
+      includeSummarySection: true,
+    });
+
+    const summaryShell = transcript.split("\n\n---\n\nAgent:")[0] ?? "";
+    expect(summaryShell).toContain("Target     run:run-123");
+    expect(summaryShell).toContain("AGENT");
+  });
 });

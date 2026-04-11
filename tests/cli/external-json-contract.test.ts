@@ -823,13 +823,17 @@ describe("external CLI JSON contract", () => {
       mode: "table",
       json: {
         operator: "run",
-        mode: "table",
-        records: [
+        mode: "list",
+        sessions: [
           {
-            id: "run-123",
+            operator: "run",
+            sessionId: "run-123",
             status: "succeeded",
             createdAt: "2026-03-31T11:00:00.000Z",
-            specPath: "specs/task.md",
+            target: {
+              kind: "file",
+              path: "specs/task.md",
+            },
           },
         ],
         warnings: ["Index contains a legacy session."],
@@ -842,13 +846,17 @@ describe("external CLI JSON contract", () => {
     expect(result.exitCode).toBe(0);
     expect(payload).toStrictEqual({
       operator: "run",
-      mode: "table",
-      records: [
+      mode: "list",
+      sessions: [
         {
-          id: "run-123",
+          operator: "run",
+          sessionId: "run-123",
           status: "succeeded",
           createdAt: "2026-03-31T11:00:00.000Z",
-          specPath: "specs/task.md",
+          target: {
+            kind: "file",
+            path: "specs/task.md",
+          },
         },
       ],
       warnings: ["Index contains a legacy session."],
@@ -863,15 +871,15 @@ describe("external CLI JSON contract", () => {
       json: {
         operator: "verify",
         mode: "detail",
-        sessionId: "verify-123",
         session: {
-          id: "verify-123",
+          operator: "verify",
+          sessionId: "verify-123",
           status: "succeeded",
           createdAt: "2026-03-31T11:05:00.000Z",
-          elapsed: "1m",
+          startedAt: "2026-03-31T11:05:00.000Z",
+          completedAt: "2026-03-31T11:06:00.000Z",
           workspacePath: ".voratiq/verify/sessions/verify-123",
-          rows: [],
-          artifacts: [],
+          agents: [],
         },
         warnings: [],
       },
@@ -889,15 +897,15 @@ describe("external CLI JSON contract", () => {
     expect(payload).toStrictEqual({
       operator: "verify",
       mode: "detail",
-      sessionId: "verify-123",
       session: {
-        id: "verify-123",
+        operator: "verify",
+        sessionId: "verify-123",
         status: "succeeded",
         createdAt: "2026-03-31T11:05:00.000Z",
-        elapsed: "1m",
+        startedAt: "2026-03-31T11:05:00.000Z",
+        completedAt: "2026-03-31T11:06:00.000Z",
         workspacePath: ".voratiq/verify/sessions/verify-123",
-        rows: [],
-        artifacts: [],
+        agents: [],
       },
       warnings: [],
     });
@@ -910,8 +918,8 @@ describe("external CLI JSON contract", () => {
       mode: "table",
       json: {
         operator: "spec",
-        mode: "table",
-        records: [],
+        mode: "list",
+        sessions: [],
         warnings: [],
       },
     });
@@ -922,8 +930,8 @@ describe("external CLI JSON contract", () => {
     expect(result.exitCode).toBe(0);
     expect(payload).toStrictEqual({
       operator: "spec",
-      mode: "table",
-      records: [],
+      mode: "list",
+      sessions: [],
       warnings: [],
     });
   });
@@ -936,7 +944,6 @@ describe("external CLI JSON contract", () => {
       json: {
         operator: "verify",
         mode: "detail",
-        sessionId: "verify-missing",
         session: null,
         warnings: ["Lookup used the on-disk index only."],
       },
@@ -954,7 +961,6 @@ describe("external CLI JSON contract", () => {
     expect(payload).toStrictEqual({
       operator: "verify",
       mode: "detail",
-      sessionId: "verify-missing",
       session: null,
       warnings: ["Lookup used the on-disk index only."],
     });

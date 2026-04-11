@@ -2,11 +2,21 @@ import type { MessageRecord } from "../../src/domain/message/model/types.js";
 import type { RunRecord } from "../../src/domain/run/model/types.js";
 import type { SpecRecord } from "../../src/domain/spec/model/types.js";
 import {
+  renderInteractiveListTable,
   renderMessageList,
+  renderMessageListTable,
+  renderReduceListTable,
   renderRunList,
+  renderRunListTable,
   renderSpecList,
+  renderVerifyListTable,
 } from "../../src/render/transcripts/list.js";
 import { formatRunTimestamp } from "../../src/render/utils/records.js";
+import {
+  formatTargetDisplay,
+  formatTargetTablePreview,
+  TARGET_TABLE_PREVIEW_LENGTH,
+} from "../../src/utils/list-target.js";
 import { createRunRecord } from "../support/factories/run-records.js";
 
 describe("renderRunList", () => {
@@ -257,28 +267,34 @@ describe("renderSpecList", () => {
 });
 
 describe("renderMessageList", () => {
-  it("renders a table with MESSAGE, PROMPT, STATUS, CREATED columns", () => {
+  it("renders a table with MESSAGE, TARGET, STATUS, CREATED columns", () => {
     const records: MessageRecord[] = [
-      buildMessageRecord({
-        sessionId: "20260406-031050-itblf",
-        status: "running",
-      }),
+      {
+        ...buildMessageRecord({
+          sessionId: "20260406-031050-itblf",
+          status: "running",
+        }),
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+        },
+      },
     ];
 
     const output = renderMessageList(records);
     const lines = output.split("\n");
 
     expect(lines[0]).toContain("MESSAGE");
-    expect(lines[0]).toContain("PROMPT");
+    expect(lines[0]).toContain("TARGET");
     expect(lines[0]).toContain("STATUS");
     expect(lines[0]).toContain("CREATED");
     expect(lines[0]).not.toContain("RECIPIENTS");
     expect(lines[1]).toContain("20260406-031050-itblf");
-    expect(lines[1]).toContain("Review this change.");
+    expect(lines[1]).toContain("run:run-123");
     expect(lines[1]).toContain("RUNNING");
   });
 
-  it("orders columns as MESSAGE, PROMPT, STATUS, CREATED", () => {
+  it("orders columns as MESSAGE, TARGET, STATUS, CREATED", () => {
     const records: MessageRecord[] = [
       buildMessageRecord({
         sessionId: "20260406-031050-itblf",
@@ -290,34 +306,168 @@ describe("renderMessageList", () => {
     const headerLine = output.split("\n")[0] ?? "";
 
     const messageIndex = headerLine.indexOf("MESSAGE");
-    const promptIndex = headerLine.indexOf("PROMPT");
+    const targetIndex = headerLine.indexOf("TARGET");
     const statusIndex = headerLine.indexOf("STATUS");
     const createdIndex = headerLine.indexOf("CREATED");
 
-    expect(messageIndex).toBeLessThan(promptIndex);
-    expect(promptIndex).toBeLessThan(statusIndex);
+    expect(messageIndex).toBeLessThan(targetIndex);
+    expect(targetIndex).toBeLessThan(statusIndex);
     expect(statusIndex).toBeLessThan(createdIndex);
   });
 
-  it("truncates long prompts to a 32-character preview", () => {
+  it("renders no-target messages as em dashes", () => {
+    const records: MessageRecord[] = [
+      buildMessageRecord({
+        sessionId: "20260406-031050-itblf",
+        status: "running",
+      }),
+    ];
+
+    const output = renderMessageList(records);
+    const lines = output.split("\n");
+
+    expect(lines[1]).toContain("—");
+  });
+
+  it("middle-elides long message targets with the shared preview formatter", () => {
+    const longTargetSessionId =
+      "20260327-043019-uatir-very-long-message-target-session-id";
     const records: MessageRecord[] = [
       {
         ...buildMessageRecord({
           sessionId: "20260406-031050-itblf",
           status: "running",
         }),
-        prompt:
-          "Ask how commit 013bdf0 aligns with the existing codebase architecture and patterns.",
+        target: {
+          kind: "interactive",
+          sessionId: longTargetSessionId,
+        },
       },
     ];
 
     const output = renderMessageList(records);
     const lines = output.split("\n");
+    const expectedPreview = formatTargetTablePreview({
+      kind: "interactive",
+      sessionId: longTargetSessionId,
+    });
 
-    expect(lines[1]).toContain("Ask how commit 013bdf0 aligns...");
-    expect(lines[1]).not.toContain(
-      "Ask how commit 013bdf0 aligns with the existing codebase architecture and patterns.",
-    );
+    expect(lines[1]).toContain(expectedPreview);
+    expect(lines[1]).not.toContain(`interactive:${longTargetSessionId}`);
+  });
+});
+
+describe("targeted list table rendering", () => {
+  it("renders canonical run target strings in table rows", () => {
+    const output = renderRunListTable([
+      {
+        id: "run-123",
+        target: formatTargetDisplay({
+          kind: "spec",
+          sessionId: "spec-123",
+        }),
+        status: "succeeded",
+        createdAt: "2026-03-01T00:00:00.000Z",
+      },
+    ]);
+    const lines = output.split("\n");
+
+    expect(lines[0]).toContain("RUN");
+    expect(lines[0]).toContain("TARGET");
+    expect(lines[1]).toContain("run-123");
+    expect(lines[1]).toContain("spec:spec-123");
+  });
+
+  it("keeps long target previews single-line with middle elision", () => {
+    const target = formatTargetTablePreview({
+      kind: "file",
+      path: ".voratiq/spec/sessions/20260327-043019-uatir/gpt-5-4-high/artifacts/clean-up-stale-review-terminology-in-auto-verify-test-surface.md",
+    });
+    const output = renderVerifyListTable([
+      {
+        id: "verify-123",
+        target,
+        status: "succeeded",
+        createdAt: "2026-03-01T00:00:00.000Z",
+      },
+    ]);
+    const lines = output.split("\n");
+
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain("verify-123");
+    expect(lines[1]).toContain("file:");
+    expect(lines[1]).toContain("...");
+    expect(lines[1]).toContain("surface.md");
+    expect(target.length).toBe(TARGET_TABLE_PREVIEW_LENGTH);
+  });
+
+  it("renders reduce target rows with shared target formatting", () => {
+    const output = renderReduceListTable([
+      {
+        id: "reduce-123",
+        target: formatTargetDisplay({
+          kind: "run",
+          sessionId: "run-456",
+        }),
+        status: "running",
+        createdAt: "2026-03-01T00:00:00.000Z",
+      },
+    ]);
+    const lines = output.split("\n");
+
+    expect(lines[0]).toContain("REDUCE");
+    expect(lines[0]).toContain("TARGET");
+    expect(lines[1]).toContain("run:run-456");
+    expect(lines[1]).toContain("RUNNING");
+  });
+
+  it("renders message table sessions with TARGET values", () => {
+    const output = renderMessageListTable([
+      {
+        id: "message-123",
+        target: formatTargetTablePreview({
+          kind: "interactive",
+          sessionId:
+            "20260327-043019-uatir-very-long-message-target-session-id",
+        }),
+        status: "succeeded",
+        createdAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        id: "message-no-target",
+        target: "—",
+        status: "running",
+        createdAt: "2026-03-01T00:00:00.000Z",
+      },
+    ]);
+    const lines = output.split("\n");
+
+    expect(lines[0]).toContain("MESSAGE");
+    expect(lines[0]).toContain("TARGET");
+    expect(lines[0]).not.toContain("PROMPT");
+    expect(lines[1]).toContain("interactive:...target-session-id");
+    expect(lines[2]).toContain("message-no-target");
+    expect(lines[2]).toContain("—");
+  });
+});
+
+describe("renderInteractiveListTable", () => {
+  it("renders INTERACTIVE, STATUS, CREATED without a target column", () => {
+    const output = renderInteractiveListTable([
+      {
+        id: "interactive-123",
+        status: "running",
+        createdAt: "2026-03-01T00:00:00.000Z",
+      },
+    ]);
+    const lines = output.split("\n");
+
+    expect(lines[0]).toContain("INTERACTIVE");
+    expect(lines[0]).toContain("STATUS");
+    expect(lines[0]).toContain("CREATED");
+    expect(lines[0]).not.toContain("TARGET");
+    expect(lines[1]).toContain("interactive-123");
+    expect(lines[1]).toContain("RUNNING");
   });
 });
 

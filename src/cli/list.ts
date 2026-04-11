@@ -6,6 +6,7 @@ import { resolveCliContext } from "../preflight/index.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import {
   resolveWorkspacePath,
+  VORATIQ_INTERACTIVE_FILE,
   VORATIQ_MESSAGE_FILE,
   VORATIQ_REDUCTION_FILE,
   VORATIQ_VERIFICATION_FILE,
@@ -46,6 +47,9 @@ export async function runListCommand(
     verificationsFilePath:
       workspacePaths.verificationsFile ??
       resolveWorkspacePath(root, VORATIQ_VERIFICATION_FILE),
+    interactiveFilePath:
+      workspacePaths.interactiveFile ??
+      resolveWorkspacePath(root, VORATIQ_INTERACTIVE_FILE),
     operator: options.operator,
     sessionId: options.sessionId,
     limit: options.limit,
@@ -71,6 +75,7 @@ interface ListCommandActionOptions {
   reduce?: string | boolean;
   verify?: string | boolean;
   message?: string | boolean;
+  interactive?: string | boolean;
   limit?: number;
   verbose?: boolean;
   json?: boolean;
@@ -103,6 +108,10 @@ export function createListCommand(): Command {
     .option(
       "--message [session-id]",
       "List message sessions or show one message session",
+    )
+    .option(
+      "--interactive [session-id]",
+      "List interactive sessions or show one interactive session",
     )
     .option(
       "--limit <count>",

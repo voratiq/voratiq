@@ -9,6 +9,7 @@ import { SessionRecordParseError } from "../../../persistence/errors.js";
 import { acquireHistoryLock } from "../../../persistence/history-lock.js";
 import {
   createSessionStore,
+  type SessionRecordWarning,
   type SessionStorePaths,
 } from "../../../persistence/session-store.js";
 import { assertRepoRelativePath, resolvePath } from "../../../utils/path.js";
@@ -38,6 +39,37 @@ export interface InteractiveSessionPaths {
   recordPath: string;
   artifactsPath: string;
   runtimePath: string;
+}
+
+export type InteractiveRecordPredicate = (
+  record: InteractiveSessionRecord,
+) => boolean;
+
+export interface InteractiveRecordWarningMissing {
+  kind: "missing-record";
+  sessionId: string;
+  recordPath: string;
+  displayPath: string;
+}
+
+export interface InteractiveRecordWarningParse {
+  kind: "parse-error";
+  sessionId: string;
+  recordPath: string;
+  displayPath: string;
+  details: string;
+}
+
+export type InteractiveRecordWarning =
+  | InteractiveRecordWarningMissing
+  | InteractiveRecordWarningParse;
+
+export interface ReadInteractiveRecordsOptions {
+  root: string;
+  interactiveFilePath: string;
+  limit?: number;
+  predicate?: InteractiveRecordPredicate;
+  onWarning?: (warning: InteractiveRecordWarning) => void;
 }
 
 const interactivePersistence = createSessionStore<
@@ -85,6 +117,26 @@ export function resolveInteractiveSessionPaths(
       "runtime",
     ),
   };
+}
+
+export async function readInteractiveRecords(
+  options: ReadInteractiveRecordsOptions,
+): Promise<InteractiveSessionRecord[]> {
+  const { root, interactiveFilePath, limit, predicate, onWarning } = options;
+  const paths = buildInteractivePaths(root, interactiveFilePath);
+
+  try {
+    return await interactivePersistence.readRecords({
+      paths,
+      limit,
+      predicate,
+      onWarning: onWarning
+        ? (warning) => onWarning(mapWarning(warning))
+        : undefined,
+    });
+  } catch (error) {
+    throw mapSessionStoreError(error, sessionStoreErrorMapper);
+  }
 }
 
 export async function ensureInteractiveSessionDirectories(options: {
@@ -205,6 +257,37 @@ function buildInteractiveSessionStorePaths(root: string): SessionStorePaths {
     indexPath: resolvePath(root, getInteractiveIndexPath()),
     sessionsDir: resolvePath(root, getInteractiveSessionsDirectoryPath()),
     lockPath: resolvePath(root, getInteractiveHistoryLockPath()),
+  };
+}
+
+function buildInteractivePaths(
+  root: string,
+  interactiveFilePath: string,
+): SessionStorePaths {
+  return {
+    root,
+    indexPath: interactiveFilePath,
+    sessionsDir: resolvePath(root, getInteractiveSessionsDirectoryPath()),
+    lockPath: resolvePath(root, getInteractiveHistoryLockPath()),
+  };
+}
+
+function mapWarning(warning: SessionRecordWarning): InteractiveRecordWarning {
+  if (warning.kind === "parse-error") {
+    return {
+      kind: "parse-error",
+      sessionId: warning.sessionId,
+      recordPath: warning.recordPath,
+      displayPath: warning.displayPath,
+      details: warning.details,
+    };
+  }
+
+  return {
+    kind: "missing-record",
+    sessionId: warning.sessionId,
+    recordPath: warning.recordPath,
+    displayPath: warning.displayPath,
   };
 }
 

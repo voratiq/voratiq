@@ -12,21 +12,30 @@ jest.mock("../../../src/render/utils/transcript-shell.js", () => {
     buildStandardSessionShellSection: jest.fn(
       actual.buildStandardSessionShellSection,
     ),
+    buildTranscriptShellSection: jest.fn(actual.buildTranscriptShellSection),
   };
 });
 
 import { renderVerifyTranscript } from "../../../src/render/transcripts/verify.js";
 import { buildRunMetadataSectionWithStyle } from "../../../src/render/utils/runs.js";
-import { buildStandardSessionShellSection } from "../../../src/render/utils/transcript-shell.js";
+import {
+  buildStandardSessionShellSection,
+  buildTranscriptShellSection,
+} from "../../../src/render/utils/transcript-shell.js";
 
 const buildStandardSessionShellSectionMock =
   buildStandardSessionShellSection as jest.MockedFunction<
     typeof buildStandardSessionShellSection
   >;
+const buildTranscriptShellSectionMock =
+  buildTranscriptShellSection as jest.MockedFunction<
+    typeof buildTranscriptShellSection
+  >;
 
 describe("shared transcript shell helpers", () => {
   beforeEach(() => {
     buildStandardSessionShellSectionMock.mockClear();
+    buildTranscriptShellSectionMock.mockClear();
   });
 
   it("renders run metadata via buildStandardSessionShellSection", () => {

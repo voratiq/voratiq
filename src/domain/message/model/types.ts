@@ -32,6 +32,38 @@ const RUNNING_MESSAGE_RECORD_STATUSES = [
   "running",
 ] as const satisfies readonly MessageStatus[];
 
+const MESSAGE_TARGET_KIND_VALUES = [
+  "interactive",
+  "run",
+  "spec",
+  "reduce",
+  "verify",
+] as const;
+
+export type MessageTargetKind = (typeof MESSAGE_TARGET_KIND_VALUES)[number];
+
+export const messageTargetKindSchema = z.enum(MESSAGE_TARGET_KIND_VALUES);
+
+export const messageTargetSchema = z
+  .object({
+    kind: messageTargetKindSchema,
+    sessionId: z.string().min(1),
+    agentId: agentIdSchema.optional(),
+  })
+  .strict()
+  .superRefine((target, ctx) => {
+    if (target.kind === "interactive" && target.agentId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["agentId"],
+        message:
+          "interactive message targets must not persist an `agentId` lane reference",
+      });
+    }
+  });
+
+export type MessageTarget = z.infer<typeof messageTargetSchema>;
+
 export const messageRecipientEntrySchema = z
   .object({
     agentId: agentIdSchema,
@@ -79,6 +111,7 @@ export const messageRecordSchema = z
     status: messageStatusSchema,
     baseRevisionSha: z.string().optional(),
     prompt: z.string(),
+    target: messageTargetSchema.optional(),
     sourceInteractiveSessionId: z.string().optional(),
     extraContext: z.array(persistedExtraContextPathSchema).optional(),
     extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),
