@@ -135,7 +135,7 @@ describe("bundled MCP server", () => {
         properties: {
           operator: {
             type: "string",
-            enum: ["spec", "run", "reduce", "verify", "message"],
+            enum: ["spec", "run", "reduce", "verify", "message", "interactive"],
           },
           mode: {
             type: "string",

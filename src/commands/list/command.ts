@@ -1,19 +1,13 @@
 import type {
-  ListJsonDetailOutput,
   ListJsonOutput,
-  ListJsonTableRecord,
   ListMode,
   ListOperator,
-  MessageListJsonArtifact,
-  MessageListJsonRow,
-  ReduceListJsonRow,
-  ReductionListJsonArtifact,
-  RunListJsonRow,
-  SpecListJsonArtifact,
-  SpecListJsonRow,
-  VerificationListJsonArtifact,
-  VerifyListJsonRow,
 } from "../../contracts/list.js";
+import type { InteractiveSessionRecord } from "../../domain/interactive/model/types.js";
+import {
+  type InteractiveRecordWarning,
+  readInteractiveRecords,
+} from "../../domain/interactive/persistence/adapter.js";
 import type { MessageRecord } from "../../domain/message/model/types.js";
 import {
   type MessageRecordWarning,
@@ -34,22 +28,21 @@ import {
   readSpecRecords,
   type SpecRecordWarning,
 } from "../../domain/spec/persistence/adapter.js";
-import type {
-  VerificationMethodResultRef,
-  VerificationRecord,
-} from "../../domain/verify/model/types.js";
+import type { VerificationRecord } from "../../domain/verify/model/types.js";
 import { TERMINAL_VERIFICATION_STATUSES } from "../../domain/verify/model/types.js";
 import {
   readVerificationRecords,
   type VerificationRecordWarning,
 } from "../../domain/verify/persistence/adapter.js";
+import { renderInteractiveTranscript } from "../../render/transcripts/interactive.js";
 import {
+  renderInteractiveListTable,
   renderListTableTranscript,
-  renderMessageList,
-  renderReduceList,
-  renderRunList,
-  renderSpecList,
-  renderVerifyList,
+  renderMessageListTable,
+  renderReduceListTable,
+  renderRunListTable,
+  renderSpecListTable,
+  renderVerifyListTable,
 } from "../../render/transcripts/list.js";
 import {
   formatMessageElapsed,
@@ -61,10 +54,7 @@ import {
   formatReducerDuration,
   renderReduceTranscript,
 } from "../../render/transcripts/reduce.js";
-import {
-  formatRunElapsed,
-  renderRunTranscript,
-} from "../../render/transcripts/run.js";
+import { renderRunTranscript } from "../../render/transcripts/run.js";
 import {
   formatSpecAgentDuration,
   formatSpecElapsed,
@@ -74,17 +64,19 @@ import {
   formatVerifyElapsed,
   renderVerifyTranscript,
 } from "../../render/transcripts/verify.js";
-import { formatAgentDuration } from "../../render/utils/agents.js";
 import { formatRenderLifecycleDuration } from "../../render/utils/duration.js";
-import { formatCompactDiffStatistics } from "../../utils/diff.js";
 import { pathExists } from "../../utils/fs.js";
 import {
-  getMessageSessionDirectoryPath,
-  getReductionSessionDirectoryPath,
-  getRunDirectoryPath,
-  getSpecSessionDirectoryPath,
-  getVerificationSessionDirectoryPath,
-} from "../../workspace/structure.js";
+  formatTargetDisplay,
+  formatTargetTablePreview,
+  type ListOperatorRecord,
+  type NormalizedListAgent,
+  type NormalizedListDetailSession,
+  type NormalizedListSession,
+  normalizeListDetailSession,
+  normalizeListSession,
+  toListJsonTargetRef,
+} from "./normalization.js";
 
 const DEFAULT_LIMIT = 10;
 const DASH = "—";
@@ -96,6 +88,7 @@ export interface ListCommandInput {
   reductionsFilePath: string;
   messagesFilePath: string;
   verificationsFilePath: string;
+  interactiveFilePath: string;
   operator: ListOperator;
   sessionId?: string;
   limit?: number;
@@ -136,8 +129,11 @@ async function executeTableMode(
         shouldIncludeInDefaultTable(operator, getRecordStatus(record)),
       );
   const records = filtered.slice(0, limit);
+  const sessions = records.map((record) =>
+    normalizeListSession(operator, record),
+  );
   const warnings = query.warnings;
-  const output = renderTableOutput(operator, records);
+  const output = renderTableOutput(operator, records, sessions);
 
   return {
     warnings,
@@ -145,8 +141,8 @@ async function executeTableMode(
     mode: "table",
     json: {
       operator,
-      mode: "table",
-      records: records.map((record) => toJsonTableRecord(operator, record)),
+      mode: "list",
+      sessions: sessions.map(toJsonSummarySession),
       warnings,
     },
   };
@@ -177,22 +173,22 @@ async function executeDetailMode(
       json: {
         operator,
         mode: "detail",
-        sessionId,
         session: null,
         warnings,
       },
     };
   }
 
+  const detailSession = normalizeListDetailSession(operator, record);
+
   return {
     warnings,
-    output: renderDetailOutput(operator, record),
+    output: renderDetailOutput(operator, detailSession),
     mode: "detail",
     json: {
       operator,
       mode: "detail",
-      sessionId,
-      session: toJsonDetailSession(operator, record),
+      session: toJsonDetailSession(detailSession),
       warnings,
     },
   };
@@ -201,6 +197,7 @@ async function executeDetailMode(
 function renderTableOutput(
   operator: ListOperator,
   records: readonly OperatorRecord[],
+  sessions: readonly NormalizedListSession[],
 ): string | undefined {
   if (records.length === 0) {
     return undefined;
@@ -208,64 +205,123 @@ function renderTableOutput(
 
   const table =
     operator === "run"
-      ? renderRunList(records as readonly RunRecord[])
+      ? renderRunListTable(
+          sessions.map((session) => ({
+            id: session.sessionId,
+            target: session.target
+              ? formatTargetTablePreview(session.target)
+              : DASH,
+            status: session.status,
+            createdAt: session.createdAt,
+          })),
+        )
       : operator === "spec"
-        ? renderSpecList(records as readonly SpecRecord[])
+        ? renderSpecListTable(
+            sessions.map((session) => {
+              return {
+                id: session.sessionId,
+                description: session.description ?? null,
+                status: session.status,
+                createdAt: session.createdAt,
+              };
+            }),
+          )
         : operator === "message"
-          ? renderMessageList(records as readonly MessageRecord[])
-          : operator === "reduce"
-            ? renderReduceList(records as readonly ReductionRecord[])
-            : renderVerifyList(records as readonly VerificationRecord[]);
+          ? renderMessageListTable(
+              sessions.map((session) => ({
+                id: session.sessionId,
+                target: session.target
+                  ? formatTargetTablePreview(session.target)
+                  : DASH,
+                status: session.status,
+                createdAt: session.createdAt,
+              })),
+            )
+          : operator === "interactive"
+            ? renderInteractiveListTable(
+                sessions.map((session) => ({
+                  id: session.sessionId,
+                  status: session.status,
+                  createdAt: session.createdAt,
+                })),
+              )
+            : operator === "reduce"
+              ? renderReduceListTable(
+                  sessions.map((session) => ({
+                    id: session.sessionId,
+                    target: session.target
+                      ? formatTargetTablePreview(session.target)
+                      : DASH,
+                    status: session.status,
+                    createdAt: session.createdAt,
+                  })),
+                )
+              : renderVerifyListTable(
+                  sessions.map((session) => ({
+                    id: session.sessionId,
+                    target: session.target
+                      ? formatTargetTablePreview(session.target)
+                      : DASH,
+                    status: session.status,
+                    createdAt: session.createdAt,
+                  })),
+                );
 
   return renderListTableTranscript(table);
 }
 
-function renderDetailOutput(operator: ListOperator, record: OperatorRecord) {
+function renderDetailOutput(
+  operator: ListOperator,
+  session: NormalizedListDetailSession,
+) {
   if (operator === "run") {
-    const runRecord = record as RunRecord;
     return renderRunTranscript({
-      runId: runRecord.runId,
-      status: runRecord.status,
-      workspacePath: getRunDirectoryPath(runRecord.runId),
-      createdAt: runRecord.createdAt,
-      startedAt: runRecord.startedAt,
-      completedAt: runRecord.completedAt,
-      agents: runRecord.agents.map((agent) => ({
-        agentId: agent.agentId,
-        status: agent.status,
+      runId: session.sessionId,
+      status: session.status as RunRecord["status"],
+      workspacePath: session.workspacePath,
+      createdAt: session.createdAt,
+      startedAt: session.startedAt,
+      completedAt: session.completedAt,
+      targetDisplay: session.target
+        ? formatTargetDisplay(session.target)
+        : undefined,
+      agents: session.agents.map((agent) => ({
+        agentId: agent.agentId ?? DASH,
+        status: agent.status as RunRecord["agents"][number]["status"],
         startedAt: agent.startedAt,
         completedAt: agent.completedAt,
         diffStatistics: agent.diffStatistics,
+        outputPath: agent.outputPath,
+        errorLine: agent.errorLine,
       })),
       isTty: process.stdout.isTTY,
     });
   }
 
   if (operator === "spec") {
-    const specRecord = record as SpecRecord;
     return renderSpecTranscript(
       {
-        sessionId: specRecord.sessionId,
-        createdAt: specRecord.createdAt,
+        sessionId: session.sessionId,
+        createdAt: session.createdAt,
         elapsed:
           formatSpecElapsed({
-            status: specRecord.status,
-            startedAt: specRecord.startedAt,
-            completedAt: specRecord.completedAt,
+            status: session.status as SpecRecord["status"],
+            startedAt: session.startedAt,
+            completedAt: session.completedAt,
           }) ?? DASH,
-        workspacePath: getSpecSessionDirectoryPath(specRecord.sessionId),
-        status: specRecord.status,
-        agents: specRecord.agents.map((agent) => ({
-          agentId: agent.agentId,
-          status: agent.status,
+        workspacePath: session.workspacePath,
+        status: session.status as SpecRecord["status"],
+        agents: session.agents.map((agent) => ({
+          agentId: agent.agentId ?? DASH,
+          status: agent.status as SpecRecord["agents"][number]["status"],
           duration: formatSpecAgentDuration({
-            status: agent.status,
+            status: agent.status as SpecRecord["agents"][number]["status"],
             startedAt: agent.startedAt,
             completedAt: agent.completedAt,
           }),
           outputPath: agent.outputPath,
           dataPath: agent.dataPath,
-          errorLine: agent.error ?? undefined,
+          errorLine: agent.errorLine,
         })),
         isTty: process.stdout.isTTY,
       },
@@ -274,31 +330,31 @@ function renderDetailOutput(operator: ListOperator, record: OperatorRecord) {
   }
 
   if (operator === "reduce") {
-    const reductionRecord = record as ReductionRecord;
     return renderReduceTranscript({
-      reductionId: reductionRecord.sessionId,
-      createdAt: reductionRecord.createdAt,
+      reductionId: session.sessionId,
+      createdAt: session.createdAt,
       elapsed:
         formatReduceElapsed({
-          status: reductionRecord.status,
-          startedAt: reductionRecord.startedAt,
-          completedAt: reductionRecord.completedAt,
+          status: session.status as ReductionRecord["status"],
+          startedAt: session.startedAt,
+          completedAt: session.completedAt,
         }) ?? DASH,
-      workspacePath: getReductionSessionDirectoryPath(
-        reductionRecord.sessionId,
-      ),
-      status: reductionRecord.status,
-      reducers: reductionRecord.reducers.map((reducer) => ({
-        reducerAgentId: reducer.agentId,
-        status: reducer.status,
+      workspacePath: session.workspacePath,
+      status: session.status as ReductionRecord["status"],
+      targetDisplay: session.target
+        ? formatTargetDisplay(session.target)
+        : undefined,
+      reducers: session.agents.map((agent) => ({
+        reducerAgentId: agent.agentId ?? DASH,
+        status: agent.status as ReductionRecord["reducers"][number]["status"],
         duration: formatReducerDuration({
-          status: reducer.status,
-          startedAt: reducer.startedAt,
-          completedAt: reducer.completedAt,
+          status: agent.status as ReductionRecord["reducers"][number]["status"],
+          startedAt: agent.startedAt,
+          completedAt: agent.completedAt,
         }),
-        outputPath: reducer.outputPath,
-        dataPath: reducer.dataPath,
-        errorLine: reducer.error ?? undefined,
+        outputPath: agent.outputPath,
+        dataPath: agent.dataPath,
+        errorLine: agent.errorLine,
       })),
       suppressHint: true,
       isTty: process.stdout.isTTY,
@@ -306,386 +362,127 @@ function renderDetailOutput(operator: ListOperator, record: OperatorRecord) {
   }
 
   if (operator === "message") {
-    const messageRecord = record as MessageRecord;
     return renderMessageTranscript({
-      messageId: messageRecord.sessionId,
-      createdAt: messageRecord.createdAt,
+      messageId: session.sessionId,
+      createdAt: session.createdAt,
       elapsed:
         formatMessageElapsed({
-          status: messageRecord.status,
-          startedAt: messageRecord.startedAt,
-          completedAt: messageRecord.completedAt,
+          status: session.status as MessageRecord["status"],
+          startedAt: session.startedAt,
+          completedAt: session.completedAt,
         }) ?? DASH,
-      workspacePath: getMessageSessionDirectoryPath(messageRecord.sessionId),
-      status: messageRecord.status,
-      recipients: messageRecord.recipients.map((recipient) => ({
-        agentId: recipient.agentId,
-        status: recipient.status,
+      workspacePath: session.workspacePath,
+      status: session.status as MessageRecord["status"],
+      targetDisplay: session.target
+        ? formatTargetDisplay(session.target)
+        : undefined,
+      recipients: session.agents.map((agent) => ({
+        agentId: agent.agentId ?? DASH,
+        status: agent.status as MessageRecord["recipients"][number]["status"],
         duration:
           formatMessageRecipientDuration({
-            status: recipient.status,
-            startedAt: recipient.startedAt,
-            completedAt: recipient.completedAt,
+            status:
+              agent.status as MessageRecord["recipients"][number]["status"],
+            startedAt: agent.startedAt,
+            completedAt: agent.completedAt,
           }) ?? DASH,
-        outputPath: recipient.outputPath,
-        errorLine: recipient.error ?? undefined,
+        outputPath: agent.outputPath,
+        errorLine: agent.errorLine,
       })),
       isTty: process.stdout.isTTY,
     });
   }
 
-  const verificationRecord = record as VerificationRecord;
+  if (operator === "interactive") {
+    const interactiveAgent = session.agents[0];
+    return renderInteractiveTranscript({
+      sessionId: session.sessionId,
+      createdAt: session.createdAt,
+      elapsed: DASH,
+      workspacePath: session.workspacePath,
+      status: session.status as InteractiveSessionRecord["status"],
+      agents: [
+        {
+          agentId: interactiveAgent?.agentId ?? DASH,
+          status:
+            (interactiveAgent?.status as InteractiveSessionRecord["status"]) ??
+            "failed",
+          duration: DASH,
+          outputPath: interactiveAgent?.outputPath,
+        },
+      ],
+      isTty: process.stdout.isTTY,
+    });
+  }
+
   return renderVerifyTranscript({
-    verificationId: verificationRecord.sessionId,
-    createdAt: verificationRecord.createdAt,
+    verificationId: session.sessionId,
+    createdAt: session.createdAt,
     elapsed:
       formatVerifyElapsed({
-        status: verificationRecord.status,
-        startedAt: verificationRecord.startedAt,
-        completedAt: verificationRecord.completedAt,
+        status: session.status as VerificationRecord["status"],
+        startedAt: session.startedAt,
+        completedAt: session.completedAt,
       }) ?? DASH,
-    workspacePath: getVerificationSessionDirectoryPath(
-      verificationRecord.sessionId,
-    ),
-    target: verificationRecord.target,
-    status: verificationRecord.status,
-    methods: verificationRecord.methods.map((method) => ({
-      verifierLabel:
-        method.method === "programmatic"
-          ? "programmatic"
-          : (method.template ?? "rubric"),
-      agentLabel: method.verifierId,
-      status: method.status,
-      duration: formatVerifyMethodDuration(method),
-      artifactPath: method.artifactPath,
-      errorLine: method.error ?? undefined,
+    workspacePath: session.workspacePath,
+    targetDisplay: session.target
+      ? formatTargetDisplay(session.target)
+      : undefined,
+    status: session.status as VerificationRecord["status"],
+    methods: session.agents.map((agent) => ({
+      verifierLabel: agent.verifier ?? "rubric",
+      agentLabel: agent.agentId ?? undefined,
+      status: agent.status as VerificationRecord["methods"][number]["status"],
+      duration: formatVerifyAgentDuration(agent),
+      artifactPath: agent.outputPath,
+      errorLine: agent.errorLine,
     })),
     suppressHint: true,
     isTty: process.stdout.isTTY,
   });
 }
 
-function toJsonTableRecord(
-  operator: ListOperator,
-  record: OperatorRecord,
-): ListJsonTableRecord {
-  if (operator === "run") {
-    const runRecord = record as RunRecord;
-    return {
-      id: runRecord.runId,
-      status: runRecord.status,
-      createdAt: runRecord.createdAt,
-      specPath: runRecord.spec.path,
-    };
-  }
-
-  if (operator === "spec") {
-    const specRecord = record as SpecRecord;
-    return {
-      id: specRecord.sessionId,
-      status: specRecord.status,
-      createdAt: specRecord.createdAt,
-      description: normalizeDescription(specRecord.description),
-    };
-  }
-
-  if (operator === "reduce") {
-    const reductionRecord = record as ReductionRecord;
-    return {
-      id: reductionRecord.sessionId,
-      status: reductionRecord.status,
-      createdAt: reductionRecord.createdAt,
-      target: {
-        kind: reductionRecord.target.type,
-        id: reductionRecord.target.id,
-      },
-    };
-  }
-
-  if (operator === "message") {
-    const messageRecord = record as MessageRecord;
-    return {
-      id: messageRecord.sessionId,
-      status: messageRecord.status,
-      createdAt: messageRecord.createdAt,
-      promptPreview: normalizePreviewText(messageRecord.prompt),
-    };
-  }
-
-  const verificationRecord = record as VerificationRecord;
+function toJsonSummarySession(session: NormalizedListSession) {
   return {
-    id: verificationRecord.sessionId,
-    status: verificationRecord.status,
-    createdAt: verificationRecord.createdAt,
-    target: {
-      kind: verificationRecord.target.kind,
-      id: verificationRecord.target.sessionId,
-    },
+    operator: session.operator,
+    sessionId: session.sessionId,
+    status: session.status,
+    createdAt: session.createdAt,
+    ...(session.target ? { target: toListJsonTargetRef(session.target) } : {}),
+    ...(session.description !== undefined
+      ? { description: session.description }
+      : {}),
   };
 }
 
 function toJsonDetailSession(
-  operator: ListOperator,
-  record: OperatorRecord,
-): NonNullable<ListJsonDetailOutput["session"]> {
-  if (operator === "run") {
-    const runRecord = record as RunRecord;
-    return {
-      id: runRecord.runId,
-      status: runRecord.status,
-      createdAt: runRecord.createdAt,
-      elapsed: formatRunRecordElapsed(runRecord),
-      workspacePath: getRunDirectoryPath(runRecord.runId),
-      rows: runRecord.agents.map(toRunJsonRow),
-      artifacts: [],
-    };
-  }
-
-  if (operator === "spec") {
-    const specRecord = record as SpecRecord;
-    return {
-      id: specRecord.sessionId,
-      status: specRecord.status,
-      createdAt: specRecord.createdAt,
-      elapsed: formatSpecRecordElapsed(specRecord),
-      workspacePath: getSpecSessionDirectoryPath(specRecord.sessionId),
-      rows: specRecord.agents.map(toSpecJsonRow),
-      artifacts: specRecord.agents.map(toSpecArtifact),
-    };
-  }
-
-  if (operator === "reduce") {
-    const reductionRecord = record as ReductionRecord;
-    return {
-      id: reductionRecord.sessionId,
-      status: reductionRecord.status,
-      createdAt: reductionRecord.createdAt,
-      elapsed: formatReductionRecordElapsed(reductionRecord),
-      workspacePath: getReductionSessionDirectoryPath(
-        reductionRecord.sessionId,
-      ),
-      target: {
-        kind: reductionRecord.target.type,
-        id: reductionRecord.target.id,
-      },
-      rows: reductionRecord.reducers.map(toReductionJsonRow),
-      artifacts: reductionRecord.reducers.map(toReductionArtifact),
-    };
-  }
-
-  if (operator === "message") {
-    const messageRecord = record as MessageRecord;
-    return {
-      id: messageRecord.sessionId,
-      status: messageRecord.status,
-      createdAt: messageRecord.createdAt,
-      elapsed: formatMessageRecordElapsed(messageRecord),
-      workspacePath: getMessageSessionDirectoryPath(messageRecord.sessionId),
-      rows: messageRecord.recipients.map(toMessageJsonRow),
-      artifacts: messageRecord.recipients.flatMap(toMessageArtifacts),
-    };
-  }
-
-  const verificationRecord = record as VerificationRecord;
+  session: NormalizedListDetailSession,
+): Extract<ListJsonOutput, { mode: "detail" }>["session"] {
   return {
-    id: verificationRecord.sessionId,
-    status: verificationRecord.status,
-    createdAt: verificationRecord.createdAt,
-    elapsed: formatVerificationRecordElapsed(verificationRecord),
-    workspacePath: getVerificationSessionDirectoryPath(
-      verificationRecord.sessionId,
-    ),
-    target: {
-      kind: verificationRecord.target.kind,
-      id: verificationRecord.target.sessionId,
-    },
-    rows: verificationRecord.methods.map(toVerificationJsonRow),
-    artifacts: verificationRecord.methods.map(toVerificationArtifact),
+    operator: session.operator,
+    sessionId: session.sessionId,
+    status: session.status,
+    createdAt: session.createdAt,
+    ...(session.startedAt ? { startedAt: session.startedAt } : {}),
+    ...(session.completedAt ? { completedAt: session.completedAt } : {}),
+    workspacePath: session.workspacePath,
+    ...(session.target ? { target: toListJsonTargetRef(session.target) } : {}),
+    ...(session.description !== undefined
+      ? { description: session.description }
+      : {}),
+    agents: session.agents.map(toJsonAgent),
   };
 }
 
-function formatRunRecordElapsed(record: RunRecord): string | undefined {
-  return formatRunElapsed({
-    status: record.status,
-    startedAt: record.startedAt,
-    completedAt: record.completedAt,
-  });
-}
-
-function formatSpecRecordElapsed(record: SpecRecord): string | undefined {
-  return formatSpecElapsed({
-    status: record.status,
-    startedAt: record.startedAt,
-    completedAt: record.completedAt,
-  });
-}
-
-function formatReductionRecordElapsed(
-  record: ReductionRecord,
-): string | undefined {
-  return formatReduceElapsed({
-    status: record.status,
-    startedAt: record.startedAt,
-    completedAt: record.completedAt,
-  });
-}
-
-function formatMessageRecordElapsed(record: MessageRecord): string | undefined {
-  return formatMessageElapsed({
-    status: record.status,
-    startedAt: record.startedAt,
-    completedAt: record.completedAt,
-  });
-}
-
-function normalizePreviewText(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = value.replace(/\s+/gu, " ").trim();
-  return normalized.length > 0 ? normalized : null;
-}
-
-function formatVerificationRecordElapsed(
-  record: VerificationRecord,
-): string | undefined {
-  return formatVerifyElapsed({
-    status: record.status,
-    startedAt: record.startedAt,
-    completedAt: record.completedAt,
-  });
-}
-
-function formatRunRowDuration(agent: RunRecord["agents"][number]): string {
-  return agent.status === "running"
-    ? DASH
-    : (formatAgentDuration(agent) ?? DASH);
-}
-
-function toRunJsonRow(agent: RunRecord["agents"][number]): RunListJsonRow {
+function toJsonAgent(agent: NormalizedListAgent) {
   return {
     agentId: agent.agentId,
     status: agent.status,
-    duration: formatRunRowDuration(agent),
-    changes: formatCompactDiffStatistics(agent.diffStatistics) ?? null,
-  };
-}
-
-function formatSpecRowDuration(agent: SpecRecord["agents"][number]): string {
-  return (
-    formatSpecAgentDuration({
-      status: agent.status,
-      startedAt: agent.startedAt,
-      completedAt: agent.completedAt,
-    }) ?? DASH
-  );
-}
-
-function toSpecJsonRow(agent: SpecRecord["agents"][number]): SpecListJsonRow {
-  return {
-    agentId: agent.agentId,
-    status: agent.status,
-    duration: formatSpecRowDuration(agent),
-  };
-}
-
-function toSpecArtifact(
-  agent: SpecRecord["agents"][number],
-): SpecListJsonArtifact {
-  return {
-    kind: "spec",
-    agentId: agent.agentId,
-    path: agent.outputPath ?? null,
-  };
-}
-
-function formatReductionRowDuration(
-  reducer: ReductionRecord["reducers"][number],
-): string {
-  return (
-    formatReducerDuration({
-      status: reducer.status,
-      startedAt: reducer.startedAt,
-      completedAt: reducer.completedAt,
-    }) ?? DASH
-  );
-}
-
-function toReductionJsonRow(
-  reducer: ReductionRecord["reducers"][number],
-): ReduceListJsonRow {
-  return {
-    agentId: reducer.agentId,
-    status: reducer.status,
-    duration: formatReductionRowDuration(reducer),
-  };
-}
-
-function toReductionArtifact(
-  reducer: ReductionRecord["reducers"][number],
-): ReductionListJsonArtifact {
-  return {
-    kind: "reduction",
-    agentId: reducer.agentId,
-    path: reducer.outputPath ?? null,
-  };
-}
-
-function toMessageJsonRow(
-  recipient: MessageRecord["recipients"][number],
-): MessageListJsonRow {
-  return {
-    agentId: recipient.agentId,
-    status: recipient.status,
-    duration:
-      formatMessageRecipientDuration({
-        status: recipient.status,
-        startedAt: recipient.startedAt,
-        completedAt: recipient.completedAt,
-      }) ?? DASH,
-  };
-}
-
-function toMessageArtifacts(
-  recipient: MessageRecord["recipients"][number],
-): MessageListJsonArtifact[] {
-  return [
-    {
-      kind: "output",
-      agentId: recipient.agentId,
-      path: recipient.outputPath ?? null,
-    },
-  ];
-}
-
-function getVerificationMethodLabel(
-  method: VerificationRecord["methods"][number],
-): string {
-  return method.method === "programmatic"
-    ? "programmatic"
-    : (method.template ?? "rubric");
-}
-
-function toVerificationJsonRow(
-  method: VerificationRecord["methods"][number],
-): VerifyListJsonRow {
-  return {
-    agentId: method.verifierId ?? null,
-    verifier: getVerificationMethodLabel(method),
-    status: method.status,
-    duration: formatVerifyMethodDuration(method),
-  };
-}
-
-function toVerificationArtifact(
-  method: VerificationRecord["methods"][number],
-): VerificationListJsonArtifact {
-  return {
-    kind: "result",
-    agentId: method.verifierId ?? null,
-    verifier: getVerificationMethodLabel(method),
-    path: method.artifactPath ?? null,
+    ...(agent.startedAt ? { startedAt: agent.startedAt } : {}),
+    ...(agent.completedAt ? { completedAt: agent.completedAt } : {}),
+    ...(agent.verifier ? { verifier: agent.verifier } : {}),
+    ...(agent.changes ? { changes: agent.changes } : {}),
+    artifacts: agent.artifacts,
   };
 }
 
@@ -704,12 +501,7 @@ function shouldIncludeInDefaultTable(
   return true;
 }
 
-type OperatorRecord =
-  | RunRecord
-  | SpecRecord
-  | MessageRecord
-  | ReductionRecord
-  | VerificationRecord;
+type OperatorRecord = ListOperatorRecord;
 
 interface ReadOperatorRecordsInput {
   root: string;
@@ -718,6 +510,7 @@ interface ReadOperatorRecordsInput {
   reductionsFilePath: string;
   messagesFilePath: string;
   verificationsFilePath: string;
+  interactiveFilePath: string;
   operator: ListOperator;
   limit?: number;
   predicate?: (record: OperatorRecord) => boolean;
@@ -821,6 +614,28 @@ async function readOperatorRecords(
     };
   }
 
+  if (operator === "interactive") {
+    if (!(await pathExists(input.interactiveFilePath))) {
+      return { records: [], warnings: [] };
+    }
+
+    const warnings: InteractiveRecordWarning[] = [];
+    const records = await readInteractiveRecords({
+      root,
+      interactiveFilePath: input.interactiveFilePath,
+      limit: input.limit,
+      predicate: input.predicate as
+        | ((record: InteractiveSessionRecord) => boolean)
+        | undefined,
+      onWarning: (warning) => warnings.push(warning),
+    });
+
+    return {
+      records,
+      warnings: warnings.map(formatSessionWarning),
+    };
+  }
+
   if (!(await pathExists(input.verificationsFilePath))) {
     return { records: [], warnings: [] };
   }
@@ -854,7 +669,12 @@ function getRecordId(operator: ListOperator, record: OperatorRecord): string {
     return (record as RunRecord).runId;
   }
   return (
-    record as SpecRecord | MessageRecord | ReductionRecord | VerificationRecord
+    record as
+      | InteractiveSessionRecord
+      | SpecRecord
+      | MessageRecord
+      | ReductionRecord
+      | VerificationRecord
   ).sessionId;
 }
 
@@ -862,24 +682,13 @@ function formatSessionWarning(warning: { displayPath: string }): string {
   return `Ignoring corrupt session ${warning.displayPath}`;
 }
 
-function normalizeDescription(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = value.replace(/\s+/g, " ").trim();
-  return normalized.length > 0 ? normalized : null;
-}
-
-function formatVerifyMethodDuration(
-  method: VerificationMethodResultRef,
-): string {
+function formatVerifyAgentDuration(agent: NormalizedListAgent): string {
   return (
     formatRenderLifecycleDuration({
       lifecycle: {
-        status: method.status,
-        startedAt: method.startedAt,
-        completedAt: method.completedAt,
+        status: agent.status,
+        startedAt: agent.startedAt,
+        completedAt: agent.completedAt,
       },
       terminalStatuses: TERMINAL_VERIFICATION_STATUSES,
     }) ?? DASH

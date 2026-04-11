@@ -24,6 +24,7 @@ describe("external adapter contract definitions", () => {
       "reduce",
       "verify",
       "message",
+      "interactive",
     ]);
     expect(externalAdapterContractReference.excludedCommands).toEqual([
       "init",
@@ -88,6 +89,14 @@ describe("external adapter contract definitions", () => {
         mode: "table",
         limit: 10,
         verbose: true,
+      }).success,
+    ).toBe(true);
+
+    expect(
+      externalInspectionInputSchemas.list.detail.safeParse({
+        operator: "interactive",
+        mode: "detail",
+        sessionId: "interactive-123",
       }).success,
     ).toBe(true);
 

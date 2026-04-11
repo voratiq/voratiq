@@ -264,7 +264,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_list",
     operator: "list",
     description:
-      "List recorded Voratiq sessions for one operator (`spec`, `run`, `reduce`, `verify`, or `message`) in table or detail mode.",
+      "List recorded Voratiq sessions for one operator (`spec`, `run`, `reduce`, `verify`, `message`, or `interactive`) in table or detail mode.",
     inputSchemaSource: externalListInspectionInputSchema,
     mcpInputSchema: createListMcpInputSchema(),
     buildArgs: (input) =>
@@ -292,7 +292,7 @@ const toolDefinitions: readonly McpToolDefinition[] = toolSpecs.map((tool) => ({
 }));
 
 const VORATIQ_MCP_SERVER_INSTRUCTIONS =
-  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, verify, or message sessions. Use voratiq_spec, voratiq_run, voratiq_reduce, voratiq_verify, voratiq_message, voratiq_apply, and voratiq_prune for the normal Voratiq workflow. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
+  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, verify, message, or interactive sessions. Use voratiq_spec, voratiq_run, voratiq_reduce, voratiq_verify, voratiq_message, voratiq_apply, and voratiq_prune for the normal Voratiq workflow. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
 
 const toolSpecsByName: ReadonlyMap<VoratiqMcpToolName, ToolSpec> = new Map(
   toolSpecs.map((tool) => [tool.name, tool]),
@@ -981,7 +981,14 @@ function createListMcpInputSchema(): Record<string, unknown> {
   return toToolInputJsonSchema(
     z
       .object({
-        operator: z.enum(["spec", "run", "reduce", "verify", "message"]),
+        operator: z.enum([
+          "spec",
+          "run",
+          "reduce",
+          "verify",
+          "message",
+          "interactive",
+        ]),
         mode: z
           .enum(["table", "detail"])
           .describe("Use `detail` only when inspecting a specific session."),

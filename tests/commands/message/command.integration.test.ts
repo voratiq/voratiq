@@ -1,4 +1,11 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from "@jest/globals";
 
 import { verifyAgentProviders } from "../../../src/agents/runtime/auth.js";
 import { executeMessageCommand } from "../../../src/commands/message/command.js";
@@ -91,8 +98,11 @@ const finalizeActiveMessageMock = jest.mocked(finalizeActiveMessage);
 const getHeadRevisionMock = jest.mocked(getHeadRevision);
 
 describe("executeMessageCommand integration", () => {
+  let cwdSpy: jest.SpiedFunction<typeof process.cwd>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    cwdSpy = jest.spyOn(process, "cwd").mockReturnValue("/repo");
 
     resolveStageCompetitorsMock.mockReturnValue({
       source: "orchestration",
@@ -136,6 +146,10 @@ describe("executeMessageCommand integration", () => {
       },
     ] as never);
     finalizeActiveMessageMock.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    cwdSpy.mockRestore();
   });
 
   it("registers and finalizes the active message lifecycle around execution", async () => {
@@ -205,6 +219,185 @@ describe("executeMessageCommand integration", () => {
     );
   });
 
+  it("persists an interactive target from sourceInteractiveSessionId", async () => {
+    const completedRecord: MessageRecord = {
+      sessionId: "message-xyz",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:00:05.000Z",
+      status: "succeeded",
+      baseRevisionSha: "message-base-sha",
+      prompt: "Review this change.",
+      target: {
+        kind: "interactive",
+        sessionId: "interactive-123",
+      },
+      sourceInteractiveSessionId: "interactive-123",
+      recipients: [
+        {
+          agentId: "alpha",
+          status: "succeeded",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:00:05.000Z",
+          outputPath:
+            ".voratiq/message/sessions/message-xyz/alpha/artifacts/response.md",
+          error: null,
+        },
+      ],
+      error: null,
+    };
+
+    const mutators: MessageRecordMutators = {
+      recordRecipientQueued: jest.fn(() => Promise.resolve()),
+      recordRecipientRunning: jest.fn(() => Promise.resolve()),
+      recordRecipientSnapshot: jest.fn(() => Promise.resolve()),
+      completeMessage: jest.fn(() => Promise.resolve(completedRecord)),
+      readRecord: jest.fn(() => Promise.resolve(completedRecord)),
+    };
+    createMessageRecordMutatorsMock.mockReturnValue(mutators);
+
+    await executeMessageCommand({
+      root: "/repo",
+      messagesFilePath: "/repo/.voratiq/message/index.json",
+      prompt: "Review this change.",
+      sourceInteractiveSessionId: "interactive-123",
+    });
+
+    expect(appendMessageRecordMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        record: expect.objectContaining({
+          sourceInteractiveSessionId: "interactive-123",
+          target: {
+            kind: "interactive",
+            sessionId: "interactive-123",
+          },
+        }),
+      }),
+    );
+  });
+
+  it("persists explicit non-interactive targets when provided", async () => {
+    const completedRecord: MessageRecord = {
+      sessionId: "message-xyz",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:00:05.000Z",
+      status: "succeeded",
+      baseRevisionSha: "message-base-sha",
+      prompt: "Review this change.",
+      target: {
+        kind: "run",
+        sessionId: "run-123",
+      },
+      sourceInteractiveSessionId: "interactive-123",
+      recipients: [
+        {
+          agentId: "alpha",
+          status: "succeeded",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:00:05.000Z",
+          outputPath:
+            ".voratiq/message/sessions/message-xyz/alpha/artifacts/response.md",
+          error: null,
+        },
+      ],
+      error: null,
+    };
+
+    const mutators: MessageRecordMutators = {
+      recordRecipientQueued: jest.fn(() => Promise.resolve()),
+      recordRecipientRunning: jest.fn(() => Promise.resolve()),
+      recordRecipientSnapshot: jest.fn(() => Promise.resolve()),
+      completeMessage: jest.fn(() => Promise.resolve(completedRecord)),
+      readRecord: jest.fn(() => Promise.resolve(completedRecord)),
+    };
+    createMessageRecordMutatorsMock.mockReturnValue(mutators);
+
+    await executeMessageCommand({
+      root: "/repo",
+      messagesFilePath: "/repo/.voratiq/message/index.json",
+      prompt: "Review this change.",
+      sourceInteractiveSessionId: "interactive-123",
+      target: {
+        kind: "run",
+        sessionId: "run-123",
+      },
+    });
+
+    expect(appendMessageRecordMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        record: expect.objectContaining({
+          sourceInteractiveSessionId: "interactive-123",
+          target: {
+            kind: "run",
+            sessionId: "run-123",
+          },
+        }),
+      }),
+    );
+  });
+
+  it("persists lane-level targets when an upstream agent lane is provided", async () => {
+    const completedRecord: MessageRecord = {
+      sessionId: "message-xyz",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:00:05.000Z",
+      status: "succeeded",
+      baseRevisionSha: "message-base-sha",
+      prompt: "Review this change.",
+      target: {
+        kind: "run",
+        sessionId: "run-123",
+        agentId: "gpt-5-4-high",
+      },
+      recipients: [
+        {
+          agentId: "alpha",
+          status: "succeeded",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:00:05.000Z",
+          outputPath:
+            ".voratiq/message/sessions/message-xyz/alpha/artifacts/response.md",
+          error: null,
+        },
+      ],
+      error: null,
+    };
+
+    const mutators: MessageRecordMutators = {
+      recordRecipientQueued: jest.fn(() => Promise.resolve()),
+      recordRecipientRunning: jest.fn(() => Promise.resolve()),
+      recordRecipientSnapshot: jest.fn(() => Promise.resolve()),
+      completeMessage: jest.fn(() => Promise.resolve(completedRecord)),
+      readRecord: jest.fn(() => Promise.resolve(completedRecord)),
+    };
+    createMessageRecordMutatorsMock.mockReturnValue(mutators);
+
+    await executeMessageCommand({
+      root: "/repo",
+      messagesFilePath: "/repo/.voratiq/message/index.json",
+      prompt: "Review this change.",
+      target: {
+        kind: "run",
+        sessionId: "run-123",
+        agentId: "gpt-5-4-high",
+      },
+    });
+
+    expect(appendMessageRecordMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        record: expect.objectContaining({
+          target: {
+            kind: "run",
+            sessionId: "run-123",
+            agentId: "gpt-5-4-high",
+          },
+        }),
+      }),
+    );
+  });
+
   it.each([
     "/repo/.voratiq/spec/sessions/spec-123/agent-a/workspace",
     "/repo/.voratiq/run/sessions/run-123/agent-a/workspace",
@@ -214,7 +407,7 @@ describe("executeMessageCommand integration", () => {
   ])(
     "rejects execution from inside a batch agent workspace: %s",
     async (cwd) => {
-      const cwdSpy = jest.spyOn(process, "cwd").mockReturnValue(cwd);
+      cwdSpy.mockReturnValue(cwd);
 
       try {
         await expect(
@@ -225,7 +418,7 @@ describe("executeMessageCommand integration", () => {
           }),
         ).rejects.toBeInstanceOf(MessageInvocationContextError);
       } finally {
-        cwdSpy.mockRestore();
+        cwdSpy.mockReturnValue("/repo");
       }
 
       expect(resolveStageCompetitorsMock).not.toHaveBeenCalled();

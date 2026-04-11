@@ -70,6 +70,7 @@ export interface MessageTranscriptOptions {
   elapsed: string;
   workspacePath: string;
   status: "queued" | "running" | "succeeded" | "failed" | "aborted";
+  targetDisplay?: string;
   recipients: readonly MessageTranscriptRecipientBlock[];
   isTty?: boolean;
   includeSummarySection?: boolean;
@@ -419,25 +420,33 @@ export function createMessageRenderer(
 export function renderMessageTranscript(
   options: MessageTranscriptOptions,
 ): string {
-  const { recipients, isTty, includeSummarySection = true } = options;
+  const {
+    recipients,
+    isTty,
+    includeSummarySection = true,
+    targetDisplay,
+  } = options;
   const style: TranscriptShellStyleOptions = { isTty };
   const resolvedStyle = resolveTranscriptShellStyle(style);
   const sections: string[][] = [];
 
   if (includeSummarySection) {
+    const metadataLines = buildStandardSessionShellSection({
+      badgeText: options.messageId,
+      badgeVariant: "message",
+      status: {
+        value: options.status,
+        color: getRunStatusStyle(options.status).cli,
+      },
+      elapsed: options.elapsed,
+      createdAt: options.createdAt,
+      workspacePath: options.workspacePath,
+      targetDisplay,
+      style,
+    });
+
     const shell = {
-      metadataLines: buildStandardSessionShellSection({
-        badgeText: options.messageId,
-        badgeVariant: "message",
-        status: {
-          value: options.status,
-          color: getRunStatusStyle(options.status).cli,
-        },
-        elapsed: options.elapsed,
-        createdAt: options.createdAt,
-        workspacePath: options.workspacePath,
-        style,
-      }),
+      metadataLines,
       statusTableLines:
         recipients.length > 0
           ? renderTranscriptStatusTable({

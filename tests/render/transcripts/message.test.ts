@@ -285,6 +285,29 @@ describe("renderMessageTranscript", () => {
     expect(transcript).not.toContain("\nDuration: ");
   });
 
+  it("renders a target row in the summary shell when provided", () => {
+    const transcript = renderMessageTranscript({
+      messageId: "message-123",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      elapsed: "3s",
+      workspacePath: ".voratiq/message/sessions/message-123",
+      status: "succeeded",
+      targetDisplay: "interactive:interactive-123",
+      recipients: [
+        {
+          agentId: "agent-a",
+          status: "succeeded",
+          duration: "3s",
+          outputPath:
+            ".voratiq/message/sessions/message-123/agent-a/artifacts/response.md",
+        },
+      ],
+      isTty: false,
+    });
+
+    expect(transcript).toMatch(/Target\s+interactive:interactive-123/u);
+  });
+
   it("uses styled status labels in TTY mode", () => {
     const transcript = renderMessageTranscript({
       messageId: "message-123",

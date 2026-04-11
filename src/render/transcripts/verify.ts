@@ -123,6 +123,7 @@ function buildVerifyStageShell(options: {
   elapsed: string;
   workspacePath: string;
   status: "queued" | "running" | "succeeded" | "failed" | "aborted";
+  targetDisplay?: string;
   tableLines?: string[];
   style?: TranscriptShellStyleOptions;
 }): {
@@ -140,6 +141,7 @@ function buildVerifyStageShell(options: {
       elapsed: options.elapsed,
       createdAt: options.createdAt,
       workspacePath: options.workspacePath,
+      targetDisplay: options.targetDisplay,
       style: options.style,
     }),
     statusTableLines: options.tableLines ?? [],
@@ -501,6 +503,7 @@ export function renderVerifyTranscript(options: {
   createdAt: string;
   elapsed: string;
   workspacePath: string;
+  targetDisplay?: string;
   target?: {
     kind: string;
     sessionId: string;
@@ -518,6 +521,7 @@ export function renderVerifyTranscript(options: {
     createdAt,
     elapsed,
     workspacePath,
+    targetDisplay,
     target,
     status,
     methods,
@@ -531,6 +535,9 @@ export function renderVerifyTranscript(options: {
   const style: TranscriptShellStyleOptions = { isTty };
   const resolvedStyle = resolveTranscriptShellStyle(style);
   const sections: string[][] = [];
+  const resolvedTargetDisplay =
+    targetDisplay ??
+    (target ? `${target.kind}:${target.sessionId}` : undefined);
 
   if (includeSummarySection) {
     const metadataLines = buildVerifyStageShell({
@@ -539,6 +546,7 @@ export function renderVerifyTranscript(options: {
       elapsed,
       workspacePath,
       status,
+      targetDisplay: resolvedTargetDisplay,
       tableLines:
         methods.length === 0
           ? []
@@ -567,13 +575,6 @@ export function renderVerifyTranscript(options: {
 
   if (methods.length > 0) {
     sections.push(["---"]);
-  }
-
-  if (target) {
-    sections.push([`Target: ${target.kind}:${target.sessionId}`]);
-    if (methods.length > 0) {
-      sections.push(["---"]);
-    }
   }
 
   methods.forEach((method, index) => {

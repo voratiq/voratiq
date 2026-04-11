@@ -41,6 +41,8 @@ describe("voratiq list command options", () => {
         reductionsFile: "/repo/.voratiq/reduce/index.json",
         verificationsDir: "/repo/.voratiq/verify",
         verificationsFile: "/repo/.voratiq/verify/index.json",
+        interactiveDir: "/repo/.voratiq/interactive",
+        interactiveFile: "/repo/.voratiq/interactive/index.json",
       },
     });
     executeListCommandMock.mockResolvedValue({
@@ -49,8 +51,8 @@ describe("voratiq list command options", () => {
       mode: "table",
       json: {
         operator: "run",
-        mode: "table",
-        records: [],
+        mode: "list",
+        sessions: [],
         warnings: [],
       },
     });
@@ -71,7 +73,7 @@ describe("voratiq list command options", () => {
     await expect(
       program.parseAsync(["node", "voratiq", "list"]),
     ).rejects.toThrow(
-      /exactly one operator flag is required: `--spec`, `--run`, `--reduce`, `--verify`, or `--message`/u,
+      /exactly one operator flag is required: `--spec`, `--run`, `--reduce`, `--verify`, `--message`, or `--interactive`/u,
     );
   });
 
@@ -90,7 +92,7 @@ describe("voratiq list command options", () => {
     await expect(
       program.parseAsync(["node", "voratiq", "list", "--run", "--spec"]),
     ).rejects.toThrow(
-      /exactly one operator flag is required: `--spec`, `--run`, `--reduce`, `--verify`, or `--message`/u,
+      /exactly one operator flag is required: `--spec`, `--run`, `--reduce`, `--verify`, `--message`, or `--interactive`/u,
     );
   });
 
@@ -109,6 +111,7 @@ describe("voratiq list command options", () => {
       messagesFilePath: "/repo/.voratiq/message/index.json",
       reductionsFilePath: "/repo/.voratiq/reduce/index.json",
       verificationsFilePath: "/repo/.voratiq/verify/index.json",
+      interactiveFilePath: "/repo/.voratiq/interactive/index.json",
       operator: "run",
       sessionId: undefined,
       limit: undefined,
@@ -128,14 +131,13 @@ describe("voratiq list command options", () => {
       json: {
         operator: "verify",
         mode: "detail",
-        sessionId: "verify-123",
         session: {
-          id: "verify-123",
+          operator: "verify",
+          sessionId: "verify-123",
           status: "succeeded",
           createdAt: "2026-03-01T00:00:00.000Z",
           workspacePath: ".voratiq/verify/sessions/verify-123",
-          rows: [],
-          artifacts: [],
+          agents: [],
         },
         warnings: [],
       },
@@ -162,6 +164,7 @@ describe("voratiq list command options", () => {
       messagesFilePath: "/repo/.voratiq/message/index.json",
       reductionsFilePath: "/repo/.voratiq/reduce/index.json",
       verificationsFilePath: "/repo/.voratiq/verify/index.json",
+      interactiveFilePath: "/repo/.voratiq/interactive/index.json",
       operator: "verify",
       sessionId: "verify-123",
       limit: undefined,
@@ -171,17 +174,39 @@ describe("voratiq list command options", () => {
       body: JSON.stringify({
         operator: "verify",
         mode: "detail",
-        sessionId: "verify-123",
         session: {
-          id: "verify-123",
+          operator: "verify",
+          sessionId: "verify-123",
           status: "succeeded",
           createdAt: "2026-03-01T00:00:00.000Z",
           workspacePath: ".voratiq/verify/sessions/verify-123",
-          rows: [],
-          artifacts: [],
+          agents: [],
         },
         warnings: [],
       }),
+    });
+  });
+
+  it("dispatches interactive table mode when --interactive is selected", async () => {
+    const listCommand = silenceCommander(createListCommand());
+    listCommand.exitOverride();
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(listCommand);
+
+    await program.parseAsync(["node", "voratiq", "list", "--interactive"]);
+
+    expect(executeListCommandMock).toHaveBeenCalledWith({
+      root: "/repo",
+      specsFilePath: "/repo/.voratiq/spec/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
+      messagesFilePath: "/repo/.voratiq/message/index.json",
+      reductionsFilePath: "/repo/.voratiq/reduce/index.json",
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
+      interactiveFilePath: "/repo/.voratiq/interactive/index.json",
+      operator: "interactive",
+      sessionId: undefined,
+      limit: undefined,
+      verbose: false,
     });
   });
 });

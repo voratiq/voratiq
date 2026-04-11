@@ -9,6 +9,7 @@ export interface RunDisplayInfo {
   workspacePath?: string;
   elapsed?: string;
   createdAt?: string;
+  targetDisplay?: string;
 }
 
 export function buildRunMetadataSectionWithStyle(
@@ -27,6 +28,7 @@ export function buildRunMetadataSectionWithStyle(
     elapsed: info.elapsed,
     createdAt: info.createdAt,
     workspacePath: info.workspacePath,
+    targetDisplay: info.targetDisplay,
     style,
   });
 }

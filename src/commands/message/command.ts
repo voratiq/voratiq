@@ -13,6 +13,7 @@ import {
   deriveMessageStatusFromRecipients,
   type MessageRecipientEntry,
   type MessageRecord,
+  type MessageTarget,
 } from "../../domain/message/model/types.js";
 import {
   appendMessageRecord,
@@ -48,6 +49,7 @@ export interface ExecuteMessageCommandInput {
   profileName?: string;
   maxParallel?: number;
   extraContextFiles?: readonly ResolvedExtraContextFile[];
+  target?: MessageTarget;
   sourceInteractiveSessionId?: string;
   renderer?: MessageProgressRenderer;
 }
@@ -73,6 +75,7 @@ export async function executeMessageCommand(
     profileName,
     maxParallel: requestedMaxParallel,
     extraContextFiles = [],
+    target,
     sourceInteractiveSessionId,
     renderer,
   } = input;
@@ -101,6 +104,10 @@ export async function executeMessageCommand(
   const messageId = generateSessionId();
   const createdAt = new Date().toISOString();
   const startedAt = createdAt;
+  const persistedTarget = resolveMessageTarget({
+    target,
+    sourceInteractiveSessionId,
+  });
   const effectiveMaxParallel = resolveEffectiveMaxParallel({
     competitorCount: competitors.length,
     requestedMaxParallel,
@@ -125,6 +132,7 @@ export async function executeMessageCommand(
       prompt,
       recipients: initialRecipients,
       ...buildPersistedExtraContextFields(extraContextFiles),
+      ...(persistedTarget ? { target: persistedTarget } : {}),
       ...(sourceInteractiveSessionId ? { sourceInteractiveSessionId } : {}),
     },
   });
@@ -302,4 +310,23 @@ function collectRecipientErrors(
     .filter((recipient) => recipient.error)
     .map((recipient) => `${recipient.agentId}: ${recipient.error}`);
   return details.length > 0 ? details.join("; ") : undefined;
+}
+
+function resolveMessageTarget(options: {
+  target?: MessageTarget;
+  sourceInteractiveSessionId?: string;
+}): MessageTarget | undefined {
+  const { target, sourceInteractiveSessionId } = options;
+  if (target) {
+    return target;
+  }
+
+  if (sourceInteractiveSessionId) {
+    return {
+      kind: "interactive",
+      sessionId: sourceInteractiveSessionId,
+    };
+  }
+
+  return undefined;
 }

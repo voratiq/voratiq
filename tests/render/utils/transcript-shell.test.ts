@@ -8,7 +8,7 @@ describe("formatTranscriptBadge", () => {
       isTty: true,
     });
 
-    expect(badge).toContain("\u001B[48;2;245;242;235m");
+    expect(badge).toContain("\u001B[48;2;252;251;248m");
     expect(badge).toContain("\u001B[38;2;0;0;0m");
   });
 });
