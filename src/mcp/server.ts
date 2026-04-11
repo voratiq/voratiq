@@ -6,6 +6,8 @@ import { z } from "zod";
 import {
   type ExternalApplyExecutionInput,
   externalApplyExecutionInputSchema,
+  externalInspectionModeSchema,
+  externalInspectionOperatorSchema,
   type ExternalListInspectionInput,
   externalListInspectionInputSchema,
   type ExternalMessageExecutionInput,
@@ -981,17 +983,10 @@ function createListMcpInputSchema(): Record<string, unknown> {
   return toToolInputJsonSchema(
     z
       .object({
-        operator: z.enum([
-          "spec",
-          "run",
-          "reduce",
-          "verify",
-          "message",
-          "interactive",
-        ]),
-        mode: z
-          .enum(["table", "detail"])
-          .describe("Use `detail` only when inspecting a specific session."),
+        operator: externalInspectionOperatorSchema,
+        mode: externalInspectionModeSchema.describe(
+          "Use `detail` only when inspecting a specific session.",
+        ),
         sessionId: z
           .string()
           .min(1)

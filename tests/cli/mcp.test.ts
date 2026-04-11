@@ -10,6 +10,8 @@ import { z } from "zod";
 
 import {
   externalApplyExecutionInputSchema,
+  externalInspectionModes,
+  externalInspectionOperators,
   externalMessageExecutionInputSchema,
   externalReduceExecutionInputSchema,
   externalRunExecutionInputSchema,
@@ -135,11 +137,11 @@ describe("bundled MCP server", () => {
         properties: {
           operator: {
             type: "string",
-            enum: ["spec", "run", "reduce", "verify", "message", "interactive"],
+            enum: [...externalInspectionOperators],
           },
           mode: {
             type: "string",
-            enum: ["table", "detail"],
+            enum: [...externalInspectionModes],
             description:
               "Use `detail` only when inspecting a specific session.",
           },
