@@ -87,6 +87,7 @@ export interface AutoVerifyStageResult {
   selectedSpecPath?: string;
   selection?: SelectionDecision;
   selectionWarnings?: readonly string[];
+  warningMessage?: string;
 }
 
 export interface AutoApplyStageInput {
@@ -284,11 +285,7 @@ export async function executeAutoCommand(
           exitCode: specVerifyResult.exitCode,
         });
 
-        if (specVerifyResult.exitCode === 1) {
-          specStatus = "failed";
-          specDetail = "One or more spec verifiers failed.";
-          hardFailure = true;
-        } else if (
+        if (
           typeof specVerifyResult.selectedSpecPath === "string" &&
           specVerifyResult.selectedSpecPath.trim().length > 0
         ) {
@@ -299,7 +296,7 @@ export async function executeAutoCommand(
           specDetail =
             "Spec verification returned a resolvable selection without a selected spec path.";
           hardFailure = true;
-        } else {
+        } else if (specVerifyResult.selection) {
           const specSelectionDisposition = classifyAutoVerificationSelection({
             targetKind: "spec",
             selection: specVerifyResult.selection,
@@ -311,6 +308,12 @@ export async function executeAutoCommand(
           }
           specDetail = specSelectionDisposition.detail;
           markActionRequired(specSelectionDisposition.detail);
+        } else if (specVerifyResult.exitCode === 1) {
+          specStatus = "failed";
+          specDetail =
+            specVerifyResult.warningMessage?.trim() ||
+            "Spec verification did not produce any successful verifier results.";
+          hardFailure = true;
         }
       } catch (error) {
         specStatus = "failed";
@@ -415,11 +418,6 @@ export async function executeAutoCommand(
 
       verifyStatus = "succeeded";
       verifySelection = verifyResult.selection;
-      if (verifyResult.exitCode === 1) {
-        verifyStatus = "failed";
-        verifyDetail = "One or more verifiers failed.";
-        hardFailure = true;
-      }
 
       recordEvent({
         kind: "body",
@@ -459,6 +457,12 @@ export async function executeAutoCommand(
             verifyDetail = detail;
           },
         });
+      } else if (verifyResult.exitCode === 1) {
+        verifyStatus = "failed";
+        verifyDetail =
+          verifyResult.warningMessage?.trim() ||
+          "Verification did not produce any successful verifier results.";
+        hardFailure = true;
       }
     } catch (error) {
       verifyStatus = "failed";

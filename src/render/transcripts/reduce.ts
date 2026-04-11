@@ -141,20 +141,22 @@ function buildReduceStageShell(options: {
   metadataLines: string[];
   statusTableLines: string[];
 } {
+  const metadataLines = buildStandardSessionShellSection({
+    badgeText: options.reductionId,
+    badgeVariant: "reduce",
+    status: {
+      value: options.status,
+      color: getRunStatusStyle(options.status).cli,
+    },
+    elapsed: options.elapsed,
+    createdAt: options.createdAt,
+    workspacePath: options.workspacePath,
+    targetDisplay: options.targetDisplay,
+    style: options.style,
+  });
+
   return {
-    metadataLines: buildStandardSessionShellSection({
-      badgeText: options.reductionId,
-      badgeVariant: "reduce",
-      status: {
-        value: options.status,
-        color: getRunStatusStyle(options.status).cli,
-      },
-      elapsed: options.elapsed,
-      createdAt: options.createdAt,
-      workspacePath: options.workspacePath,
-      targetDisplay: options.targetDisplay,
-      style: options.style,
-    }),
+    metadataLines,
     statusTableLines: options.tableLines ?? [],
   };
 }

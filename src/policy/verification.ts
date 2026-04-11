@@ -365,8 +365,7 @@ function buildVerificationSelectionVerifiers(options: {
   winnerPolicy: VerificationWinnerPolicy;
 }): VerifierSelectionReviewerInput[] {
   const participatingRubrics = resolveWinnerPolicyParticipatingRubrics(options);
-
-  return participatingRubrics.map((rubric) => {
+  const verifiers = participatingRubrics.map((rubric) => {
     if (rubric.status !== "succeeded") {
       return {
         verifierAgentId: rubric.verifierId,
@@ -384,6 +383,28 @@ function buildVerificationSelectionVerifiers(options: {
       ...(preferredCandidateId ? { preferredCandidateId } : {}),
     };
   });
+  const addedFailedVerifierIds = new Set<string>(
+    verifiers
+      .filter((verifier) => verifier.status === "failed")
+      .map((verifier) => verifier.verifierAgentId),
+  );
+
+  for (const rubric of options.policyInput.rubrics) {
+    if (rubric.status === "succeeded") {
+      continue;
+    }
+    if (addedFailedVerifierIds.has(rubric.verifierId)) {
+      continue;
+    }
+
+    verifiers.push({
+      verifierAgentId: rubric.verifierId,
+      status: "failed",
+    });
+    addedFailedVerifierIds.add(rubric.verifierId);
+  }
+
+  return verifiers;
 }
 
 function resolveVerificationWinnerPolicy(

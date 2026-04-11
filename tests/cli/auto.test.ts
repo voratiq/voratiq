@@ -1304,7 +1304,7 @@ describe("voratiq auto", () => {
     expect(output).toContain("Auto FAILED");
   });
 
-  it("surfaces mixed-outcome verify transcript when verify returns exitCode 1", async () => {
+  it("routes mixed-outcome verify(run) to action-required instead of hard failure", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
       .spyOn(process.stdout, "write")
@@ -1320,7 +1320,7 @@ describe("voratiq auto", () => {
         outputPath:
           ".voratiq/verify/sessions/verify-789/verifier-a/run-verification/artifacts/result.json",
         body: [
-          "verify-789 FAILED",
+          "verify-789 SUCCEEDED",
           "",
           "AGENT       STATUS",
           "verifier-a  SUCCEEDED",
@@ -1348,22 +1348,18 @@ describe("voratiq auto", () => {
           "",
           "Error: verifier violated output contract",
         ].join("\n"),
+        selection: {
+          state: "unresolved",
+          applyable: false,
+          unresolvedReasons: [
+            {
+              code: "verifier_failed",
+              failedVerifierAgentIds: ["verifier-b"],
+            },
+          ],
+        },
       }),
       exitCode: 1,
-      reviews: [
-        buildVerificationExecution({
-          agentId: "verifier-a",
-          outputPath:
-            ".voratiq/verify/sessions/verify-789/verifier-a/run-verification/artifacts/result.json",
-        }),
-        buildVerificationExecution({
-          agentId: "verifier-b",
-          outputPath:
-            ".voratiq/verify/sessions/verify-789/verifier-b/run-verification/artifacts/result.json",
-          status: "failed",
-          error: "verifier violated output contract",
-        }),
-      ],
     });
 
     await runAutoCommand({
@@ -1372,11 +1368,14 @@ describe("voratiq auto", () => {
     });
 
     const output = stripAnsi(stdout.join(""));
-    expect(output).toContain("verify-789 FAILED");
+    expect(output).toContain("verify-789 SUCCEEDED");
     expect(output).toContain("Agent: verifier-b");
     expect(output).toContain("Verifier: run-verification");
     expect(output).toContain("Error: verifier violated output contract");
-    expect(output).toContain("Auto FAILED");
+    expect(output).toContain(
+      "Action required: Verification did not produce a resolvable candidate; manual selection required.",
+    );
+    expect(output).toContain("Auto ACTION_REQUIRED");
     expect(runApplyCommandMock).not.toHaveBeenCalled();
   });
 

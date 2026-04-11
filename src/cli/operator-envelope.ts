@@ -147,7 +147,7 @@ export interface VerifyEnvelopeInput {
     sessionId: string;
   };
   outputPath: string;
-  status: VerificationStatus;
+  status: VerificationStatus | "unresolved";
   selection?: SelectionDecision;
   selectedSpecPath?: string;
   warningMessage?: string;
@@ -308,7 +308,7 @@ export function buildVerifyOperatorEnvelope(
   options: VerifyEnvelopeInput,
 ): OperatorResultEnvelope {
   const status =
-    options.selection?.state === "unresolved"
+    options.status === "unresolved" || options.selection?.state === "unresolved"
       ? "unresolved"
       : normalizeTerminalStatus(options.status);
 
@@ -397,6 +397,9 @@ export function buildReduceOperatorEnvelope(
   }
   if (options.target.type === "reduce") {
     ids.reductionId = options.target.id;
+  }
+  if (options.target.type === "message") {
+    ids.messageId = options.target.id;
   }
 
   return buildOperatorEnvelope({

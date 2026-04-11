@@ -289,6 +289,189 @@ describe("voratiq verify", () => {
     expect(result.body).not.toContain("Summary:");
   });
 
+  it("keeps mixed-outcome verification sessions succeeded while preserving failed method rows", async () => {
+    readFileMock.mockImplementation((path) => {
+      const displayPath = normalizeReadFilePath(path);
+      if (
+        displayPath.endsWith(
+          "/.voratiq/verify/sessions/verify-mixed/gpt-5-4/run-verification/artifacts/result.json",
+        )
+      ) {
+        return Promise.resolve(
+          JSON.stringify({
+            method: "rubric",
+            template: "run-verification",
+            verifierId: "gpt-5-4",
+            generatedAt: "2026-03-19T20:00:05.000Z",
+            status: "succeeded",
+            result: {
+              preferred: "agent-a",
+              ranking: ["agent-a", "agent-b"],
+              rationale: "agent-a is strongest.",
+            },
+          }),
+        );
+      }
+      throw new Error(`Unexpected read: ${displayPath}`);
+    });
+
+    executeVerifyCommandMock.mockResolvedValue({
+      verificationId: "verify-mixed",
+      record: {
+        sessionId: "verify-mixed",
+        createdAt: "2026-03-19T20:00:00.000Z",
+        startedAt: "2026-03-19T20:00:01.000Z",
+        completedAt: "2026-03-19T20:00:05.000Z",
+        status: "succeeded",
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+          candidateIds: ["agent-a", "agent-b"],
+        },
+        methods: [
+          {
+            method: "rubric",
+            template: "run-verification",
+            verifierId: "gpt-5-4",
+            scope: { kind: "run" },
+            status: "succeeded",
+            artifactPath:
+              ".voratiq/verify/sessions/verify-mixed/gpt-5-4/run-verification/artifacts/result.json",
+            startedAt: "2026-03-19T20:00:01.000Z",
+            completedAt: "2026-03-19T20:00:03.000Z",
+          },
+          {
+            method: "rubric",
+            template: "failure-modes",
+            verifierId: "failure-modes",
+            scope: { kind: "run" },
+            status: "failed",
+            artifactPath:
+              ".voratiq/verify/sessions/verify-mixed/failure-modes/failure-modes/artifacts/result.json",
+            startedAt: "2026-03-19T20:00:03.000Z",
+            completedAt: "2026-03-19T20:00:05.000Z",
+            error: "verifier violated output contract",
+          },
+        ],
+      },
+    });
+
+    const result = await runVerifyCommand({
+      target: { kind: "run", sessionId: "run-123" },
+      stdout: { write: () => true, isTTY: false },
+    } satisfies VerifyCommandOptions);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.body).toContain("verify-mixed SUCCEEDED");
+    expect(result.body).toContain("FAILED");
+    expect(result.body).toContain("Error: verifier violated output contract");
+  });
+
+  it("suppresses the apply hint when mixed run verification is unresolved", async () => {
+    readFileMock.mockImplementation((path) => {
+      const displayPath = normalizeReadFilePath(path);
+      if (
+        displayPath.endsWith(
+          "/.voratiq/verify/sessions/verify-unresolved/gpt-5-4/run-verification/artifacts/result.json",
+        )
+      ) {
+        return Promise.resolve(
+          JSON.stringify({
+            method: "rubric",
+            template: "run-verification",
+            verifierId: "gpt-5-4",
+            generatedAt: "2026-03-19T20:00:05.000Z",
+            status: "succeeded",
+            result: {
+              preferred: "agent-a",
+              ranking: ["agent-a", "agent-b"],
+              rationale: "agent-a is strongest.",
+            },
+          }),
+        );
+      }
+      if (
+        displayPath.endsWith(
+          "/.voratiq/verify/sessions/verify-unresolved/failure-modes/failure-modes/artifacts/result.json",
+        )
+      ) {
+        return Promise.resolve(
+          JSON.stringify({
+            method: "rubric",
+            template: "failure-modes",
+            verifierId: "failure-modes",
+            generatedAt: "2026-03-19T20:00:05.000Z",
+            status: "failed",
+            result: {
+              preferred: "agent-b",
+              ranking: ["agent-b", "agent-a"],
+              rationale: "agent-b has a hidden failure mode.",
+            },
+            error: "verifier violated output contract",
+          }),
+        );
+      }
+      throw new Error(`Unexpected read: ${displayPath}`);
+    });
+
+    executeVerifyCommandMock.mockResolvedValue({
+      verificationId: "verify-unresolved",
+      record: {
+        sessionId: "verify-unresolved",
+        createdAt: "2026-03-19T20:00:00.000Z",
+        startedAt: "2026-03-19T20:00:01.000Z",
+        completedAt: "2026-03-19T20:00:05.000Z",
+        status: "succeeded",
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+          candidateIds: ["agent-a", "agent-b"],
+        },
+        methods: [
+          {
+            method: "rubric",
+            template: "run-verification",
+            verifierId: "gpt-5-4",
+            scope: { kind: "run" },
+            status: "succeeded",
+            artifactPath:
+              ".voratiq/verify/sessions/verify-unresolved/gpt-5-4/run-verification/artifacts/result.json",
+            startedAt: "2026-03-19T20:00:01.000Z",
+            completedAt: "2026-03-19T20:00:03.000Z",
+          },
+          {
+            method: "rubric",
+            template: "failure-modes",
+            verifierId: "failure-modes",
+            scope: { kind: "run" },
+            status: "failed",
+            artifactPath:
+              ".voratiq/verify/sessions/verify-unresolved/failure-modes/failure-modes/artifacts/result.json",
+            startedAt: "2026-03-19T20:00:03.000Z",
+            completedAt: "2026-03-19T20:00:05.000Z",
+            error: "verifier violated output contract",
+          },
+        ],
+      },
+    });
+
+    const result = await runVerifyCommand({
+      target: { kind: "run", sessionId: "run-123" },
+      stdout: { write: () => true, isTTY: false },
+    } satisfies VerifyCommandOptions);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.status).toBe("unresolved");
+    expect(result.body).toContain("verify-unresolved UNRESOLVED");
+    expect(result.warningMessage).toContain(
+      "Verification did not produce a resolvable candidate; manual selection required.",
+    );
+    expect(result.body).toContain(
+      "Verification did not produce a resolvable candidate; manual selection required.",
+    );
+    expect(result.body).not.toContain("To apply a solution:");
+  });
+
   it("surfaces selection warnings while keeping the apply hint for a resolved rubric winner", async () => {
     readFileMock.mockImplementation((path) => {
       const displayPath = normalizeReadFilePath(path);
@@ -406,7 +589,7 @@ describe("voratiq verify", () => {
     );
   });
 
-  it("does not render the apply hint when verification status failed even if selection resolved", async () => {
+  it("does not render the apply hint when verification status is failed", async () => {
     readFileMock.mockImplementation((path) => {
       const displayPath = normalizeReadFilePath(path);
       if (
@@ -420,7 +603,7 @@ describe("voratiq verify", () => {
             template: "run-verification",
             verifierId: "gpt-5-4",
             generatedAt: "2026-03-19T20:00:05.000Z",
-            status: "succeeded",
+            status: "failed",
             result: {
               preferred: "v_aaaaaaaaaa",
               ranking: ["v_aaaaaaaaaa", "v_bbbbbbbbbb"],
@@ -461,7 +644,7 @@ describe("voratiq verify", () => {
             template: "run-verification",
             verifierId: "gpt-5-4",
             scope: { kind: "run" },
-            status: "succeeded",
+            status: "failed",
             artifactPath:
               ".voratiq/verify/sessions/verify-123/gpt-5-4/run-verification/artifacts/result.json",
             startedAt: "2026-03-19T20:00:03.000Z",
@@ -820,6 +1003,110 @@ describe("voratiq verify", () => {
     expect(result.body).toContain("Spec draft evidence was sufficient.");
     expect(result.body).not.toContain("Results: 0");
     expect(result.body).not.toContain("programmatic/artifacts/result.json");
+  });
+
+  it("returns non-success for spec verification without a selected spec path", async () => {
+    readFileMock.mockImplementation((path) => {
+      const displayPath = normalizeReadFilePath(path);
+      if (
+        displayPath.endsWith(
+          "/.voratiq/verify/sessions/verify-spec-unresolved/gpt-5-4/spec-verification/artifacts/result.json",
+        )
+      ) {
+        return Promise.resolve(
+          JSON.stringify({
+            method: "rubric",
+            template: "spec-verification",
+            verifierId: "gpt-5-4",
+            generatedAt: "2026-03-19T20:00:05.000Z",
+            status: "succeeded",
+            result: {
+              preferred: "draft-a",
+              ranking: ["draft-a", "draft-b"],
+              rationale: "draft-a is strongest.",
+            },
+          }),
+        );
+      }
+      if (
+        displayPath.endsWith(
+          "/.voratiq/verify/sessions/verify-spec-unresolved/failure-modes/failure-modes/artifacts/result.json",
+        )
+      ) {
+        return Promise.resolve(
+          JSON.stringify({
+            method: "rubric",
+            template: "failure-modes",
+            verifierId: "failure-modes",
+            generatedAt: "2026-03-19T20:00:05.000Z",
+            status: "failed",
+            result: {
+              preferred: "draft-b",
+              ranking: ["draft-b", "draft-a"],
+              rationale: "draft-a carries a defect.",
+            },
+            error: "verifier violated output contract",
+          }),
+        );
+      }
+      throw new Error(`Unexpected read: ${displayPath}`);
+    });
+
+    executeVerifyCommandMock.mockResolvedValue({
+      verificationId: "verify-spec-unresolved",
+      record: {
+        sessionId: "verify-spec-unresolved",
+        createdAt: "2026-03-19T20:00:00.000Z",
+        startedAt: "2026-03-19T20:00:01.000Z",
+        completedAt: "2026-03-19T20:00:05.000Z",
+        status: "succeeded",
+        target: {
+          kind: "spec",
+          sessionId: "spec-123",
+        },
+        methods: [
+          {
+            method: "rubric",
+            template: "spec-verification",
+            verifierId: "gpt-5-4",
+            scope: { kind: "target" },
+            status: "succeeded",
+            artifactPath:
+              ".voratiq/verify/sessions/verify-spec-unresolved/gpt-5-4/spec-verification/artifacts/result.json",
+            startedAt: "2026-03-19T20:00:01.000Z",
+            completedAt: "2026-03-19T20:00:03.000Z",
+          },
+          {
+            method: "rubric",
+            template: "failure-modes",
+            verifierId: "failure-modes",
+            scope: { kind: "target" },
+            status: "failed",
+            artifactPath:
+              ".voratiq/verify/sessions/verify-spec-unresolved/failure-modes/failure-modes/artifacts/result.json",
+            startedAt: "2026-03-19T20:00:03.000Z",
+            completedAt: "2026-03-19T20:00:05.000Z",
+            error: "verifier violated output contract",
+          },
+        ],
+      },
+    });
+
+    const result = await runVerifyCommand({
+      target: { kind: "spec", sessionId: "spec-123" },
+      stdout: { write: () => true, isTTY: false },
+    } satisfies VerifyCommandOptions);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.status).toBe("unresolved");
+    expect(result.selectedSpecPath).toBeUndefined();
+    expect(result.warningMessage).toContain(
+      "Verification did not select a spec path; manual review required.",
+    );
+    expect(result.body).toContain(
+      "Verification did not select a spec path; manual review required.",
+    );
+    expect(result.body).toContain("verify-spec-unresolved UNRESOLVED");
   });
 });
 

@@ -244,7 +244,21 @@ async function assertVerificationTargetEligible(
     );
   }
 
-  const missing = await findMissingVerificationArtifacts(root, record.methods);
+  const artifactMethods = record.methods.filter(
+    (method): method is typeof method & { artifactPath: string } =>
+      typeof method.artifactPath === "string" &&
+      method.artifactPath.trim().length > 0,
+  );
+
+  if (artifactMethods.length === 0) {
+    throw new CliError(
+      `Verification session \`${target.id}\` has no reduction-ready artifacts.`,
+      [],
+      ["Re-run `voratiq verify` to generate at least one durable artifact."],
+    );
+  }
+
+  const missing = await findMissingVerificationArtifacts(root, artifactMethods);
   if (missing.length > 0) {
     throw new CliError(
       `Verification session \`${target.id}\` is missing required artifacts.`,
@@ -298,7 +312,19 @@ async function assertReductionTargetEligibleInternal(
     );
   }
 
-  const missing = await findMissingReductionArtifacts(root, record.reducers);
+  const succeededReducers = record.reducers.filter(
+    (reducer): reducer is typeof reducer & { outputPath: string } =>
+      reducer.status === "succeeded" && typeof reducer.outputPath === "string",
+  );
+  if (succeededReducers.length === 0) {
+    throw new CliError(
+      `Reduction session \`${target.id}\` has no successful reduction artifacts.`,
+      [],
+      ["Re-run `voratiq reduce` to regenerate reduction artifacts."],
+    );
+  }
+
+  const missing = await findMissingReductionArtifacts(root, succeededReducers);
   if (missing.length > 0) {
     throw new CliError(
       `Reduction session \`${target.id}\` is missing required artifacts.`,

@@ -218,6 +218,7 @@ describe("executeAutoCommand", () => {
         .fn<AutoCommandDependencies["runVerifyStage"]>()
         .mockResolvedValue(
           createVerifyStageResult({
+            exitCode: 1,
             selection: {
               state: "unresolved",
               applyable: false,
@@ -338,6 +339,87 @@ describe("executeAutoCommand", () => {
     );
   });
 
+  it("treats mixed-outcome verify(run) as action required when selection is unresolved", async () => {
+    const runApplyStage = jest.fn<AutoCommandDependencies["runApplyStage"]>();
+    const dependencies = createDependencies({
+      now: () => 0,
+      runRunStage: jest
+        .fn<AutoCommandDependencies["runRunStage"]>()
+        .mockResolvedValue(createRunStageResult()),
+      runVerifyStage: jest
+        .fn<AutoCommandDependencies["runVerifyStage"]>()
+        .mockResolvedValue(
+          createVerifyStageResult({
+            exitCode: 1,
+            selection: {
+              state: "unresolved",
+              applyable: false,
+              unresolvedReasons: [
+                {
+                  code: "verifier_failed",
+                  failedVerifierAgentIds: ["verifier-b"],
+                },
+              ],
+            },
+          }),
+        ),
+      runApplyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        specPath: "specs/task.md",
+      },
+      dependencies,
+    );
+
+    expect(runApplyStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("action_required");
+    expect(result.apply.status).toBe("skipped");
+    expect(result.summary.verify.status).toBe("succeeded");
+    expect(result.summary.verify.detail).toBe(
+      "Verification did not produce a resolvable candidate; manual selection required.",
+    );
+  });
+
+  it("treats verify(spec) exit code 1 as a hard failure", async () => {
+    const runRunStage = jest.fn<AutoCommandDependencies["runRunStage"]>();
+    const runVerifyStage = jest
+      .fn<AutoCommandDependencies["runVerifyStage"]>()
+      .mockResolvedValueOnce(
+        createVerifyStageResult({
+          body: "spec verify body",
+          exitCode: 1,
+        }),
+      );
+    const dependencies = createDependencies({
+      now: () => 0,
+      runSpecStage: jest
+        .fn<AutoCommandDependencies["runSpecStage"]>()
+        .mockResolvedValue({
+          sessionId: "spec-session-no-success",
+          body: "spec body",
+          generatedSpecPaths: ["specs/a.md"],
+        }),
+      runRunStage,
+      runVerifyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        description: "Define the task",
+      },
+      dependencies,
+    );
+
+    expect(runRunStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("failed");
+    expect(result.summary.spec.detail).toBe(
+      "Spec verification did not produce any successful verifier results.",
+    );
+    expect(result.exitCode).toBe(1);
+  });
+
   it("returns action required when verify(spec) is unresolved", async () => {
     const runRunStage = jest.fn<AutoCommandDependencies["runRunStage"]>();
     const runVerifyStage = jest
@@ -345,6 +427,7 @@ describe("executeAutoCommand", () => {
       .mockResolvedValueOnce(
         createVerifyStageResult({
           body: "spec verify body",
+          exitCode: 1,
           selection: {
             state: "unresolved",
             applyable: false,
@@ -575,6 +658,7 @@ describe("executeAutoCommand", () => {
         .mockResolvedValue(
           createVerifyStageResult({
             body: "run verify body",
+            exitCode: 1,
             selection: {
               state: "unresolved",
               applyable: false,

@@ -213,6 +213,58 @@ describe("verify live progress renderer", () => {
     expect(normalizeFrame(ttyFrame)).toBe(normalizeFrame(nonTtyFrame));
   });
 
+  it("rewrites the final TTY frame to unresolved when selection downgrades the result", () => {
+    const tty = new VirtualTty();
+    const renderer = createVerifyRenderer({
+      stdout: tty,
+      now: () => Date.parse("2026-01-01T00:00:05.000Z"),
+    });
+
+    renderer.begin({
+      verificationId: "verify-123",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      workspacePath: ".voratiq/verify/sessions/verify-123",
+      status: "running",
+    });
+    renderer.update({
+      methodKey: "programmatic",
+      verifierLabel: "programmatic",
+      status: "succeeded",
+      startedAt: "2026-01-01T00:00:01.000Z",
+      completedAt: "2026-01-01T00:00:04.000Z",
+      artifactPath: "programmatic/artifacts/result.json",
+    });
+    renderer.complete("succeeded");
+    renderer.complete("unresolved", {
+      startedAt: "2026-01-01T00:00:01.000Z",
+      completedAt: "2026-01-01T00:00:04.000Z",
+    });
+
+    const nonTtyTranscript = renderVerifyTranscript({
+      verificationId: "verify-123",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      elapsed: "3s",
+      workspacePath: ".voratiq/verify/sessions/verify-123",
+      status: "unresolved",
+      methods: [
+        {
+          verifierLabel: "programmatic",
+          duration: "3s",
+          status: "succeeded",
+          artifactPath: "programmatic/artifacts/result.json",
+        },
+      ],
+      suppressHint: true,
+      isTty: false,
+      includeSummarySection: true,
+    });
+
+    const ttyFrame = tty.snapshot().split("\n\n---")[0] ?? "";
+    const nonTtyFrame = nonTtyTranscript.split("\n\n---")[0] ?? "";
+
+    expect(normalizeFrame(ttyFrame)).toBe(normalizeFrame(nonTtyFrame));
+  });
+
   it("shows live elapsed while keeping running table duration frozen", () => {
     let currentTime = Date.parse("2026-01-01T00:00:03.000Z");
     const tty = new VirtualTty();
@@ -326,5 +378,40 @@ describe("verify live progress renderer", () => {
     const summaryShell = transcript.split("\n\n---\n\nAgent:")[0] ?? "";
     expect(summaryShell).toContain("Target     run:run-123");
     expect(summaryShell).toContain("AGENT");
+  });
+
+  it("renders mixed outcomes with a succeeded session summary and failed method rows", () => {
+    const transcript = renderVerifyTranscript({
+      verificationId: "verify-mixed",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      elapsed: "3s",
+      workspacePath: ".voratiq/verify/sessions/verify-mixed",
+      status: "succeeded",
+      methods: [
+        {
+          verifierLabel: "run-verification",
+          agentLabel: "verifier-a",
+          duration: "2s",
+          status: "succeeded",
+          artifactPath: "verifier-a/result.json",
+        },
+        {
+          verifierLabel: "run-verification",
+          agentLabel: "verifier-b",
+          duration: "2s",
+          status: "failed",
+          artifactPath: "verifier-b/result.json",
+          errorLine: "verifier output invalid",
+        },
+      ],
+      suppressHint: true,
+      isTty: false,
+      includeSummarySection: true,
+    });
+
+    expect(transcript).toContain("verify-mixed SUCCEEDED");
+    expect(transcript).toContain("verifier-b");
+    expect(transcript).toContain("FAILED");
+    expect(transcript).toContain("Error: verifier output invalid");
   });
 });

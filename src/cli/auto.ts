@@ -228,6 +228,7 @@ export async function runAutoCommand(
           selectedSpecPath: result.selectedSpecPath,
           selection: result.selection?.decision,
           selectionWarnings: result.selection?.warnings,
+          warningMessage: result.warningMessage,
         })),
       runApplyStage: async (input) =>
         runApplyCommand({
