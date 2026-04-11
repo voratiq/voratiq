@@ -19,6 +19,7 @@ import type { SpecRecord } from "../../../src/domain/spec/model/types.js";
 import { appendSpecRecord } from "../../../src/domain/spec/persistence/adapter.js";
 import type { VerificationRecord } from "../../../src/domain/verify/model/types.js";
 import { appendVerificationRecord } from "../../../src/domain/verify/persistence/adapter.js";
+import { formatRunTimestamp } from "../../../src/render/utils/records.js";
 import { createRunRecord } from "../../support/factories/run-records.js";
 
 describe("executeListCommand", () => {
@@ -1396,11 +1397,13 @@ describe("executeListCommand", () => {
   });
 
   it("renders interactive detail output and json without target metadata", async () => {
+    const createdAt = "2026-03-01T00:00:00.000Z";
     await appendInteractiveSessionRecord({
       root: testDir,
       record: buildInteractiveRecord({
         sessionId: "interactive-detail",
         status: "succeeded",
+        createdAt,
         chat: {
           captured: true,
           format: "jsonl",
@@ -1420,7 +1423,9 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("interactive-detail");
     expect(result.output).toContain("SUCCEEDED");
     expect(result.output).toMatch(/Elapsed\s+—/u);
-    expect(result.output).toMatch(/Created\s+2026-02-28 16:00 PST/u);
+    expect(result.output).toContain(
+      `Created    ${formatRunTimestamp(createdAt)}`,
+    );
     expect(result.output).toMatch(
       /Workspace\s+\.voratiq\/interactive\/sessions\/interactive-detail/u,
     );
