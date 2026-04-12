@@ -6,10 +6,7 @@ import { z } from "zod";
 import {
   type ExternalApplyExecutionInput,
   externalApplyExecutionInputSchema,
-  externalInspectionModeSchema,
   externalInspectionOperatorSchema,
-  type ExternalListInspectionInput,
-  externalListInspectionInputSchema,
   type ExternalMessageExecutionInput,
   externalMessageExecutionInputSchema,
   type ExternalPruneExecutionInput,
@@ -28,6 +25,8 @@ import {
   operatorResultEnvelopeSchema,
 } from "../cli/operator-envelope.js";
 import {
+  listJsonModes,
+  listJsonModeSchema,
   type ListJsonOutput,
   listJsonOutputSchema,
 } from "../contracts/list.js";
@@ -112,6 +111,28 @@ interface ToolSpec {
   readonly buildArgs: (input: unknown) => string[];
   readonly outputContract: "execution" | "list";
 }
+
+const mcpListInspectionInputSchema = z.discriminatedUnion("mode", [
+  z
+    .object({
+      operator: externalInspectionOperatorSchema,
+      mode: z.literal(listJsonModes[0]),
+      verbose: z.boolean().optional(),
+      limit: z.number().int().positive().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      operator: externalInspectionOperatorSchema,
+      mode: z.literal(listJsonModes[1]),
+      sessionId: z.string().min(1),
+      verbose: z.boolean().optional(),
+      limit: z.number().int().positive().optional(),
+    })
+    .strict(),
+]);
+
+type McpListInspectionInput = z.infer<typeof mcpListInspectionInputSchema>;
 
 interface CliInvocationSuccess {
   kind: "success";
@@ -266,11 +287,11 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_list",
     operator: "list",
     description:
-      "List recorded Voratiq sessions for one operator (`spec`, `run`, `reduce`, `verify`, `message`, or `interactive`) in table or detail mode.",
-    inputSchemaSource: externalListInspectionInputSchema,
+      "List recorded Voratiq sessions for one operator (`spec`, `run`, `reduce`, `verify`, `message`, or `interactive`) in list or detail mode.",
+    inputSchemaSource: mcpListInspectionInputSchema,
     mcpInputSchema: createListMcpInputSchema(),
     buildArgs: (input) =>
-      buildListInspectionArgs(input as ExternalListInspectionInput),
+      buildListInspectionArgs(input as McpListInspectionInput),
     outputContract: "list",
   },
   {
@@ -836,7 +857,7 @@ function buildPruneExecutionArgs(input: ExternalPruneExecutionInput): string[] {
   return args;
 }
 
-function buildListInspectionArgs(input: ExternalListInspectionInput): string[] {
+function buildListInspectionArgs(input: McpListInspectionInput): string[] {
   const args = ["list", `--${input.operator}`];
   if (input.mode === "detail") {
     args.push(input.sessionId);
@@ -984,7 +1005,7 @@ function createListMcpInputSchema(): Record<string, unknown> {
     z
       .object({
         operator: externalInspectionOperatorSchema,
-        mode: externalInspectionModeSchema.describe(
+        mode: listJsonModeSchema.describe(
           "Use `detail` only when inspecting a specific session.",
         ),
         sessionId: z
