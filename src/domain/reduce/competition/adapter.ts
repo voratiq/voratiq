@@ -21,6 +21,7 @@ import {
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import { readMessageRecords } from "../../../domain/message/persistence/adapter.js";
+import { deriveReductionStatusFromReducers } from "../../../domain/reduce/competition/finalize.js";
 import { validateReductionOutputContract } from "../../../domain/reduce/competition/output-validation.js";
 import { buildReducePrompt } from "../../../domain/reduce/competition/prompt.js";
 import { parseReductionArtifact } from "../../../domain/reduce/competition/reduction.js";
@@ -468,7 +469,7 @@ export function createReduceCompetitionAdapter(
       };
     },
     finalizeCompetition: async () => {
-      const failed = failure !== undefined;
+      let finalizedStatus: ReductionRecord["status"] | undefined;
       const completedAt = new Date().toISOString();
       await rewriteReductionRecord({
         root,
@@ -480,25 +481,32 @@ export function createReduceCompetitionAdapter(
             startedAt: record.startedAt ?? completedAt,
             completedAt,
           });
-          const status = failed ? "failed" : "succeeded";
+          const status = deriveReductionStatusFromReducers(record.reducers);
+          finalizedStatus = status;
           return {
             ...record,
             status,
             ...recordComplete,
-            error: failed ? toErrorMessage(failure) : null,
+            error:
+              status === "failed" && failure !== undefined
+                ? toErrorMessage(failure)
+                : null,
             reducers: record.reducers.map((reducer) => {
               if (reducer.status !== "running" && reducer.status !== "queued") {
                 return reducer;
               }
               return {
                 ...reducer,
-                status,
+                status: "failed",
                 ...buildOperationLifecycleCompleteFields({
                   existing: reducer,
                   startedAt: reducer.startedAt ?? recordComplete.completedAt,
                   completedAt: recordComplete.completedAt,
                 }),
-                error: failed ? toErrorMessage(failure) : null,
+                error:
+                  failure !== undefined
+                    ? toErrorMessage(failure)
+                    : reducer.error,
               };
             }),
           };
@@ -545,10 +553,12 @@ export function createReduceCompetitionAdapter(
           status: finalizedRecord.status,
         });
       } else {
+        const status =
+          finalizedStatus ?? (failure === undefined ? "succeeded" : "failed");
         emitStageProgressEvent(renderer, {
           type: "stage.status",
           stage: "reduce",
-          status: failed ? "failed" : "succeeded",
+          status,
         });
       }
 
@@ -818,6 +828,12 @@ async function prepareVerificationTargetContext(options: {
     });
   }
 
+  if (artifacts.length === 0) {
+    throw new Error(
+      `Verification session \`${target.id}\` has no reduction-ready artifacts.`,
+    );
+  }
+
   return {
     target,
     displayPath: `.voratiq/verify/sessions/${record.sessionId}`,
@@ -854,8 +870,17 @@ async function prepareReductionTargetContextInternal(options: {
 
   const stagedFiles: StagedTargetFile[] = [];
   const artifacts: Array<Record<string, unknown>> = [];
+  const succeededReducers = record.reducers.filter(
+    (reducer): reducer is typeof reducer & { outputPath: string } =>
+      reducer.status === "succeeded" && typeof reducer.outputPath === "string",
+  );
+  if (succeededReducers.length === 0) {
+    throw new Error(
+      `Reduction session \`${target.id}\` has no successful reduction artifacts.`,
+    );
+  }
 
-  for (const reducer of record.reducers) {
+  for (const reducer of succeededReducers) {
     const reductionRelative = `inputs/reducers/${reducer.agentId}/reduction.md`;
     stagedFiles.push({
       sourceAbsolutePath: resolvePath(root, reducer.outputPath),

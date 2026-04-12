@@ -26,6 +26,17 @@ type CliWriter = Pick<NodeJS.WriteStream, "write"> & {
 };
 
 const DASH = "—";
+type VerifyTranscriptStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "aborted"
+  | "unresolved";
+const VERIFY_TRANSCRIPT_TERMINAL_STATUSES = [
+  ...TERMINAL_VERIFICATION_STATUSES,
+  "unresolved",
+] as const;
 
 function formatErrorDetail(error: unknown): string {
   if (error instanceof Error) {
@@ -72,7 +83,7 @@ export interface VerifyProgressContext {
   startedAt?: string;
   completedAt?: string;
   workspacePath: string;
-  status: "queued" | "running" | "succeeded" | "failed" | "aborted";
+  status: VerifyTranscriptStatus;
 }
 
 export interface VerifyProgressMethodRecord {
@@ -102,7 +113,7 @@ export interface VerifyProgressRenderer extends StageProgressEventConsumer<
   begin(context?: VerifyProgressContext): void;
   update(record: VerifyProgressMethodRecord): void;
   complete(
-    status?: VerifyProgressContext["status"],
+    status?: VerifyTranscriptStatus,
     lifecycle?: { startedAt?: string; completedAt?: string },
   ): void;
 }
@@ -122,7 +133,7 @@ function buildVerifyStageShell(options: {
   createdAt: string;
   elapsed: string;
   workspacePath: string;
-  status: "queued" | "running" | "succeeded" | "failed" | "aborted";
+  status: VerifyTranscriptStatus;
   targetDisplay?: string;
   tableLines?: string[];
   style?: TranscriptShellStyleOptions;
@@ -130,20 +141,25 @@ function buildVerifyStageShell(options: {
   metadataLines: string[];
   statusTableLines: string[];
 } {
+  const metadataLines = buildStandardSessionShellSection({
+    badgeText: options.verificationId,
+    badgeVariant: "verify",
+    status: {
+      value: options.status,
+      color:
+        options.status === "unresolved"
+          ? "yellow"
+          : getRunStatusStyle(options.status).cli,
+    },
+    elapsed: options.elapsed,
+    createdAt: options.createdAt,
+    workspacePath: options.workspacePath,
+    targetDisplay: options.targetDisplay,
+    style: options.style,
+  });
+
   return {
-    metadataLines: buildStandardSessionShellSection({
-      badgeText: options.verificationId,
-      badgeVariant: "verify",
-      status: {
-        value: options.status,
-        color: getRunStatusStyle(options.status).cli,
-      },
-      elapsed: options.elapsed,
-      createdAt: options.createdAt,
-      workspacePath: options.workspacePath,
-      targetDisplay: options.targetDisplay,
-      style: options.style,
-    }),
+    metadataLines,
     statusTableLines: options.tableLines ?? [],
   };
 }
@@ -469,10 +485,22 @@ export function createVerifyRenderer(
       });
     },
     complete(
-      status?: VerifyProgressContext["status"],
+      status?: VerifyTranscriptStatus,
       lifecycle?: { startedAt?: string; completedAt?: string },
     ): void {
       stopRefreshLoop();
+      const allowTerminalOverride =
+        disabled &&
+        stdout.isTTY === true &&
+        context !== undefined &&
+        status !== undefined &&
+        context.status !== status;
+      if (disabled && !allowTerminalOverride) {
+        return;
+      }
+      if (allowTerminalOverride) {
+        disabled = false;
+      }
       guard(() => {
         if (context && lifecycle) {
           context = {
@@ -483,11 +511,11 @@ export function createVerifyRenderer(
         }
 
         if (status) {
-          this.onProgressEvent({
-            type: "stage.status",
-            stage: "verify",
-            status,
-          });
+          if (context) {
+            context = { ...context, status };
+          }
+          render();
+          syncRefreshLoop();
         } else {
           render();
         }
@@ -508,7 +536,7 @@ export function renderVerifyTranscript(options: {
     kind: string;
     sessionId: string;
   };
-  status: "queued" | "running" | "succeeded" | "failed" | "aborted";
+  status: VerifyTranscriptStatus;
   methods: readonly VerifyTranscriptMethodBlock[];
   suppressHint?: boolean;
   warningMessage?: string;
@@ -629,7 +657,7 @@ export function formatVerifyElapsed(
       startedAt: source.startedAt,
       completedAt: source.completedAt,
     },
-    terminalStatuses: TERMINAL_VERIFICATION_STATUSES,
+    terminalStatuses: VERIFY_TRANSCRIPT_TERMINAL_STATUSES,
     now,
   });
 }

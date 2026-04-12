@@ -299,4 +299,37 @@ describe("reduce live progress renderer", () => {
     expect(summaryShell).toContain("Target     run:run-123");
     expect(summaryShell).toContain("AGENT");
   });
+
+  it("renders mixed reducers with a succeeded session summary and failed reducer rows", () => {
+    const transcript = renderReduceTranscript({
+      reductionId: "reduce-mixed",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      elapsed: "4s",
+      workspacePath: ".voratiq/reduce/sessions/reduce-mixed",
+      status: "succeeded",
+      reducers: [
+        {
+          reducerAgentId: "reducer-a",
+          outputPath: "reducer-a/reduction.md",
+          duration: "2s",
+          status: "succeeded",
+        },
+        {
+          reducerAgentId: "reducer-b",
+          outputPath: "reducer-b/reduction.md",
+          duration: "2s",
+          status: "failed",
+          errorLine: "contract mismatch",
+        },
+      ],
+      suppressHint: true,
+      isTty: false,
+      includeSummarySection: true,
+    });
+
+    expect(transcript).toContain("reduce-mixed SUCCEEDED");
+    expect(transcript).toContain("reducer-b");
+    expect(transcript).toContain("FAILED");
+    expect(transcript).toContain("Error: contract mismatch");
+  });
 });

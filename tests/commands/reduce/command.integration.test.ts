@@ -137,7 +137,7 @@ describe("executeReduceCommand integration", () => {
         target: { type: "run", id: "run-123" },
         createdAt: "2026-01-01T00:00:00.000Z",
         completedAt: "2026-01-01T00:00:05.000Z",
-        status: "failed",
+        status: "succeeded",
         reducers: [
           {
             agentId: "gamma",

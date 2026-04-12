@@ -15,6 +15,7 @@ interface RunRubricFixture {
   verifierId: string;
   template: string;
   result: Record<string, unknown>;
+  status?: "succeeded" | "failed";
 }
 
 describe("verification winner policy defaults", () => {
@@ -204,6 +205,112 @@ describe("verification winner policy defaults", () => {
     ]);
   });
 
+  it("keeps selection unresolved when a non-participating verifier fails", async () => {
+    const output = await loadVerificationSelectionPolicyOutput({
+      root,
+      record: await writeRunVerificationRecord({
+        root,
+        verificationId: "verify-non-participating-failed",
+        rubrics: [
+          {
+            verifierId: "verifier-selection",
+            template: "run-verification",
+            result: {
+              preferred: "v_aaaaaaaaaa",
+              ranking: ["v_aaaaaaaaaa", "v_bbbbbbbbbb"],
+            },
+          },
+          {
+            verifierId: "verifier-failure-modes",
+            template: "failure-modes",
+            status: "failed",
+            result: {
+              preferred: "v_bbbbbbbbbb",
+              ranking: ["v_bbbbbbbbbb", "v_aaaaaaaaaa"],
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(output.input.verifiers).toEqual([
+      {
+        verifierAgentId: "verifier-selection",
+        status: "succeeded",
+        preferredCandidateId: "v_aaaaaaaaaa",
+        resolvedPreferredCandidateId: "agent-a",
+      },
+      {
+        verifierAgentId: "verifier-failure-modes",
+        status: "failed",
+      },
+    ]);
+    expect(output.decision).toEqual({
+      state: "unresolved",
+      applyable: false,
+      unresolvedReasons: [
+        {
+          code: "verifier_failed",
+          failedVerifierAgentIds: ["verifier-failure-modes"],
+        },
+      ],
+    });
+  });
+
+  it("does not duplicate failed participating verifiers", async () => {
+    const output = await loadVerificationSelectionPolicyOutput({
+      root,
+      record: await writeRunVerificationRecord({
+        root,
+        verificationId: "verify-participating-failed-once",
+        rubrics: [
+          {
+            verifierId: "verifier-selection",
+            template: "run-verification",
+            status: "failed",
+            result: {
+              preferred: "v_aaaaaaaaaa",
+              ranking: ["v_aaaaaaaaaa", "v_bbbbbbbbbb"],
+            },
+          },
+          {
+            verifierId: "verifier-failure-modes",
+            template: "failure-modes",
+            status: "failed",
+            result: {
+              preferred: "v_bbbbbbbbbb",
+              ranking: ["v_bbbbbbbbbb", "v_aaaaaaaaaa"],
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(output.input.verifiers).toEqual([
+      {
+        verifierAgentId: "verifier-selection",
+        status: "failed",
+      },
+      {
+        verifierAgentId: "verifier-failure-modes",
+        status: "failed",
+      },
+    ]);
+    expect(output.decision).toEqual({
+      state: "unresolved",
+      applyable: false,
+      unresolvedReasons: [
+        {
+          code: "no_successful_verifiers",
+          failedVerifierAgentIds: [
+            "verifier-selection",
+            "verifier-failure-modes",
+          ],
+        },
+      ],
+    });
+  });
+
   it("does not resolve programmatic-only run verification without selector verifiers", async () => {
     const output = await loadVerificationSelectionPolicyOutput({
       root,
@@ -334,12 +441,13 @@ async function writeRunVerificationRecord(options: {
 
   for (const rubric of rubrics) {
     const artifactPath = `.voratiq/verify/sessions/${verificationId}/${rubric.verifierId}/${rubric.template}/artifacts/result.json`;
+    const status = rubric.status ?? "succeeded";
     await writeArtifact(root, artifactPath, {
       method: "rubric",
       template: rubric.template,
       verifierId: rubric.verifierId,
       generatedAt,
-      status: "succeeded",
+      status,
       result: rubric.result,
     });
     methods.push({
@@ -347,7 +455,7 @@ async function writeRunVerificationRecord(options: {
       template: rubric.template,
       verifierId: rubric.verifierId,
       scope: { kind: "run" },
-      status: "succeeded",
+      status,
       artifactPath,
       startedAt: generatedAt,
       completedAt: generatedAt,

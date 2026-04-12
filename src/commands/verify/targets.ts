@@ -1,4 +1,4 @@
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 
 import { CliError, RunNotFoundCliError } from "../../cli/errors.js";
 import { TERMINAL_MESSAGE_STATUSES } from "../../domain/message/model/types.js";
@@ -18,7 +18,13 @@ import type {
 } from "../../domain/verify/competition/target.js";
 import { readVerificationRecords } from "../../domain/verify/persistence/adapter.js";
 import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
-import { MESSAGE_RESPONSE_FILENAME } from "../../workspace/structure.js";
+import { pathExists } from "../../utils/fs.js";
+import { normalizePathForDisplay, resolvePath } from "../../utils/path.js";
+import { buildAgentWorkspacePaths } from "../../workspace/layout.js";
+import {
+  DIFF_FILENAME,
+  MESSAGE_RESPONSE_FILENAME,
+} from "../../workspace/structure.js";
 
 export type VerifyTargetKind = "spec" | "run" | "reduce" | "message";
 
@@ -88,14 +94,45 @@ async function resolveSpecVerifyTarget(
     );
   }
 
+  const competitiveCandidates = record.agents
+    .filter((agent) => agent.status === "succeeded" && agent.outputPath)
+    .map((agent) => ({
+      canonicalId: agent.agentId,
+      forbiddenIdentityTokens: [agent.agentId],
+    }));
+
+  if (competitiveCandidates.length === 0) {
+    throw new CliError(
+      `Spec session \`${target.sessionId}\` has no verifiable drafts.`,
+      [],
+      [
+        "Re-run `voratiq spec` to generate at least one succeeded draft before running `voratiq verify`.",
+      ],
+    );
+  }
+
+  const missingSpecArtifacts = await collectMissingSpecVerificationArtifacts({
+    root,
+    outputPaths: record.agents
+      .filter(
+        (agent): agent is typeof agent & { outputPath: string } =>
+          agent.status === "succeeded" && typeof agent.outputPath === "string",
+      )
+      .map((agent) => agent.outputPath),
+  });
+  if (missingSpecArtifacts.length > 0) {
+    throw new CliError(
+      `Spec session \`${target.sessionId}\` is missing required verification artifacts.`,
+      missingSpecArtifacts.map((artifact) => `Missing: \`${artifact}\`.`),
+      [
+        "Re-run `voratiq spec` to regenerate the retained artifacts before running `voratiq verify`.",
+      ],
+    );
+  }
+
   return {
     baseRevisionSha: resolveSpecBaseRevisionSha(record),
-    competitiveCandidates: record.agents
-      .filter((agent) => agent.status === "succeeded" && agent.outputPath)
-      .map((agent) => ({
-        canonicalId: agent.agentId,
-        forbiddenIdentityTokens: [agent.agentId],
-      })),
+    competitiveCandidates,
     target: {
       kind: "spec",
       sessionId: record.sessionId,
@@ -143,6 +180,23 @@ async function resolveRunVerifyTarget(
       `Run \`${target.sessionId}\` has no candidate agents to verify.`,
       [],
       ["Re-run `voratiq run` to generate verifiable candidates."],
+    );
+  }
+
+  const missingRequiredArtifacts = await collectMissingRunVerificationArtifacts(
+    {
+      root,
+      record,
+      candidateIds,
+    },
+  );
+  if (missingRequiredArtifacts.length > 0) {
+    throw new CliError(
+      `Run \`${target.sessionId}\` is missing required verification artifacts.`,
+      missingRequiredArtifacts.map((artifact) => `Missing: \`${artifact}\`.`),
+      [
+        "Re-run `voratiq run` to regenerate the retained artifacts before running `voratiq verify`.",
+      ],
     );
   }
 
@@ -200,16 +254,48 @@ async function resolveReductionVerifyTarget(
     );
   }
 
-  const referenceRepo = await resolveReductionReferenceRepo({
-    ...input,
-    reductionRecord: record,
-  });
   const competitiveCandidates = record.reducers
     .filter((reducer) => reducer.status === "succeeded" && reducer.outputPath)
     .map((reducer) => ({
       canonicalId: reducer.agentId,
       forbiddenIdentityTokens: [reducer.agentId],
     }));
+
+  if (competitiveCandidates.length === 0) {
+    throw new CliError(
+      `Reduction session \`${target.sessionId}\` has no verifiable reductions.`,
+      [],
+      [
+        "Re-run `voratiq reduce` to produce at least one succeeded reduction before running `voratiq verify`.",
+      ],
+    );
+  }
+
+  const missingReductionArtifacts =
+    await collectMissingRetainedVerificationArtifacts({
+      root,
+      relativePaths: record.reducers
+        .filter(
+          (reducer): reducer is typeof reducer & { outputPath: string } =>
+            reducer.status === "succeeded" &&
+            typeof reducer.outputPath === "string",
+        )
+        .map((reducer) => reducer.outputPath),
+    });
+  if (missingReductionArtifacts.length > 0) {
+    throw new CliError(
+      `Reduction session \`${target.sessionId}\` is missing required verification artifacts.`,
+      missingReductionArtifacts.map((artifact) => `Missing: \`${artifact}\`.`),
+      [
+        "Re-run `voratiq reduce` to regenerate the retained artifacts before running `voratiq verify`.",
+      ],
+    );
+  }
+
+  const referenceRepo = await resolveReductionReferenceRepo({
+    ...input,
+    reductionRecord: record,
+  });
 
   if (referenceRepo.kind === "git") {
     return {
@@ -282,6 +368,21 @@ async function resolveMessageVerifyTarget(
     );
   }
 
+  const missingMessageArtifacts =
+    await collectMissingRetainedVerificationArtifacts({
+      root,
+      relativePaths: recipients.map((recipient) => recipient.outputPath),
+    });
+  if (missingMessageArtifacts.length > 0) {
+    throw new CliError(
+      `Message session \`${target.sessionId}\` is missing required verification artifacts.`,
+      missingMessageArtifacts.map((artifact) => `Missing: \`${artifact}\`.`),
+      [
+        "Re-run `voratiq message` to regenerate the retained artifacts before running `voratiq verify`.",
+      ],
+    );
+  }
+
   return {
     competitiveCandidates: recipients.map((recipient) => ({
       canonicalId: recipient.agentId,
@@ -293,6 +394,77 @@ async function resolveMessageVerifyTarget(
     },
     messageRecord: record,
   };
+}
+
+async function collectMissingSpecVerificationArtifacts(options: {
+  root: string;
+  outputPaths: readonly string[];
+}): Promise<string[]> {
+  return collectMissingRetainedVerificationArtifacts({
+    root: options.root,
+    relativePaths: options.outputPaths,
+  });
+}
+
+async function collectMissingRunVerificationArtifacts(options: {
+  root: string;
+  record: RunRecord;
+  candidateIds: readonly string[];
+}): Promise<string[]> {
+  const { root, record, candidateIds } = options;
+  const missing = new Set<string>();
+
+  const specAbsolute = resolvePath(root, record.spec.path);
+  if (!(await pathExists(specAbsolute))) {
+    missing.add(normalizePathForDisplay(record.spec.path));
+  }
+
+  for (const candidateId of candidateIds) {
+    const runAgentRecord = record.agents.find(
+      (agent) => agent.agentId === candidateId,
+    );
+    if (runAgentRecord?.artifacts?.diffCaptured !== true) {
+      continue;
+    }
+
+    const paths = buildAgentWorkspacePaths({
+      root,
+      runId: record.runId,
+      agentId: candidateId,
+    });
+    const diffAbsolute = join(paths.artifactsPath, DIFF_FILENAME);
+    if (!(await pathExists(diffAbsolute))) {
+      missing.add(
+        normalizePathForDisplay(
+          join(
+            ".voratiq",
+            "run",
+            "sessions",
+            record.runId,
+            candidateId,
+            "artifacts",
+            DIFF_FILENAME,
+          ),
+        ),
+      );
+    }
+  }
+
+  return Array.from(missing).sort((left, right) => left.localeCompare(right));
+}
+
+async function collectMissingRetainedVerificationArtifacts(options: {
+  root: string;
+  relativePaths: readonly string[];
+}): Promise<string[]> {
+  const { root, relativePaths } = options;
+  const missing = new Set<string>();
+  for (const relativePath of relativePaths) {
+    if (!(await pathExists(resolvePath(root, relativePath)))) {
+      missing.add(normalizePathForDisplay(relativePath));
+    }
+  }
+  return Array.from(missing).sort((left, right) => left.localeCompare(right));
 }
 
 function collectRunCandidateIdentityTokens(options: {

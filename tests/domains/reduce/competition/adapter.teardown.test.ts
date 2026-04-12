@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { createReduceCompetitionAdapter } from "../../../../src/domain/reduce/competition/adapter.js";
 import { readSpecRecords } from "../../../../src/domain/spec/persistence/adapter.js";
 import { pathExists } from "../../../../src/utils/fs.js";
+import { createWorkspace } from "../../../../src/workspace/setup.js";
 
 jest.mock("../../../../src/domain/spec/persistence/adapter.js", () => ({
   readSpecRecords: jest.fn(),
@@ -91,4 +92,166 @@ describe("reduce competition teardown", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("stages only succeeded reducers when reducing a mixed-outcome reduction session", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-reduce-source-"));
+
+    try {
+      await createWorkspace(root);
+
+      const sourceReductionId = "reduce-source";
+      const succeededOutput = `.voratiq/reduce/sessions/${sourceReductionId}/alpha/artifacts/reduction.md`;
+      const succeededData = `.voratiq/reduce/sessions/${sourceReductionId}/alpha/artifacts/reduction.json`;
+      await mkdir(
+        join(
+          root,
+          ".voratiq",
+          "reduce",
+          "sessions",
+          sourceReductionId,
+          "alpha",
+          "artifacts",
+        ),
+        {
+          recursive: true,
+        },
+      );
+      await writeFile(join(root, succeededOutput), "# Alpha\n", "utf8");
+      await writeFile(
+        join(root, succeededData),
+        '{"summary":"alpha"}\n',
+        "utf8",
+      );
+
+      await writeReductionSession(root, {
+        sessionId: sourceReductionId,
+        target: { type: "run", id: "run-123" },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: "2026-01-01T00:00:05.000Z",
+        status: "succeeded",
+        reducers: [
+          {
+            agentId: "alpha",
+            status: "succeeded",
+            outputPath: succeededOutput,
+            dataPath: succeededData,
+            startedAt: "2026-01-01T00:00:00.000Z",
+            completedAt: "2026-01-01T00:00:02.000Z",
+            error: null,
+          },
+          {
+            agentId: "beta",
+            status: "failed",
+            outputPath: `.voratiq/reduce/sessions/${sourceReductionId}/beta/artifacts/reduction.md`,
+            dataPath: `.voratiq/reduce/sessions/${sourceReductionId}/beta/artifacts/reduction.json`,
+            startedAt: "2026-01-01T00:00:00.000Z",
+            completedAt: "2026-01-01T00:00:03.000Z",
+            error: "contract mismatch",
+          },
+        ],
+        error: null,
+      });
+
+      const adapter = createReduceCompetitionAdapter({
+        root,
+        reductionId: "reduce-123",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
+        specsFilePath: join(root, ".voratiq", "specs", "index.json"),
+        runsFilePath: join(root, ".voratiq", "runs", "index.json"),
+        messagesFilePath: join(root, ".voratiq", "message", "index.json"),
+        verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
+        target: { type: "reduce", id: sourceReductionId },
+        environment: {},
+      });
+
+      const preparation = await adapter.prepareCandidates([
+        {
+          id: "reducer",
+          provider: "codex",
+          model: "gpt-5",
+          binary: "node",
+          argv: [],
+        },
+      ]);
+      const prepared = preparation.ready[0];
+      expect(prepared).toBeDefined();
+
+      const alphaMarkdown = join(
+        prepared.workspacePaths.workspacePath,
+        "inputs",
+        "reducers",
+        "alpha",
+        "reduction.md",
+      );
+      const alphaData = join(
+        prepared.workspacePaths.workspacePath,
+        "inputs",
+        "reducers",
+        "alpha",
+        "reduction.json",
+      );
+      const betaMarkdown = join(
+        prepared.workspacePaths.workspacePath,
+        "inputs",
+        "reducers",
+        "beta",
+        "reduction.md",
+      );
+
+      await expect(readFile(alphaMarkdown, "utf8")).resolves.toContain(
+        "# Alpha",
+      );
+      await expect(readFile(alphaData, "utf8")).resolves.toContain("alpha");
+      await expect(pathExists(betaMarkdown)).resolves.toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
+
+async function writeReductionSession(
+  root: string,
+  record: {
+    sessionId: string;
+    target: { type: "run"; id: string };
+    createdAt: string;
+    startedAt: string;
+    completedAt: string;
+    status: "succeeded";
+    reducers: Array<{
+      agentId: string;
+      status: "succeeded" | "failed";
+      outputPath: string;
+      dataPath: string;
+      startedAt: string;
+      completedAt: string;
+      error: string | null;
+    }>;
+    error: string | null;
+  },
+): Promise<void> {
+  const reduceDir = join(root, ".voratiq", "reduce");
+  const sessionsDir = join(reduceDir, "sessions", record.sessionId);
+  await mkdir(sessionsDir, { recursive: true });
+  await writeFile(
+    join(reduceDir, "index.json"),
+    JSON.stringify({
+      version: 1,
+      sessions: [
+        {
+          sessionId: record.sessionId,
+          createdAt: record.createdAt,
+          status: record.status,
+        },
+      ],
+    }),
+    "utf8",
+  );
+  await writeFile(
+    join(sessionsDir, "record.json"),
+    JSON.stringify(record),
+    "utf8",
+  );
+}

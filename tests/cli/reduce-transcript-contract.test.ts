@@ -82,7 +82,7 @@ describe("reduce transcript contract", () => {
         target: { type: "run", id: "run-123" },
         createdAt: "2026-01-01T00:00:00.000Z",
         completedAt: "2026-01-01T00:00:10.000Z",
-        status: "failed",
+        status: "succeeded",
         reducers: [
           {
             agentId: "alpha",
@@ -140,6 +140,7 @@ describe("reduce transcript contract", () => {
     expect(body).toContain("Agent: gamma");
     expect(body).toContain("SUCCEEDED");
     expect(body).toContain("FAILED");
+    expect(result.exitCode).toBe(0);
 
     expect(body).not.toContain("Next:");
     expect(body).not.toContain("--extra-context");

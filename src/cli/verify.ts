@@ -77,7 +77,7 @@ export interface VerifyCommandOptions {
 
 export interface VerifyCommandResult {
   verificationId: string;
-  status: VerificationRecord["status"];
+  status: VerificationRecord["status"] | "unresolved";
   target: VerificationRecord["target"];
   body: string;
   exitCode?: number;
@@ -85,6 +85,32 @@ export interface VerifyCommandResult {
   selectedSpecPath?: string;
   selection?: VerificationSelectionPolicyOutput;
   warningMessage?: string;
+}
+
+function resolveVerifyManualActionMessage(options: {
+  targetKind: VerificationRecord["target"]["kind"];
+  status: VerificationRecord["status"];
+  selection?: VerificationSelectionPolicyOutput;
+  selectedSpecPath?: string;
+}): string | undefined {
+  const { targetKind, status, selection, selectedSpecPath } = options;
+  if (status !== "succeeded") {
+    return undefined;
+  }
+
+  if (targetKind === "spec" && !selectedSpecPath) {
+    return "Verification did not select a spec path; manual review required.";
+  }
+
+  if (selection?.decision.state !== "unresolved") {
+    return undefined;
+  }
+
+  if (targetKind === "run") {
+    return "Verification did not produce a resolvable candidate; manual selection required.";
+  }
+
+  return "Verification did not produce a resolvable result; manual review required.";
 }
 
 export async function runVerifyCommand(
@@ -190,10 +216,32 @@ export async function runVerifyCommand(
   const selectionWarnings = (selection?.warnings ?? []).map(
     (warning) => `Warning: ${warning}`,
   );
+  const selectedSpecPath =
+    execution.record.target.kind === "spec" &&
+    typeof execution.record.target.specPath === "string"
+      ? execution.record.target.specPath
+      : undefined;
+  const manualActionMessage = resolveVerifyManualActionMessage({
+    targetKind: execution.record.target.kind,
+    status: execution.record.status,
+    selection,
+    selectedSpecPath,
+  });
   const warningMessage = [
     ...selectionWarnings,
     ...(selectionPolicyWarning ? [selectionPolicyWarning] : []),
+    ...(manualActionMessage ? [manualActionMessage] : []),
   ].join("\n");
+  const displayStatus =
+    selection?.decision.state === "unresolved"
+      ? "unresolved"
+      : execution.record.status;
+  if (displayStatus === "unresolved" && !json) {
+    renderer.complete("unresolved", {
+      startedAt: execution.record.startedAt,
+      completedAt: execution.record.completedAt,
+    });
+  }
   const recommendedRunAgent =
     execution.record.target.kind === "run" &&
     selection !== undefined &&
@@ -205,9 +253,10 @@ export async function runVerifyCommand(
     suppressHint ||
     selectionPolicyWarning ||
     execution.record.target.kind !== "run" ||
-    execution.record.status !== "succeeded"
+    execution.record.status !== "succeeded" ||
+    selection?.decision.state !== "resolvable"
       ? undefined
-      : `To apply a solution:\n  voratiq apply --run ${execution.record.target.sessionId} --agent ${recommendedRunAgent ?? "<agent-id>"}`;
+      : `To apply a solution:\n  voratiq apply --run ${execution.record.target.sessionId} --agent ${recommendedRunAgent}`;
 
   const outputPath = normalizePathForDisplay(
     relativeToRoot(
@@ -240,7 +289,7 @@ export async function runVerifyCommand(
       ),
     ),
     target: execution.record.target,
-    status: execution.record.status,
+    status: displayStatus,
     methods: methodBlocks,
     suppressHint,
     ...(warningMessage ? { warningMessage } : {}),
@@ -251,15 +300,20 @@ export async function runVerifyCommand(
 
   return {
     verificationId: execution.verificationId,
-    status: execution.record.status,
+    status: displayStatus,
     target: execution.record.target,
     body,
-    exitCode: execution.record.status === "succeeded" ? 0 : 1,
+    exitCode:
+      execution.record.status === "succeeded" &&
+      selection?.decision.state !== "unresolved" &&
+      !(
+        execution.record.target.kind === "spec" &&
+        typeof selectedSpecPath !== "string"
+      )
+        ? 0
+        : 1,
     outputPath,
-    ...(execution.record.target.kind === "spec" &&
-    typeof execution.record.target.specPath === "string"
-      ? { selectedSpecPath: execution.record.target.specPath }
-      : {}),
+    ...(selectedSpecPath ? { selectedSpecPath } : {}),
     selection,
     ...(warningMessage ? { warningMessage } : {}),
   };

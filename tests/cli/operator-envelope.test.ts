@@ -314,6 +314,10 @@ describe("operator envelope helpers", () => {
       status: "succeeded",
     });
 
+    expect(envelope.ids).toMatchObject({
+      sessionId: "reduce-123",
+      messageId: "message-456",
+    });
     expect(envelope.artifacts).toEqual(
       expect.arrayContaining([
         {

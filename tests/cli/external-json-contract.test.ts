@@ -427,6 +427,56 @@ describe("external CLI JSON contract", () => {
       },
     },
     {
+      operator: "reduce",
+      argv: ["reduce", "--message", "message-123", "--json"],
+      setup: () => {
+        executeReduceCommandMock.mockResolvedValue({
+          reductionId: "reduce-message-123",
+          target: {
+            type: "message",
+            id: "message-123",
+          },
+          reducerAgentIds: ["agent-r"],
+          reductions: [],
+        });
+        readReductionRecordsMock.mockResolvedValue([
+          {
+            sessionId: "reduce-message-123",
+            createdAt: "2026-03-31T10:03:00.000Z",
+            startedAt: "2026-03-31T10:03:00.000Z",
+            completedAt: "2026-03-31T10:04:00.000Z",
+            status: "succeeded",
+            target: {
+              type: "message",
+              id: "message-123",
+            },
+            reducers: [],
+          },
+        ]);
+      },
+      expected: {
+        version: 1,
+        operator: "reduce",
+        status: "succeeded",
+        ids: {
+          sessionId: "reduce-message-123",
+          messageId: "message-123",
+        },
+        artifacts: [
+          {
+            kind: "session",
+            role: "session",
+            path: ".voratiq/reduce/sessions/reduce-message-123",
+          },
+          {
+            kind: "message",
+            role: "input",
+            path: ".voratiq/message/sessions/message-123",
+          },
+        ],
+      },
+    },
+    {
       operator: "verify",
       argv: ["verify", "--run", "run-123", "--json"],
       setup: () => {
@@ -643,7 +693,7 @@ describe("external CLI JSON contract", () => {
     const result = await invokeCli(["verify", "--run", "run-123", "--json"]);
     const envelope = normalizeEnvelope(parseJson<JsonEnvelope>(result));
 
-    expect(result.exitCode).toBe(0);
+    expect(result.exitCode).toBe(1);
     expect(envelope).toStrictEqual({
       version: 1,
       operator: "verify",
@@ -676,7 +726,8 @@ describe("external CLI JSON contract", () => {
       alerts: [
         {
           level: "warn",
-          message: "Warning: Selection policy loaded with warnings.",
+          message:
+            "Warning: Selection policy loaded with warnings.\nVerification did not produce a resolvable candidate; manual selection required.",
         },
         {
           level: "warn",

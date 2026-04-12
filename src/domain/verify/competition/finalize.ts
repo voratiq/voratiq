@@ -6,15 +6,41 @@ import type {
 import { rewriteVerificationRecord } from "../persistence/adapter.js";
 import type { ResolvedVerificationTarget } from "./target.js";
 
+/**
+ * Derive the session-level verification status from per-method outcomes.
+ *
+ * Session status is "succeeded" when at least one terminal method succeeds.
+ * Session status is "aborted" only when all terminal methods are aborted.
+ * Otherwise, the session is treated as "failed". When no terminal method
+ * snapshots exist yet, preserve the historical default of reporting
+ * "succeeded" rather than manufacturing a failure.
+ */
 export function deriveVerificationStatusFromMethods(
   methods: readonly VerificationMethodResultRef[],
 ): VerificationStatus {
-  if (methods.some((method) => method.status === "failed")) {
-    return "failed";
+  const terminalMethods = methods.filter(
+    (method) =>
+      method.status === "succeeded" ||
+      method.status === "failed" ||
+      method.status === "aborted",
+  );
+  const hasSucceeded = terminalMethods.some(
+    (method) => method.status === "succeeded",
+  );
+  if (hasSucceeded) {
+    return "succeeded";
   }
 
-  if (methods.some((method) => method.status === "aborted")) {
+  const hasTerminalMethods = terminalMethods.length > 0;
+  const allTerminalAborted =
+    hasTerminalMethods &&
+    terminalMethods.every((method) => method.status === "aborted");
+  if (allTerminalAborted) {
     return "aborted";
+  }
+
+  if (terminalMethods.some((method) => method.status === "failed")) {
+    return "failed";
   }
 
   return "succeeded";
