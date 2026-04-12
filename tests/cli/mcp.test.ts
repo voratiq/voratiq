@@ -10,7 +10,6 @@ import { z } from "zod";
 
 import {
   externalApplyExecutionInputSchema,
-  externalInspectionModes,
   externalInspectionOperators,
   externalMessageExecutionInputSchema,
   externalReduceExecutionInputSchema,
@@ -19,6 +18,7 @@ import {
   externalVerifyExecutionInputSchema,
 } from "../../src/cli/contract.js";
 import type { OperatorResultEnvelope } from "../../src/cli/operator-envelope.js";
+import { listJsonModes } from "../../src/contracts/list.js";
 import {
   createEntrypointCliTarget,
   createVoratiqMcpRequestHandler,
@@ -141,7 +141,7 @@ describe("bundled MCP server", () => {
           },
           mode: {
             type: "string",
-            enum: [...externalInspectionModes],
+            enum: [...listJsonModes],
             description:
               "Use `detail` only when inspecting a specific session.",
           },
@@ -173,6 +173,12 @@ describe("bundled MCP server", () => {
         ),
       );
     }
+
+    const listDefinition = definitions.find(
+      (definition) => definition.name === "voratiq_list",
+    );
+    expect(listDefinition?.description).toContain("list or detail mode");
+    expect(listDefinition?.description).not.toContain("table");
   });
 
   it("initializes for MCP protocol 2025-11-25 and lists tool capabilities", async () => {
@@ -734,6 +740,150 @@ describe("bundled MCP server", () => {
     });
     expect(result.isError).toBe(false);
     expect(result.structuredContent).toEqual(listPayload);
+  });
+
+  it("regression: routes MCP list mode through request handler and preserves ListJsonOutput payload", async () => {
+    const listPayload = {
+      operator: "run",
+      mode: "list",
+      sessions: [],
+      warnings: [],
+    };
+    const invokeCliJsonContractMock =
+      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>;
+    invokeCliJsonContractMock.mockResolvedValue({
+      kind: "success",
+      exitCode: 0,
+      stdout: JSON.stringify(listPayload),
+      stderr: "",
+    });
+    const handler = await createInitializedHandler(invokeCliJsonContractMock);
+
+    const response = await handler.handleRequest({
+      jsonrpc: "2.0",
+      id: 51,
+      method: "tools/call",
+      params: {
+        name: "voratiq_list",
+        arguments: {
+          operator: "run",
+          mode: "list",
+        },
+      },
+    });
+    const result = expectSuccess<CallToolResult>(response);
+
+    expect(invokeCliJsonContractMock).toHaveBeenCalledWith({
+      operator: "list",
+      args: ["list", "--run", "--json"],
+    });
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toEqual(listPayload);
+  });
+
+  it("routes MCP list mode with limit to the CLI summary path", async () => {
+    const listPayload = {
+      operator: "run",
+      mode: "list",
+      sessions: [],
+      warnings: [],
+    };
+    const invokeCliJsonContractMock =
+      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>;
+    invokeCliJsonContractMock.mockResolvedValue({
+      kind: "success",
+      exitCode: 0,
+      stdout: JSON.stringify(listPayload),
+      stderr: "",
+    });
+    const handler = await createInitializedHandler(invokeCliJsonContractMock);
+
+    const response = await handler.handleRequest({
+      jsonrpc: "2.0",
+      id: 52,
+      method: "tools/call",
+      params: {
+        name: "voratiq_list",
+        arguments: {
+          operator: "run",
+          mode: "list",
+          limit: 2,
+        },
+      },
+    });
+    const result = expectSuccess<CallToolResult>(response);
+
+    expect(invokeCliJsonContractMock).toHaveBeenCalledWith({
+      operator: "list",
+      args: ["list", "--run", "--limit", "2", "--json"],
+    });
+    expect(result.isError).toBe(false);
+  });
+
+  it("routes MCP detail mode to the CLI detail path and returns detail output unchanged", async () => {
+    const detailPayload = {
+      operator: "verify",
+      mode: "detail",
+      session: null,
+      warnings: [],
+    };
+    const invokeCliJsonContractMock =
+      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>;
+    invokeCliJsonContractMock.mockResolvedValue({
+      kind: "success",
+      exitCode: 0,
+      stdout: JSON.stringify(detailPayload),
+      stderr: "",
+    });
+    const handler = await createInitializedHandler(invokeCliJsonContractMock);
+
+    const response = await handler.handleRequest({
+      jsonrpc: "2.0",
+      id: 53,
+      method: "tools/call",
+      params: {
+        name: "voratiq_list",
+        arguments: {
+          operator: "verify",
+          mode: "detail",
+          sessionId: "verify-abc",
+        },
+      },
+    });
+    const result = expectSuccess<CallToolResult>(response);
+
+    expect(invokeCliJsonContractMock).toHaveBeenCalledWith({
+      operator: "list",
+      args: ["list", "--verify", "verify-abc", "--json"],
+    });
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toEqual(detailPayload);
+  });
+
+  it("rejects MCP list mode `table` as invalid_input before spawning", async () => {
+    const invokeCliJsonContractMock =
+      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>;
+    const handler = await createInitializedHandler(invokeCliJsonContractMock);
+
+    const response = await handler.handleRequest({
+      jsonrpc: "2.0",
+      id: 54,
+      method: "tools/call",
+      params: {
+        name: "voratiq_list",
+        arguments: {
+          operator: "run",
+          mode: "table",
+        },
+      },
+    });
+    const result = expectSuccess<CallToolResult>(response);
+    const failure = result.structuredContent as TransportFailureResult;
+
+    expect(failure.failureKind).toBe("invalid_input");
+    expect(failure.operator).toBe("list");
+    expect(result.isError).toBe(true);
+    expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
   });
 
   it("rejects prune without confirmed: true as invalid_input before spawning", async () => {
