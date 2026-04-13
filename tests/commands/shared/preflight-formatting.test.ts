@@ -43,14 +43,14 @@ describe("shared preflight issue formatting", () => {
     expect(runError.detailLines[0]?.length).toBeLessThanOrEqual(120);
     expect(reduceError.detailLines[0]?.length).toBeLessThanOrEqual(120);
     expect(runError.hintLines).toEqual([
-      "Run `voratiq init` to configure the workspace.",
+      "Run `voratiq doctor --fix` to repair workspace setup.",
     ]);
     expect(reduceError.hintLines).toEqual([
-      "Run `voratiq init` to configure the workspace.",
+      "Run `voratiq doctor --fix` to repair workspace setup.",
     ]);
   });
 
-  it("allows auth-only preflight errors to suppress the generic init hint", () => {
+  it("allows auth-only preflight errors to suppress the generic doctor hint", () => {
     const runError = new RunPreflightError(
       [
         {

@@ -1,4 +1,5 @@
 import { detectEnvironmentConfig } from "../../configs/environment/detect.js";
+import { EnvironmentConfigParseError } from "../../configs/environment/errors.js";
 import {
   readEnvironmentConfig,
   serializeEnvironmentConfig,
@@ -10,28 +11,30 @@ import {
   isNodeEnvironmentDisabled,
   isPythonEnvironmentDisabled,
 } from "../../configs/environment/types.js";
-import { loadYamlConfig, persistYamlConfig } from "../../utils/yaml.js";
+import { persistYamlConfig, readConfigSnapshot } from "../../utils/yaml.js";
 import {
   formatWorkspacePath,
   resolveWorkspacePath,
   VORATIQ_ENVIRONMENT_FILE,
 } from "../../workspace/structure.js";
 import { buildDefaultEnvironmentTemplate } from "../../workspace/templates.js";
-import type { EnvironmentInitSummary, InitConfigureOptions } from "./types.js";
+import type {
+  DoctorBootstrapConfigureOptions,
+  EnvironmentInitSummary,
+} from "./fix-types.js";
 
 const ENVIRONMENT_CONFIG_DISPLAY_PATH = formatWorkspacePath(
   VORATIQ_ENVIRONMENT_FILE,
 );
 
-export async function configureEnvironment(
+export async function reconcileDoctorEnvironment(
   root: string,
-  options: InitConfigureOptions,
+  options: DoctorBootstrapConfigureOptions,
 ): Promise<EnvironmentInitSummary> {
   const filePath = resolveWorkspacePath(root, VORATIQ_ENVIRONMENT_FILE);
   const defaultTemplate = buildDefaultEnvironmentTemplate();
-
-  const loadResult = await loadYamlConfig(filePath, readEnvironmentConfig);
-  const existingConfig = loadResult.config;
+  const originalSnapshot = await readConfigSnapshot(filePath);
+  const existingConfig = resolveExistingConfig(originalSnapshot);
 
   const detection = await detectEnvironmentConfig({
     root,
@@ -48,17 +51,54 @@ export async function configureEnvironment(
   const configUpdated = await persistYamlConfig({
     filePath,
     serialized: finalSerialized,
-    original: loadResult.snapshot,
+    original: shouldRewriteFromScratch(originalSnapshot)
+      ? { content: "", normalized: "", exists: false }
+      : originalSnapshot,
     defaultTemplate,
   });
 
   return {
     configPath: ENVIRONMENT_CONFIG_DISPLAY_PATH,
     detectedEntries: describeEnvironmentEntries(mergedConfig),
-    configCreated: !loadResult.snapshot.exists,
+    configCreated: !originalSnapshot.exists,
     configUpdated,
     config: mergedConfig,
   };
+}
+
+function resolveExistingConfig(
+  snapshot: Awaited<ReturnType<typeof readConfigSnapshot>>,
+): EnvironmentConfig {
+  if (!snapshot.exists) {
+    return {};
+  }
+
+  try {
+    return readEnvironmentConfig(snapshot.content);
+  } catch (error) {
+    if (error instanceof EnvironmentConfigParseError) {
+      return {};
+    }
+    throw error;
+  }
+}
+
+function shouldRewriteFromScratch(
+  snapshot: Awaited<ReturnType<typeof readConfigSnapshot>>,
+): boolean {
+  if (!snapshot.exists) {
+    return false;
+  }
+
+  try {
+    readEnvironmentConfig(snapshot.content);
+    return false;
+  } catch (error) {
+    if (error instanceof EnvironmentConfigParseError) {
+      return true;
+    }
+    throw error;
+  }
 }
 
 function mergeEnvironmentConfig(

@@ -35,7 +35,7 @@ describe("CLI entrypoint error handling", () => {
       new WorkspaceMissingEntryError(".voratiq/agents.yaml"),
     );
     expect(cliError.hintLines).toEqual([
-      "Run `voratiq init` to configure the workspace.",
+      "Run `voratiq doctor --fix` to repair workspace setup.",
     ]);
 
     const rendered = renderCliError(cliError);
@@ -43,7 +43,7 @@ describe("CLI entrypoint error handling", () => {
       "Missing workspace entry: `.voratiq/agents.yaml`.",
     );
     expect(rendered).toContain(
-      "Run `voratiq init` to configure the workspace.",
+      "Run `voratiq doctor --fix` to repair workspace setup.",
     );
   });
 
@@ -57,7 +57,7 @@ describe("CLI entrypoint error handling", () => {
       [
         "Error: Missing workspace entry: `.voratiq/orchestration.yaml`.",
         "",
-        "Run `voratiq init` to configure the workspace.",
+        "Run `voratiq doctor --fix` to repair workspace setup.",
       ].join("\n"),
     );
   });
@@ -72,7 +72,7 @@ describe("CLI entrypoint error handling", () => {
       [
         "Error: Wrong workspace entry type: `.voratiq/verify/index.json` must be a file.",
         "",
-        "Run `voratiq init` to configure the workspace.",
+        "Run `voratiq doctor --fix` to repair workspace setup.",
       ].join("\n"),
     );
   });
@@ -93,7 +93,7 @@ describe("CLI entrypoint error handling", () => {
       "  - `.voratiq/run/index.json`",
     ]);
     expect(cliError.hintLines).toEqual([
-      "Run `voratiq init` from the repository root, then retry.",
+      "Run `voratiq doctor --fix` to repair workspace setup.",
     ]);
 
     const rendered = renderCliError(cliError);
@@ -101,7 +101,7 @@ describe("CLI entrypoint error handling", () => {
     expect(rendered).toContain("Missing workspace entries:");
     expect(rendered).toContain(".voratiq/run/index.json");
     expect(rendered).toContain(
-      "Run `voratiq init` from the repository root, then retry.",
+      "Run `voratiq doctor --fix` to repair workspace setup.",
     );
   });
 
@@ -132,6 +132,36 @@ describe("CLI entrypoint error handling", () => {
     expect(occurrences).toHaveLength(1);
     expect(process.exitCode).toBe(1);
   });
+
+  it.each(["init", "sync"])(
+    "treats `%s` like an unknown command",
+    async (removedCommand) => {
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+
+      stdoutSpy = jest
+        .spyOn(process.stdout, "write")
+        .mockImplementation((chunk: unknown) => {
+          stdout.push(String(chunk));
+          return true;
+        });
+
+      stderrSpy = jest
+        .spyOn(process.stderr, "write")
+        .mockImplementation((chunk: unknown) => {
+          stderr.push(String(chunk));
+          return true;
+        });
+
+      await runCli(["node", "voratiq", removedCommand]);
+
+      expect(stdout).toHaveLength(0);
+      expect(stderr.join("")).toContain(
+        `error: unknown command '${removedCommand}'`,
+      );
+      expect(process.exitCode).toBe(1);
+    },
+  );
 
   it("emits a failed json envelope for prune without explicit confirmation", async () => {
     const stdout: string[] = [];
@@ -230,6 +260,9 @@ describe("CLI entrypoint error handling", () => {
       "Describe what to build, then run the full pipeline",
     );
     expect(help).toContain("auto [options]");
+    expect(help).toContain("doctor [options]");
+    expect(help).not.toContain("init [options]");
+    expect(help).not.toContain("sync [options]");
     expect(stderr.join("")).toHaveLength(0);
     expect(process.exitCode).toBe(0);
   });

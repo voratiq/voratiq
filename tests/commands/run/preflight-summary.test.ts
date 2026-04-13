@@ -107,7 +107,7 @@ describe("run preflight error summary", () => {
     expect(preflightError.detailLines[0]?.length).toBeLessThanOrEqual(120);
     expect(preflightError.detailLines[1]?.length).toBeLessThanOrEqual(120);
     expect(preflightError.hintLines).toContain(
-      "Run `voratiq init` to configure the workspace.",
+      "Run `voratiq doctor --fix` to repair workspace setup.",
     );
   });
 
@@ -148,7 +148,7 @@ describe("run preflight error summary", () => {
     expect(preflightError.detailLines[0]).toContain("Invalid settings file");
   });
 
-  it("suppresses the generic init hint when preflight only has auth provider issues", async () => {
+  it("suppresses the generic doctor hint when preflight only has auth provider issues", async () => {
     const diagnostics: AgentCatalogDiagnostics = {
       enabledAgents: [
         {

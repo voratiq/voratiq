@@ -500,8 +500,6 @@ async function registerCommands(
   const wantsHelp = argv.includes("--help") || argv.includes("-h");
   const wantsVersion = argv.includes("--version") || argv.includes("-v");
   const knownCommandNames = new Set([
-    "init",
-    "sync",
     "spec",
     "run",
     "reduce",
@@ -511,6 +509,7 @@ async function registerCommands(
     "apply",
     "list",
     "prune",
+    "doctor",
     "mcp",
   ]);
 
@@ -524,8 +523,6 @@ async function registerCommands(
   }
 
   if (loadAll) {
-    program.addCommand((await import("./cli/init.js")).createInitCommand());
-    program.addCommand((await import("./cli/sync.js")).createSyncCommand());
     program.addCommand((await import("./cli/spec.js")).createSpecCommand());
     program.addCommand((await import("./cli/run.js")).createRunCommand());
     program.addCommand((await import("./cli/reduce.js")).createReduceCommand());
@@ -537,17 +534,12 @@ async function registerCommands(
     program.addCommand((await import("./cli/apply.js")).createApplyCommand());
     program.addCommand((await import("./cli/list.js")).createListCommand());
     program.addCommand((await import("./cli/prune.js")).createPruneCommand());
+    program.addCommand((await import("./cli/doctor.js")).createDoctorCommand());
     program.addCommand((await import("./cli/mcp.js")).createMcpCommand());
     return;
   }
 
   switch (commandName) {
-    case "init":
-      program.addCommand((await import("./cli/init.js")).createInitCommand());
-      break;
-    case "sync":
-      program.addCommand((await import("./cli/sync.js")).createSyncCommand());
-      break;
     case "spec":
       program.addCommand((await import("./cli/spec.js")).createSpecCommand());
       break;
@@ -580,6 +572,11 @@ async function registerCommands(
       break;
     case "prune":
       program.addCommand((await import("./cli/prune.js")).createPruneCommand());
+      break;
+    case "doctor":
+      program.addCommand(
+        (await import("./cli/doctor.js")).createDoctorCommand(),
+      );
       break;
     case "mcp":
       program.addCommand((await import("./cli/mcp.js")).createMcpCommand());

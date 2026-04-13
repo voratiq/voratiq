@@ -1,6 +1,6 @@
 import { isAbsolute, resolve } from "node:path";
 
-import { executeSyncCommand } from "../commands/sync/command.js";
+import { executeDoctorReconcile } from "../commands/doctor/reconcile.js";
 import { ensureFileExists, pathExists } from "../utils/fs.js";
 import {
   assertGitRepository,
@@ -93,7 +93,7 @@ export async function resolveCliContext(
   if (requireWorkspace) {
     let workspaceMissing = !initialWorkspaceExists;
     if (workspaceAutoInitMode === "when-missing" && workspaceMissing) {
-      await executeSyncCommand({ root });
+      await executeDoctorReconcile({ root });
       workspaceAutoInitialized = true;
       workspaceMissing = false;
     }

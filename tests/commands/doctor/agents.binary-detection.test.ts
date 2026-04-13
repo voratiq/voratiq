@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { configureAgents } from "../../../src/commands/init/agents.js";
+import { bootstrapDoctorAgents } from "../../../src/commands/doctor/agents.js";
 import { getSupportedAgentDefaults } from "../../../src/configs/agents/defaults.js";
 import { detectBinary } from "../../../src/utils/binaries.js";
 import { buildAgentsTemplate } from "../../../src/workspace/templates.js";
@@ -13,7 +13,7 @@ jest.mock("../../../src/utils/binaries.js", () => ({
 
 const detectBinaryMock = jest.mocked(detectBinary);
 
-describe("configureAgents binary detection", () => {
+describe("bootstrapDoctorAgents binary detection", () => {
   let repoRoot: string;
 
   beforeEach(async () => {
@@ -34,7 +34,7 @@ describe("configureAgents binary detection", () => {
       "utf8",
     );
 
-    await configureAgents(repoRoot, "pro", { interactive: false });
+    await bootstrapDoctorAgents(repoRoot, "pro", { interactive: false });
 
     const uniqueProviders = [
       ...new Set(getSupportedAgentDefaults().map((entry) => entry.provider)),

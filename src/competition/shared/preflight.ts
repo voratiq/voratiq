@@ -11,7 +11,7 @@ export interface FormatPreflightIssueLinesOptions {
 export const PREFLIGHT_SUMMARY_MAX_CHARS = 120 as const;
 
 export const PREFLIGHT_HINT =
-  "Run `voratiq init` to configure the workspace." as const;
+  "Run `voratiq doctor --fix` to repair workspace setup." as const;
 
 export function formatPreflightIssueLines(
   issues: readonly PreflightIssue[],

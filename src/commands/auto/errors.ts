@@ -35,7 +35,7 @@ export class AutoPreflightError extends CliError {
     });
 
     super("Preflight failed. Aborting auto.", detailLines, [
-      "Run `voratiq init` from the repository root, then retry.",
+      "Run `voratiq doctor --fix` to repair workspace setup.",
     ]);
     this.name = "AutoPreflightError";
   }

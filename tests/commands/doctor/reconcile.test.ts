@@ -9,18 +9,18 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { executeSyncCommand } from "../../../src/commands/sync/command.js";
+import { executeDoctorReconcile } from "../../../src/commands/doctor/reconcile.js";
 import { readAgentsConfig } from "../../../src/configs/agents/loader.js";
 import { readOrchestrationConfig } from "../../../src/configs/orchestration/loader.js";
 import { readManagedState } from "../../../src/workspace/managed-state.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
-describe("executeSyncCommand", () => {
+describe("executeDoctorReconcile", () => {
   let repoRoot: string;
   let originalPath: string | undefined;
 
   beforeEach(async () => {
-    repoRoot = await mkdtemp(join(tmpdir(), "voratiq-sync-"));
+    repoRoot = await mkdtemp(join(tmpdir(), "voratiq-doctor-reconcile-"));
     await mkdir(join(repoRoot, ".git"), { recursive: true });
     originalPath = process.env.PATH;
     process.env.PATH = "";
@@ -31,12 +31,12 @@ describe("executeSyncCommand", () => {
     await rm(repoRoot, { recursive: true, force: true });
   });
 
-  it("bootstraps a missing workspace before syncing managed config", async () => {
+  it("bootstraps a missing workspace before reconciling managed config", async () => {
     await mockDetectedBinaries(repoRoot, {
       codex: "/usr/local/bin/codex",
     });
 
-    const result = await executeSyncCommand({ root: repoRoot });
+    const result = await executeDoctorReconcile({ root: repoRoot });
 
     expect(result.workspaceBootstrapped).toBe(true);
     expect(result.agentSummary.detectedProviders).toHaveLength(1);
@@ -76,7 +76,7 @@ describe("executeSyncCommand", () => {
       join(repoRoot, ".voratiq", "orchestration.yaml"),
       "utf8",
     );
-    const result = await executeSyncCommand({ root: repoRoot });
+    const result = await executeDoctorReconcile({ root: repoRoot });
     const after = await readFile(
       join(repoRoot, ".voratiq", "orchestration.yaml"),
       "utf8",
@@ -88,7 +88,7 @@ describe("executeSyncCommand", () => {
     expect(after).not.toBe(before);
   });
 
-  it("preserves customized orchestration during sync", async () => {
+  it("preserves customized orchestration during reconcile", async () => {
     await createWorkspace(repoRoot);
     await writeFile(
       join(repoRoot, ".voratiq", "orchestration.yaml"),
@@ -118,7 +118,7 @@ describe("executeSyncCommand", () => {
       join(repoRoot, ".voratiq", "orchestration.yaml"),
       "utf8",
     );
-    const result = await executeSyncCommand({ root: repoRoot });
+    const result = await executeDoctorReconcile({ root: repoRoot });
     const updated = await readFile(
       join(repoRoot, ".voratiq", "orchestration.yaml"),
       "utf8",
@@ -133,14 +133,14 @@ describe("executeSyncCommand", () => {
       codex: "/usr/local/bin/codex",
     });
 
-    await executeSyncCommand({ root: repoRoot });
+    await executeDoctorReconcile({ root: repoRoot });
 
     await mockDetectedBinaries(repoRoot, {
       codex: "/usr/local/bin/codex",
       claude: "/usr/local/bin/claude",
     });
 
-    const result = await executeSyncCommand({ root: repoRoot });
+    const result = await executeDoctorReconcile({ root: repoRoot });
     const agentsConfig = readAgentsConfig(
       await readFile(join(repoRoot, ".voratiq", "agents.yaml"), "utf8"),
     );
@@ -179,7 +179,7 @@ describe("executeSyncCommand", () => {
       codex: "/usr/local/bin/codex",
     });
 
-    await executeSyncCommand({ root: repoRoot });
+    await executeDoctorReconcile({ root: repoRoot });
 
     await writeFile(
       join(repoRoot, ".voratiq", "agents.yaml"),
@@ -192,7 +192,7 @@ describe("executeSyncCommand", () => {
       claude: "/usr/local/bin/claude",
     });
 
-    const result = await executeSyncCommand({ root: repoRoot });
+    const result = await executeDoctorReconcile({ root: repoRoot });
     const agentsConfig = readAgentsConfig(
       await readFile(join(repoRoot, ".voratiq", "agents.yaml"), "utf8"),
     );
@@ -221,11 +221,11 @@ describe("executeSyncCommand", () => {
       claude: "/usr/local/bin/claude",
     });
 
-    await executeSyncCommand({ root: repoRoot });
+    await executeDoctorReconcile({ root: repoRoot });
     process.env.PATH = join(repoRoot, "bin");
     await rm(join(repoRoot, "bin", "claude"), { force: true });
 
-    await executeSyncCommand({ root: repoRoot });
+    await executeDoctorReconcile({ root: repoRoot });
 
     const agentsConfig = readAgentsConfig(
       await readFile(join(repoRoot, ".voratiq", "agents.yaml"), "utf8"),
@@ -241,12 +241,12 @@ describe("executeSyncCommand", () => {
     }
   });
 
-  it("does not re-adopt customized orchestration on a later sync", async () => {
+  it("does not re-adopt customized orchestration on a later reconcile", async () => {
     await mockDetectedBinaries(repoRoot, {
       codex: "/usr/local/bin/codex",
     });
 
-    await executeSyncCommand({ root: repoRoot });
+    await executeDoctorReconcile({ root: repoRoot });
     const orchestrationPath = join(repoRoot, ".voratiq", "orchestration.yaml");
     const customized = [
       "profiles:",
@@ -266,8 +266,8 @@ describe("executeSyncCommand", () => {
     ].join("\n");
     await writeFile(orchestrationPath, customized, "utf8");
 
-    const first = await executeSyncCommand({ root: repoRoot });
-    const second = await executeSyncCommand({ root: repoRoot });
+    const first = await executeDoctorReconcile({ root: repoRoot });
+    const second = await executeDoctorReconcile({ root: repoRoot });
     const final = await readFile(orchestrationPath, "utf8");
 
     expect(first.orchestrationSummary.skippedCustomized).toBe(true);

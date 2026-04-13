@@ -42,6 +42,18 @@ export interface ValidationResult {
   readonly environment: EnvironmentConfig;
 }
 
+export interface RunPreflightDiagnosticsInput {
+  readonly root: string;
+  readonly resolvedAgentIds?: readonly string[];
+}
+
+export interface RunPreflightDiagnosticsResult {
+  readonly agents: readonly AgentDefinition[];
+  readonly issues: readonly PreflightIssue[];
+  readonly preProviderIssueCount: number;
+  readonly noAgentsEnabled: boolean;
+}
+
 /**
  * Validate command parameters, load spec, and prepare execution prerequisites.
  */
@@ -75,64 +87,21 @@ export async function validateAndPrepare(
   });
 
   const baseRevisionSha = await getHeadRevision(root);
-  const preflightIssues: PreflightIssue[] = [];
-  let agents: readonly AgentDefinition[];
-  if (resolvedAgentIds) {
-    if (resolvedAgentIds.length === 0) {
-      throw new NoAgentsEnabledError();
-    }
-
-    const selectedAgentIds = new Set(resolvedAgentIds);
-    const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
-    preflightIssues.push(
-      ...agentDiagnostics.issues.filter((issue) =>
-        selectedAgentIds.has(issue.agentId),
-      ),
-    );
-
-    const catalogById = new Map(
-      agentDiagnostics.catalog.map((agent) => [agent.id, agent]),
-    );
-    agents = resolvedAgentIds.flatMap((agentId) => {
-      const agent = catalogById.get(agentId);
-      return agent ? [agent] : [];
-    });
-  } else {
-    const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
-    const enabledAgents = agentDiagnostics.enabledAgents;
-
-    if (enabledAgents.length === 0) {
-      throw new NoAgentsEnabledError();
-    }
-
-    preflightIssues.push(...agentDiagnostics.issues);
-    agents = agentDiagnostics.catalog;
+  const preflight = await collectRunPreflightDiagnostics({
+    root,
+    resolvedAgentIds,
+  });
+  if (preflight.noAgentsEnabled) {
+    throw new NoAgentsEnabledError();
   }
 
-  try {
-    loadRepoSettings({ root });
-  } catch (error) {
-    preflightIssues.push({
-      agentId: "settings",
-      message: toErrorMessage(error),
-    });
-  }
-
-  const preProviderIssueCount = preflightIssues.length;
-  const providerIssues = await verifyAgentProviders(
-    agents.map((agent) => ({
-      id: agent.id,
-      provider: agent.provider,
-    })),
-  );
-
-  preflightIssues.push(...providerIssues);
-  if (preflightIssues.length > 0) {
+  if (preflight.issues.length > 0) {
     throw new RunPreflightError(
-      preflightIssues,
-      preProviderIssueCount === 0 ? [] : undefined,
+      preflight.issues,
+      preflight.preProviderIssueCount === 0 ? [] : undefined,
     );
   }
+  const agents = preflight.agents;
 
   const environment = (() => {
     try {
@@ -160,5 +129,81 @@ export async function validateAndPrepare(
     agents,
     effectiveMaxParallel,
     environment,
+  };
+}
+
+export async function collectRunPreflightDiagnostics(
+  input: RunPreflightDiagnosticsInput,
+): Promise<RunPreflightDiagnosticsResult> {
+  const { root, resolvedAgentIds } = input;
+
+  const preflightIssues: PreflightIssue[] = [];
+  let agents: readonly AgentDefinition[] = [];
+
+  if (resolvedAgentIds) {
+    if (resolvedAgentIds.length === 0) {
+      return {
+        agents: [],
+        issues: [],
+        preProviderIssueCount: 0,
+        noAgentsEnabled: true,
+      };
+    }
+
+    const selectedAgentIds = new Set(resolvedAgentIds);
+    const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
+    preflightIssues.push(
+      ...agentDiagnostics.issues.filter((issue) =>
+        selectedAgentIds.has(issue.agentId),
+      ),
+    );
+
+    const catalogById = new Map(
+      agentDiagnostics.catalog.map((agent) => [agent.id, agent]),
+    );
+    agents = resolvedAgentIds.flatMap((agentId) => {
+      const agent = catalogById.get(agentId);
+      return agent ? [agent] : [];
+    });
+  } else {
+    const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
+    const enabledAgents = agentDiagnostics.enabledAgents;
+
+    if (enabledAgents.length === 0) {
+      return {
+        agents: [],
+        issues: [],
+        preProviderIssueCount: 0,
+        noAgentsEnabled: true,
+      };
+    }
+
+    preflightIssues.push(...agentDiagnostics.issues);
+    agents = agentDiagnostics.catalog;
+  }
+
+  try {
+    loadRepoSettings({ root });
+  } catch (error) {
+    preflightIssues.push({
+      agentId: "settings",
+      message: toErrorMessage(error),
+    });
+  }
+
+  const preProviderIssueCount = preflightIssues.length;
+  const providerIssues = await verifyAgentProviders(
+    agents.map((agent) => ({
+      id: agent.id,
+      provider: agent.provider,
+    })),
+  );
+  preflightIssues.push(...providerIssues);
+
+  return {
+    agents,
+    issues: preflightIssues,
+    preProviderIssueCount,
+    noAgentsEnabled: false,
   };
 }
