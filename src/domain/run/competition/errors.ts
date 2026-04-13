@@ -1,8 +1,8 @@
+import { type PreflightIssue } from "../../../competition/shared/preflight.js";
 import {
-  formatPreflightIssueLines,
-  PREFLIGHT_HINT,
-  type PreflightIssue,
-} from "../../../competition/shared/preflight.js";
+  formatOperatorPreflightIssueLines,
+  resolveOperatorPreflightHintLines,
+} from "../../../preflight/formatting.js";
 import {
   DisplayableError,
   type HintedErrorOptions,
@@ -127,21 +127,18 @@ export class AuthProviderStageError extends RunCommandError {
   }
 }
 
-const RUN_PREFLIGHT_UNLABELED_AGENT_IDS = ["settings"] as const;
-
 export class RunPreflightError extends RunCommandError {
   public readonly kind = "workspace-setup" as const;
   public readonly issues: readonly PreflightIssue[];
 
   constructor(
     issues: readonly PreflightIssue[],
-    hintLines: readonly string[] = [PREFLIGHT_HINT],
+    preProviderIssueCount: number = issues.length,
   ) {
     super("Preflight failed. Aborting run.", {
-      detailLines: formatPreflightIssueLines(issues, {
-        unlabeledAgentIds: RUN_PREFLIGHT_UNLABELED_AGENT_IDS,
-      }),
-      hintLines,
+      detailLines: formatOperatorPreflightIssueLines(issues),
+      hintLines:
+        resolveOperatorPreflightHintLines(issues, preProviderIssueCount) ?? [],
     });
     this.issues = Array.from(issues);
     this.name = "RunPreflightError";

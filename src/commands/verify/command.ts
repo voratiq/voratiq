@@ -1,6 +1,5 @@
 import { teardownSessionAuth } from "../../agents/runtime/registry.js";
 import { createTeardownController } from "../../competition/shared/teardown.js";
-import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import { loadVerificationConfig } from "../../configs/verification/loader.js";
 import { buildBlindedAliasMap } from "../../domain/verify/competition/blinding.js";
 import {
@@ -19,6 +18,8 @@ import {
   flushVerificationRecordBuffer,
 } from "../../domain/verify/persistence/adapter.js";
 import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
+import { loadOperatorEnvironment } from "../../preflight/environment.js";
+import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import type { VerifyProgressRenderer } from "../../render/transcripts/verify.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
@@ -27,10 +28,8 @@ import {
   VORATIQ_VERIFICATION_SESSIONS_DIR,
 } from "../../workspace/structure.js";
 import { generateSessionId } from "../shared/session-id.js";
-import {
-  assertVerifierPreflight,
-  resolveVerificationAgents,
-} from "./agents.js";
+import { resolveVerificationAgents } from "./agents.js";
+import { VerifyPreflightError } from "./errors.js";
 import {
   finalizeActiveVerification,
   registerActiveVerification,
@@ -88,15 +87,25 @@ export async function executeVerifyCommand(
     target,
   });
   const verificationConfig = loadVerificationConfig({ root });
-  const verificationAgents = resolveVerificationAgents({
+  const verificationPlan = resolveVerificationAgents({
     agentIds,
     root,
     agentOverrideFlag,
     profileName,
   });
-  await assertVerifierPreflight(verificationAgents);
-
-  const environment = loadEnvironmentConfig({ root });
+  const preflight = await prepareConfiguredOperatorReadiness({
+    root,
+    resolvedAgentIds: verificationPlan.agentIds,
+    includeEnvironment: false,
+  });
+  if (preflight.issues.length > 0) {
+    throw new VerifyPreflightError(
+      preflight.issues,
+      preflight.preProviderIssueCount,
+    );
+  }
+  const verificationAgents = preflight.agents;
+  const environment = loadOperatorEnvironment({ root });
   const verificationId = generateSessionId();
   const createdAt = new Date().toISOString();
   const aliasMap = buildBlindedAliasMap(resolvedTarget);

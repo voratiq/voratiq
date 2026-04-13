@@ -1,26 +1,14 @@
-import { verifyAgentProviders } from "../../agents/runtime/auth.js";
-import { loadAgentCatalogDiagnostics } from "../../configs/agents/loader.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
-import {
-  EnvironmentConfigParseError,
-  MissingEnvironmentConfigError,
-} from "../../configs/environment/errors.js";
-import {
-  DEFAULT_ENVIRONMENT_FILE_DISPLAY,
-  loadEnvironmentConfig,
-} from "../../configs/environment/loader.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
-import { loadRepoSettings } from "../../configs/settings/loader.js";
 import {
   NoAgentsEnabledError,
-  type PreflightIssue,
   RunPreflightError,
 } from "../../domain/run/competition/errors.js";
 import { RunOptionValidationError } from "../../domain/run/model/errors.js";
 import type { RunSpecTarget } from "../../domain/run/model/types.js";
-import { toErrorMessage } from "../../utils/errors.js";
+import { loadOperatorEnvironment } from "../../preflight/environment.js";
+import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import { getHeadRevision } from "../../utils/git.js";
-import { WorkspaceMissingEntryError } from "../../workspace/errors.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { loadRunSpecInput } from "./spec-provenance.js";
 
@@ -40,18 +28,6 @@ export interface ValidationResult {
   readonly agents: readonly AgentDefinition[];
   readonly effectiveMaxParallel: number;
   readonly environment: EnvironmentConfig;
-}
-
-export interface RunPreflightDiagnosticsInput {
-  readonly root: string;
-  readonly resolvedAgentIds?: readonly string[];
-}
-
-export interface RunPreflightDiagnosticsResult {
-  readonly agents: readonly AgentDefinition[];
-  readonly issues: readonly PreflightIssue[];
-  readonly preProviderIssueCount: number;
-  readonly noAgentsEnabled: boolean;
 }
 
 /**
@@ -87,9 +63,10 @@ export async function validateAndPrepare(
   });
 
   const baseRevisionSha = await getHeadRevision(root);
-  const preflight = await collectRunPreflightDiagnostics({
+  const preflight = await prepareConfiguredOperatorReadiness({
     root,
     resolvedAgentIds,
+    includeEnvironment: false,
   });
   if (preflight.noAgentsEnabled) {
     throw new NoAgentsEnabledError();
@@ -98,24 +75,14 @@ export async function validateAndPrepare(
   if (preflight.issues.length > 0) {
     throw new RunPreflightError(
       preflight.issues,
-      preflight.preProviderIssueCount === 0 ? [] : undefined,
+      preflight.preProviderIssueCount,
     );
   }
   const agents = preflight.agents;
-
-  const environment = (() => {
-    try {
-      return loadEnvironmentConfig({ root });
-    } catch (error) {
-      if (
-        error instanceof MissingEnvironmentConfigError ||
-        error instanceof EnvironmentConfigParseError
-      ) {
-        throw new WorkspaceMissingEntryError(DEFAULT_ENVIRONMENT_FILE_DISPLAY);
-      }
-      throw error;
-    }
-  })();
+  const environment = loadOperatorEnvironment({
+    root,
+    errorMode: "workspace-missing",
+  });
 
   const effectiveMaxParallel = resolveEffectiveMaxParallel({
     competitorCount: agents.length,
@@ -129,81 +96,5 @@ export async function validateAndPrepare(
     agents,
     effectiveMaxParallel,
     environment,
-  };
-}
-
-export async function collectRunPreflightDiagnostics(
-  input: RunPreflightDiagnosticsInput,
-): Promise<RunPreflightDiagnosticsResult> {
-  const { root, resolvedAgentIds } = input;
-
-  const preflightIssues: PreflightIssue[] = [];
-  let agents: readonly AgentDefinition[] = [];
-
-  if (resolvedAgentIds) {
-    if (resolvedAgentIds.length === 0) {
-      return {
-        agents: [],
-        issues: [],
-        preProviderIssueCount: 0,
-        noAgentsEnabled: true,
-      };
-    }
-
-    const selectedAgentIds = new Set(resolvedAgentIds);
-    const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
-    preflightIssues.push(
-      ...agentDiagnostics.issues.filter((issue) =>
-        selectedAgentIds.has(issue.agentId),
-      ),
-    );
-
-    const catalogById = new Map(
-      agentDiagnostics.catalog.map((agent) => [agent.id, agent]),
-    );
-    agents = resolvedAgentIds.flatMap((agentId) => {
-      const agent = catalogById.get(agentId);
-      return agent ? [agent] : [];
-    });
-  } else {
-    const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
-    const enabledAgents = agentDiagnostics.enabledAgents;
-
-    if (enabledAgents.length === 0) {
-      return {
-        agents: [],
-        issues: [],
-        preProviderIssueCount: 0,
-        noAgentsEnabled: true,
-      };
-    }
-
-    preflightIssues.push(...agentDiagnostics.issues);
-    agents = agentDiagnostics.catalog;
-  }
-
-  try {
-    loadRepoSettings({ root });
-  } catch (error) {
-    preflightIssues.push({
-      agentId: "settings",
-      message: toErrorMessage(error),
-    });
-  }
-
-  const preProviderIssueCount = preflightIssues.length;
-  const providerIssues = await verifyAgentProviders(
-    agents.map((agent) => ({
-      id: agent.id,
-      provider: agent.provider,
-    })),
-  );
-  preflightIssues.push(...providerIssues);
-
-  return {
-    agents,
-    issues: preflightIssues,
-    preProviderIssueCount,
-    noAgentsEnabled: false,
   };
 }

@@ -103,4 +103,36 @@ describe("executeDoctorDiagnosis", () => {
       expect.stringContaining("Missing workspace entry"),
     );
   });
+
+  it("still reports invalid settings when no agents are enabled", async () => {
+    await createWorkspace(repoRoot);
+    await writeFile(
+      resolveWorkspacePath(repoRoot, "agents.yaml"),
+      [
+        "agents:",
+        "  - id: disabled-codex",
+        "    provider: codex",
+        "    model: gpt-5.4",
+        "    enabled: false",
+        `    binary: ${process.execPath}`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await writeFile(
+      resolveWorkspacePath(repoRoot, "settings.yaml"),
+      "bounded:\n  codex:\n    globalConfigPolicy: unignore\n",
+      "utf8",
+    );
+
+    const result = await executeDoctorDiagnosis({ root: repoRoot });
+
+    expect(result.healthy).toBe(false);
+    expect(result.issueLines).toEqual(
+      expect.arrayContaining([
+        "- No agents are enabled in `agents.yaml`.",
+        expect.stringContaining("Invalid settings file"),
+      ]),
+    );
+  });
 });

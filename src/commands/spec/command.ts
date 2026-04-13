@@ -1,7 +1,6 @@
 import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
 import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
-import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import {
   buildLifecycleStartFields,
   buildOperationLifecycleCompleteFields,
@@ -22,13 +21,19 @@ import {
   rewriteSpecRecord,
 } from "../../domain/spec/persistence/adapter.js";
 import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
+import { loadOperatorEnvironment } from "../../preflight/environment.js";
+import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import type { SpecProgressRenderer } from "../../render/transcripts/spec.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
-import { SpecAgentNotFoundError, SpecGenerationFailedError } from "./errors.js";
+import {
+  SpecAgentNotFoundError,
+  SpecGenerationFailedError,
+  SpecPreflightError,
+} from "./errors.js";
 
 export interface ExecuteSpecCommandInput {
   root: string;
@@ -66,7 +71,7 @@ export async function executeSpecCommand(
     renderer,
   } = input;
 
-  let competitors;
+  let resolvedAgentIds: readonly string[];
   try {
     const normalizedCliIds =
       cliAgentIds && cliAgentIds.length > 0 ? [...cliAgentIds] : undefined;
@@ -75,9 +80,10 @@ export async function executeSpecCommand(
       stageId: "spec",
       cliAgentIds: normalizedCliIds,
       profileName,
+      includeDefinitions: false,
     });
-    competitors = resolution.competitors;
-    if (competitors.length === 0) {
+    resolvedAgentIds = resolution.agentIds;
+    if (resolvedAgentIds.length === 0) {
       throw new SpecGenerationFailedError(["Spec agent resolution failed."]);
     }
   } catch (error) {
@@ -86,8 +92,19 @@ export async function executeSpecCommand(
     }
     throw error;
   }
-
-  const environment = loadEnvironmentConfig({ root });
+  const preflight = await prepareConfiguredOperatorReadiness({
+    root,
+    resolvedAgentIds,
+    includeEnvironment: false,
+  });
+  if (preflight.issues.length > 0) {
+    throw new SpecPreflightError(
+      preflight.issues,
+      preflight.preProviderIssueCount,
+    );
+  }
+  const competitors = preflight.agents;
+  const environment = loadOperatorEnvironment({ root });
   const effectiveMaxParallel = resolveEffectiveMaxParallel({
     competitorCount: competitors.length,
     requestedMaxParallel,

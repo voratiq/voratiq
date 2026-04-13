@@ -1,9 +1,7 @@
-import { verifyAgentProviders } from "../../agents/runtime/auth.js";
 import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
 import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
-import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import {
   createReduceCompetitionAdapter,
   type ReductionCompetitionExecution,
@@ -16,6 +14,8 @@ import {
   flushReductionRecordBuffer,
   readReductionRecords,
 } from "../../domain/reduce/persistence/adapter.js";
+import { loadOperatorEnvironment } from "../../preflight/environment.js";
+import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import type { ReduceProgressRenderer } from "../../render/transcripts/reduce.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
@@ -80,16 +80,26 @@ export async function executeReduceCommand(
     target,
   });
 
-  const reducers = resolveReduceAgents({
+  const reducerPlan = resolveReduceAgentPlan({
     root,
     agentIds,
     agentOverrideFlag,
     profileName,
   });
 
-  await assertReducePreflight(reducers);
-
-  const environment = loadEnvironmentConfig({ root });
+  const preflight = await prepareConfiguredOperatorReadiness({
+    root,
+    resolvedAgentIds: reducerPlan.agentIds,
+    includeEnvironment: false,
+  });
+  if (preflight.issues.length > 0) {
+    throw new ReducePreflightError(
+      preflight.issues,
+      preflight.preProviderIssueCount,
+    );
+  }
+  const reducers = preflight.agents;
+  const environment = loadOperatorEnvironment({ root });
   const reductionId = generateSessionId();
   const createdAt = new Date().toISOString();
   const effectiveMaxParallel = resolveEffectiveMaxParallel({
@@ -175,41 +185,29 @@ export async function executeReduceCommand(
   };
 }
 
-function resolveReduceAgents(options: {
+function resolveReduceAgentPlan(options: {
   agentIds?: readonly string[];
   root: string;
   agentOverrideFlag?: string;
   profileName?: string;
-}): AgentDefinition[] {
+}): {
+  readonly agentIds: readonly string[];
+  readonly competitors: readonly AgentDefinition[];
+} {
   const { agentIds, root, agentOverrideFlag, profileName } = options;
   try {
-    const resolution = resolveReductionCompetitors({
+    return resolveReductionCompetitors({
       root,
       cliAgentIds: agentIds,
       cliOverrideFlag: agentOverrideFlag,
       profileName,
+      includeDefinitions: false,
     });
-    return [...resolution.competitors];
   } catch (error) {
     if (error instanceof AgentNotFoundError) {
       throw new ReduceAgentNotFoundError(error.agentId);
     }
     throw error;
-  }
-}
-
-async function assertReducePreflight(
-  agents: readonly AgentDefinition[],
-): Promise<void> {
-  const providerIssues = await verifyAgentProviders(
-    agents.map((agent) => ({
-      id: agent.id,
-      provider: agent.provider,
-    })),
-  );
-
-  if (providerIssues.length > 0) {
-    throw new ReducePreflightError(providerIssues, []);
   }
 }
 

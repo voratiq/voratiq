@@ -146,6 +146,9 @@ describe("run preflight error summary", () => {
     const preflightError = captured as RunPreflightError;
     expect(preflightError.detailLines).toHaveLength(1);
     expect(preflightError.detailLines[0]).toContain("Invalid settings file");
+    expect(preflightError.hintLines).toEqual([
+      "Review `.voratiq/settings.yaml` and correct invalid values.",
+    ]);
   });
 
   it("suppresses the generic doctor hint when preflight only has auth provider issues", async () => {

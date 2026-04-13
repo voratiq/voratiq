@@ -1,9 +1,9 @@
 import { CliError } from "../../cli/errors.js";
+import type { PreflightIssue } from "../../competition/shared/preflight.js";
 import {
-  formatPreflightIssueLines,
-  PREFLIGHT_HINT,
-  type PreflightIssue,
-} from "../../competition/shared/preflight.js";
+  formatOperatorPreflightIssueLines,
+  resolveOperatorPreflightHintLines,
+} from "../../preflight/formatting.js";
 
 export type ReducePreflightIssue = PreflightIssue;
 
@@ -34,12 +34,12 @@ export class ReducePreflightError extends ReduceError {
 
   constructor(
     issues: readonly ReducePreflightIssue[],
-    hintLines: readonly string[] = [PREFLIGHT_HINT],
+    preProviderIssueCount: number = issues.length,
   ) {
     super(
       "Preflight failed. Aborting reduction.",
-      formatPreflightIssueLines(issues),
-      hintLines,
+      formatOperatorPreflightIssueLines(issues),
+      resolveOperatorPreflightHintLines(issues, preProviderIssueCount) ?? [],
     );
     this.issues = Array.from(issues);
     this.name = "ReducePreflightError";

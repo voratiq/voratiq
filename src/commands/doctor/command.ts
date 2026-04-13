@@ -4,6 +4,7 @@ import {
   MissingEnvironmentConfigError,
 } from "../../configs/environment/errors.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
+import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { pathExists } from "../../utils/fs.js";
 import {
@@ -18,7 +19,6 @@ import {
   formatWorkspacePath,
   resolveWorkspacePath,
 } from "../../workspace/structure.js";
-import { collectRunPreflightDiagnostics } from "../run/validation.js";
 import { executeDoctorBootstrap } from "./fix.js";
 import type { DoctorReconcileResult } from "./fix-types.js";
 import { executeDoctorReconcile } from "./reconcile.js";
@@ -79,7 +79,7 @@ export async function executeDoctorDiagnosis(
   }
 
   try {
-    const diagnostics = await collectRunPreflightDiagnostics({ root });
+    const diagnostics = await prepareConfiguredOperatorReadiness({ root });
     if (diagnostics.noAgentsEnabled) {
       issueLines.push("- No agents are enabled in `agents.yaml`.");
     }
