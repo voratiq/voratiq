@@ -2,7 +2,10 @@ import type { ExtractedTokenUsage } from "../../domain/run/model/types.js";
 import { getRunStatusStyle } from "../../status/colors.js";
 import { TERMINAL_VERIFICATION_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
-import { formatRenderLifecycleDuration } from "../utils/duration.js";
+import {
+  formatRenderLifecycleDuration,
+  formatRenderLifecycleRowDuration,
+} from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
 import {
   buildStageFrameLines,
@@ -297,20 +300,15 @@ export function createVerifyRenderer(
   }
 
   function formatDuration(record: VerifyProgressMethodRecord): string {
-    if (record.status === "running") {
-      return DASH;
-    }
-    return (
-      formatRenderLifecycleDuration({
-        lifecycle: {
-          status: record.status,
-          startedAt: record.startedAt,
-          completedAt: record.completedAt,
-        },
-        terminalStatuses: TERMINAL_VERIFICATION_STATUSES,
-        now: now(),
-      }) ?? DASH
-    );
+    return formatRenderLifecycleRowDuration({
+      lifecycle: {
+        status: record.status,
+        startedAt: record.startedAt,
+        completedAt: record.completedAt,
+      },
+      terminalStatuses: TERMINAL_VERIFICATION_STATUSES,
+      now: now(),
+    });
   }
 
   function syncContextLifecycleFromMethods(): void {

@@ -290,6 +290,27 @@ describe("verify live progress renderer", () => {
     let frame = normalizeFrame(tty.snapshot());
     expect(frame).toContain("Elapsed    3s");
     expect(frame).toMatch(/—\s+programmatic\s+RUNNING\s+—/u);
+    expect(frame).toBe(
+      normalizeFrame(
+        renderVerifyTranscript({
+          verificationId: "verify-123",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          elapsed: "3s",
+          workspacePath: ".voratiq/verify/sessions/verify-123",
+          status: "running",
+          methods: [
+            {
+              verifierLabel: "programmatic",
+              duration: "—",
+              status: "running",
+            },
+          ],
+          suppressHint: true,
+          isTty: false,
+          includeSummarySection: true,
+        }).split("\n\n---")[0] ?? "",
+      ),
+    );
 
     currentTime = Date.parse("2026-01-01T00:00:07.000Z");
     renderer.update({

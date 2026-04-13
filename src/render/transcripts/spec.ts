@@ -4,7 +4,10 @@ import { TERMINAL_SPEC_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
 import { formatAgentErrorLine } from "../utils/agents.js";
 import { formatAgentBadge } from "../utils/badges.js";
-import { formatRenderLifecycleDuration } from "../utils/duration.js";
+import {
+  formatRenderLifecycleDuration,
+  formatRenderLifecycleRowDuration,
+} from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
 import {
   buildStageFrameLines,
@@ -238,20 +241,15 @@ export function createSpecRenderer(
   }
 
   function formatDuration(record: SpecProgressAgentRecord): string {
-    if (record.status === "running") {
-      return DASH;
-    }
-    return (
-      formatRenderLifecycleDuration({
-        lifecycle: {
-          status: record.status,
-          startedAt: record.startedAt,
-          completedAt: record.completedAt,
-        },
-        terminalStatuses: ["succeeded", "failed"],
-        now: now(),
-      }) ?? DASH
-    );
+    return formatRenderLifecycleRowDuration({
+      lifecycle: {
+        status: record.status,
+        startedAt: record.startedAt,
+        completedAt: record.completedAt,
+      },
+      terminalStatuses: ["succeeded", "failed"],
+      now: now(),
+    });
   }
 
   function syncContextLifecycleFromAgentRecords(): void {
@@ -481,17 +479,15 @@ export function formatSpecAgentDuration(options: {
   completedAt?: string;
   now?: number;
 }): string {
-  return (
-    formatRenderLifecycleDuration({
-      lifecycle: {
-        status: options.status,
-        startedAt: options.startedAt,
-        completedAt: options.completedAt,
-      },
-      terminalStatuses: ["succeeded", "failed"],
-      now: options.now,
-    }) ?? DASH
-  );
+  return formatRenderLifecycleRowDuration({
+    lifecycle: {
+      status: options.status,
+      startedAt: options.startedAt,
+      completedAt: options.completedAt,
+    },
+    terminalStatuses: ["succeeded", "failed"],
+    now: options.now,
+  });
 }
 
 export function renderSpecTranscript(

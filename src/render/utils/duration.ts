@@ -32,6 +32,20 @@ export function formatRenderLifecycleDuration<TStatus extends string>(options: {
   return formatDurationLabel(durationMs);
 }
 
+export function formatRenderLifecycleRowDuration<
+  TStatus extends string,
+>(options: {
+  lifecycle: LifecycleExecutionDurationInput<TStatus>;
+  terminalStatuses: readonly TStatus[];
+  now?: number;
+}): string {
+  if (!options.terminalStatuses.includes(options.lifecycle.status)) {
+    return "—";
+  }
+
+  return formatRenderLifecycleDuration(options) ?? "—";
+}
+
 export function formatDurationLabel(durationMs: number): string | undefined {
   if (!Number.isFinite(durationMs) || durationMs < 0) {
     return undefined;

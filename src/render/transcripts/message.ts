@@ -3,7 +3,10 @@ import { getAgentStatusStyle, getRunStatusStyle } from "../../status/colors.js";
 import { TERMINAL_MESSAGE_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
 import { formatAgentErrorLine } from "../utils/agents.js";
-import { formatRenderLifecycleDuration } from "../utils/duration.js";
+import {
+  formatRenderLifecycleDuration,
+  formatRenderLifecycleRowDuration,
+} from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
 import {
   buildStageFrameLines,
@@ -233,20 +236,15 @@ export function createMessageRenderer(
   }
 
   function formatDuration(record: MessageProgressRecipientRecord): string {
-    if (record.status === "running") {
-      return DASH;
-    }
-    return (
-      formatRenderLifecycleDuration({
-        lifecycle: {
-          status: record.status,
-          startedAt: record.startedAt,
-          completedAt: record.completedAt,
-        },
-        terminalStatuses: TERMINAL_MESSAGE_STATUSES,
-        now: now(),
-      }) ?? DASH
-    );
+    return formatRenderLifecycleRowDuration({
+      lifecycle: {
+        status: record.status,
+        startedAt: record.startedAt,
+        completedAt: record.completedAt,
+      },
+      terminalStatuses: TERMINAL_MESSAGE_STATUSES,
+      now: now(),
+    });
   }
 
   function syncContextLifecycleFromRecipientRecords(): void {
@@ -511,8 +509,8 @@ export function formatMessageRecipientDuration(input: {
   startedAt?: string;
   completedAt?: string;
   now?: number;
-}): string | undefined {
-  return formatRenderLifecycleDuration({
+}): string {
+  return formatRenderLifecycleRowDuration({
     lifecycle: {
       status: input.status,
       startedAt: input.startedAt,

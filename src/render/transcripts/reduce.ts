@@ -3,7 +3,10 @@ import { getAgentStatusStyle, getRunStatusStyle } from "../../status/colors.js";
 import { TERMINAL_REDUCTION_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
 import { formatAgentErrorLine } from "../utils/agents.js";
-import { formatRenderLifecycleDuration } from "../utils/duration.js";
+import {
+  formatRenderLifecycleDuration,
+  formatRenderLifecycleRowDuration,
+} from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
 import {
   buildStageFrameLines,
@@ -264,20 +267,15 @@ export function createReduceRenderer(
   }
 
   function formatDuration(record: ReduceProgressReducerRecord): string {
-    if (record.status === "running") {
-      return DASH;
-    }
-    return (
-      formatRenderLifecycleDuration({
-        lifecycle: {
-          status: record.status,
-          startedAt: record.startedAt,
-          completedAt: record.completedAt,
-        },
-        terminalStatuses: TERMINAL_REDUCTION_STATUSES,
-        now: now(),
-      }) ?? DASH
-    );
+    return formatRenderLifecycleRowDuration({
+      lifecycle: {
+        status: record.status,
+        startedAt: record.startedAt,
+        completedAt: record.completedAt,
+      },
+      terminalStatuses: TERMINAL_REDUCTION_STATUSES,
+      now: now(),
+    });
   }
 
   function syncContextLifecycleFromReducerRecords(): void {
@@ -568,17 +566,15 @@ export function formatReducerDuration(options: {
   completedAt?: string;
   now?: number;
 }): string {
-  return (
-    formatRenderLifecycleDuration({
-      lifecycle: {
-        status: options.status,
-        startedAt: options.startedAt,
-        completedAt: options.completedAt,
-      },
-      terminalStatuses: TERMINAL_REDUCTION_STATUSES,
-      now: options.now,
-    }) ?? "—"
-  );
+  return formatRenderLifecycleRowDuration({
+    lifecycle: {
+      status: options.status,
+      startedAt: options.startedAt,
+      completedAt: options.completedAt,
+    },
+    terminalStatuses: TERMINAL_REDUCTION_STATUSES,
+    now: options.now,
+  });
 }
 
 export function formatReduceElapsed(options: {
