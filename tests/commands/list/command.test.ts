@@ -636,6 +636,58 @@ describe("executeListCommand", () => {
     expect(result.json.session).not.toHaveProperty("target");
   });
 
+  it("renders spec detail running rows with suppressed duration", async () => {
+    await appendSpecRecord({
+      root: testDir,
+      specsFilePath,
+      record: buildSpecRecord({
+        sessionId: "spec-running",
+        status: "running",
+        agents: [
+          {
+            agentId: "agent-a",
+            status: "running",
+            startedAt: "2026-03-01T00:00:00.000Z",
+          },
+        ],
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "spec",
+        sessionId: "spec-running",
+      }),
+    );
+
+    const row = findDetailTableRow(result.output, "agent-a", "RUNNING");
+    expect(result.output).toContain("Elapsed");
+    expect(row).toContain("RUNNING");
+    expect(row).toContain("—");
+  });
+
+  it("renders spec detail terminal rows with completed duration", async () => {
+    await appendSpecRecord({
+      root: testDir,
+      specsFilePath,
+      record: buildSpecRecord({
+        sessionId: "spec-detail",
+        status: "succeeded",
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "spec",
+        sessionId: "spec-detail",
+      }),
+    );
+
+    const row = findDetailTableRow(result.output, "agent-a", "SUCCEEDED");
+    expect(row).toContain("SUCCEEDED");
+    expect(row).toContain("5m");
+  });
+
   it("normalizes spec description text in table json", async () => {
     await appendSpecRecord({
       root: testDir,
@@ -808,6 +860,9 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("Agent: agent-a");
     expect(result.output).toContain("Output:");
     expect(result.output).not.toContain("\nRun");
+    expect(findDetailTableRow(result.output, "agent-a", "SUCCEEDED")).toContain(
+      "5m",
+    );
     expect(result.json).toMatchObject({
       operator: "reduce",
       mode: "detail",
@@ -837,6 +892,37 @@ describe("executeListCommand", () => {
         ],
       },
     });
+  });
+
+  it("renders reduce detail running rows with suppressed duration", async () => {
+    const reduction = buildReductionRecord({
+      sessionId: "reduce-running",
+      status: "running",
+      target: { type: "run", id: "run-123" },
+    });
+    reduction.reducers = [
+      {
+        ...reduction.reducers[0],
+        status: "running",
+        completedAt: undefined,
+      },
+    ];
+    await appendReductionRecord({
+      root: testDir,
+      reductionsFilePath,
+      record: reduction,
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "reduce",
+        sessionId: "reduce-running",
+      }),
+    );
+
+    const row = findDetailTableRow(result.output, "agent-a", "RUNNING");
+    expect(result.output).toContain("Elapsed");
+    expect(row).toContain("—");
   });
 
   it("renders message table with TARGET values and without a recipients column", async () => {
@@ -1004,6 +1090,31 @@ describe("executeListCommand", () => {
     expect(result.output).not.toContain("Target:");
     expect(result.output).toContain("\n---\n");
     expect(result.output?.trimEnd().endsWith("---")).toBe(false);
+    expect(findDetailTableRow(result.output, "agent-a", "SUCCEEDED")).toContain(
+      "5m",
+    );
+  });
+
+  it("renders message detail running rows with suppressed duration", async () => {
+    await appendMessageRecord({
+      root: testDir,
+      messagesFilePath,
+      record: buildMessageRecord({
+        sessionId: "message-running",
+        status: "running",
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "message",
+        sessionId: "message-running",
+      }),
+    );
+
+    const row = findDetailTableRow(result.output, "agent-a", "RUNNING");
+    expect(result.output).toContain("Elapsed");
+    expect(row).toContain("—");
   });
 
   it("renders persisted message targets in detail transcript and json", async () => {
@@ -1214,6 +1325,9 @@ describe("executeListCommand", () => {
     expect(result.output).toMatch(/Target\s+run:run-123/u);
     expect(result.output).toContain("Output:");
     expect(result.output).not.toContain("\nRun");
+    expect(
+      findDetailTableRow(result.output, "programmatic", "SUCCEEDED"),
+    ).toContain("1m");
     expect(result.json).toMatchObject({
       operator: "verify",
       mode: "detail",
@@ -1239,6 +1353,37 @@ describe("executeListCommand", () => {
         ],
       },
     });
+  });
+
+  it("renders verify detail running rows with suppressed duration", async () => {
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: buildVerificationRecord({
+        sessionId: "verify-running",
+        status: "running",
+        methods: [
+          {
+            method: "programmatic",
+            slug: "programmatic",
+            scope: { kind: "run" },
+            status: "running",
+            startedAt: "2026-03-01T00:00:00.000Z",
+          },
+        ],
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-running",
+      }),
+    );
+
+    const row = findDetailTableRow(result.output, "programmatic", "RUNNING");
+    expect(result.output).toContain("Elapsed");
+    expect(row).toContain("—");
   });
 
   it("renders message-target verify detail without mislabeling it as a reduction", async () => {
@@ -1747,4 +1892,21 @@ function buildVerificationRecord(params: {
     methods: params.methods ?? [],
     error: params.status === "failed" ? "failed" : null,
   };
+}
+
+function findDetailTableRow(
+  output: string | undefined,
+  label: string,
+  status: string,
+): string {
+  if (!output) {
+    throw new Error("Expected detail transcript output");
+  }
+  const row = output
+    .split("\n")
+    .find((line) => line.includes(label) && line.includes(status));
+  if (!row) {
+    throw new Error(`Expected detail row for ${label} with status ${status}`);
+  }
+  return row;
 }

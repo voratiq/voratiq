@@ -230,6 +230,25 @@ describe("message live progress renderer", () => {
     let frame = normalizeFrame(tty.snapshot());
     expect(frame).toContain("Elapsed    3s");
     expect(frame).toMatch(/agent-a\s+RUNNING\s+—/u);
+    expect(frame).toBe(
+      normalizeFrame(
+        renderMessageTranscript({
+          messageId: "message-123",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          elapsed: "3s",
+          workspacePath: ".voratiq/message/sessions/message-123",
+          status: "running",
+          recipients: [
+            {
+              agentId: "agent-a",
+              status: "running",
+              duration: "—",
+            },
+          ],
+          isTty: false,
+        }).split("\n\n---")[0] ?? "",
+      ),
+    );
 
     currentTime = Date.parse("2026-01-01T00:00:07.000Z");
     renderer.update({

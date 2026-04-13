@@ -64,7 +64,7 @@ import {
   formatVerifyElapsed,
   renderVerifyTranscript,
 } from "../../render/transcripts/verify.js";
-import { formatRenderLifecycleDuration } from "../../render/utils/duration.js";
+import { formatRenderLifecycleRowDuration } from "../../render/utils/duration.js";
 import { pathExists } from "../../utils/fs.js";
 import {
   formatTargetDisplay,
@@ -379,13 +379,11 @@ function renderDetailOutput(
       recipients: session.agents.map((agent) => ({
         agentId: agent.agentId ?? DASH,
         status: agent.status as MessageRecord["recipients"][number]["status"],
-        duration:
-          formatMessageRecipientDuration({
-            status:
-              agent.status as MessageRecord["recipients"][number]["status"],
-            startedAt: agent.startedAt,
-            completedAt: agent.completedAt,
-          }) ?? DASH,
+        duration: formatMessageRecipientDuration({
+          status: agent.status as MessageRecord["recipients"][number]["status"],
+          startedAt: agent.startedAt,
+          completedAt: agent.completedAt,
+        }),
         outputPath: agent.outputPath,
         errorLine: agent.errorLine,
       })),
@@ -683,14 +681,12 @@ function formatSessionWarning(warning: { displayPath: string }): string {
 }
 
 function formatVerifyAgentDuration(agent: NormalizedListAgent): string {
-  return (
-    formatRenderLifecycleDuration({
-      lifecycle: {
-        status: agent.status,
-        startedAt: agent.startedAt,
-        completedAt: agent.completedAt,
-      },
-      terminalStatuses: TERMINAL_VERIFICATION_STATUSES,
-    }) ?? DASH
-  );
+  return formatRenderLifecycleRowDuration({
+    lifecycle: {
+      status: agent.status,
+      startedAt: agent.startedAt,
+      completedAt: agent.completedAt,
+    },
+    terminalStatuses: TERMINAL_VERIFICATION_STATUSES,
+  });
 }

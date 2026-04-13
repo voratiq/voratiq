@@ -238,6 +238,28 @@ describe("reduce live progress renderer", () => {
     let frame = normalizeFrame(tty.snapshot());
     expect(frame).toContain("Elapsed    3s");
     expect(frame).toMatch(/reducer-a\s+RUNNING\s+—/u);
+    expect(frame).toBe(
+      normalizeFrame(
+        renderReduceTranscript({
+          reductionId: "reduce-123",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          elapsed: "3s",
+          workspacePath: ".voratiq/reduce/sessions/reduce-123",
+          status: "running",
+          reducers: [
+            {
+              reducerAgentId: "reducer-a",
+              outputPath: "reduction.md",
+              duration: "—",
+              status: "running",
+            },
+          ],
+          suppressHint: true,
+          isTty: false,
+          includeSummarySection: true,
+        }).split("\n\n---")[0] ?? "",
+      ),
+    );
 
     currentTime = Date.parse("2026-01-01T00:00:07.000Z");
     renderer.update({
