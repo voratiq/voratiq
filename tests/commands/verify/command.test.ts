@@ -144,10 +144,8 @@ describe("executeVerifyCommand preflight", () => {
       }),
     ).rejects.toMatchObject({
       headline: "Preflight failed. Aborting verification.",
-      detailLines: ["- Invalid settings file at /repo/.voratiq/settings.yaml"],
-      hintLines: [
-        "Review `.voratiq/settings.yaml` and correct invalid values.",
-      ],
+      detailLines: ["- Invalid `settings.yaml`."],
+      hintLines: ["Review `settings.yaml` and correct invalid values."],
     });
     expect(appendVerificationRecordMock).not.toHaveBeenCalled();
   });
@@ -171,7 +169,7 @@ describe("executeVerifyCommand preflight", () => {
         target: { kind: "run", sessionId: "run-123" },
       }),
     ).rejects.toMatchObject({
-      detailLines: ["- verifier-a: token expired"],
+      detailLines: ["- `verifier-a`: token expired"],
       hintLines: [],
     });
   });

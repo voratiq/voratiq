@@ -131,7 +131,7 @@ describe("executeDoctorDiagnosis", () => {
     expect(result.issueLines).toEqual(
       expect.arrayContaining([
         "- No agents are enabled in `agents.yaml`.",
-        expect.stringContaining("Invalid settings file"),
+        expect.stringContaining("Invalid `settings.yaml`"),
       ]),
     );
   });

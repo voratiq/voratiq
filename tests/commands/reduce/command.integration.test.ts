@@ -472,8 +472,8 @@ describe("executeReduceCommand integration", () => {
     expect(preflight.headline).toBe("Preflight failed. Aborting reduction.");
     expect(preflight.detailLines).toEqual(
       expect.arrayContaining([
-        "- reducer-a: token expired",
-        "- reducer-b: missing provider",
+        "- `reducer-a`: token expired",
+        "- `reducer-b`: missing provider",
       ]),
     );
     expect(preflight.hintLines).toEqual([]);
@@ -524,10 +524,8 @@ describe("executeReduceCommand integration", () => {
       }),
     ).rejects.toMatchObject({
       headline: "Preflight failed. Aborting reduction.",
-      detailLines: ["- Invalid settings file at /repo/.voratiq/settings.yaml"],
-      hintLines: [
-        "Review `.voratiq/settings.yaml` and correct invalid values.",
-      ],
+      detailLines: ["- Invalid `settings.yaml`."],
+      hintLines: ["Review `settings.yaml` and correct invalid values."],
     });
   });
 });

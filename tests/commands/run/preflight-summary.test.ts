@@ -145,9 +145,9 @@ describe("run preflight error summary", () => {
     expect(captured).toBeInstanceOf(RunPreflightError);
     const preflightError = captured as RunPreflightError;
     expect(preflightError.detailLines).toHaveLength(1);
-    expect(preflightError.detailLines[0]).toContain("Invalid settings file");
+    expect(preflightError.detailLines[0]).toContain("Invalid `settings.yaml`");
     expect(preflightError.hintLines).toEqual([
-      "Review `.voratiq/settings.yaml` and correct invalid values.",
+      "Review `settings.yaml` and correct invalid values.",
     ]);
   });
 
@@ -184,7 +184,7 @@ describe("run preflight error summary", () => {
     expect(captured).toBeInstanceOf(RunPreflightError);
     const preflightError = captured as RunPreflightError;
     expect(preflightError.detailLines).toEqual([
-      "- claude-sonnet: Claude authentication failed. Authenticate directly via Claude before continuing.",
+      "- `claude-sonnet`: Claude authentication failed. Authenticate directly via Claude before continuing.",
     ]);
     expect(preflightError.hintLines).toEqual([]);
   });

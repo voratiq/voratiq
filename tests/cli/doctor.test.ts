@@ -36,6 +36,11 @@ const executeDoctorDiagnosisMock = jest.mocked(executeDoctorDiagnosis);
 const executeDoctorFixMock = jest.mocked(executeDoctorFix);
 const resolveDoctorFixModeMock = jest.mocked(resolveDoctorFixMode);
 const isInteractiveShellMock = jest.mocked(isInteractiveShell);
+const ANSI_ESCAPE = String.fromCharCode(27);
+
+function stripAnsi(value: string): string {
+  return value.replace(new RegExp(`${ANSI_ESCAPE}\\[[0-9;]*m`, "gu"), "");
+}
 
 describe("voratiq doctor (cli)", () => {
   beforeEach(() => {
@@ -75,10 +80,14 @@ describe("voratiq doctor (cli)", () => {
 
     const result = await runDoctorCommand();
 
-    expect(result).toEqual({
-      body: "healthy",
-      exitCode: 0,
-    });
+    expect(result.exitCode).toBe(0);
+    expect(stripAnsi(result.body)).toBe(
+      [
+        "Workspace healthy, no issues found.",
+        "",
+        "Still having issues? Please reach out to support@voratiq.com.",
+      ].join("\n"),
+    );
   });
 
   it("returns issue output with doctor --fix as the primary next action", async () => {
@@ -109,14 +118,64 @@ describe("voratiq doctor (cli)", () => {
     const result = await runDoctorCommand();
 
     expect(result.exitCode).toBe(1);
-    expect(result.body).toBe(
+    expect(stripAnsi(result.body)).toBe(
       [
-        "issues found",
-        "- Missing workspace entry: `.voratiq/agents.yaml`.",
+        "Error: Missing workspace entry: `.voratiq/agents.yaml`.",
         "",
-        "next: `voratiq doctor --fix`",
+        "Run `voratiq doctor --fix` to repair workspace setup.",
       ].join("\n"),
     );
+  });
+
+  it("returns the healthy doctor output for --fix when no repair is needed", async () => {
+    resolveCliContextMock.mockResolvedValue({
+      root: "/repo",
+      workspacePaths: {
+        root: "/repo",
+        workspaceDir: "/repo/.voratiq",
+        runsDir: "/repo/.voratiq/run",
+        runsFile: "/repo/.voratiq/run/index.json",
+        reductionsDir: "/repo/.voratiq/reduce",
+        reductionsFile: "/repo/.voratiq/reduce/index.json",
+        messagesDir: "/repo/.voratiq/message",
+        messagesFile: "/repo/.voratiq/message/index.json",
+        interactiveDir: "/repo/.voratiq/interactive",
+        interactiveFile: "/repo/.voratiq/interactive/index.json",
+        specsDir: "/repo/.voratiq/spec",
+        specsFile: "/repo/.voratiq/spec/index.json",
+        verificationsDir: "/repo/.voratiq/verify",
+        verificationsFile: "/repo/.voratiq/verify/index.json",
+      },
+    });
+    executeDoctorDiagnosisMock.mockResolvedValue({
+      healthy: true,
+      issueLines: [],
+    });
+
+    const outputWrites: string[] = [];
+    const result = await runDoctorCommand({
+      fix: true,
+      writeOutput: (payload) => {
+        const alertMessages = (payload.alerts ?? []).map(
+          (alert) => alert.message,
+        );
+        if (alertMessages.length > 0) {
+          outputWrites.push(...alertMessages);
+        }
+      },
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(stripAnsi(result.body)).toBe(
+      [
+        "Workspace healthy, no issues found.",
+        "",
+        "Still having issues? Please reach out to support@voratiq.com.",
+      ].join("\n"),
+    );
+    expect(outputWrites).toEqual([]);
+    expect(resolveDoctorFixModeMock).not.toHaveBeenCalled();
+    expect(executeDoctorFixMock).not.toHaveBeenCalled();
   });
 
   it("emits explicit mutation messaging before fix mode", async () => {
@@ -139,6 +198,15 @@ describe("voratiq doctor (cli)", () => {
         verificationsFile: "/repo/.voratiq/verify/index.json",
       },
     });
+    executeDoctorDiagnosisMock
+      .mockResolvedValueOnce({
+        healthy: false,
+        issueLines: ["- No agents are enabled in `agents.yaml`."],
+      })
+      .mockResolvedValueOnce({
+        healthy: true,
+        issueLines: [],
+      });
     resolveDoctorFixModeMock.mockResolvedValue("repair-and-reconcile");
     executeDoctorFixMock.mockResolvedValue({
       mode: "repair-and-reconcile",
@@ -187,7 +255,13 @@ describe("voratiq doctor (cli)", () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.body).toContain("Repair complete.");
+    expect(stripAnsi(result.body)).toBe(
+      [
+        "Workspace healthy, no issues found.",
+        "",
+        "Still having issues? Please reach out to support@voratiq.com.",
+      ].join("\n"),
+    );
     expect(outputWrites).toEqual([
       "Workspace found. This will repair structure and reconcile managed config.",
     ]);
@@ -224,6 +298,15 @@ describe("voratiq doctor (cli)", () => {
       prompt,
       close,
     });
+    executeDoctorDiagnosisMock
+      .mockResolvedValueOnce({
+        healthy: false,
+        issueLines: ["- Missing workspace entry: `.voratiq/`."],
+      })
+      .mockResolvedValueOnce({
+        healthy: true,
+        issueLines: [],
+      });
     resolveDoctorFixModeMock.mockResolvedValue("bootstrap-workspace");
     executeDoctorFixMock.mockResolvedValue({
       mode: "bootstrap-workspace",
@@ -278,6 +361,15 @@ describe("voratiq doctor (cli)", () => {
       prompt: () => Promise.resolve(""),
       close,
     });
+    executeDoctorDiagnosisMock
+      .mockResolvedValueOnce({
+        healthy: false,
+        issueLines: ["- Missing workspace entry: `.voratiq/`."],
+      })
+      .mockResolvedValueOnce({
+        healthy: true,
+        issueLines: [],
+      });
     resolveDoctorFixModeMock.mockResolvedValue("bootstrap-workspace");
     executeDoctorFixMock.mockResolvedValue({
       mode: "bootstrap-workspace",

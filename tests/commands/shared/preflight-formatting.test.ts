@@ -23,11 +23,11 @@ describe("shared preflight issue formatting", () => {
     expect(runError.detailLines).toEqual([
       "- bad settings",
       "- second line",
-      "- agent-a: missing token",
+      "- `agent-a`: missing token",
     ]);
     expect(reduceError.detailLines).toEqual([
-      "- reducer-a: missing token",
-      "- reducer-a: second line",
+      "- `reducer-a`: missing token",
+      "- `reducer-a`: second line",
     ]);
   });
 
@@ -61,10 +61,10 @@ describe("shared preflight issue formatting", () => {
     const reduceError = new ReducePreflightError(settingsIssue, 1);
 
     expect(runError.hintLines).toEqual([
-      "Review `.voratiq/settings.yaml` and correct invalid values.",
+      "Review `settings.yaml` and correct invalid values.",
     ]);
     expect(reduceError.hintLines).toEqual([
-      "Review `.voratiq/settings.yaml` and correct invalid values.",
+      "Review `settings.yaml` and correct invalid values.",
     ]);
   });
 

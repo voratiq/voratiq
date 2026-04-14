@@ -280,10 +280,8 @@ describe("executeMessageCommand integration", () => {
       }),
     ).rejects.toMatchObject({
       headline: "Preflight failed. Aborting message.",
-      detailLines: ["- Invalid settings file at /repo/.voratiq/settings.yaml"],
-      hintLines: [
-        "Review `.voratiq/settings.yaml` and correct invalid values.",
-      ],
+      detailLines: ["- Invalid `settings.yaml`."],
+      hintLines: ["Review `settings.yaml` and correct invalid values."],
     });
     expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
   });

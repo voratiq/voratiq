@@ -256,12 +256,8 @@ describe("executeSpecCommand integration", () => {
         }),
       ).rejects.toMatchObject({
         headline: "Preflight failed. Aborting specification generation.",
-        detailLines: [
-          "- Invalid settings file at /repo/.voratiq/settings.yaml",
-        ],
-        hintLines: [
-          "Review `.voratiq/settings.yaml` and correct invalid values.",
-        ],
+        detailLines: ["- Invalid `settings.yaml`."],
+        hintLines: ["Review `settings.yaml` and correct invalid values."],
       });
       expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
     } finally {
@@ -300,7 +296,7 @@ describe("executeSpecCommand integration", () => {
         }),
       ).rejects.toMatchObject({
         headline: "Preflight failed. Aborting specification generation.",
-        detailLines: ["- alpha: missing binary path"],
+        detailLines: ["- `alpha`: missing binary path"],
       });
       expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
     } finally {

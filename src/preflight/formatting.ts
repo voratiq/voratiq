@@ -6,7 +6,7 @@ import {
 
 export const OPERATOR_PREFLIGHT_UNLABELED_AGENT_IDS = ["settings"] as const;
 export const SETTINGS_PREFLIGHT_HINT =
-  "Review `.voratiq/settings.yaml` and correct invalid values." as const;
+  "Review `settings.yaml` and correct invalid values." as const;
 
 export function formatOperatorPreflightIssueLines(
   issues: readonly PreflightIssue[],
@@ -28,13 +28,12 @@ export function resolveOperatorPreflightHintLines(
     (issue) => issue.agentId !== "settings",
   );
 
-  const hintLines: string[] = [];
   if (hasSettingsIssue) {
-    hintLines.push(SETTINGS_PREFLIGHT_HINT);
+    return [SETTINGS_PREFLIGHT_HINT];
   }
   if (hasRepairableWorkspaceIssue) {
-    hintLines.push(PREFLIGHT_HINT);
+    return [PREFLIGHT_HINT];
   }
 
-  return hintLines;
+  return [];
 }
