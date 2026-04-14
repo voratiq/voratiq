@@ -10,7 +10,7 @@ Register agents and their invocation details.
 
 `agents.yaml` is the local catalog of agents available to a repository. Voratiq never runs an agent that isn't in this file.
 
-`voratiq init` populates this file with every supported agent and auto-detects installed CLIs to fill in binary paths. Your preset choice does not affect which agents appear here — it only shapes [orchestration](./orchestration.md). You can edit the catalog at any time.
+Voratiq seeds this file when it bootstraps `.voratiq/` on first use or via `voratiq doctor --fix`. It populates every supported agent and auto-detects installed CLIs to fill in binary paths. Your preset choice does not affect which agents appear here; it only shapes [orchestration](./orchestration.md). You can edit the catalog at any time.
 
 ## Schema
 

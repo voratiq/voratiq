@@ -4,66 +4,45 @@ title: CLI Reference
 
 # CLI Reference
 
-Complete reference for all Voratiq commands.
+## Command Overview
 
-## Global Behavior
+| Command   | Use it for                                                                |
+| --------- | ------------------------------------------------------------------------- |
+| `voratiq` | Start an interactive agent session from a repo root                       |
+| `spec`    | Draft a Markdown spec from a task description                             |
+| `run`     | Execute agents against a spec                                             |
+| `reduce`  | Synthesize recorded artifacts                                             |
+| `verify`  | Evaluate recorded outputs from a spec, run, reduction, or message session |
+| `message` | Collect persisted responses to a prompt                                   |
+| `auto`    | Run the common coding workflow                                            |
+| `apply`   | Apply a selected diff from a run                                          |
+| `list`    | Inspect recorded sessions                                                 |
+| `prune`   | Clean up heavy artifacts and worktrees from old runs                      |
+| `doctor`  | Diagnose and repair workspace or preflight setup                          |
+| `mcp`     | Run the bundled Voratiq MCP server                                        |
 
-- Must be run inside a git repository
-- `.voratiq/` is created automatically on first use
-- Transcripts stream to stdout; stderr is reserved for warnings and errors
-- Commands exit with code 1 on operational errors
+## `voratiq`
 
-## `voratiq init`
-
-Initialize the Voratiq workspace.
+Launch an interactive agent session.
 
 ### Usage
 
 ```bash
-voratiq init [options]
+voratiq
 ```
-
-### Options
-
-- `--preset <preset>`: Select a preset (`pro|lite|manual`, default: `pro`)
-- `-y, --yes`: Assume yes and accept defaults (suppresses prompts; useful for CI/scripts)
 
 ### Behavior
 
-Creates:
+- must be run from a git repo root
+- creates `.voratiq/` on first use if it does not exist
+- launches an interactive agent session with access to Voratiq operators
+- may prompt for agent selection or tool attachment depending on your setup
 
-- `.voratiq/` directory
-- `spec/`, `run/`, `reduce/`, `verify/`, and `message/` directories
-- `agents.yaml` with the full supported agent catalog (binary paths filled for CLIs found on `$PATH`)
-- `orchestration.yaml` with stage-to-agent assignments based on the selected preset
-- `environment.yaml` with environment settings
-- `verification.yaml` with verification settings
-- `sandbox.yaml` with sandbox policies
-- `index.json` files under `spec/`, `run/`, `reduce/`, `verify/`, and `message/`
-
-If `.voratiq/` already exists, `voratiq init` fills any missing files and directories.
-
-Interactive mode (TTY) prompts for confirmation. Non-TTY environments require the `--yes` flag.
-
-### Examples
-
-```bash
-voratiq init
-```
-
-```bash
-# Smaller, faster agent set
-voratiq init --preset lite
-```
-
-### Errors
-
-- Repository is not a git repo
-- Insufficient permissions to create files
+See [Getting Started](getting-started.md) for a typical first launch.
 
 ## `voratiq spec`
 
-Generate a spec from a task description.
+Generate one or more specs from a task description.
 
 ### Usage
 
@@ -74,35 +53,22 @@ voratiq spec --description <text> [options]
 ### Options
 
 - `--description <text>`: Task description (required)
-- `--agent <agent-id>`: Agent to draft the spec (uses orchestration config if omitted)
+- `--agent <agent-id>`: Set agents directly (repeatable)
 - `--profile <name>`: Orchestration profile (default: `default`)
+- `--max-parallel <count>`: Max concurrent agents
 - `--title <text>`: Spec title; agent infers if omitted
-- `--output <path>`: Output path (default: `.voratiq/spec/<slug>.md`)
+- `--extra-context <path>`: Stage an extra context file into the spec workspace (repeatable)
+- `--json`: Emit a machine-readable result envelope
 
 ### Behavior
 
-The spec agent runs in a sandbox.
+Spec agents run in a sandbox and write Markdown specs under `.voratiq/spec/`. When more than one spec agent is configured or passed with repeated `--agent` flags, `spec` generates one draft per agent.
 
 ### Examples
 
 ```bash
-# Spec agent comes from orchestration.yaml
-voratiq spec --description "add dark mode toggle with localStorage persistence"
+voratiq spec --description "Add dark mode toggle with localStorage persistence"
 ```
-
-```bash
-# Set the spec agent directly
-voratiq spec --description "add dark mode toggle with localStorage persistence" --agent claude-opus-4-5-20251101
-```
-
-### Errors
-
-- Missing required flags
-- Agent not found
-- No agent found for spec stage (stage config empty and no `--agent`)
-- Multiple agents found for spec stage (multi-agent spec is not supported)
-- Output path already exists
-- Spec generation failed
 
 ## `voratiq run`
 
@@ -117,19 +83,23 @@ voratiq run --spec <path> [options]
 ### Options
 
 - `--spec <path>`: Path to the spec file (required)
-- `--agent <agent-id>`: Set agents directly (repeatable; order preserved)
+- `--agent <agent-id>`: Set agents directly (repeatable)
 - `--profile <name>`: Orchestration profile (default: `default`)
-- `--max-parallel <count>`: Max concurrent agents (default: all)
+- `--max-parallel <count>`: Max concurrent agents
 - `--branch`: Create or checkout a branch named after the spec
+- `--extra-context <path>`: Stage an extra context file into each agent workspace (repeatable)
+- `--json`: Emit a machine-readable result envelope
 
 ### Behavior
 
-1. Validates clean git tree, spec exists, and configs are valid
-2. Generates run ID, creates run workspace, initializes run record
-3. Spawns agents, each in an isolated git worktree
-4. Captures diffs, persists records, generates report
+`run`:
 
-Verification (programmatic checks + rubric verifiers) runs separately via `voratiq verify`.
+1. validates the repo and config state
+2. creates a run session
+3. spawns agents in isolated worktrees
+4. captures diffs, summaries, logs, and metadata
+
+Verification runs separately via `voratiq verify`.
 
 ### Examples
 
@@ -138,22 +108,12 @@ voratiq run --spec .voratiq/spec/fix-auth-bug.md
 ```
 
 ```bash
-# Isolate changes on a branch
 voratiq run --spec .voratiq/spec/refactor.md --branch
 ```
 
-### Errors
-
-- Git working tree is not clean
-- Spec file doesn't exist
-- No agents found for the stage (empty orchestration config and no `--agent` override)
-- Agent binary not found or not executable
-- Stale or missing agent credentials
-- Invalid agent or verification configuration
-
 ## `voratiq reduce`
 
-Reduce artifact sets into a summarized form.
+Reduce recorded artifacts into a synthesized summary.
 
 ### Usage
 
@@ -168,10 +128,11 @@ voratiq reduce (--spec <spec-id> | --run <run-id> | --reduce <reduce-id> | --ver
 - `--reduce <reduce-id>`: Reduction to reduce
 - `--verify <verify-id>`: Verification to reduce
 - `--message <message-id>`: Message session to reduce
-- `--agent <agent-id>`: Set reducers directly (repeatable; order preserved)
+- `--agent <agent-id>`: Set reducers directly (repeatable)
 - `--profile <name>`: Orchestration profile (default: `default`)
-- `--max-parallel <count>`: Max concurrent reducers (default: all)
+- `--max-parallel <count>`: Max concurrent reducers
 - `--extra-context <path>`: Stage an extra context file into each reducer workspace (repeatable)
+- `--json`: Emit a machine-readable result envelope
 
 ### Behavior
 
@@ -185,7 +146,7 @@ voratiq reduce --run 20251031-232802-abc123
 
 ## `voratiq verify`
 
-Verify a recorded spec, run, reduce, or message session.
+Verify recorded outputs from a spec, run, reduction, or message session.
 
 ### Usage
 
@@ -199,14 +160,28 @@ voratiq verify (--spec <spec-id> | --run <run-id> | --reduce <reduce-id> | --mes
 - `--run <run-id>`: Run to verify
 - `--reduce <reduce-id>`: Reduction to verify
 - `--message <message-id>`: Message session to verify
-- `--agent <agent-id>`: Set verifiers directly (repeatable; order preserved)
+- `--agent <agent-id>`: Set verifiers directly (repeatable)
 - `--profile <name>`: Orchestration profile (default: `default`)
-- `--max-parallel <count>`: Max concurrent verifiers (default: all)
+- `--max-parallel <count>`: Max concurrent verifiers
 - `--extra-context <path>`: Stage an extra context file into each verifier workspace (repeatable)
+- `--json`: Emit a machine-readable result envelope
 
 ### Behavior
 
-Verification is blinded when comparing candidates — verifiers see randomized candidate ids, not agent names. Artifacts are saved under `.voratiq/verify/`.
+Verification can include:
+
+- programmatic checks
+- rubric verifiers
+
+Rubric verification is blinded when comparing candidates: verifiers see randomized candidate ids, not agent names. Artifacts are saved under `.voratiq/verify/`.
+
+Verification produces a recommendation. It does not automatically apply a run diff unless a higher-level workflow does so.
+
+Possible outcomes include:
+
+- a clear recommendation with a concrete next action
+- a recommendation without an automatic next action
+- an unresolved outcome that still requires manual review
 
 ### Examples
 
@@ -218,23 +193,20 @@ voratiq verify --run 20251031-232802-abc123
 voratiq verify --message 20251031-232802-abc123
 ```
 
-```bash
-# Set verifiers directly
-voratiq verify --run 20251031-232802-abc123 --agent gpt-5-2-codex --agent claude-opus-4-5-20251101
+Representative fields in a verification artifact:
+
+```text
+Recommendation
+  Preferred Candidate: <candidate-id>
+  Next Action:
+    voratiq apply --run <run-id> --agent <agent-id>
 ```
 
-### Errors
-
-- Target ID not found
-- Target record is malformed
-- No agent found for verify stage (stage config empty and no `--agent`)
-- Verifier authentication fails (aborts before any verifier starts)
-- Verifier output contract violation
-- Target artifacts are missing
+When verification does not produce a clean next action, inspect the verification session with `voratiq list --verify <session-id>` and review the artifacts under `.voratiq/verify/`.
 
 ## `voratiq message`
 
-Send an isolated prompt to one or more agents.
+Send the same prompt to one or more agents and persist their replies.
 
 ### Usage
 
@@ -245,10 +217,11 @@ voratiq message --prompt <text> [options]
 ### Options
 
 - `--prompt <text>`: Prompt to send (required)
-- `--agent <agent-id>`: Set recipient agents directly (repeatable; order preserved)
+- `--agent <agent-id>`: Set recipient agents directly (repeatable)
 - `--profile <name>`: Orchestration profile (default: `default`)
-- `--max-parallel <count>`: Max concurrent recipients (default: all)
+- `--max-parallel <count>`: Max concurrent recipients
 - `--extra-context <path>`: Stage an extra context file into each recipient workspace (repeatable)
+- `--json`: Emit a machine-readable result envelope
 
 ### Behavior
 
@@ -257,12 +230,12 @@ Recipients run independently against the same prompt. Replies are persisted unde
 ### Examples
 
 ```bash
-voratiq message --prompt "summarize the migration risks" --agent gpt-5-4-high
+voratiq message --prompt "Review this design doc for backlinks" --extra-context docs/backlinks-design.md
 ```
 
 ## `voratiq auto`
 
-Run `spec`, `run`, `verify`, and `apply` as one command.
+Run the common coding workflow in one command.
 
 ### Usage
 
@@ -276,31 +249,34 @@ Provide exactly one of `--spec` or `--description`.
 
 - `--spec <path>`: Existing spec to run
 - `--description <text>`: Generate a spec, then run and verify it
-- `--run-agent <agent-id>`: Set run-stage agents directly (repeatable; order preserved)
+- `--run-agent <agent-id>`: Set run-stage agents directly (repeatable)
 - `--verify-agent <agent-id>`: Set verify-stage agents directly (repeatable)
 - `--profile <name>`: Orchestration profile (default: `default`)
-- `--max-parallel <count>`: Max concurrent agents/verifiers
+- `--max-parallel <count>`: Max concurrent agents or verifiers
 - `--branch`: Create or checkout a branch named after the spec
-- `--apply`: Apply the selected candidate after verification
+- `--apply`: Apply the selected diff after verification
 - `--commit`: Commit after apply (requires `--apply`)
 
 ### Behavior
 
-Stages run in order: `spec` (if `--description`), `run`, `verify`, `apply` (if `--apply`).
+Stages run in order:
+
+- `spec` if you passed `--description`
+- `run`
+- `verify`
+- `apply` if you passed `--apply`
+
+`reduce` is available separately when you want a synthesized step before verification.
 
 ### Examples
 
 ```bash
-# Apply and commit the winner
-voratiq auto --description "add retries to billing webhook delivery" --apply --commit
+voratiq auto --description "Add backlinks between pages"
 ```
 
-### Errors
-
-- Exactly one of `--spec` or `--description` is required
-- `--commit` requires `--apply`
-- Stage failure in `spec`, `run`, `verify`, or `apply`
-- Verifiers disagree and no single candidate resolves
+```bash
+voratiq auto --description "Add backlinks between pages" --apply --commit
+```
 
 ## `voratiq apply`
 
@@ -318,31 +294,17 @@ voratiq apply --run <run-id> --agent <agent-id> [options]
 - `--agent <agent-id>`: Agent ID whose diff to apply (required)
 - `--ignore-base-mismatch`: Skip base revision check
 - `--commit`: Commit after apply, using the agent's summary as the message
+- `--json`: Emit a machine-readable result envelope
 
 ### Behavior
 
-1. Validates git working tree is clean
-2. Loads the agent's diff from `.voratiq/run/`
-3. Verifies `HEAD` matches the run's base revision
-4. Executes `git apply <diff.patch>`
+`apply` validates the repo state, loads the chosen diff from `.voratiq/run/`, checks the recorded base revision, and applies the patch to your working tree.
 
 ### Examples
 
 ```bash
 voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh
 ```
-
-```bash
-# Apply and commit
-voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh --commit
-```
-
-### Errors
-
-- Run or agent not found
-- Git working tree is not clean
-- Base revision mismatch (without `--ignore-base-mismatch`)
-- `git apply` fails (conflicts or other errors)
 
 ## `voratiq list`
 
@@ -361,12 +323,14 @@ voratiq list [options]
 - `--reduce [session-id]`: List reduction sessions or show one reduction session
 - `--verify [session-id]`: List verification sessions or show one verification session
 - `--message [session-id]`: List message sessions or show one message session
-- `--limit <count>`: Show only the N most recent sessions (default: 10)
+- `--interactive [session-id]`: List interactive sessions or show one interactive session
+- `--limit <count>`: Show only the N most recent sessions (default: `10`)
 - `--verbose`: Show all statuses for the selected operator in table mode
+- `--json`: Emit machine-readable list output
 
 ### Behavior
 
-Provide exactly one operator flag. Without a session id, `list` shows table output for that operator. With a session id, it shows detail output for that session.
+Use `list` to recover recent `session-id` values or inspect a specific recorded session in detail.
 
 ### Examples
 
@@ -375,18 +339,12 @@ voratiq list --run
 ```
 
 ```bash
-# Show one verification session
 voratiq list --verify 20251031-232802-abc123
 ```
 
-### Errors
-
-- Exactly one operator flag is required
-- Session records are malformed
-
 ## `voratiq prune`
 
-Remove run workspaces and mark runs as pruned.
+Remove run workspaces and optionally purge old artifacts.
 
 ### Usage
 
@@ -396,19 +354,11 @@ voratiq prune (--run <run-id> | --all) [options]
 
 ### Options
 
-- `--run <run-id>`: Run ID to prune (required)
+- `--run <run-id>`: Run ID to prune
 - `--all`: Prune all non-pruned runs
-- `--purge`: Delete all associated configs and artifacts
+- `--purge`: Delete associated configs and artifacts too
 - `-y, --yes`: Skip interactive confirmations
-
-### Behavior
-
-1. Loads the run record
-2. Shows what will be deleted, then confirms (unless `-y`)
-3. Deletes run worktrees and, when `--purge` is set, all associated configs and artifacts
-4. Updates run record, marking it as pruned
-
-`--purge` still prompts for confirmation; combine with `-y` to skip.
+- `--json`: Emit a machine-readable result envelope
 
 ### Examples
 
@@ -417,15 +367,46 @@ voratiq prune --run 20251031-232802-abc123
 ```
 
 ```bash
-# Full cleanup, no prompts
 voratiq prune --run 20251031-232802-abc123 --purge -y
 ```
 
-### Errors
+## `voratiq doctor`
 
-- Run ID not found
-- Artifacts already deleted
-- Insufficient permissions to delete files
+Diagnose workspace and preflight setup issues.
+
+### Usage
+
+```bash
+voratiq doctor [options]
+```
+
+### Options
+
+- `--fix`: Apply safe workspace and managed-config repairs
+
+### Behavior
+
+Without `--fix`, `doctor` reports workspace structure, config, environment, and agent-readiness issues.
+
+With `--fix`, `doctor`:
+
+- bootstraps `.voratiq/` when the workspace is missing
+- repairs missing workspace files and directories when the workspace exists
+- reconciles managed config such as `agents.yaml`, `environment.yaml`, `orchestration.yaml`, and `managed-state.json`
+- preserves customized orchestration config when it no longer looks managed
+- may prompt for a bootstrap preset in an interactive shell; otherwise it defaults to `pro`
+
+Bootstrapping or repair ensures the config surface and operator directories under `.voratiq/`, including `spec/`, `run/`, `reduce/`, `verify/`, `message/`, and `interactive/`.
+
+### Examples
+
+```bash
+voratiq doctor
+```
+
+```bash
+voratiq doctor --fix
+```
 
 ## `voratiq mcp`
 
@@ -440,12 +421,3 @@ voratiq mcp --stdio
 ### Options
 
 - `--stdio`: Serve MCP over stdio (required)
-
-### Behavior
-
-Starts the bundled Voratiq MCP server and exposes the Voratiq tool surface over stdio transport.
-
-### Errors
-
-- Missing required flags
-- MCP server startup fails

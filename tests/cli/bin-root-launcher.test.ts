@@ -175,7 +175,7 @@ describe("CLI root launcher wiring", () => {
 
     expect(runInteractiveRootLauncherMock).not.toHaveBeenCalled();
     expect(stdout.join("")).toContain(
-      "Agent ensembles to design, generate, and select the best code for every task.",
+      "Run workflows, delegate to swarms, and verify outputs before you apply them.",
     );
     expect(stderr.join("")).toHaveLength(0);
   });
