@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { executeInitCommand } from "../../../src/commands/init/command.js";
+import { executeDoctorBootstrap } from "../../../src/commands/doctor/fix.js";
 import {
   getAgentDefaultId,
   getAgentDefaultsForPreset,
@@ -16,7 +16,7 @@ import {
   serializeAgentsConfigEntries,
 } from "../../../src/workspace/templates.js";
 
-describe("voratiq init preset application", () => {
+describe("doctor bootstrap preset application", () => {
   let repoRoot: string;
   let originalPath: string | undefined;
 
@@ -32,7 +32,7 @@ describe("voratiq init preset application", () => {
   });
 
   it("writes lite preset when agents config is missing", async () => {
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "lite",
       interactive: false,
@@ -44,9 +44,9 @@ describe("voratiq init preset application", () => {
   });
 
   it.each(["pro", "lite", "manual"] as const)(
-    "fresh init seeds full catalog with implicit enabled defaults for %s",
+    "fresh bootstrap seeds full catalog with implicit enabled defaults for %s",
     async (preset) => {
-      await executeInitCommand({
+      await executeDoctorBootstrap({
         root: repoRoot,
         preset,
         interactive: false,
@@ -70,7 +70,7 @@ describe("voratiq init preset application", () => {
     const initial = buildAgentsTemplate("pro");
     await writeFile(agentsPath, initial, "utf8");
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "lite",
       presetProvided: true,
@@ -96,7 +96,7 @@ describe("voratiq init preset application", () => {
     const content = serializeAgentsConfigEntries(entries);
     await writeFile(agentsPath, content, "utf8");
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "lite",
       presetProvided: true,
@@ -110,7 +110,7 @@ describe("voratiq init preset application", () => {
   it("prompts for preset selection when interactive and config is missing", async () => {
     const prompt = createPromptMock("2");
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "pro",
       interactive: true,
@@ -139,7 +139,7 @@ describe("voratiq init preset application", () => {
 
     const prompt = createPromptMock("1");
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "pro",
       interactive: true,
@@ -178,7 +178,7 @@ describe("voratiq init preset application", () => {
     ]);
     await writeFile(agentsPath, managedPro, "utf8");
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "lite",
       presetProvided: true,
@@ -203,7 +203,7 @@ describe("voratiq init preset application", () => {
     );
   });
 
-  it("does not migrate old managed preset files during init on existing workspaces", async () => {
+  it("does not migrate old managed preset files during bootstrap on existing workspaces", async () => {
     await mkdir(join(repoRoot, ".voratiq"), { recursive: true });
     const agentsPath = join(repoRoot, ".voratiq", "agents.yaml");
 
@@ -226,7 +226,7 @@ describe("voratiq init preset application", () => {
       "utf8",
     );
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "lite",
       presetProvided: true,
@@ -251,7 +251,7 @@ describe("voratiq init preset application", () => {
     const content = serializeAgentsConfigEntries(customized);
     await writeFile(agentsPath, content, "utf8");
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "lite",
       presetProvided: true,
@@ -265,7 +265,7 @@ describe("voratiq init preset application", () => {
   it("skips preset selection when preset is provided", async () => {
     const prompt = createPromptMock("2");
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "lite",
       presetProvided: true,

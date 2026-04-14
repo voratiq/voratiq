@@ -7,7 +7,9 @@ import { assertReductionTargetEligible } from "../../../src/commands/reduce/targ
 import { resolveReductionCompetitors } from "../../../src/commands/shared/resolve-reduction-competitors.js";
 import { generateSessionId } from "../../../src/commands/shared/session-id.js";
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
+import { loadAgentCatalogDiagnostics } from "../../../src/configs/agents/loader.js";
 import { loadEnvironmentConfig } from "../../../src/configs/environment/loader.js";
+import { loadRepoSettings } from "../../../src/configs/settings/loader.js";
 import * as reduceAdapter from "../../../src/domain/reduce/competition/adapter.js";
 import type { ReductionRecord } from "../../../src/domain/reduce/model/types.js";
 import {
@@ -22,6 +24,20 @@ jest.mock("../../../src/competition/command-adapter.js", () => ({
 
 jest.mock("../../../src/configs/environment/loader.js", () => ({
   loadEnvironmentConfig: jest.fn(),
+}));
+
+jest.mock("../../../src/configs/agents/loader.js", () => {
+  const actual = jest.requireActual<
+    typeof import("../../../src/configs/agents/loader.js")
+  >("../../../src/configs/agents/loader.js");
+  return {
+    ...actual,
+    loadAgentCatalogDiagnostics: jest.fn(),
+  };
+});
+
+jest.mock("../../../src/configs/settings/loader.js", () => ({
+  loadRepoSettings: jest.fn(),
 }));
 
 jest.mock(
@@ -51,7 +67,11 @@ jest.mock("../../../src/domain/reduce/persistence/adapter.js", () => ({
 const executeCompetitionWithAdapterMock = jest.mocked(
   executeCompetitionWithAdapter,
 );
+const loadAgentCatalogDiagnosticsMock = jest.mocked(
+  loadAgentCatalogDiagnostics,
+);
 const loadEnvironmentConfigMock = jest.mocked(loadEnvironmentConfig);
+const loadRepoSettingsMock = jest.mocked(loadRepoSettings);
 const resolveReductionCompetitorsMock = jest.mocked(
   resolveReductionCompetitors,
 );
@@ -68,8 +88,61 @@ describe("executeReduceCommand integration", () => {
     jest.clearAllMocks();
     assertReductionTargetEligibleMock.mockResolvedValue(undefined);
     verifyAgentProvidersMock.mockResolvedValue([]);
+    loadRepoSettingsMock.mockReturnValue({
+      bounded: { codex: { globalConfigPolicy: "ignore" } },
+      mcp: { codex: "ask", claude: "ask", gemini: "ask" },
+    });
     loadEnvironmentConfigMock.mockReturnValue({});
     flushReductionRecordBufferMock.mockResolvedValue(undefined);
+    loadAgentCatalogDiagnosticsMock.mockReturnValue({
+      enabledAgents: [
+        {
+          id: "alpha",
+          provider: "codex",
+          model: "gpt-5",
+          enabled: true,
+          binary: "node",
+        },
+        {
+          id: "beta",
+          provider: "codex",
+          model: "gpt-5",
+          enabled: true,
+          binary: "node",
+        },
+        {
+          id: "gamma",
+          provider: "codex",
+          model: "gpt-5",
+          enabled: true,
+          binary: "node",
+        },
+      ],
+      catalog: [
+        {
+          id: "alpha",
+          provider: "codex",
+          model: "gpt-5",
+          binary: "node",
+          argv: [],
+        },
+        {
+          id: "beta",
+          provider: "codex",
+          model: "gpt-5",
+          binary: "node",
+          argv: [],
+        },
+        {
+          id: "gamma",
+          provider: "codex",
+          model: "gpt-5",
+          binary: "node",
+          argv: [],
+        },
+      ],
+      issues: [],
+    });
   });
 
   it("routes reduction execution through shared competition adapter and preserves reducer order", async () => {
@@ -399,12 +472,60 @@ describe("executeReduceCommand integration", () => {
     expect(preflight.headline).toBe("Preflight failed. Aborting reduction.");
     expect(preflight.detailLines).toEqual(
       expect.arrayContaining([
-        "- reducer-a: token expired",
-        "- reducer-b: missing provider",
+        "- `reducer-a`: token expired",
+        "- `reducer-b`: missing provider",
       ]),
     );
     expect(preflight.hintLines).toEqual([]);
     expect(generateSessionIdMock).not.toHaveBeenCalled();
     expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces settings issues as shared preflight failures without the settings label", async () => {
+    resolveReductionCompetitorsMock.mockReturnValue({
+      source: "orchestration",
+      agentIds: ["reducer-a"],
+      competitors: [],
+    });
+    loadAgentCatalogDiagnosticsMock.mockReturnValue({
+      enabledAgents: [
+        {
+          id: "reducer-a",
+          provider: "codex",
+          model: "gpt-5",
+          enabled: true,
+          binary: "node",
+        },
+      ],
+      catalog: [
+        {
+          id: "reducer-a",
+          provider: "codex",
+          model: "gpt-5",
+          binary: "node",
+          argv: [],
+        },
+      ],
+      issues: [],
+    });
+    loadRepoSettingsMock.mockImplementation(() => {
+      throw new Error("Invalid settings file at /repo/.voratiq/settings.yaml");
+    });
+
+    await expect(
+      executeReduceCommand({
+        root: "/repo",
+        specsFilePath: "/repo/.voratiq/spec/index.json",
+        runsFilePath: "/repo/.voratiq/run/index.json",
+        reductionsFilePath: "/repo/.voratiq/reduce/index.json",
+        messagesFilePath: "/repo/.voratiq/message/index.json",
+        verificationsFilePath: "/repo/.voratiq/verify/index.json",
+        target: { type: "run", id: "run-123" },
+      }),
+    ).rejects.toMatchObject({
+      headline: "Preflight failed. Aborting reduction.",
+      detailLines: ["- Invalid `settings.yaml`."],
+      hintLines: ["Review `settings.yaml` and correct invalid values."],
+    });
   });
 });

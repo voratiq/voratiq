@@ -26,8 +26,8 @@ fi
 
 command -v voratiq >/dev/null || die "voratiq command not found."
 
-log "Initializing workspace with lite preset..."
-voratiq init --yes --preset lite
+log "Repairing workspace..."
+voratiq doctor --fix
 
 if ! grep -q "provider: codex" .voratiq/agents.yaml; then
   die "Codex provider entry missing from .voratiq/agents.yaml"

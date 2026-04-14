@@ -31,35 +31,35 @@ import {
 import type {
   AgentInitSummary,
   DetectedProviderSummary,
-  InitConfigureOptions,
-} from "./types.js";
+  DoctorBootstrapConfigureOptions,
+} from "./fix-types.js";
 
 export const AGENTS_CONFIG_DISPLAY_PATH =
   formatWorkspacePath(VORATIQ_AGENTS_FILE);
 
-export async function configureAgents(
+export async function bootstrapDoctorAgents(
   root: string,
   preset: AgentPreset,
-  options: InitConfigureOptions,
+  options: DoctorBootstrapConfigureOptions,
 ): Promise<AgentInitSummary> {
   void preset;
   void options;
   const defaultTemplate = buildDefaultAgentsTemplate();
 
-  return configureAgentsWithMode(root, defaultTemplate, "init");
+  return configureAgentsWithMode(root, defaultTemplate, "bootstrap");
 }
 
-export async function syncManagedAgents(
+export async function reconcileManagedDoctorAgents(
   root: string,
 ): Promise<AgentInitSummary> {
   const defaultTemplate = buildDefaultAgentsTemplate();
-  return configureAgentsWithMode(root, defaultTemplate, "sync");
+  return configureAgentsWithMode(root, defaultTemplate, "reconcile");
 }
 
 async function configureAgentsWithMode(
   root: string,
   defaultTemplate: string,
-  mode: "init" | "sync",
+  mode: "bootstrap" | "reconcile",
 ): Promise<AgentInitSummary> {
   const filePath = resolveWorkspacePath(root, VORATIQ_AGENTS_FILE);
   const loadResult = await loadYamlConfig(filePath, readAgentsConfig);
@@ -69,9 +69,9 @@ async function configureAgentsWithMode(
   );
   const configCreated = !loadResult.snapshot.exists;
   const managedState =
-    mode === "sync" ? await readManagedState(root) : undefined;
+    mode === "reconcile" ? await readManagedState(root) : undefined;
   const managed =
-    mode === "sync"
+    mode === "reconcile"
       ? !loadResult.snapshot.exists ||
         isManagedAgentsFingerprintMatch(
           managedState?.configs.agents,
@@ -135,7 +135,7 @@ interface AgentTemplateState {
 
 function scanWorkspaceForAgentDefaults(
   config: AgentsConfig,
-  mode: "init" | "sync",
+  mode: "bootstrap" | "reconcile",
   templates: readonly VendorTemplate[],
 ): AgentLifecycleState {
   const templatesById = new Map<string, AgentConfigEntry>();
@@ -165,7 +165,7 @@ function scanWorkspaceForAgentDefaults(
     if (hasBinary(detectedBinary)) {
       entry.binary = detectedBinary ?? "";
       entry.enabled = true;
-    } else if (!existing || mode === "init") {
+    } else if (!existing || mode === "bootstrap") {
       entry.binary = "";
       entry.enabled = false;
     }

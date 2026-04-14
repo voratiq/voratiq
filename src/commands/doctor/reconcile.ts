@@ -16,19 +16,26 @@ import {
   resolveWorkspacePath,
   VORATIQ_ORCHESTRATION_FILE,
 } from "../../workspace/structure.js";
-import { syncManagedAgents } from "../init/agents.js";
-import type { SyncCommandInput, SyncCommandResult } from "./types.js";
+import { reconcileManagedDoctorAgents } from "./agents.js";
+import { reconcileDoctorEnvironment } from "./environment.js";
+import type {
+  DoctorReconcileInput,
+  DoctorReconcileResult,
+} from "./fix-types.js";
 
-export async function executeSyncCommand(
-  input: SyncCommandInput,
-): Promise<SyncCommandResult> {
+export async function executeDoctorReconcile(
+  input: DoctorReconcileInput,
+): Promise<DoctorReconcileResult> {
   const { root } = input;
   const workspaceDirExists = await pathExists(resolveWorkspacePath(root));
   const workspaceResult = workspaceDirExists
     ? undefined
     : await createWorkspace(root);
 
-  const agentSummary = await syncManagedAgents(root);
+  const agentSummary = await reconcileManagedDoctorAgents(root);
+  const environmentSummary = await reconcileDoctorEnvironment(root, {
+    interactive: false,
+  });
 
   const orchestrationSummary = await reconcileManagedOrchestration(root);
 
@@ -51,6 +58,7 @@ export async function executeSyncCommand(
     workspaceBootstrapped: !workspaceDirExists,
     workspaceResult,
     agentSummary,
+    environmentSummary,
     orchestrationSummary,
   };
 }

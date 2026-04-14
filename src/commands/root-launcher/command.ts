@@ -229,9 +229,7 @@ function assertEnabledAgents(diagnostics: AgentCatalogDiagnostics): void {
   throw new CliError(
     "No enabled agents found.",
     [],
-    [
-      "Add agents to `.voratiq/agents.yaml` or run `voratiq init` to set up your workspace.",
-    ],
+    ["Run `voratiq doctor --fix` to repair workspace setup."],
   );
 }
 

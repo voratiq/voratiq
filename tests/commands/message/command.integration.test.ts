@@ -9,7 +9,10 @@ import {
 
 import { verifyAgentProviders } from "../../../src/agents/runtime/auth.js";
 import { executeMessageCommand } from "../../../src/commands/message/command.js";
-import { MessageInvocationContextError } from "../../../src/commands/message/errors.js";
+import {
+  MessageInvocationContextError,
+  MessagePreflightError,
+} from "../../../src/commands/message/errors.js";
 import {
   finalizeActiveMessage,
   registerActiveMessage,
@@ -18,7 +21,9 @@ import { resolveEffectiveMaxParallel } from "../../../src/commands/shared/max-pa
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../../../src/commands/shared/session-id.js";
 import { executeCompetitionWithAdapter } from "../../../src/competition/command-adapter.js";
+import { loadAgentCatalogDiagnostics } from "../../../src/configs/agents/loader.js";
 import { loadEnvironmentConfig } from "../../../src/configs/environment/loader.js";
+import { loadRepoSettings } from "../../../src/configs/settings/loader.js";
 import { createMessageCompetitionAdapter } from "../../../src/domain/message/competition/adapter.js";
 import type { MessageRecordMutators } from "../../../src/domain/message/model/mutators.js";
 import { createMessageRecordMutators } from "../../../src/domain/message/model/mutators.js";
@@ -35,6 +40,20 @@ jest.mock("../../../src/agents/runtime/auth.js", () => ({
 
 jest.mock("../../../src/configs/environment/loader.js", () => ({
   loadEnvironmentConfig: jest.fn(),
+}));
+
+jest.mock("../../../src/configs/agents/loader.js", () => {
+  const actual = jest.requireActual<
+    typeof import("../../../src/configs/agents/loader.js")
+  >("../../../src/configs/agents/loader.js");
+  return {
+    ...actual,
+    loadAgentCatalogDiagnostics: jest.fn(),
+  };
+});
+
+jest.mock("../../../src/configs/settings/loader.js", () => ({
+  loadRepoSettings: jest.fn(),
 }));
 
 jest.mock("../../../src/commands/shared/resolve-stage-competitors.js", () => ({
@@ -76,7 +95,11 @@ jest.mock("../../../src/utils/git.js", () => ({
 }));
 
 const verifyAgentProvidersMock = jest.mocked(verifyAgentProviders);
+const loadAgentCatalogDiagnosticsMock = jest.mocked(
+  loadAgentCatalogDiagnostics,
+);
 const loadEnvironmentConfigMock = jest.mocked(loadEnvironmentConfig);
+const loadRepoSettingsMock = jest.mocked(loadRepoSettings);
 const resolveStageCompetitorsMock = jest.mocked(resolveStageCompetitors);
 const generateSessionIdMock = jest.mocked(generateSessionId);
 const resolveEffectiveMaxParallelMock = jest.mocked(
@@ -107,7 +130,19 @@ describe("executeMessageCommand integration", () => {
     resolveStageCompetitorsMock.mockReturnValue({
       source: "orchestration",
       agentIds: ["alpha"],
-      competitors: [
+      competitors: [],
+    });
+    loadAgentCatalogDiagnosticsMock.mockReturnValue({
+      enabledAgents: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          enabled: true,
+          binary: "node",
+        },
+      ],
+      catalog: [
         {
           id: "alpha",
           provider: "claude",
@@ -116,8 +151,13 @@ describe("executeMessageCommand integration", () => {
           argv: ["index.mjs"],
         },
       ],
+      issues: [],
     });
     verifyAgentProvidersMock.mockResolvedValue([]);
+    loadRepoSettingsMock.mockReturnValue({
+      bounded: { codex: { globalConfigPolicy: "ignore" } },
+      mcp: { codex: "ask", claude: "ask", gemini: "ask" },
+    });
     loadEnvironmentConfigMock.mockReturnValue({});
     getHeadRevisionMock.mockResolvedValue("message-base-sha");
     generateSessionIdMock.mockReturnValue("message-xyz");
@@ -217,6 +257,33 @@ describe("executeMessageCommand integration", () => {
         }),
       }),
     );
+  });
+
+  it("surfaces shared preflight failures before message execution starts", async () => {
+    loadRepoSettingsMock.mockImplementation(() => {
+      throw new Error("Invalid settings file at /repo/.voratiq/settings.yaml");
+    });
+
+    await expect(
+      executeMessageCommand({
+        root: "/repo",
+        messagesFilePath: "/repo/.voratiq/message/index.json",
+        prompt: "Review this change.",
+      }),
+    ).rejects.toBeInstanceOf(MessagePreflightError);
+
+    await expect(
+      executeMessageCommand({
+        root: "/repo",
+        messagesFilePath: "/repo/.voratiq/message/index.json",
+        prompt: "Review this change.",
+      }),
+    ).rejects.toMatchObject({
+      headline: "Preflight failed. Aborting message.",
+      detailLines: ["- Invalid `settings.yaml`."],
+      hintLines: ["Review `settings.yaml` and correct invalid values."],
+    });
+    expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
   });
 
   it("persists an interactive target from sourceInteractiveSessionId", async () => {

@@ -1,26 +1,14 @@
-import { verifyAgentProviders } from "../../agents/runtime/auth.js";
-import { loadAgentCatalogDiagnostics } from "../../configs/agents/loader.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
-import {
-  EnvironmentConfigParseError,
-  MissingEnvironmentConfigError,
-} from "../../configs/environment/errors.js";
-import {
-  DEFAULT_ENVIRONMENT_FILE_DISPLAY,
-  loadEnvironmentConfig,
-} from "../../configs/environment/loader.js";
 import type { EnvironmentConfig } from "../../configs/environment/types.js";
-import { loadRepoSettings } from "../../configs/settings/loader.js";
 import {
   NoAgentsEnabledError,
-  type PreflightIssue,
   RunPreflightError,
 } from "../../domain/run/competition/errors.js";
 import { RunOptionValidationError } from "../../domain/run/model/errors.js";
 import type { RunSpecTarget } from "../../domain/run/model/types.js";
-import { toErrorMessage } from "../../utils/errors.js";
+import { loadOperatorEnvironment } from "../../preflight/environment.js";
+import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import { getHeadRevision } from "../../utils/git.js";
-import { WorkspaceMissingEntryError } from "../../workspace/errors.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { loadRunSpecInput } from "./spec-provenance.js";
 
@@ -75,78 +63,26 @@ export async function validateAndPrepare(
   });
 
   const baseRevisionSha = await getHeadRevision(root);
-  const preflightIssues: PreflightIssue[] = [];
-  let agents: readonly AgentDefinition[];
-  if (resolvedAgentIds) {
-    if (resolvedAgentIds.length === 0) {
-      throw new NoAgentsEnabledError();
-    }
-
-    const selectedAgentIds = new Set(resolvedAgentIds);
-    const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
-    preflightIssues.push(
-      ...agentDiagnostics.issues.filter((issue) =>
-        selectedAgentIds.has(issue.agentId),
-      ),
-    );
-
-    const catalogById = new Map(
-      agentDiagnostics.catalog.map((agent) => [agent.id, agent]),
-    );
-    agents = resolvedAgentIds.flatMap((agentId) => {
-      const agent = catalogById.get(agentId);
-      return agent ? [agent] : [];
-    });
-  } else {
-    const agentDiagnostics = loadAgentCatalogDiagnostics({ root });
-    const enabledAgents = agentDiagnostics.enabledAgents;
-
-    if (enabledAgents.length === 0) {
-      throw new NoAgentsEnabledError();
-    }
-
-    preflightIssues.push(...agentDiagnostics.issues);
-    agents = agentDiagnostics.catalog;
+  const preflight = await prepareConfiguredOperatorReadiness({
+    root,
+    resolvedAgentIds,
+    includeEnvironment: false,
+  });
+  if (preflight.noAgentsEnabled) {
+    throw new NoAgentsEnabledError();
   }
 
-  try {
-    loadRepoSettings({ root });
-  } catch (error) {
-    preflightIssues.push({
-      agentId: "settings",
-      message: toErrorMessage(error),
-    });
-  }
-
-  const preProviderIssueCount = preflightIssues.length;
-  const providerIssues = await verifyAgentProviders(
-    agents.map((agent) => ({
-      id: agent.id,
-      provider: agent.provider,
-    })),
-  );
-
-  preflightIssues.push(...providerIssues);
-  if (preflightIssues.length > 0) {
+  if (preflight.issues.length > 0) {
     throw new RunPreflightError(
-      preflightIssues,
-      preProviderIssueCount === 0 ? [] : undefined,
+      preflight.issues,
+      preflight.preProviderIssueCount,
     );
   }
-
-  const environment = (() => {
-    try {
-      return loadEnvironmentConfig({ root });
-    } catch (error) {
-      if (
-        error instanceof MissingEnvironmentConfigError ||
-        error instanceof EnvironmentConfigParseError
-      ) {
-        throw new WorkspaceMissingEntryError(DEFAULT_ENVIRONMENT_FILE_DISPLAY);
-      }
-      throw error;
-    }
-  })();
+  const agents = preflight.agents;
+  const environment = loadOperatorEnvironment({
+    root,
+    errorMode: "workspace-missing",
+  });
 
   const effectiveMaxParallel = resolveEffectiveMaxParallel({
     competitorCount: agents.length,

@@ -107,7 +107,7 @@ describe("run preflight error summary", () => {
     expect(preflightError.detailLines[0]?.length).toBeLessThanOrEqual(120);
     expect(preflightError.detailLines[1]?.length).toBeLessThanOrEqual(120);
     expect(preflightError.hintLines).toContain(
-      "Run `voratiq init` to configure the workspace.",
+      "Run `voratiq doctor --fix` to repair workspace setup.",
     );
   });
 
@@ -145,10 +145,13 @@ describe("run preflight error summary", () => {
     expect(captured).toBeInstanceOf(RunPreflightError);
     const preflightError = captured as RunPreflightError;
     expect(preflightError.detailLines).toHaveLength(1);
-    expect(preflightError.detailLines[0]).toContain("Invalid settings file");
+    expect(preflightError.detailLines[0]).toContain("Invalid `settings.yaml`");
+    expect(preflightError.hintLines).toEqual([
+      "Review `settings.yaml` and correct invalid values.",
+    ]);
   });
 
-  it("suppresses the generic init hint when preflight only has auth provider issues", async () => {
+  it("suppresses the generic doctor hint when preflight only has auth provider issues", async () => {
     const diagnostics: AgentCatalogDiagnostics = {
       enabledAgents: [
         {
@@ -181,7 +184,7 @@ describe("run preflight error summary", () => {
     expect(captured).toBeInstanceOf(RunPreflightError);
     const preflightError = captured as RunPreflightError;
     expect(preflightError.detailLines).toEqual([
-      "- claude-sonnet: Claude authentication failed. Authenticate directly via Claude before continuing.",
+      "- `claude-sonnet`: Claude authentication failed. Authenticate directly via Claude before continuing.",
     ]);
     expect(preflightError.hintLines).toEqual([]);
   });

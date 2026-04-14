@@ -23,11 +23,11 @@ describe("shared preflight issue formatting", () => {
     expect(runError.detailLines).toEqual([
       "- bad settings",
       "- second line",
-      "- agent-a: missing token",
+      "- `agent-a`: missing token",
     ]);
     expect(reduceError.detailLines).toEqual([
-      "- reducer-a: missing token",
-      "- reducer-a: second line",
+      "- `reducer-a`: missing token",
+      "- `reducer-a`: second line",
     ]);
   });
 
@@ -43,14 +43,32 @@ describe("shared preflight issue formatting", () => {
     expect(runError.detailLines[0]?.length).toBeLessThanOrEqual(120);
     expect(reduceError.detailLines[0]?.length).toBeLessThanOrEqual(120);
     expect(runError.hintLines).toEqual([
-      "Run `voratiq init` to configure the workspace.",
+      "Run `voratiq doctor --fix` to repair workspace setup.",
     ]);
     expect(reduceError.hintLines).toEqual([
-      "Run `voratiq init` to configure the workspace.",
+      "Run `voratiq doctor --fix` to repair workspace setup.",
     ]);
   });
 
-  it("allows auth-only preflight errors to suppress the generic init hint", () => {
+  it("uses a settings-specific hint when the preflight failure is only invalid settings", () => {
+    const settingsIssue = [
+      {
+        agentId: "settings",
+        message: "Invalid settings file at /repo/.voratiq/settings.yaml",
+      },
+    ];
+    const runError = new RunPreflightError(settingsIssue, 1);
+    const reduceError = new ReducePreflightError(settingsIssue, 1);
+
+    expect(runError.hintLines).toEqual([
+      "Review `settings.yaml` and correct invalid values.",
+    ]);
+    expect(reduceError.hintLines).toEqual([
+      "Review `settings.yaml` and correct invalid values.",
+    ]);
+  });
+
+  it("allows auth-only preflight errors to suppress the generic doctor hint", () => {
     const runError = new RunPreflightError(
       [
         {
@@ -59,7 +77,7 @@ describe("shared preflight issue formatting", () => {
             "Claude authentication failed. Authenticate directly via Claude before continuing.",
         },
       ],
-      [],
+      0,
     );
     const reduceError = new ReducePreflightError(
       [
@@ -69,7 +87,7 @@ describe("shared preflight issue formatting", () => {
             "Claude authentication failed. Authenticate directly via Claude before continuing.",
         },
       ],
-      [],
+      0,
     );
 
     expect(runError.hintLines).toEqual([]);

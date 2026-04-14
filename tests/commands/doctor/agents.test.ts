@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { configureAgents } from "../../../src/commands/init/agents.js";
+import { bootstrapDoctorAgents } from "../../../src/commands/doctor/agents.js";
 import {
   getAgentDefaultId,
   getDefaultAgentIdByProvider,
@@ -43,7 +43,7 @@ function enabledIdsForProviders(...providers: string[]): string[] {
     (provider) => ENABLED_IDS_BY_PROVIDER.get(provider) ?? [],
   );
 }
-describe("configureAgents", () => {
+describe("bootstrapDoctorAgents", () => {
   let repoRoot: string;
   let originalPath: string | undefined;
 
@@ -73,7 +73,7 @@ describe("configureAgents", () => {
     const configPath = join(repoRoot, ".voratiq", "agents.yaml");
     await writeFile(configPath, content, "utf8");
 
-    const summary = await configureAgents(repoRoot, "pro", {
+    const summary = await bootstrapDoctorAgents(repoRoot, "pro", {
       interactive: false,
     });
 
@@ -111,7 +111,7 @@ describe("configureAgents", () => {
       Promise.resolve(true),
     );
 
-    const summary = await configureAgents(repoRoot, "pro", {
+    const summary = await bootstrapDoctorAgents(repoRoot, "pro", {
       interactive: true,
       confirm,
     });
@@ -137,7 +137,7 @@ describe("configureAgents", () => {
       Promise.resolve(true),
     );
 
-    const summary = await configureAgents(repoRoot, "pro", {
+    const summary = await bootstrapDoctorAgents(repoRoot, "pro", {
       interactive: true,
       confirm,
     });
@@ -201,7 +201,7 @@ describe("configureAgents", () => {
       Promise.resolve(true),
     );
 
-    const summary = await configureAgents(repoRoot, "lite", {
+    const summary = await bootstrapDoctorAgents(repoRoot, "lite", {
       interactive: true,
       confirm,
     });
@@ -232,7 +232,7 @@ describe("configureAgents", () => {
       Promise.resolve(false),
     );
 
-    const summary = await configureAgents(repoRoot, "pro", {
+    const summary = await bootstrapDoctorAgents(repoRoot, "pro", {
       interactive: true,
       assumeYes: true,
       confirm,
@@ -253,7 +253,7 @@ describe("configureAgents", () => {
       Promise.resolve(true),
     );
 
-    const summary = await configureAgents(repoRoot, "pro", {
+    const summary = await bootstrapDoctorAgents(repoRoot, "pro", {
       interactive: true,
       confirm,
     });
@@ -276,7 +276,7 @@ describe("configureAgents", () => {
       Promise.resolve(true),
     );
 
-    const summary = await configureAgents(repoRoot, "manual", {
+    const summary = await bootstrapDoctorAgents(repoRoot, "manual", {
       interactive: true,
       confirm,
     });
@@ -308,7 +308,7 @@ describe("configureAgents", () => {
     const configPath = join(repoRoot, ".voratiq", "agents.yaml");
     await writeFile(configPath, buildAgentsTemplate("manual"), "utf8");
 
-    const summary = await configureAgents(repoRoot, "manual", {
+    const summary = await bootstrapDoctorAgents(repoRoot, "manual", {
       interactive: false,
     });
 
@@ -340,7 +340,7 @@ describe("configureAgents", () => {
     }
   });
 
-  it("preserves explicit disabled entries on init reruns", async () => {
+  it("preserves explicit disabled entries on bootstrap reruns", async () => {
     await mockDetectedBinaries(repoRoot, {
       claude: "/usr/bin/claude",
       codex: "/usr/bin/codex",
@@ -355,7 +355,7 @@ describe("configureAgents", () => {
     );
     await writeFile(configPath, serializeAgentsConfigEntries(entries), "utf8");
 
-    const summary = await configureAgents(repoRoot, "lite", {
+    const summary = await bootstrapDoctorAgents(repoRoot, "lite", {
       interactive: false,
     });
 

@@ -6,20 +6,19 @@ import type {
 import type { AgentPreset } from "../../workspace/templates.js";
 import type { CreateWorkspaceResult } from "../../workspace/types.js";
 
-export interface InitCommandInput {
+export interface DoctorBootstrapInput {
   root: string;
   preset: AgentPreset;
   presetProvided?: boolean;
   onPresetResolved?: (preset: AgentPreset) => void;
   assumeYes?: boolean;
   interactive: boolean;
-  confirm?: InitConfirmationHandler;
-  prompt?: InitPromptHandler;
+  confirm?: DoctorConfirmationHandler;
+  prompt?: DoctorPromptHandler;
 }
 
-export interface InitCommandResult {
+export interface DoctorBootstrapResult {
   mode: "bootstrap" | "repair";
-  syncRecommended: boolean;
   preset: AgentPreset;
   workspaceResult: CreateWorkspaceResult;
   agentSummary: AgentInitSummary;
@@ -64,15 +63,36 @@ export interface OrchestrationInitSummary {
   configUpdated?: boolean;
 }
 
-export type InitConfirmationHandler = (
+export type DoctorConfirmationHandler = (
   options: ConfirmationOptions,
 ) => Promise<boolean>;
 
-export type InitPromptHandler = (options: PromptOptions) => Promise<string>;
+export type DoctorPromptHandler = (options: PromptOptions) => Promise<string>;
 
-export interface InitConfigureOptions {
+export interface DoctorBootstrapConfigureOptions {
   interactive: boolean;
   assumeYes?: boolean;
-  confirm?: InitConfirmationHandler;
-  prompt?: InitPromptHandler;
+  confirm?: DoctorConfirmationHandler;
+  prompt?: DoctorPromptHandler;
+}
+
+export interface DoctorReconcileInput {
+  root: string;
+}
+
+export interface DoctorReconcileOrchestrationSummary {
+  configPath: string;
+  configCreated: boolean;
+  configUpdated: boolean;
+  skippedCustomized: boolean;
+  managed: boolean;
+  preset: AgentPreset;
+}
+
+export interface DoctorReconcileResult {
+  workspaceBootstrapped: boolean;
+  workspaceResult?: CreateWorkspaceResult;
+  agentSummary: AgentInitSummary;
+  environmentSummary: EnvironmentInitSummary;
+  orchestrationSummary: DoctorReconcileOrchestrationSummary;
 }

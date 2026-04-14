@@ -1,7 +1,7 @@
 import { HintedError } from "../utils/errors.js";
 
 const DEFAULT_WORKSPACE_HINT = [
-  "Run `voratiq init` to configure the workspace.",
+  "Run `voratiq doctor --fix` to repair workspace setup.",
 ] as const satisfies readonly string[];
 
 export class WorkspaceError extends HintedError {
@@ -39,7 +39,7 @@ export class WorkspaceNotInitializedError extends WorkspaceError {
     super(
       "Voratiq workspace is not initialized.",
       buildMissingEntryDetailLines(missingEntries),
-      ["Run `voratiq init` from the repository root, then retry."],
+      ["Run `voratiq doctor --fix` to repair workspace setup."],
     );
     this.name = "WorkspaceNotInitializedError";
   }

@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { executeInitCommand } from "../../../src/commands/init/command.js";
+import { executeDoctorBootstrap } from "../../../src/commands/doctor/fix.js";
 import {
   getAgentDefaultId,
   getAgentDefaultsForPreset,
@@ -20,7 +20,7 @@ import { readOrchestrationConfig } from "../../../src/configs/orchestration/load
 import type { OrchestrationConfig } from "../../../src/configs/orchestration/types.js";
 import { buildAgentsTemplate } from "../../../src/workspace/templates.js";
 
-describe("init orchestration bootstrap", () => {
+describe("doctor bootstrap orchestration", () => {
   let repoRoot: string;
   let originalPath: string | undefined;
 
@@ -42,7 +42,7 @@ describe("init orchestration bootstrap", () => {
       gemini: "/usr/local/bin/gemini",
     });
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "pro",
       interactive: false,
@@ -70,7 +70,7 @@ describe("init orchestration bootstrap", () => {
       gemini: "/usr/local/bin/gemini",
     });
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "lite",
       interactive: false,
@@ -109,7 +109,7 @@ describe("init orchestration bootstrap", () => {
       gemini: "/usr/local/bin/gemini",
     });
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "lite",
       presetProvided: true,
@@ -135,7 +135,7 @@ describe("init orchestration bootstrap", () => {
       gemini: "/usr/local/bin/gemini",
     });
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "manual",
       interactive: false,
@@ -163,7 +163,7 @@ describe("init orchestration bootstrap", () => {
       gemini: "/usr/local/bin/gemini",
     });
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "pro",
       interactive: true,
@@ -198,7 +198,7 @@ describe("init orchestration bootstrap", () => {
       "utf8",
     );
 
-    await executeInitCommand({
+    await executeDoctorBootstrap({
       root: repoRoot,
       preset: "pro",
       interactive: false,

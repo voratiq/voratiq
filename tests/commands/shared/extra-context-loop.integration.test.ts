@@ -11,6 +11,8 @@ import { resolveReductionCompetitors } from "../../../src/commands/shared/resolv
 import { resolveStageCompetitors } from "../../../src/commands/shared/resolve-stage-competitors.js";
 import { executeSpecCommand } from "../../../src/commands/spec/command.js";
 import { resolveExtraContextFiles } from "../../../src/competition/shared/extra-context.js";
+import { loadAgentCatalogDiagnostics } from "../../../src/configs/agents/loader.js";
+import { loadRepoSettings } from "../../../src/configs/settings/loader.js";
 import { appendSpecRecord } from "../../../src/domain/spec/persistence/adapter.js";
 import { getHeadRevision } from "../../../src/utils/git.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
@@ -21,6 +23,20 @@ jest.mock("../../../src/agents/runtime/harness.js", () => ({
 
 jest.mock("../../../src/agents/runtime/auth.js", () => ({
   verifyAgentProviders: jest.fn(),
+}));
+
+jest.mock("../../../src/configs/agents/loader.js", () => {
+  const actual = jest.requireActual<
+    typeof import("../../../src/configs/agents/loader.js")
+  >("../../../src/configs/agents/loader.js");
+  return {
+    ...actual,
+    loadAgentCatalogDiagnostics: jest.fn(),
+  };
+});
+
+jest.mock("../../../src/configs/settings/loader.js", () => ({
+  loadRepoSettings: jest.fn(),
 }));
 
 jest.mock(
@@ -40,6 +56,10 @@ jest.mock("../../../src/utils/git.js", () => ({
 
 const runSandboxedAgentMock = jest.mocked(harness.runSandboxedAgent);
 const verifyAgentProvidersMock = jest.mocked(verifyAgentProviders);
+const loadAgentCatalogDiagnosticsMock = jest.mocked(
+  loadAgentCatalogDiagnostics,
+);
+const loadRepoSettingsMock = jest.mocked(loadRepoSettings);
 const resolveReductionCompetitorsMock = jest.mocked(
   resolveReductionCompetitors,
 );
@@ -104,10 +124,21 @@ describe("end-to-end extra-context reuse loop", () => {
       });
 
       verifyAgentProvidersMock.mockResolvedValue([]);
-      resolveReductionCompetitorsMock.mockReturnValue({
-        source: "cli",
-        agentIds: ["alpha"],
-        competitors: [
+      loadRepoSettingsMock.mockReturnValue({
+        bounded: { codex: { globalConfigPolicy: "ignore" } },
+        mcp: { codex: "ask", claude: "ask", gemini: "ask" },
+      });
+      loadAgentCatalogDiagnosticsMock.mockReturnValue({
+        enabledAgents: [
+          {
+            id: "alpha",
+            provider: "codex",
+            model: "gpt-5",
+            enabled: true,
+            binary: "node",
+          },
+        ],
+        catalog: [
           {
             id: "alpha",
             provider: "codex",
@@ -116,19 +147,17 @@ describe("end-to-end extra-context reuse loop", () => {
             argv: [],
           },
         ],
+        issues: [],
+      });
+      resolveReductionCompetitorsMock.mockReturnValue({
+        source: "cli",
+        agentIds: ["alpha"],
+        competitors: [],
       });
       resolveStageCompetitorsMock.mockReturnValue({
         source: "cli",
         agentIds: ["alpha"],
-        competitors: [
-          {
-            id: "alpha",
-            provider: "codex",
-            model: "gpt-5",
-            binary: "node",
-            argv: [],
-          },
-        ],
+        competitors: [],
       });
 
       let sawExtraContextPromptSection = false;

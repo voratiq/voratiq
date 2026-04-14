@@ -1,4 +1,9 @@
 import { CliError } from "../../cli/errors.js";
+import type { PreflightIssue } from "../../competition/shared/preflight.js";
+import {
+  formatOperatorPreflightIssueLines,
+  resolveOperatorPreflightHintLines,
+} from "../../preflight/formatting.js";
 
 export class SpecError extends CliError {
   constructor(
@@ -28,5 +33,22 @@ export class SpecGenerationFailedError extends SpecError {
       "Inspect `stderr.log` to diagnose the failure.",
     ]);
     this.name = "SpecGenerationFailedError";
+  }
+}
+
+export class SpecPreflightError extends SpecError {
+  public readonly issues: readonly PreflightIssue[];
+
+  constructor(
+    issues: readonly PreflightIssue[],
+    preProviderIssueCount: number,
+  ) {
+    super(
+      "Preflight failed. Aborting specification generation.",
+      formatOperatorPreflightIssueLines(issues),
+      resolveOperatorPreflightHintLines(issues, preProviderIssueCount) ?? [],
+    );
+    this.issues = Array.from(issues);
+    this.name = "SpecPreflightError";
   }
 }

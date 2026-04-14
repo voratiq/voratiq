@@ -12,7 +12,6 @@ import type {
 } from "../../configs/agents/types.js";
 import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import { buildDefaultOrchestrationTemplate } from "../../configs/orchestration/bootstrap.js";
-import { renderPresetPromptPreface } from "../../render/transcripts/init.js";
 import { pathExists } from "../../utils/fs.js";
 import {
   normalizeConfigText,
@@ -34,19 +33,19 @@ import {
   serializeAgentsConfigEntries,
 } from "../../workspace/templates.js";
 import type { CreateWorkspaceResult } from "../../workspace/types.js";
-import { configureAgents } from "./agents.js";
-import { configureEnvironment } from "./environment.js";
+import { bootstrapDoctorAgents } from "./agents.js";
+import { reconcileDoctorEnvironment } from "./environment.js";
 import type {
-  InitCommandInput,
-  InitCommandResult,
-  InitPromptHandler,
+  DoctorBootstrapInput,
+  DoctorBootstrapResult,
+  DoctorPromptHandler,
   OrchestrationInitSummary,
   SandboxInitSummary,
-} from "./types.js";
+} from "./fix-types.js";
 
-export async function executeInitCommand(
-  input: InitCommandInput,
-): Promise<InitCommandResult> {
+export async function executeDoctorBootstrap(
+  input: DoctorBootstrapInput,
+): Promise<DoctorBootstrapResult> {
   const {
     root,
     preset,
@@ -83,7 +82,6 @@ export async function executeInitCommand(
     const repairOnly = await buildRepairOnlySummaries(root, workspaceResult);
     return {
       mode: "repair",
-      syncRecommended: true,
       preset,
       workspaceResult,
       ...repairOnly,
@@ -105,7 +103,7 @@ export async function executeInitCommand(
     agentsConfigMissing,
   });
 
-  const agentSummary = await configureAgents(root, resolvedPreset, {
+  const agentSummary = await bootstrapDoctorAgents(root, resolvedPreset, {
     interactive,
     assumeYes,
     confirm,
@@ -116,7 +114,7 @@ export async function executeInitCommand(
     preset: resolvedPreset,
   });
 
-  const environmentSummary = await configureEnvironment(root, {
+  const environmentSummary = await reconcileDoctorEnvironment(root, {
     interactive: false,
   });
 
@@ -125,7 +123,6 @@ export async function executeInitCommand(
 
   return {
     mode: "bootstrap",
-    syncRecommended: false,
     preset: resolvedPreset,
     workspaceResult,
     agentSummary,
@@ -140,7 +137,7 @@ async function buildRepairOnlySummaries(
   workspaceResult: CreateWorkspaceResult,
 ): Promise<
   Pick<
-    InitCommandResult,
+    DoctorBootstrapResult,
     | "agentSummary"
     | "orchestrationSummary"
     | "environmentSummary"
@@ -350,7 +347,7 @@ async function resolveAgentPreset(options: {
   preset: AgentPreset;
   presetProvided?: boolean;
   interactive: boolean;
-  prompt?: InitPromptHandler;
+  prompt?: DoctorPromptHandler;
   agentsConfigMissing: boolean;
 }): Promise<AgentPreset> {
   const {
@@ -377,7 +374,7 @@ async function resolveAgentPreset(options: {
 }
 
 async function promptForPresetSelection(
-  prompt: InitPromptHandler,
+  prompt: DoctorPromptHandler,
 ): Promise<AgentPreset> {
   const choices: Record<string, AgentPreset> = {
     "1": "pro",
@@ -390,7 +387,7 @@ async function promptForPresetSelection(
   for (;;) {
     const response = await prompt({
       message: "[1]",
-      prefaceLines: renderPresetPromptPreface(firstPrompt),
+      prefaceLines: buildPresetPromptPreface(firstPrompt),
     });
     const trimmed = response.trim();
     const normalized = trimmed.length === 0 ? "1" : trimmed;
@@ -529,6 +526,17 @@ function detectManagedAgentsPreset(
   }
 
   return undefined;
+}
+
+function buildPresetPromptPreface(firstPrompt: boolean): string[] {
+  const lines = [
+    "Which workspace preset would you like?",
+    "  [1] Pro (flagship)",
+    "  [2] Lite (faster/cheaper)",
+    "  [3] Manual (configure yourself)",
+  ];
+
+  return firstPrompt ? ["", ...lines] : lines;
 }
 
 function retargetManagedAgentEntries(

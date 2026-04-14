@@ -1,9 +1,7 @@
-import { verifyAgentProviders } from "../../agents/runtime/auth.js";
 import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
 import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { createTeardownController } from "../../competition/shared/teardown.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
-import { loadEnvironmentConfig } from "../../configs/environment/loader.js";
 import {
   createMessageCompetitionAdapter,
   type MessageCompetitionExecution,
@@ -20,6 +18,8 @@ import {
   flushMessageRecordBuffer,
 } from "../../domain/message/persistence/adapter.js";
 import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
+import { loadOperatorEnvironment } from "../../preflight/environment.js";
+import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import type { MessageProgressRenderer } from "../../render/transcripts/message.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
@@ -37,6 +37,7 @@ import {
   MessageAgentNotFoundError,
   MessageGenerationFailedError,
   MessageInvocationContextError,
+  MessagePreflightError,
 } from "./errors.js";
 import { finalizeActiveMessage, registerActiveMessage } from "./lifecycle.js";
 
@@ -80,7 +81,7 @@ export async function executeMessageCommand(
     renderer,
   } = input;
 
-  let competitors;
+  let resolvedAgentIds: readonly string[];
   try {
     const resolution = resolveStageCompetitors({
       root,
@@ -88,8 +89,9 @@ export async function executeMessageCommand(
       cliAgentIds: agentIds,
       cliOverrideFlag: agentOverrideFlag,
       profileName,
+      includeDefinitions: false,
     });
-    competitors = resolution.competitors;
+    resolvedAgentIds = resolution.agentIds;
   } catch (error) {
     if (error instanceof AgentNotFoundError) {
       throw new MessageAgentNotFoundError(error.agentId);
@@ -97,9 +99,19 @@ export async function executeMessageCommand(
     throw error;
   }
 
-  await assertMessagePreflight(competitors);
-
-  const environment = loadEnvironmentConfig({ root });
+  const preflight = await prepareConfiguredOperatorReadiness({
+    root,
+    resolvedAgentIds,
+    includeEnvironment: false,
+  });
+  if (preflight.issues.length > 0) {
+    throw new MessagePreflightError(
+      preflight.issues,
+      preflight.preProviderIssueCount,
+    );
+  }
+  const competitors = preflight.agents;
+  const environment = loadOperatorEnvironment({ root });
   const baseRevisionSha = await getHeadRevision(root);
   const messageId = generateSessionId();
   const createdAt = new Date().toISOString();
@@ -269,19 +281,6 @@ function toRecipientEntry(
     tokenUsage: execution.tokenUsage,
     error: execution.error ?? null,
   };
-}
-
-async function assertMessagePreflight(
-  agents: readonly { id: string; provider: string }[],
-): Promise<void> {
-  const providerIssues = await verifyAgentProviders(
-    agents.map((agent) => ({ id: agent.id, provider: agent.provider })),
-  );
-  if (providerIssues.length > 0) {
-    throw new MessageGenerationFailedError(
-      providerIssues.map((issue) => `${issue.agentId}: ${issue.message}`),
-    );
-  }
 }
 
 function assertMessageInvocationContext(): void {
