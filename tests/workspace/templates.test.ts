@@ -44,7 +44,7 @@ describe("buildAgentsTemplate", () => {
   it("includes default extraArgs for variant agents", () => {
     const yaml = buildAgentsTemplate("pro");
     expect(yaml).toContain("id: gpt-5-3-codex-high");
-    expect(yaml).toContain("id: gpt-5-2-codex-xhigh");
+    expect(yaml).toContain("id: gpt-5-2-xhigh");
     expect(yaml).toContain("extraArgs:");
     expect(yaml).toContain("- --config");
     expect(yaml).toContain('- "model_reasoning_effort=high"');

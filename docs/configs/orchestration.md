@@ -83,16 +83,16 @@ profiles:
     run:
       agents:
         - id: claude-haiku-4-5-20251001
-        - id: gpt-5-1-codex-mini
+        - id: gpt-5-4-mini
     reduce:
       agents:
-        - id: gpt-5-1-codex-mini
+        - id: gpt-5-4-mini
     verify:
       agents:
-        - id: gpt-5-1-codex-mini
+        - id: gpt-5-4-mini
     message:
       agents:
-        - id: gpt-5-1-codex-mini
+        - id: gpt-5-4-mini
 ```
 
 Profiles let you switch agent sets without editing stage lists.

@@ -170,7 +170,7 @@ describe("executeDoctorReconcile", () => {
     ]);
     expect(orchestration.profiles.lite.run.agents).toEqual([
       { id: "claude-haiku-4-5-20251001" },
-      { id: "gpt-5-3-codex-spark" },
+      { id: "gpt-5-4-mini" },
     ]);
   });
 
