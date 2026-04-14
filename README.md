@@ -1,14 +1,10 @@
 # Voratiq
 
-Agent ensembles to design, generate, and select the best code for every task.
+Run workflows, delegate to swarms, and verify outputs before you apply them.
 
-![`voratiq auto --spec .voratiq/spec/categorical-performance-by-taxonomy.md`](https://raw.githubusercontent.com/voratiq/voratiq/main/assets/run-demo.png)
-
-No single model wins every task. Run several, keep the best result. [Here's why that works](https://voratiq.com/blog/selection-rather-than-prediction/).
+Voratiq provides composable operators for structured multi-agent workflows, with durable artifacts and session history that keep each step inspectable as work unfolds.
 
 ## Installation
-
-Install via npm:
 
 ```bash
 npm install -g voratiq
@@ -23,7 +19,7 @@ npm install -g voratiq
 - macOS: `ripgrep`
 - Linux (Debian/Ubuntu): `bubblewrap`, `socat`, `ripgrep`
 
-See the [sandbox runtime docs](https://github.com/anthropic-experimental/sandbox-runtime/blob/1bafa66a2c3ebc52569fc0c1a868e85e778f66a0/README.md#platform-specific-dependencies) for guidance on the platform-specific dependencies.
+See the [sandbox runtime docs](https://github.com/anthropic-experimental/sandbox-runtime/blob/1bafa66a2c3ebc52569fc0c1a868e85e778f66a0/README.md#platform-specific-dependencies) for platform-specific dependencies.
 
 Windows is not currently supported.
 
@@ -31,40 +27,40 @@ Windows is not currently supported.
 
 ## Quick Start
 
-Get started with a single command:
+From a git repo root, run:
 
 ```bash
 voratiq
 ```
 
-This drops you into an interactive session with an agent of your choice.
+That opens an interactive agent session with access to Voratiq's operators.
 
-That agent gets access to Voratiq tools for orchestration and verification.
+From there, the agent can:
 
-Describe what you want built, and the agent can use those tools to:
+- run multi-step workflows with explicit stages
+- delegate work to swarms of agents
+- verify outputs before applying them
+- use different workflow architectures for different tasks
+- inspect session history and artifacts
 
-- turn your request into a structured execution plan
-- delegate work to a custom-designed swarm or a multi-stage workflow
-- verify outputs and compare alternatives before choosing what to keep
-- track outcomes across runs to learn which agents and workflows work best
-
-You keep the native interactive workflow, with more execution depth and control.
+For more information, see the [getting started](docs/getting-started.md) guide.
 
 ## Documentation
 
 Start here:
 
-- [Tutorial](https://github.com/voratiq/voratiq/blob/main/docs/tutorial.md) - End-to-end walkthrough
-- [CLI Reference](https://github.com/voratiq/voratiq/blob/main/docs/cli-reference.md) - Commands and options
-- [Core Concepts](https://github.com/voratiq/voratiq/blob/main/docs/core-concepts.md) - Workflow model and design rationale
+- [Getting Started](docs/getting-started.md) - Which workflow to use and how to run it
+- [How It Works](docs/how-it-works.md) - Operators, verification, and artifacts
+- [CLI Reference](docs/cli-reference.md) - Commands and options
+- [Troubleshooting](docs/troubleshooting.md) - Common setup and runtime issues
 
 Configuration:
 
-- [Agents](https://github.com/voratiq/voratiq/blob/main/docs/configs/agents.md) - Agent catalog and invocation details
-- [Orchestration](https://github.com/voratiq/voratiq/blob/main/docs/configs/orchestration.md) - Which agents run at each stage
-- [Verification](https://github.com/voratiq/voratiq/blob/main/docs/configs/verification.md) - How agent outputs are checked and scored before selection
-- [Environment](https://github.com/voratiq/voratiq/blob/main/docs/configs/environment.md) - Runtime dependencies for agents
-- [Sandbox](https://github.com/voratiq/voratiq/blob/main/docs/configs/sandbox.md) - Network and filesystem restrictions
+- [Agents](docs/configs/agents.md) - Agent catalog and invocation details
+- [Environment](docs/configs/environment.md) - Runtime dependencies for agent execution
+- [Sandbox](docs/configs/sandbox.md) - Network and filesystem restrictions
+- [Orchestration](docs/configs/orchestration.md) - Which agents participate at each workflow stage
+- [Verification](docs/configs/verification.md) - How verification is configured across stages
 
 ## License
 

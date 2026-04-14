@@ -1,7 +1,7 @@
 {
   "name": "voratiq",
   "version": "0.1.0-beta.21",
-  "description": "Agent ensembles to design, generate, and select the best code for every task.",
+  "description": "Run workflows, delegate to swarms, and verify outputs before you apply them.",
   "keywords": [
     "agent-ensembles",
     "agent-orchestration",

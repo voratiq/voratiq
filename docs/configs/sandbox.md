@@ -8,7 +8,7 @@ Customize network and filesystem policies enforced during agent execution.
 
 ## Overview
 
-Voratiq reads `.voratiq/sandbox.yaml` to override default sandbox policies per provider (`claude`, `codex`, `gemini`). `voratiq init` generates this file with empty provider stubs. Add overrides only when you need to relax or tighten restrictions. Providers omitted from the file inherit built-in defaults.
+Voratiq reads `.voratiq/sandbox.yaml` to override default sandbox policies per provider (`claude`, `codex`, `gemini`). Workspace bootstrap generates this file with empty provider stubs. Add overrides only when you need to relax or tighten restrictions. Providers omitted from the file inherit built-in defaults.
 
 ## Schema
 

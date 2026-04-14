@@ -321,7 +321,7 @@ export async function runCli(
   program
     .name("voratiq")
     .description(
-      "Agent ensembles to design, generate, and select the best code for every task.",
+      "Run workflows, delegate to swarms, and verify outputs before you apply them.",
     )
     .enablePositionalOptions()
     .version(localVersion, "-v, --version", "print the Voratiq version")

@@ -4,7 +4,11 @@ title: Verification Configuration
 
 # Verification Configuration
 
-Verification evaluates agent outputs and feeds the results into a selection policy that recommends a winner. `verification.yaml` controls what gets checked and how. Results are saved under `.voratiq/verify/`.
+Verification evaluates recorded outputs and produces a recommendation.
+
+Depending on the workflow, that can mean recommending a result to apply, guiding review, or indicating that manual judgment is still needed.
+
+`verification.yaml` controls what gets checked and how. Results are saved under `.voratiq/verify/`.
 
 ## Schema
 
@@ -53,4 +57,4 @@ Rubric templates live under `.voratiq/verify/templates/<name>/`:
 - `rubric.md` — scoring criteria
 - `schema.yaml` — expected output structure
 
-`voratiq init` seeds default templates and a starter `verification.yaml`.
+Workspace bootstrap seeds default templates and a starter `verification.yaml`.
