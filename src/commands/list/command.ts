@@ -122,13 +122,12 @@ async function executeTableMode(
   input: ListCommandInput & { limit: number },
 ): Promise<ListCommandResult> {
   const { operator, limit, verbose = false } = input;
-  const query = await readOperatorRecords({ ...input, limit: undefined });
-  const filtered = verbose
-    ? query.records
-    : query.records.filter((record) =>
-        shouldIncludeInDefaultTable(operator, getRecordStatus(record)),
-      );
-  const records = filtered.slice(0, limit);
+  const predicate = verbose
+    ? undefined
+    : (record: OperatorRecord) =>
+        shouldIncludeInDefaultTable(operator, getRecordStatus(record));
+  const query = await readOperatorRecords({ ...input, limit, predicate });
+  const records = query.records;
   const sessions = records.map((record) =>
     normalizeListSession(operator, record),
   );

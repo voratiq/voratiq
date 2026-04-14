@@ -14,13 +14,20 @@ import { appendMessageRecord } from "../../../src/domain/message/persistence/ada
 import type { ReductionRecord } from "../../../src/domain/reduce/model/types.js";
 import { appendReductionRecord } from "../../../src/domain/reduce/persistence/adapter.js";
 import type { RunRecord } from "../../../src/domain/run/model/types.js";
-import { appendRunRecord } from "../../../src/domain/run/persistence/adapter.js";
+import {
+  appendRunRecord,
+  type ReadRunRecordsOptions,
+} from "../../../src/domain/run/persistence/adapter.js";
 import type { SpecRecord } from "../../../src/domain/spec/model/types.js";
 import { appendSpecRecord } from "../../../src/domain/spec/persistence/adapter.js";
 import type { VerificationRecord } from "../../../src/domain/verify/model/types.js";
 import { appendVerificationRecord } from "../../../src/domain/verify/persistence/adapter.js";
 import { formatRunTimestamp } from "../../../src/render/utils/records.js";
 import { createRunRecord } from "../../support/factories/run-records.js";
+import {
+  resetReadRunRecordsImplementation,
+  setReadRunRecordsImplementation,
+} from "../../support/hooks/run-records.js";
 
 describe("executeListCommand", () => {
   let testDir: string;
@@ -1663,6 +1670,198 @@ describe("executeListCommand", () => {
       mode: "detail",
       session: null,
       warnings: [],
+    });
+  });
+
+  describe("bounded read path", () => {
+    let capturedOptions: ReadRunRecordsOptions | undefined;
+
+    afterEach(() => {
+      resetReadRunRecordsImplementation();
+      capturedOptions = undefined;
+    });
+
+    it("passes limit and default-filter predicate to readRunRecords in default table mode", async () => {
+      await appendRunRecord({
+        root: testDir,
+        runsFilePath,
+        record: buildRunRecord({
+          runId: "run-bounded-setup",
+          status: "succeeded",
+        }),
+      });
+
+      setReadRunRecordsImplementation((options) => {
+        capturedOptions = options;
+        return Promise.resolve([]);
+      });
+
+      await executeListCommand(buildInput({ operator: "run", limit: 3 }));
+
+      expect(capturedOptions).toBeDefined();
+      expect(capturedOptions!.limit).toBe(3);
+      expect(typeof capturedOptions!.predicate).toBe("function");
+    });
+
+    it("passes limit without predicate in verbose table mode", async () => {
+      await appendRunRecord({
+        root: testDir,
+        runsFilePath,
+        record: buildRunRecord({
+          runId: "run-verbose-setup",
+          status: "succeeded",
+        }),
+      });
+
+      setReadRunRecordsImplementation((options) => {
+        capturedOptions = options;
+        return Promise.resolve([]);
+      });
+
+      await executeListCommand(
+        buildInput({ operator: "run", limit: 5, verbose: true }),
+      );
+
+      expect(capturedOptions).toBeDefined();
+      expect(capturedOptions!.limit).toBe(5);
+      expect(capturedOptions!.predicate).toBeUndefined();
+    });
+
+    it("default-filter predicate excludes aborted and pruned statuses", async () => {
+      await appendRunRecord({
+        root: testDir,
+        runsFilePath,
+        record: buildRunRecord({
+          runId: "run-predicate-setup",
+          status: "succeeded",
+        }),
+      });
+
+      setReadRunRecordsImplementation((options) => {
+        capturedOptions = options;
+        return Promise.resolve([]);
+      });
+
+      await executeListCommand(buildInput({ operator: "run" }));
+
+      const predicate = capturedOptions!.predicate!;
+      const visible = buildRunRecord({
+        runId: "test",
+        status: "succeeded",
+      });
+      const aborted = buildRunRecord({
+        runId: "test",
+        status: "aborted",
+      });
+      const pruned = buildRunRecord({
+        runId: "test",
+        status: "pruned",
+        deletedAt: "2026-03-02T00:00:00.000Z",
+      });
+
+      expect(predicate(visible)).toBe(true);
+      expect(predicate(aborted)).toBe(false);
+      expect(predicate(pruned)).toBe(false);
+    });
+
+    it("detail mode does not use the table-mode bounded predicate", async () => {
+      await appendRunRecord({
+        root: testDir,
+        runsFilePath,
+        record: buildRunRecord({
+          runId: "run-detail-setup",
+          status: "succeeded",
+        }),
+      });
+
+      setReadRunRecordsImplementation((options) => {
+        capturedOptions = options;
+        return Promise.resolve([]);
+      });
+
+      await executeListCommand(
+        buildInput({ operator: "run", sessionId: "run-detail-setup" }),
+      );
+
+      expect(capturedOptions).toBeDefined();
+      expect(capturedOptions!.limit).toBe(1);
+      expect(typeof capturedOptions!.predicate).toBe("function");
+
+      const matched = buildRunRecord({
+        runId: "run-detail-setup",
+        status: "succeeded",
+      });
+      const unmatched = buildRunRecord({
+        runId: "other-run",
+        status: "succeeded",
+      });
+      expect(capturedOptions!.predicate!(matched)).toBe(true);
+      expect(capturedOptions!.predicate!(unmatched)).toBe(false);
+    });
+
+    it("bounds on visible rows rather than raw scanned rows", async () => {
+      await appendRunRecord({
+        root: testDir,
+        runsFilePath,
+        record: buildRunRecord({
+          runId: "run-visible-1",
+          status: "succeeded",
+          createdAt: "2026-03-01T00:00:00.000Z",
+        }),
+      });
+      await appendRunRecord({
+        root: testDir,
+        runsFilePath,
+        record: buildRunRecord({
+          runId: "run-visible-2",
+          status: "succeeded",
+          createdAt: "2026-03-01T00:01:00.000Z",
+        }),
+      });
+      await appendRunRecord({
+        root: testDir,
+        runsFilePath,
+        record: buildRunRecord({
+          runId: "run-aborted-1",
+          status: "aborted",
+          createdAt: "2026-03-01T00:02:00.000Z",
+        }),
+      });
+      await appendRunRecord({
+        root: testDir,
+        runsFilePath,
+        record: buildRunRecord({
+          runId: "run-aborted-2",
+          status: "aborted",
+          createdAt: "2026-03-01T00:03:00.000Z",
+        }),
+      });
+      await appendRunRecord({
+        root: testDir,
+        runsFilePath,
+        record: buildRunRecord({
+          runId: "run-visible-3",
+          status: "succeeded",
+          createdAt: "2026-03-01T00:04:00.000Z",
+        }),
+      });
+
+      const result = await executeListCommand(
+        buildInput({ operator: "run", limit: 2 }),
+      );
+
+      expect(result.json).toMatchObject({
+        operator: "run",
+        mode: "list",
+        sessions: [
+          { sessionId: "run-visible-3" },
+          { sessionId: "run-visible-2" },
+        ],
+      });
+      if (result.json.mode !== "list") {
+        throw new Error("Expected list-mode JSON output");
+      }
+      expect(result.json.sessions).toHaveLength(2);
     });
   });
 
