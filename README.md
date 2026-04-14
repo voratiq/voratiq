@@ -43,24 +43,24 @@ From there, the agent can:
 - use different workflow architectures for different tasks
 - inspect session history and artifacts
 
-For more information, see the [getting started](docs/getting-started.md) guide.
+For more information, see the [getting started](https://github.com/voratiq/voratiq/blob/main/docs/getting-started.md) guide.
 
 ## Documentation
 
 Start here:
 
-- [Getting Started](docs/getting-started.md) - Which workflow to use and how to run it
-- [How It Works](docs/how-it-works.md) - Operators, verification, and artifacts
-- [CLI Reference](docs/cli-reference.md) - Commands and options
-- [Troubleshooting](docs/troubleshooting.md) - Common setup and runtime issues
+- [Getting Started](https://github.com/voratiq/voratiq/blob/main/docs/getting-started.md) - Which workflow to use and how to run it
+- [How It Works](https://github.com/voratiq/voratiq/blob/main/docs/how-it-works.md) - Operators, verification, and artifacts
+- [CLI Reference](https://github.com/voratiq/voratiq/blob/main/docs/cli-reference.md) - Commands and options
+- [Troubleshooting](https://github.com/voratiq/voratiq/blob/main/docs/troubleshooting.md) - Common setup and runtime issues
 
 Configuration:
 
-- [Agents](docs/configs/agents.md) - Agent catalog and invocation details
-- [Environment](docs/configs/environment.md) - Runtime dependencies for agent execution
-- [Sandbox](docs/configs/sandbox.md) - Network and filesystem restrictions
-- [Orchestration](docs/configs/orchestration.md) - Which agents participate at each workflow stage
-- [Verification](docs/configs/verification.md) - How verification is configured across stages
+- [Agents](https://github.com/voratiq/voratiq/blob/main/docs/configs/agents.md) - Agent catalog and invocation details
+- [Environment](https://github.com/voratiq/voratiq/blob/main/docs/configs/environment.md) - Runtime dependencies for agent execution
+- [Sandbox](https://github.com/voratiq/voratiq/blob/main/docs/configs/sandbox.md) - Network and filesystem restrictions
+- [Orchestration](https://github.com/voratiq/voratiq/blob/main/docs/configs/orchestration.md) - Which agents participate at each workflow stage
+- [Verification](https://github.com/voratiq/voratiq/blob/main/docs/configs/verification.md) - How verification is configured across stages
 
 ## License
 
