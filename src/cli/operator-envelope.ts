@@ -13,13 +13,19 @@ import {
   getReductionSessionDirectoryPath,
   getRunDirectoryPath,
   getSpecSessionDirectoryPath,
+  getVerificationSessionDirectoryPath,
 } from "../workspace/structure.js";
 import { externalExecutionOperators } from "./contract.js";
 import { toCliError } from "./errors.js";
 
 export type EnvelopeOperator = (typeof externalExecutionOperators)[number];
 
-export type EnvelopeStatus = "succeeded" | "failed" | "unresolved";
+export type EnvelopeStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "unresolved";
 
 export interface EnvelopeArtifactRef {
   kind: string;
@@ -72,7 +78,7 @@ export const operatorResultEnvelopeSchema = z
   .object({
     version: z.literal(1),
     operator: z.enum(externalExecutionOperators),
-    status: z.enum(["succeeded", "failed", "unresolved"]),
+    status: z.enum(["queued", "running", "succeeded", "failed", "unresolved"]),
     timestamp: z.string(),
     ids: z
       .object({
@@ -448,6 +454,58 @@ export function buildMessageOperatorEnvelope(
             ]
           : []),
       ]),
+    ],
+  });
+}
+
+export function buildDurableOperatorAcknowledgementEnvelope(options: {
+  operator: Extract<
+    EnvelopeOperator,
+    "spec" | "run" | "reduce" | "verify" | "message"
+  >;
+  sessionId: string;
+  status: Extract<
+    EnvelopeStatus,
+    "queued" | "running" | "succeeded" | "failed"
+  >;
+}): OperatorResultEnvelope {
+  const ids =
+    options.operator === "run"
+      ? ({ runId: options.sessionId } satisfies NonNullable<
+          OperatorResultEnvelope["ids"]
+        >)
+      : ({ sessionId: options.sessionId } satisfies NonNullable<
+          OperatorResultEnvelope["ids"]
+        >);
+
+  const sessionPath =
+    options.operator === "spec"
+      ? getSpecSessionDirectoryPath(options.sessionId)
+      : options.operator === "run"
+        ? getRunDirectoryPath(options.sessionId)
+        : options.operator === "reduce"
+          ? getReductionSessionDirectoryPath(options.sessionId)
+          : options.operator === "verify"
+            ? getVerificationSessionDirectoryPath(options.sessionId)
+            : getMessageSessionDirectoryPath(options.sessionId);
+
+  return buildOperatorEnvelope({
+    operator: options.operator,
+    status: options.status,
+    ids,
+    artifacts: [
+      {
+        kind: "session",
+        role: "session",
+        path: sessionPath,
+      },
+    ],
+    alerts: [
+      {
+        level: "info",
+        message:
+          "Durable operator acknowledged. Use `voratiq_list` to inspect progress instead of retrying.",
+      },
     ],
   });
 }

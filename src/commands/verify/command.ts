@@ -21,6 +21,7 @@ import { buildPersistedExtraContextFields } from "../../extra-context/contract.j
 import { loadOperatorEnvironment } from "../../preflight/environment.js";
 import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import type { VerifyProgressRenderer } from "../../render/transcripts/verify.js";
+import { emitDurableOperatorAcknowledgement } from "../../utils/durable-ack.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
 import {
@@ -128,6 +129,11 @@ export async function executeVerifyCommand(
       ...(aliasMap ? { blinded: { enabled: true as const, aliasMap } } : {}),
       methods: [],
     },
+  });
+  await emitDurableOperatorAcknowledgement({
+    operator: "verify",
+    sessionId: verificationId,
+    status: "queued",
   });
 
   renderer?.begin({

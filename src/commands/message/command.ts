@@ -21,6 +21,7 @@ import { buildPersistedExtraContextFields } from "../../extra-context/contract.j
 import { loadOperatorEnvironment } from "../../preflight/environment.js";
 import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import type { MessageProgressRenderer } from "../../render/transcripts/message.js";
+import { emitDurableOperatorAcknowledgement } from "../../utils/durable-ack.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import {
@@ -147,6 +148,11 @@ export async function executeMessageCommand(
       ...(persistedTarget ? { target: persistedTarget } : {}),
       ...(sourceInteractiveSessionId ? { sourceInteractiveSessionId } : {}),
     },
+  });
+  await emitDurableOperatorAcknowledgement({
+    operator: "message",
+    sessionId: messageId,
+    status: "running",
   });
 
   renderer?.begin({

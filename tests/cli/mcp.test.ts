@@ -20,6 +20,7 @@ import {
 import type { OperatorResultEnvelope } from "../../src/cli/operator-envelope.js";
 import { listJsonModes } from "../../src/contracts/list.js";
 import {
+  createDefaultCliJsonContractInvoker,
   createEntrypointCliTarget,
   createVoratiqMcpRequestHandler,
   getVoratiqMcpToolDefinitions,
@@ -1098,6 +1099,121 @@ describe("bundled MCP server", () => {
       command: "voratiq",
       argsPrefix: [],
     });
+  });
+
+  it("acknowledges durable operators once a recorded session exists", async () => {
+    const repoDir = await mkdtemp(join(tmpdir(), "voratiq-mcp-ack-"));
+    const scriptPath = join(repoDir, "fake-voratiq.js");
+    const originalCwd = process.cwd();
+
+    await writeFile(
+      scriptPath,
+      [
+        "import { mkdirSync, writeFileSync } from 'node:fs';",
+        "import { join } from 'node:path';",
+        "",
+        "const operator = process.argv[2];",
+        "if (operator === 'spec') {",
+        "  setTimeout(() => {",
+        "    writeFileSync(process.env.VORATIQ_MCP_ACK_PATH, JSON.stringify({ operator: 'spec', sessionId: '20260415-ack-spec', status: 'running' }));",
+        "  }, 50);",
+        "  setTimeout(() => {",
+        "    process.stdout.write(JSON.stringify({ version: 1, operator: 'spec', status: 'succeeded', timestamp: '2026-04-15T22:00:00.000Z', ids: { sessionId: '20260415-ack-spec' }, artifacts: [] }));",
+        "    process.exit(0);",
+        "  }, 500);",
+        "} else {",
+        "  process.exit(1);",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    try {
+      process.chdir(repoDir);
+      const invoker = createDefaultCliJsonContractInvoker({
+        command: process.execPath,
+        argsPrefix: [scriptPath],
+      });
+
+      const startedAt = Date.now();
+      const result = await invoker({
+        operator: "spec",
+        args: ["spec", "--json"],
+      });
+      const elapsedMs = Date.now() - startedAt;
+
+      expect(result.kind).toBe("success");
+      if (result.kind !== "success") {
+        return;
+      }
+
+      expect(elapsedMs).toBeLessThan(400);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        version: 1,
+        operator: "spec",
+        status: "running",
+        ids: {
+          sessionId: "20260415-ack-spec",
+        },
+      });
+    } finally {
+      process.chdir(originalCwd);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      await rm(repoDir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps control operators synchronous in the default CLI bridge", async () => {
+    const repoDir = await mkdtemp(join(tmpdir(), "voratiq-mcp-sync-"));
+    const scriptPath = join(repoDir, "fake-voratiq.js");
+    const originalCwd = process.cwd();
+
+    await writeFile(
+      scriptPath,
+      [
+        "const operator = process.argv[2];",
+        "if (operator === 'apply') {",
+        "  setTimeout(() => {",
+        "    process.stdout.write(JSON.stringify({ version: 1, operator: 'apply', status: 'succeeded', timestamp: '2026-04-15T22:00:00.000Z', ids: { runId: 'run-123', agentId: 'agent-1' }, artifacts: [] }));",
+        "    process.exit(0);",
+        "  }, 300);",
+        "} else {",
+        "  process.exit(1);",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    try {
+      process.chdir(repoDir);
+      const invoker = createDefaultCliJsonContractInvoker({
+        command: process.execPath,
+        argsPrefix: [scriptPath],
+      });
+
+      const startedAt = Date.now();
+      const result = await invoker({
+        operator: "apply",
+        args: ["apply", "--run", "run-123", "--agent", "agent-1", "--json"],
+      });
+      const elapsedMs = Date.now() - startedAt;
+
+      expect(result.kind).toBe("success");
+      if (result.kind !== "success") {
+        return;
+      }
+
+      expect(elapsedMs).toBeGreaterThanOrEqual(250);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        operator: "apply",
+        status: "succeeded",
+      });
+    } finally {
+      process.chdir(originalCwd);
+      await rm(repoDir, { recursive: true, force: true });
+    }
   });
 });
 
