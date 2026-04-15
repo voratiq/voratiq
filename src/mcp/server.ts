@@ -1,4 +1,7 @@
 import { spawn } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import process from "node:process";
 
 import { z } from "zod";
@@ -21,6 +24,7 @@ import {
   externalVerifyExecutionInputSchema,
 } from "../cli/contract.js";
 import {
+  buildDurableOperatorAcknowledgementEnvelope,
   type OperatorResultEnvelope,
   operatorResultEnvelopeSchema,
 } from "../cli/operator-envelope.js";
@@ -30,6 +34,10 @@ import {
   type ListJsonOutput,
   listJsonOutputSchema,
 } from "../contracts/list.js";
+import {
+  VORATIQ_MCP_ACK_OPERATOR_ENV,
+  VORATIQ_MCP_ACK_PATH_ENV,
+} from "../utils/durable-ack.js";
 import { getVoratiqVersion } from "../utils/version.js";
 import {
   createEntrypointVoratiqCliTarget as createEntrypointCliTarget,
@@ -46,6 +54,8 @@ const JSON_RPC_INVALID_REQUEST = -32600;
 const JSON_RPC_METHOD_NOT_FOUND = -32601;
 const JSON_RPC_INVALID_PARAMS = -32602;
 const JSON_RPC_INTERNAL_ERROR = -32603;
+const DURABLE_EARLY_ACK_TIMEOUT_MS = 15_000;
+const DURABLE_EARLY_ACK_POLL_INTERVAL_MS = 100;
 
 export const VORATIQ_MCP_PROTOCOL_VERSION = "2025-11-25" as const;
 export const VORATIQ_SUPPORTED_MCP_PROTOCOL_VERSIONS = [
@@ -82,6 +92,13 @@ export type VoratiqMcpOperator =
   | "apply"
   | "list"
   | "prune";
+
+type DurableExecutionOperator =
+  | "spec"
+  | "run"
+  | "reduce"
+  | "verify"
+  | "message";
 
 export type TransportFailureKind =
   | "invalid_input"
@@ -315,7 +332,7 @@ const toolDefinitions: readonly McpToolDefinition[] = toolSpecs.map((tool) => ({
 }));
 
 const VORATIQ_MCP_SERVER_INSTRUCTIONS =
-  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, verify, message, or interactive sessions. Use voratiq_spec, voratiq_run, voratiq_reduce, voratiq_verify, voratiq_message, voratiq_apply, and voratiq_prune for the normal Voratiq workflow. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
+  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, verify, message, or interactive sessions. Durable workflow tools (voratiq_spec, voratiq_run, voratiq_reduce, voratiq_verify, voratiq_message) may acknowledge once a recorded session is created and continue running afterward; if a durable call times out or returns a non-terminal status, inspect progress with voratiq_list instead of retrying. Use voratiq_apply and voratiq_prune for synchronous control actions. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
 
 const toolSpecsByName: ReadonlyMap<VoratiqMcpToolName, ToolSpec> = new Map(
   toolSpecs.map((tool) => [tool.name, tool]),
@@ -501,10 +518,16 @@ export async function runVoratiqMcpStdioServer(
   });
 
   let buffer = Buffer.alloc(0);
-  const pendingPayloads: string[] = [];
+  const pendingPayloads: Array<{
+    payload: string;
+    transportEncoding: McpTransportEncoding;
+  }> = [];
   let isDraining = false;
   let hasEnded = false;
+  let inFlightHandlers = 0;
+  let hasCompletedInitialize = false;
   let transportEncoding: McpTransportEncoding = "framed";
+  let writeChain = Promise.resolve();
 
   await new Promise<void>((resolve, reject) => {
     const tryResolve = (): void => {
@@ -517,7 +540,92 @@ export async function runVoratiqMcpStdioServer(
       if (pendingPayloads.length > 0) {
         return;
       }
+      if (inFlightHandlers > 0) {
+        return;
+      }
       resolve();
+    };
+
+    const writeMessageSerialized = (
+      outputEncoding: McpTransportEncoding,
+      message: JsonRpcResponse | JsonRpcNotificationResponse,
+    ): Promise<void> => {
+      writeChain = writeChain.then(() => {
+        writeMessage(stdout, outputEncoding, message);
+      });
+      return writeChain;
+    };
+
+    const handlePayload = async (
+      payload: string,
+      outputEncoding: McpTransportEncoding,
+    ): Promise<void> => {
+      try {
+        const parsed = JSON.parse(payload) as unknown;
+        const message = normalizeIncomingMessage(parsed);
+        if (!message) {
+          await writeMessageSerialized(
+            outputEncoding,
+            createErrorResponse(
+              null,
+              JSON_RPC_INVALID_REQUEST,
+              "Invalid JSON-RPC message.",
+            ),
+          );
+          return;
+        }
+
+        if ("id" in message) {
+          const response = await requestHandler.handleRequest(message);
+          await writeMessageSerialized(outputEncoding, response);
+          if (message.method === "initialize" && !("error" in response)) {
+            hasCompletedInitialize = true;
+            await writeMessageSerialized(
+              outputEncoding,
+              createNotification("notifications/tools/list_changed"),
+            );
+          }
+          return;
+        }
+
+        await requestHandler.handleNotification(message);
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          await writeMessageSerialized(
+            outputEncoding,
+            createErrorResponse(
+              null,
+              JSON_RPC_PARSE_ERROR,
+              "Failed to parse JSON-RPC payload.",
+              { message: error.message },
+            ),
+          );
+          return;
+        }
+
+        await writeMessageSerialized(
+          outputEncoding,
+          createErrorResponse(
+            null,
+            JSON_RPC_INTERNAL_ERROR,
+            "Unhandled MCP server error.",
+            {
+              message: toErrorMessage(error),
+            },
+          ),
+        );
+      }
+    };
+
+    const dispatchPayload = (
+      payload: string,
+      outputEncoding: McpTransportEncoding,
+    ): Promise<void> => {
+      inFlightHandlers += 1;
+      return handlePayload(payload, outputEncoding).finally(() => {
+        inFlightHandlers -= 1;
+        tryResolve();
+      });
     };
 
     const drainQueue = (): void => {
@@ -528,69 +636,17 @@ export async function runVoratiqMcpStdioServer(
       isDraining = true;
       void (async () => {
         while (pendingPayloads.length > 0) {
-          const payload = pendingPayloads.shift();
-          if (payload === undefined) {
+          const queued = pendingPayloads.shift();
+          if (queued === undefined) {
             continue;
           }
 
-          try {
-            const parsed = JSON.parse(payload) as unknown;
-            const message = normalizeIncomingMessage(parsed);
-            if (!message) {
-              writeMessage(
-                stdout,
-                transportEncoding,
-                createErrorResponse(
-                  null,
-                  JSON_RPC_INVALID_REQUEST,
-                  "Invalid JSON-RPC message.",
-                ),
-              );
-              continue;
-            }
-
-            if ("id" in message) {
-              const response = await requestHandler.handleRequest(message);
-              writeMessage(stdout, transportEncoding, response);
-              if (message.method === "initialize" && !("error" in response)) {
-                writeMessage(
-                  stdout,
-                  transportEncoding,
-                  createNotification("notifications/tools/list_changed"),
-                );
-              }
-              continue;
-            }
-
-            await requestHandler.handleNotification(message);
-          } catch (error) {
-            if (error instanceof SyntaxError) {
-              writeMessage(
-                stdout,
-                transportEncoding,
-                createErrorResponse(
-                  null,
-                  JSON_RPC_PARSE_ERROR,
-                  "Failed to parse JSON-RPC payload.",
-                  { message: error.message },
-                ),
-              );
-              continue;
-            }
-
-            writeMessage(
-              stdout,
-              transportEncoding,
-              createErrorResponse(
-                null,
-                JSON_RPC_INTERNAL_ERROR,
-                "Unhandled MCP server error.",
-                {
-                  message: toErrorMessage(error),
-                },
-              ),
-            );
+          if (!hasCompletedInitialize) {
+            await dispatchPayload(queued.payload, queued.transportEncoding);
+            continue;
           }
+
+          void dispatchPayload(queued.payload, queued.transportEncoding);
         }
         isDraining = false;
         tryResolve();
@@ -621,7 +677,10 @@ export async function runVoratiqMcpStdioServer(
         }
 
         transportEncoding = extracted.transportEncoding;
-        pendingPayloads.push(extracted.payload);
+        pendingPayloads.push({
+          payload: extracted.payload,
+          transportEncoding,
+        });
         buffer = Buffer.from(extracted.remaining);
       }
 
@@ -632,7 +691,10 @@ export async function runVoratiqMcpStdioServer(
       const trailingPayload = extractTrailingJsonLine(buffer);
       if (trailingPayload) {
         transportEncoding = "jsonl";
-        pendingPayloads.push(trailingPayload);
+        pendingPayloads.push({
+          payload: trailingPayload,
+          transportEncoding,
+        });
         buffer = Buffer.alloc(0);
         drainQueue();
       }
@@ -913,11 +975,21 @@ export { createEntrypointCliTarget, resolveVoratiqCliTarget };
 export function createDefaultCliJsonContractInvoker(
   target: VoratiqCliTarget = resolveVoratiqCliTarget(),
 ): InvokeCliJsonContract {
-  return async (input) =>
-    await invokeSubprocess({
+  return async (input) => {
+    if (isDurableExecutionOperator(input.operator)) {
+      return await invokeDurableSubprocessWithEarlyAck({
+        command: target.command,
+        args: [...target.argsPrefix, ...input.args],
+        operator: input.operator,
+        cwd: process.cwd(),
+      });
+    }
+
+    return await invokeSubprocess({
       command: target.command,
       args: [...target.argsPrefix, ...input.args],
     });
+  };
 }
 
 async function invokeSubprocess(options: {
@@ -970,6 +1042,192 @@ async function invokeSubprocess(options: {
         stderr: stderrChunks.join(""),
       });
     });
+  });
+}
+
+async function invokeDurableSubprocessWithEarlyAck(options: {
+  command: string;
+  args: string[];
+  operator: DurableExecutionOperator;
+  cwd: string;
+}): Promise<CliInvocationResult> {
+  const ackDir = await mkdtemp(join(tmpdir(), "voratiq-mcp-ack-"));
+  const ackPath = join(ackDir, "ack.json");
+
+  return await new Promise<CliInvocationResult>((resolve) => {
+    let settled = false;
+    let shouldBufferOutput = true;
+    const child = spawn(options.command, options.args, {
+      cwd: options.cwd,
+      env: {
+        ...process.env,
+        [VORATIQ_MCP_ACK_PATH_ENV]: ackPath,
+        [VORATIQ_MCP_ACK_OPERATOR_ENV]: options.operator,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const stdoutChunks: string[] = [];
+    const stderrChunks: string[] = [];
+
+    const settle = (result: CliInvocationResult): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      void rm(ackDir, { recursive: true, force: true }).catch(() => {});
+      resolve(result);
+    };
+
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+
+    child.stdout?.on("data", (chunk: string) => {
+      if (shouldBufferOutput) {
+        stdoutChunks.push(chunk);
+      }
+    });
+    child.stderr?.on("data", (chunk: string) => {
+      if (shouldBufferOutput) {
+        stderrChunks.push(chunk);
+      }
+    });
+
+    child.once("error", (error) => {
+      settle({
+        kind: "spawn_failed",
+        error,
+      });
+    });
+
+    child.once("close", (code) => {
+      settle({
+        kind: "success",
+        exitCode: code ?? 0,
+        stdout: stdoutChunks.join(""),
+        stderr: stderrChunks.join(""),
+      });
+    });
+
+    void waitForDurableSessionObservation({
+      ackPath,
+      timeoutMs: DURABLE_EARLY_ACK_TIMEOUT_MS,
+      pollIntervalMs: DURABLE_EARLY_ACK_POLL_INTERVAL_MS,
+    })
+      .then((observation) => {
+        if (!observation) {
+          return;
+        }
+
+        shouldBufferOutput = false;
+        settle({
+          kind: "success",
+          exitCode: 0,
+          stdout: JSON.stringify(
+            buildDurableOperatorAcknowledgementEnvelope({
+              operator: options.operator,
+              sessionId: observation.sessionId,
+              status: observation.status,
+            }),
+          ),
+          stderr: "",
+        });
+      })
+      .catch(() => {});
+  });
+}
+
+function isDurableExecutionOperator(
+  operator: VoratiqMcpOperator,
+): operator is DurableExecutionOperator {
+  return (
+    operator === "spec" ||
+    operator === "run" ||
+    operator === "reduce" ||
+    operator === "verify" ||
+    operator === "message"
+  );
+}
+
+async function waitForDurableSessionObservation(options: {
+  ackPath: string;
+  timeoutMs: number;
+  pollIntervalMs: number;
+}): Promise<
+  | {
+      sessionId: string;
+      status: "queued" | "running" | "succeeded" | "failed";
+    }
+  | undefined
+> {
+  const deadline = Date.now() + options.timeoutMs;
+
+  while (Date.now() < deadline) {
+    const observation = await readDurableSessionRecord({
+      ackPath: options.ackPath,
+    });
+    if (observation) {
+      return observation;
+    }
+    await sleep(options.pollIntervalMs);
+  }
+
+  return undefined;
+}
+
+async function readDurableSessionRecord(options: { ackPath: string }): Promise<
+  | {
+      sessionId: string;
+      status: "queued" | "running" | "succeeded" | "failed";
+    }
+  | undefined
+> {
+  try {
+    const raw = await readFile(options.ackPath, "utf8");
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isRecord(parsed)) {
+      return undefined;
+    }
+
+    const sessionId = parsed.sessionId;
+    if (typeof sessionId !== "string" || sessionId.length === 0) {
+      return undefined;
+    }
+
+    const status = parsed.status;
+    if (
+      status !== "queued" &&
+      status !== "running" &&
+      status !== "succeeded" &&
+      status !== "failed"
+    ) {
+      return undefined;
+    }
+
+    return {
+      sessionId,
+      status,
+    };
+  } catch (error) {
+    if (isMissingPathError(error) || error instanceof SyntaxError) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+function isMissingPathError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "ENOENT"
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
   });
 }
 

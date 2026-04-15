@@ -1,6 +1,7 @@
 import type { RunRecordInitResult } from "../../domain/run/competition/phases.js";
 import type { RunRecord, RunSpecTarget } from "../../domain/run/model/types.js";
 import { appendRunRecord } from "../../domain/run/persistence/adapter.js";
+import { emitDurableOperatorAcknowledgement } from "../../utils/durable-ack.js";
 import { normalizePathForDisplay } from "../../utils/path.js";
 import { cleanupRunWorkspace } from "../../workspace/cleanup.js";
 
@@ -59,6 +60,11 @@ export async function initializeRunRecord(
 
   try {
     await appendRunRecord({ root, runsFilePath, record: initialRecord });
+    await emitDurableOperatorAcknowledgement({
+      operator: "run",
+      sessionId: runId,
+      status: "running",
+    });
     return { initialRecord, recordPersisted: true };
   } catch (error) {
     await cleanupRunWorkspace(runRoot);

@@ -52,6 +52,7 @@ import { readVerificationRecords } from "../../../domain/verify/persistence/adap
 import { buildPersistedExtraContextFields } from "../../../extra-context/contract.js";
 import type { ReduceProgressRenderer } from "../../../render/transcripts/reduce.js";
 import { emitStageProgressEvent } from "../../../render/transcripts/stage-progress.js";
+import { emitDurableOperatorAcknowledgement } from "../../../utils/durable-ack.js";
 import { toErrorMessage } from "../../../utils/errors.js";
 import {
   normalizePathForDisplay,
@@ -212,6 +213,11 @@ export function createReduceCompetitionAdapter(
         root,
         reductionsFilePath,
         record,
+      });
+      await emitDurableOperatorAcknowledgement({
+        operator: "reduce",
+        sessionId: reductionId,
+        status: "queued",
       });
 
       const prepared: PreparedReduceCompetitionCandidate[] = [];

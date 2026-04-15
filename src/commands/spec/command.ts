@@ -24,6 +24,7 @@ import { buildPersistedExtraContextFields } from "../../extra-context/contract.j
 import { loadOperatorEnvironment } from "../../preflight/environment.js";
 import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import type { SpecProgressRenderer } from "../../render/transcripts/spec.js";
+import { emitDurableOperatorAcknowledgement } from "../../utils/durable-ack.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { getHeadRevision } from "../../utils/git.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
@@ -140,6 +141,11 @@ export async function executeSpecCommand(
     root,
     specsFilePath,
     record,
+  });
+  await emitDurableOperatorAcknowledgement({
+    operator: "spec",
+    sessionId,
+    status: "running",
   });
   let currentAgents: SpecAgentEntry[] = [...initialAgents];
 
