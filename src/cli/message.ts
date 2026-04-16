@@ -19,7 +19,6 @@ import {
 import { renderWorkspaceAutoInitializedNotice } from "../render/transcripts/shared.js";
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { resolvePath } from "../utils/path.js";
-import { parsePositiveInteger } from "../utils/validators.js";
 import { VORATIQ_MESSAGE_FILE } from "../workspace/constants.js";
 import { resolveWorkspacePath } from "../workspace/path-resolvers.js";
 import { parseMessageExecutionCommandOptions } from "./contract.js";
@@ -28,6 +27,10 @@ import {
   createSilentCliWriter,
   writeOperatorResultEnvelope,
 } from "./operator-envelope.js";
+import {
+  collectRepeatedStringOption,
+  parseMaxParallelOption,
+} from "./option-parsers.js";
 import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface MessageCommandOptions {
@@ -179,18 +182,6 @@ interface MessageCommandActionOptions {
   json?: boolean;
 }
 
-function collectStringOption(value: string, previous: string[]): string[] {
-  return [...previous, value];
-}
-
-function parseMaxParallelOption(value: string): number {
-  return parsePositiveInteger(
-    value,
-    "Expected positive integer after --max-parallel",
-    "--max-parallel must be greater than 0",
-  );
-}
-
 export function createMessageCommand(): Command {
   return new Command("message")
     .description("Send an isolated prompt to one or more agents")
@@ -201,7 +192,7 @@ export function createMessageCommand(): Command {
         "Set recipient agents directly (repeatable; order preserved)",
       )
         .default([], "")
-        .argParser(collectStringOption),
+        .argParser(collectRepeatedStringOption),
     )
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
@@ -215,7 +206,7 @@ export function createMessageCommand(): Command {
         "Stage an extra context file into each recipient workspace (repeatable)",
       )
         .default([], "")
-        .argParser(collectStringOption),
+        .argParser(collectRepeatedStringOption),
     )
     .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)

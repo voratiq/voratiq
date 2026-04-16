@@ -34,7 +34,6 @@ import {
   relativeToRoot,
   resolvePath,
 } from "../utils/path.js";
-import { parsePositiveInteger } from "../utils/validators.js";
 import {
   VORATIQ_MESSAGE_FILE,
   VORATIQ_REDUCTION_FILE,
@@ -47,6 +46,10 @@ import {
   createSilentCliWriter,
   writeOperatorResultEnvelope,
 } from "./operator-envelope.js";
+import {
+  collectRepeatedStringOption,
+  parseMaxParallelOption,
+} from "./option-parsers.js";
 import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
 
@@ -270,25 +273,6 @@ interface ReduceCommandActionOptions {
   json?: boolean;
 }
 
-function collectAgentOption(value: string, previous: string[]): string[] {
-  return [...previous, value];
-}
-
-function collectExtraContextOption(
-  value: string,
-  previous: string[],
-): string[] {
-  return [...previous, value];
-}
-
-function parseMaxParallelOption(value: string): number {
-  return parsePositiveInteger(
-    value,
-    "Expected positive integer after --max-parallel",
-    "--max-parallel must be greater than 0",
-  );
-}
-
 export function createReduceCommand(): Command {
   return new Command("reduce")
     .description("Reduce artifact sets into a summarized form")
@@ -305,7 +289,7 @@ export function createReduceCommand(): Command {
         "Set reducers directly (repeatable; order preserved)",
       )
         .default([], "")
-        .argParser(collectAgentOption),
+        .argParser(collectRepeatedStringOption),
     )
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
@@ -319,7 +303,7 @@ export function createReduceCommand(): Command {
         "Stage an extra context file into each reducer workspace (repeatable)",
       )
         .default([], "")
-        .argParser(collectExtraContextOption),
+        .argParser(collectRepeatedStringOption),
     )
     .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
