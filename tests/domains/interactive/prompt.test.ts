@@ -8,9 +8,9 @@ import { VORATIQ_GUIDE_RESOURCE_URI } from "../../../src/mcp/server.js";
 
 describe("FIRST_PARTY_ATTACHED_LAUNCH_PROMPT", () => {
   it("is 3 sentences or fewer", () => {
-    const sentences = FIRST_PARTY_ATTACHED_LAUNCH_PROMPT.split(/(?<=[.!?])\s+/u).filter(
-      (s) => s.trim().length > 0,
-    );
+    const sentences = FIRST_PARTY_ATTACHED_LAUNCH_PROMPT.split(
+      /(?<=[.!?])\s+/u,
+    ).filter((s) => s.trim().length > 0);
     expect(sentences.length).toBeLessThanOrEqual(3);
   });
 
