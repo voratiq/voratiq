@@ -3,11 +3,17 @@ import { getAgentStatusStyle, getRunStatusStyle } from "../../status/colors.js";
 import { TERMINAL_REDUCTION_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
 import { formatAgentErrorLine } from "../utils/agents.js";
+import type { CliWriter } from "../utils/cli-writer.js";
 import {
   formatRenderLifecycleDuration,
   formatRenderLifecycleRowDuration,
 } from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
+import {
+  clearRefreshIntervalHandle,
+  formatProgressiveRenderErrorDetail,
+  parseProgressTimestamp,
+} from "../utils/progressive-render.js";
 import {
   buildStageFrameLines,
   buildStageFrameSections,
@@ -22,11 +28,6 @@ import {
   resolveTranscriptShellStyleFromWriter,
 } from "../utils/transcript-shell.js";
 import type { StageProgressEventConsumer } from "./stage-progress.js";
-
-type CliWriter = Pick<NodeJS.WriteStream, "write"> & {
-  isTTY?: boolean;
-  columns?: number;
-};
 
 export interface ReduceProgressContext {
   reductionId: string;
@@ -67,45 +68,6 @@ export interface ReduceProgressRenderer extends StageProgressEventConsumer<
 }
 
 const DASH = "—";
-
-function formatErrorDetail(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  if (error === null || error === undefined) {
-    return "unknown error";
-  }
-
-  if (
-    typeof error === "number" ||
-    typeof error === "boolean" ||
-    typeof error === "bigint"
-  ) {
-    return `${error}`;
-  }
-
-  if (typeof error === "symbol") {
-    return error.description ?? error.toString();
-  }
-
-  if (typeof error === "object") {
-    try {
-      const serialized = JSON.stringify(error);
-      if (serialized) {
-        return serialized;
-      }
-    } catch {
-      // Ignore serialization errors and fall back.
-    }
-  }
-
-  return "unknown error";
-}
 
 export interface ReduceTranscriptReducerBlock {
   reducerAgentId: string;
@@ -183,14 +145,6 @@ export function createReduceRenderer(
   const reducerOrder: string[] = [];
   const reducerRecords = new Map<string, ReduceProgressReducerRecord>();
 
-  function stopRefreshLoop(): void {
-    if (!refreshInterval) {
-      return;
-    }
-    clearInterval(refreshInterval);
-    refreshInterval = undefined;
-  }
-
   function hasRunningReducers(): boolean {
     for (const reducer of reducerRecords.values()) {
       if (reducer.status === "running") {
@@ -202,7 +156,7 @@ export function createReduceRenderer(
 
   function syncRefreshLoop(): void {
     if (!stdout.isTTY || disabled || !context || !hasRunningReducers()) {
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       return;
     }
     if (refreshInterval) {
@@ -211,7 +165,7 @@ export function createReduceRenderer(
     refreshInterval = setInterval(() => {
       guard(() => {
         if (!stdout.isTTY || disabled || !context || !hasRunningReducers()) {
-          stopRefreshLoop();
+          refreshInterval = clearRefreshIntervalHandle(refreshInterval);
           return;
         }
         const nextElapsed = formatReduceProgressElapsed(context);
@@ -232,11 +186,13 @@ export function createReduceRenderer(
       action();
     } catch (error) {
       disabled = true;
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       if (!warningLogged) {
         warningLogged = true;
         stderr.write(
-          `[voratiq] Progressive reduce output disabled: ${formatErrorDetail(error)}\n`,
+          `[voratiq] Progressive reduce output disabled: ${formatProgressiveRenderErrorDetail(
+            error,
+          )}\n`,
         );
       }
     }
@@ -258,14 +214,6 @@ export function createReduceRenderer(
     });
   }
 
-  function safeParse(value?: string): number | undefined {
-    if (!value) {
-      return undefined;
-    }
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? undefined : parsed;
-  }
-
   function formatDuration(record: ReduceProgressReducerRecord): string {
     return formatRenderLifecycleRowDuration({
       lifecycle: {
@@ -283,11 +231,11 @@ export function createReduceRenderer(
       return;
     }
 
-    let earliestStartedAt = safeParse(context.startedAt);
-    let latestCompletedAt = safeParse(context.completedAt);
+    let earliestStartedAt = parseProgressTimestamp(context.startedAt);
+    let latestCompletedAt = parseProgressTimestamp(context.completedAt);
 
     for (const reducer of reducerRecords.values()) {
-      const startedAt = safeParse(reducer.startedAt);
+      const startedAt = parseProgressTimestamp(reducer.startedAt);
       if (
         startedAt !== undefined &&
         (earliestStartedAt === undefined || startedAt < earliestStartedAt)
@@ -295,7 +243,7 @@ export function createReduceRenderer(
         earliestStartedAt = startedAt;
       }
 
-      const completedAt = safeParse(reducer.completedAt);
+      const completedAt = parseProgressTimestamp(reducer.completedAt);
       if (
         completedAt !== undefined &&
         (latestCompletedAt === undefined || completedAt > latestCompletedAt)
@@ -453,7 +401,7 @@ export function createReduceRenderer(
       status?: ReduceProgressContext["status"],
       lifecycle?: { startedAt?: string; completedAt?: string },
     ): void {
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       guard(() => {
         if (context && lifecycle) {
           context = {

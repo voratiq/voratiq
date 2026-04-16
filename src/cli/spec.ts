@@ -18,14 +18,17 @@ import {
 } from "../render/transcripts/spec.js";
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { resolvePath } from "../utils/path.js";
-import { parsePositiveInteger } from "../utils/validators.js";
-import { getSpecSessionDirectoryPath } from "../workspace/structure.js";
+import { getSpecSessionDirectoryPath } from "../workspace/session-paths.js";
 import { parseSpecExecutionCommandOptions } from "./contract.js";
 import {
   buildSpecOperatorEnvelope,
   createSilentCliWriter,
   writeOperatorResultEnvelope,
 } from "./operator-envelope.js";
+import {
+  collectRepeatedStringOption,
+  parseMaxParallelOption,
+} from "./option-parsers.js";
 import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
 
 export interface SpecCommandOptions {
@@ -231,21 +234,6 @@ function formatSpecPreview(spec: SpecData): string {
 }
 
 export function createSpecCommand(): Command {
-  const parseMaxParallelOption = (value: string): number =>
-    parsePositiveInteger(
-      value,
-      "Expected positive integer after --max-parallel",
-      "--max-parallel must be greater than 0",
-    );
-  const collectAgentOption = (value: string, previous: string[]): string[] => [
-    ...previous,
-    value,
-  ];
-  const collectExtraContextOption = (
-    value: string,
-    previous: string[],
-  ): string[] => [...previous, value];
-
   return new Command("spec")
     .description("Generate a spec from a task description")
     .requiredOption("--description <text>", "Task description")
@@ -255,7 +243,7 @@ export function createSpecCommand(): Command {
         "Set agents directly (repeatable; order preserved)",
       )
         .default([], "")
-        .argParser(collectAgentOption),
+        .argParser(collectRepeatedStringOption),
     )
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .addOption(
@@ -270,7 +258,7 @@ export function createSpecCommand(): Command {
         "Stage an extra context file into the spec workspace (repeatable)",
       )
         .default([], "")
-        .argParser(collectExtraContextOption),
+        .argParser(collectRepeatedStringOption),
     )
     .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)

@@ -19,7 +19,7 @@ import { toErrorMessage } from "../../utils/errors.js";
 import {
   getVerificationProgrammaticResultPath,
   getVerificationRubricResultPath,
-} from "../../workspace/structure.js";
+} from "../../workspace/artifact-paths.js";
 
 export const VERIFY_ABORT_DETAIL = "Verification aborted before completion.";
 

@@ -30,7 +30,7 @@ import {
   VORATIQ_RUN_DIR,
   VORATIQ_SPEC_DIR,
   VORATIQ_VERIFICATION_DIR,
-} from "../../workspace/structure.js";
+} from "../../workspace/constants.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";

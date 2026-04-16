@@ -12,7 +12,7 @@ import os from "node:os";
 import { join } from "node:path";
 
 import { geminiAuthProvider } from "../../../src/auth/providers/gemini.js";
-import { SANDBOX_DIRNAME } from "../../../src/workspace/structure.js";
+import { SANDBOX_DIRNAME } from "../../../src/workspace/constants.js";
 
 describe("geminiAuthProvider.stage", () => {
   it("stages sandbox home and env variables for Gemini", async () => {

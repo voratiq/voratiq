@@ -2,11 +2,17 @@ import type { ExtractedTokenUsage } from "../../domain/run/model/types.js";
 import { getRunStatusStyle } from "../../status/colors.js";
 import { TERMINAL_VERIFICATION_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
+import type { CliWriter } from "../utils/cli-writer.js";
 import {
   formatRenderLifecycleDuration,
   formatRenderLifecycleRowDuration,
 } from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
+import {
+  clearRefreshIntervalHandle,
+  formatProgressiveRenderErrorDetail,
+  parseProgressTimestamp,
+} from "../utils/progressive-render.js";
 import {
   buildStageFrameLines,
   buildStageFrameSections,
@@ -23,11 +29,6 @@ import {
 } from "../utils/transcript-shell.js";
 import type { StageProgressEventConsumer } from "./stage-progress.js";
 
-type CliWriter = Pick<NodeJS.WriteStream, "write"> & {
-  isTTY?: boolean;
-  columns?: number;
-};
-
 const DASH = "—";
 type VerifyTranscriptStatus =
   | "queued"
@@ -40,45 +41,6 @@ const VERIFY_TRANSCRIPT_TERMINAL_STATUSES = [
   ...TERMINAL_VERIFICATION_STATUSES,
   "unresolved",
 ] as const;
-
-function formatErrorDetail(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  if (error === null || error === undefined) {
-    return "unknown error";
-  }
-
-  if (
-    typeof error === "number" ||
-    typeof error === "boolean" ||
-    typeof error === "bigint"
-  ) {
-    return `${error}`;
-  }
-
-  if (typeof error === "symbol") {
-    return error.description ?? error.toString();
-  }
-
-  if (typeof error === "object") {
-    try {
-      const serialized = JSON.stringify(error);
-      if (serialized) {
-        return serialized;
-      }
-    } catch {
-      // Ignore serialization errors and fall back.
-    }
-  }
-
-  return "unknown error";
-}
 
 export interface VerifyProgressContext {
   verificationId: string;
@@ -227,15 +189,6 @@ export function createVerifyRenderer(
   const methodOrder: string[] = [];
   const methodRecords = new Map<string, VerifyProgressMethodRecord>();
 
-  function stopRefreshLoop(): void {
-    if (!refreshInterval) {
-      return;
-    }
-
-    clearInterval(refreshInterval);
-    refreshInterval = undefined;
-  }
-
   function hasRunningMethods(): boolean {
     for (const method of methodRecords.values()) {
       if (method.status === "running") {
@@ -247,7 +200,7 @@ export function createVerifyRenderer(
 
   function syncRefreshLoop(): void {
     if (!stdout.isTTY || disabled || !context || !hasRunningMethods()) {
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       return;
     }
 
@@ -258,7 +211,7 @@ export function createVerifyRenderer(
     refreshInterval = setInterval(() => {
       guard(() => {
         if (!stdout.isTTY || disabled || !context || !hasRunningMethods()) {
-          stopRefreshLoop();
+          refreshInterval = clearRefreshIntervalHandle(refreshInterval);
           return;
         }
 
@@ -281,22 +234,16 @@ export function createVerifyRenderer(
       action();
     } catch (error) {
       disabled = true;
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       if (!warningLogged) {
         warningLogged = true;
         stderr.write(
-          `[voratiq] Progressive verify output disabled: ${formatErrorDetail(error)}\n`,
+          `[voratiq] Progressive verify output disabled: ${formatProgressiveRenderErrorDetail(
+            error,
+          )}\n`,
         );
       }
     }
-  }
-
-  function safeParse(value?: string): number | undefined {
-    if (!value) {
-      return undefined;
-    }
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? undefined : parsed;
   }
 
   function formatDuration(record: VerifyProgressMethodRecord): string {
@@ -316,11 +263,11 @@ export function createVerifyRenderer(
       return;
     }
 
-    let earliestStartedAt = safeParse(context.startedAt);
-    let latestCompletedAt = safeParse(context.completedAt);
+    let earliestStartedAt = parseProgressTimestamp(context.startedAt);
+    let latestCompletedAt = parseProgressTimestamp(context.completedAt);
 
     for (const method of methodRecords.values()) {
-      const startedAt = safeParse(method.startedAt);
+      const startedAt = parseProgressTimestamp(method.startedAt);
       if (
         startedAt !== undefined &&
         (earliestStartedAt === undefined || startedAt < earliestStartedAt)
@@ -328,7 +275,7 @@ export function createVerifyRenderer(
         earliestStartedAt = startedAt;
       }
 
-      const completedAt = safeParse(method.completedAt);
+      const completedAt = parseProgressTimestamp(method.completedAt);
       if (
         completedAt !== undefined &&
         (latestCompletedAt === undefined || completedAt > latestCompletedAt)
@@ -486,7 +433,7 @@ export function createVerifyRenderer(
       status?: VerifyTranscriptStatus,
       lifecycle?: { startedAt?: string; completedAt?: string },
     ): void {
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       const allowTerminalOverride =
         disabled &&
         stdout.isTTY === true &&

@@ -43,6 +43,13 @@ export interface TeardownController {
   listResources(): readonly TeardownResource[];
 }
 
+export interface ScratchWorkspaceTeardownPaths {
+  readonly workspacePath: string;
+  readonly contextPath: string;
+  readonly runtimePath: string;
+  readonly sandboxPath: string;
+}
+
 export function createTeardownController(label: string): TeardownController {
   const resources = new Map<string, TeardownResource>();
 
@@ -76,6 +83,17 @@ export function createTeardownController(label: string): TeardownController {
       return [...resources.values()];
     },
   };
+}
+
+export function registerScratchWorkspaceTeardownPaths(
+  teardown: TeardownController,
+  workspacePaths: ScratchWorkspaceTeardownPaths,
+  labelPrefix: string,
+): void {
+  teardown.addPath(workspacePaths.workspacePath, `${labelPrefix} workspace`);
+  teardown.addPath(workspacePaths.contextPath, `${labelPrefix} context`);
+  teardown.addPath(workspacePaths.runtimePath, `${labelPrefix} runtime`);
+  teardown.addPath(workspacePaths.sandboxPath, `${labelPrefix} sandbox`);
 }
 
 export async function runTeardown(

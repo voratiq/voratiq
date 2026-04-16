@@ -12,6 +12,7 @@ import type { RunRecord } from "../../domain/run/model/types.js";
 import type { SpecRecord } from "../../domain/spec/model/types.js";
 import type { VerificationMethodResultRef } from "../../domain/verify/model/types.js";
 import type { VerificationRecord } from "../../domain/verify/model/types.js";
+import { extractStat } from "../../utils/diff.js";
 import {
   getInteractiveSessionDirectoryPath,
   getMessageSessionDirectoryPath,
@@ -19,12 +20,13 @@ import {
   getRunDirectoryPath,
   getSpecSessionDirectoryPath,
   getVerificationSessionDirectoryPath,
-} from "../../workspace/structure.js";
+} from "../../workspace/session-paths.js";
 export {
   formatTargetDisplay,
   formatTargetTablePreview,
   TARGET_TABLE_PREVIEW_LENGTH,
 } from "../../utils/list-target.js";
+import { getListRecordId, type ListRecord } from "./records.js";
 const FILES_CHANGED_PATTERN = /(\d+)\s+file/u;
 const INSERTIONS_PATTERN = /(\d+)\s+insertion/u;
 const DELETIONS_PATTERN = /(\d+)\s+deletion/u;
@@ -49,13 +51,7 @@ export type ListFileTarget = {
 
 export type ListTarget = ListSessionTarget | ListLaneTarget | ListFileTarget;
 
-export type ListOperatorRecord =
-  | InteractiveSessionRecord
-  | RunRecord
-  | SpecRecord
-  | MessageRecord
-  | ReductionRecord
-  | VerificationRecord;
+export type ListOperatorRecord = ListRecord;
 
 export interface NormalizedListSession {
   operator: ListOperator;
@@ -93,7 +89,7 @@ export function normalizeListSession(
 ): NormalizedListSession {
   return {
     operator,
-    sessionId: getRecordId(operator, record),
+    sessionId: getListRecordId(operator, record),
     status: getRecordStatus(record),
     createdAt: getRecordCreatedAt(record),
     target: normalizeListTarget(operator, record),
@@ -425,34 +421,6 @@ function parseDiffStatistics(value?: string): ListJsonChanges | undefined {
     ...(insertions !== undefined ? { insertions } : {}),
     ...(deletions !== undefined ? { deletions } : {}),
   };
-}
-
-function extractStat(pattern: RegExp, input: string): number | undefined {
-  const match = input.match(pattern);
-  if (!match) {
-    return undefined;
-  }
-
-  const parsed = Number.parseInt(match[1], 10);
-  return Number.isNaN(parsed) ? undefined : parsed;
-}
-
-function getRecordId(
-  operator: ListOperator,
-  record: ListOperatorRecord,
-): string {
-  if (operator === "run") {
-    return (record as RunRecord).runId;
-  }
-
-  return (
-    record as
-      | InteractiveSessionRecord
-      | SpecRecord
-      | MessageRecord
-      | ReductionRecord
-      | VerificationRecord
-  ).sessionId;
 }
 
 function getRecordStatus(record: ListOperatorRecord): string {

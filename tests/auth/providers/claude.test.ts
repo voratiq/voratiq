@@ -11,7 +11,7 @@ import os from "node:os";
 import { join } from "node:path";
 
 import { claudeAuthProvider } from "../../../src/auth/providers/claude.js";
-import { SANDBOX_DIRNAME } from "../../../src/workspace/structure.js";
+import { SANDBOX_DIRNAME } from "../../../src/workspace/constants.js";
 
 describe("claudeAuthProvider.stage", () => {
   it("stages sandbox environment variables inside the sandbox home", async () => {

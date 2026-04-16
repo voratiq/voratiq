@@ -15,11 +15,9 @@ import {
   removeWorktree,
   runGitCommand,
 } from "../../../utils/git.js";
+import { getVerificationProgrammaticResultPath } from "../../../workspace/artifact-paths.js";
+import { VORATIQ_VERIFICATION_DIR } from "../../../workspace/constants.js";
 import { buildAgentWorkspacePaths } from "../../../workspace/layout.js";
-import {
-  getVerificationProgrammaticResultPath,
-  VORATIQ_VERIFICATION_DIR,
-} from "../../../workspace/structure.js";
 import type { RunRecord } from "../../run/model/types.js";
 import type { VerificationRecordMutators } from "../model/mutators.js";
 import type { VerificationRecord } from "../model/types.js";

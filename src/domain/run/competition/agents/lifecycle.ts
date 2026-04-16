@@ -19,7 +19,7 @@ import type {
 import { toErrorMessage } from "../../../../utils/errors.js";
 import { GIT_AUTHOR_EMAIL, GIT_AUTHOR_NAME } from "../../../../utils/git.js";
 import { extractProviderNativeTokenUsageForSession } from "../../../../workspace/chat/native-usage.js";
-import { VORATIQ_RUN_DIR } from "../../../../workspace/structure.js";
+import { VORATIQ_RUN_DIR } from "../../../../workspace/constants.js";
 import { runPostProcessingAndCollectArtifacts } from "./post-processing.js";
 import { AgentRunContext } from "./run-context.js";
 import type { PreparedAgentExecution } from "./types.js";

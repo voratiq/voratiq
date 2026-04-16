@@ -8,7 +8,7 @@ import {
   buildWorkspaceArtifactRequirements,
 } from "../../../competition/shared/prompt-helpers.js";
 import { toExtraContextContextSubpath } from "../../../extra-context/contract.js";
-import { VORATIQ_VERIFICATION_DIR } from "../../../workspace/structure.js";
+import { VORATIQ_VERIFICATION_DIR } from "../../../workspace/constants.js";
 import type { VerificationTarget } from "../model/types.js";
 import type { StagedVerificationInputs } from "./shared-layout.js";
 

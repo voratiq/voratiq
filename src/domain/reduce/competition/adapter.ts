@@ -16,6 +16,7 @@ import {
 import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
 import {
   createTeardownController,
+  registerScratchWorkspaceTeardownPaths,
   runTeardown,
 } from "../../../competition/shared/teardown.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
@@ -62,17 +63,17 @@ import { emitSwarmSessionAcknowledgement } from "../../../utils/swarm-session-ac
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import {
-  type AgentWorkspacePaths,
-  scaffoldAgentSessionWorkspace,
-} from "../../../workspace/layout.js";
-import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
-import {
   MESSAGE_RESPONSE_FILENAME,
   REDUCTION_ARTIFACT_INFO_FILENAME,
   REDUCTION_DATA_FILENAME,
   REDUCTION_FILENAME,
   VORATIQ_REDUCTION_DIR,
-} from "../../../workspace/structure.js";
+} from "../../../workspace/constants.js";
+import {
+  type AgentWorkspacePaths,
+  scaffoldAgentSessionWorkspace,
+} from "../../../workspace/layout.js";
+import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
 
 export type ReduceCompetitionCandidate = AgentDefinition;
 
@@ -232,7 +233,7 @@ export function createReduceCompetitionAdapter(
           sessionId: reductionId,
           agentId: candidate.id,
         });
-        registerScratchWorkspaceTeardown(
+        registerScratchWorkspaceTeardownPaths(
           teardown,
           workspacePaths,
           candidate.id,
@@ -577,17 +578,6 @@ export function createReduceCompetitionAdapter(
       return left.agentId.localeCompare(right.agentId);
     },
   };
-}
-
-function registerScratchWorkspaceTeardown(
-  teardown: ReturnType<typeof createTeardownController>,
-  workspacePaths: AgentWorkspacePaths,
-  agentId: string,
-): void {
-  teardown.addPath(workspacePaths.workspacePath, `${agentId} workspace`);
-  teardown.addPath(workspacePaths.contextPath, `${agentId} context`);
-  teardown.addPath(workspacePaths.runtimePath, `${agentId} runtime`);
-  teardown.addPath(workspacePaths.sandboxPath, `${agentId} sandbox`);
 }
 
 async function rewriteOrAppendReductionRecord(options: {

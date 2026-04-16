@@ -6,9 +6,9 @@ import { isFileSystemError } from "../../../utils/fs.js";
 import {
   type AgentArtifactPaths,
   buildAgentArtifactPaths,
-  getAgentDirectoryPath,
   getAgentManifestPath,
-} from "../../../workspace/structure.js";
+} from "../../../workspace/artifact-paths.js";
+import { getAgentDirectoryPath } from "../../../workspace/session-paths.js";
 import type {
   AgentStatus,
   ExtractedTokenUsage,

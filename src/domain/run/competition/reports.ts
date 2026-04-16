@@ -5,12 +5,12 @@ import type {
   RunRecord,
   RunReport,
 } from "../../../domain/run/model/types.js";
-import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import {
   buildAgentArtifactPaths,
-  getAgentDirectoryPath,
   getAgentManifestPath,
-} from "../../../workspace/structure.js";
+} from "../../../workspace/artifact-paths.js";
+import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
+import { getAgentDirectoryPath } from "../../../workspace/session-paths.js";
 import { RunReportInvariantError } from "./errors.js";
 
 export interface AgentExecutionState {

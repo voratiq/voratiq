@@ -11,14 +11,12 @@ import {
   WorkspaceError,
   WorkspaceMissingEntryError,
 } from "../../workspace/errors.js";
+import { formatWorkspacePath } from "../../workspace/path-formatters.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
 import {
   repairWorkspaceStructure,
   validateWorkspace,
 } from "../../workspace/setup.js";
-import {
-  formatWorkspacePath,
-  resolveWorkspacePath,
-} from "../../workspace/structure.js";
 import { executeDoctorBootstrap } from "./fix.js";
 import type { DoctorReconcileResult } from "./fix-types.js";
 import { executeDoctorReconcile } from "./reconcile.js";

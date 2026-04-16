@@ -22,9 +22,12 @@ import { renderWorkspaceAutoInitializedNotice } from "../render/transcripts/shar
 import { renderCliError } from "../render/utils/errors.js";
 import { HintedError } from "../utils/errors.js";
 import { formatAlertMessage } from "../utils/output.js";
-import { parsePositiveInteger } from "../utils/validators.js";
 import { runApplyCommand } from "./apply.js";
 import { toCliError } from "./errors.js";
+import {
+  collectRepeatedStringOption,
+  parseMaxParallelOption,
+} from "./option-parsers.js";
 import { beginChainedCommandOutput, writeCommandOutput } from "./output.js";
 import { runRunCommand } from "./run.js";
 import { runSpecCommand } from "./spec.js";
@@ -58,22 +61,6 @@ export interface AutoCommandResult {
 
 interface AutoRuntimeOptions {
   now?: () => number;
-}
-
-function parseMaxParallelOption(value: string): number {
-  return parsePositiveInteger(
-    value,
-    "Expected positive integer after --max-parallel",
-    "--max-parallel must be greater than 0",
-  );
-}
-
-function collectRunAgentOption(value: string, previous: string[]): string[] {
-  return [...previous, value];
-}
-
-function collectVerifyAgentOption(value: string, previous: string[]): string[] {
-  return [...previous, value];
 }
 
 function replayAutoCommandEvent(event: AutoCommandEvent): void {
@@ -300,7 +287,7 @@ export function createAutoCommand(): Command {
         "Set run-stage agents directly (repeatable; order preserved)",
       )
         .default([], "")
-        .argParser(collectRunAgentOption),
+        .argParser(collectRepeatedStringOption),
     )
     .addOption(
       new Option(
@@ -308,7 +295,7 @@ export function createAutoCommand(): Command {
         "Set verify-stage agents directly (repeatable)",
       )
         .default([], "")
-        .argParser(collectVerifyAgentOption),
+        .argParser(collectRepeatedStringOption),
     )
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(

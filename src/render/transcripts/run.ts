@@ -10,8 +10,13 @@ import {
   formatAgentStatusLabelWithStyle,
 } from "../utils/agents.js";
 import { formatAgentBadge } from "../utils/badges.js";
+import type { CliWriter } from "../utils/cli-writer.js";
 import { formatRenderLifecycleDuration } from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
+import {
+  clearRefreshIntervalHandle,
+  formatProgressiveRenderErrorDetail,
+} from "../utils/progressive-render.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import { buildRunMetadataSectionWithStyle } from "../utils/runs.js";
 import {
@@ -26,11 +31,6 @@ import {
   resolveTranscriptShellStyleFromWriter,
 } from "../utils/transcript-shell.js";
 import type { StageProgressEventConsumer } from "./stage-progress.js";
-
-type CliWriter = Pick<NodeJS.WriteStream, "write"> & {
-  isTTY?: boolean;
-  columns?: number;
-};
 
 interface RunProgressContext {
   runId: string;
@@ -190,45 +190,6 @@ export function renderRunTranscript(options: RunTranscriptOptions): string {
   return renderTranscript({ sections });
 }
 
-function formatErrorDetail(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  if (error === null || error === undefined) {
-    return "unknown error";
-  }
-
-  if (
-    typeof error === "number" ||
-    typeof error === "boolean" ||
-    typeof error === "bigint"
-  ) {
-    return `${error}`;
-  }
-
-  if (typeof error === "symbol") {
-    return error.description ?? error.toString();
-  }
-
-  if (typeof error === "object") {
-    try {
-      const serialized = JSON.stringify(error);
-      if (serialized) {
-        return serialized;
-      }
-    } catch {
-      // ignore JSON serialization failures; fall through to default message.
-    }
-  }
-
-  return "unknown error";
-}
-
 export function createRunRenderer(
   options: RunRendererOptions = {},
 ): RunProgressRenderer {
@@ -248,15 +209,6 @@ export function createRunRenderer(
   const agentOrder: string[] = [];
   const agentRecords = new Map<string, AgentInvocationRecord>();
 
-  function stopRefreshLoop(): void {
-    if (!refreshInterval) {
-      return;
-    }
-
-    clearInterval(refreshInterval);
-    refreshInterval = undefined;
-  }
-
   function hasRunningAgents(): boolean {
     for (const record of agentRecords.values()) {
       if (record.status === "running") {
@@ -269,12 +221,12 @@ export function createRunRenderer(
 
   function syncRefreshLoop(): void {
     if (!stdout.isTTY || disabled) {
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       return;
     }
 
     if (!hasRunningAgents()) {
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       return;
     }
 
@@ -285,12 +237,12 @@ export function createRunRenderer(
     refreshInterval = setInterval(() => {
       guard(() => {
         if (!stdout.isTTY || disabled || !context) {
-          stopRefreshLoop();
+          refreshInterval = clearRefreshIntervalHandle(refreshInterval);
           return;
         }
 
         if (!hasRunningAgents()) {
-          stopRefreshLoop();
+          refreshInterval = clearRefreshIntervalHandle(refreshInterval);
           return;
         }
 
@@ -314,10 +266,10 @@ export function createRunRenderer(
       action();
     } catch (error) {
       disabled = true;
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       if (!warningLogged) {
         warningLogged = true;
-        const detail = formatErrorDetail(error);
+        const detail = formatProgressiveRenderErrorDetail(error);
         stderr.write(`[voratiq] Progressive run output disabled: ${detail}\n`);
       }
     }
@@ -537,7 +489,7 @@ export function createRunRenderer(
       });
     },
     complete(report: RunReport, options?: { suppressHint?: boolean }): string {
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       syncRecordsFromReport(report);
       guard(() => {
         this.onProgressEvent({

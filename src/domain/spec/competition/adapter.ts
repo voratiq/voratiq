@@ -16,6 +16,7 @@ import {
 import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
 import {
   createTeardownController,
+  registerScratchWorkspaceTeardownPaths,
   runTeardown,
 } from "../../../competition/shared/teardown.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
@@ -35,13 +36,13 @@ import {
 import { slugify } from "../../../utils/slug.js";
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
+import { VORATIQ_SPEC_DIR } from "../../../workspace/constants.js";
 import {
   type AgentWorkspacePaths,
   buildAgentSessionWorkspacePaths,
   scaffoldAgentWorkspace,
 } from "../../../workspace/layout.js";
 import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
-import { VORATIQ_SPEC_DIR } from "../../../workspace/structure.js";
 
 const SPEC_MARKDOWN_FILENAME = "spec.md";
 const SPEC_DATA_FILENAME = "spec.json";
@@ -119,7 +120,7 @@ export function createSpecCompetitionAdapter(
           sessionId,
           agentId: candidate.id,
         });
-        registerScratchWorkspaceTeardown(
+        registerScratchWorkspaceTeardownPaths(
           teardown,
           workspacePaths,
           candidate.id,
@@ -288,17 +289,6 @@ export function createSpecCompetitionAdapter(
     },
     sortResults: compareSpecExecutionsByAgentId,
   };
-}
-
-function registerScratchWorkspaceTeardown(
-  teardown: ReturnType<typeof createTeardownController>,
-  workspacePaths: AgentWorkspacePaths,
-  agentId: string,
-): void {
-  teardown.addPath(workspacePaths.workspacePath, `${agentId} workspace`);
-  teardown.addPath(workspacePaths.contextPath, `${agentId} context`);
-  teardown.addPath(workspacePaths.runtimePath, `${agentId} runtime`);
-  teardown.addPath(workspacePaths.sandboxPath, `${agentId} sandbox`);
 }
 
 function compareSpecExecutionsByAgentId(

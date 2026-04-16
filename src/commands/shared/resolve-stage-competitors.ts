@@ -14,10 +14,10 @@ import type {
 import { HintedError } from "../../utils/errors.js";
 import { readUtf8File } from "../../utils/fs.js";
 import {
-  resolveWorkspacePath,
   VORATIQ_AGENTS_FILE,
   VORATIQ_ORCHESTRATION_FILE,
-} from "../../workspace/structure.js";
+} from "../../workspace/constants.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
 
 export interface ResolveStageCompetitorsInput {
   root: string;

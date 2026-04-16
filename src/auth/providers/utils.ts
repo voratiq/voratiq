@@ -11,7 +11,7 @@ import {
 import { isAbsolute, resolve as resolveNative } from "node:path";
 
 import { isMissing } from "../../utils/fs.js";
-import { SANDBOX_DIRNAME } from "../../workspace/structure.js";
+import { SANDBOX_DIRNAME } from "../../workspace/constants.js";
 import type {
   AuthRuntimeContext,
   StageResult,

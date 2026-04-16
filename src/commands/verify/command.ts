@@ -24,10 +24,8 @@ import type { VerifyProgressRenderer } from "../../render/transcripts/verify.js"
 import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
 import { emitSwarmSessionAcknowledgement } from "../../utils/swarm-session-ack.js";
-import {
-  resolveWorkspacePath,
-  VORATIQ_VERIFICATION_SESSIONS_DIR,
-} from "../../workspace/structure.js";
+import { VORATIQ_VERIFICATION_SESSIONS_DIR } from "../../workspace/constants.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
 import { generateSessionId } from "../shared/session-id.js";
 import { resolveVerificationAgents } from "./agents.js";
 import { VerifyPreflightError } from "./errors.js";

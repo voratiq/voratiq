@@ -4,18 +4,16 @@ import { readAgentsConfig } from "../../configs/agents/loader.js";
 import { buildDefaultOrchestrationTemplate } from "../../configs/orchestration/bootstrap.js";
 import { pathExists } from "../../utils/fs.js";
 import { readConfigSnapshot, writeConfigIfChanged } from "../../utils/yaml.js";
+import { VORATIQ_ORCHESTRATION_FILE } from "../../workspace/constants.js";
 import {
   computeManagedFingerprint,
   isManagedFingerprintMatch,
   readManagedState,
   updateManagedState,
 } from "../../workspace/managed-state.js";
+import { formatWorkspacePath } from "../../workspace/path-formatters.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
 import { createWorkspace } from "../../workspace/setup.js";
-import {
-  formatWorkspacePath,
-  resolveWorkspacePath,
-  VORATIQ_ORCHESTRATION_FILE,
-} from "../../workspace/structure.js";
 import { reconcileManagedDoctorAgents } from "./agents.js";
 import { reconcileDoctorEnvironment } from "./environment.js";
 import type {

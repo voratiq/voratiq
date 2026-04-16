@@ -12,7 +12,6 @@ import {
   writeSandboxSettings,
 } from "../../../src/agents/runtime/sandbox.js";
 import {
-  resolveWorkspacePath,
   VORATIQ_AGENTS_FILE,
   VORATIQ_ENVIRONMENT_FILE,
   VORATIQ_HISTORY_LOCK_FILENAME,
@@ -21,7 +20,8 @@ import {
   VORATIQ_RUN_FILE,
   VORATIQ_SANDBOX_FILE,
   VORATIQ_VERIFICATION_DIR,
-} from "../../../src/workspace/structure.js";
+} from "../../../src/workspace/constants.js";
+import { resolveWorkspacePath } from "../../../src/workspace/path-resolvers.js";
 import { clearSandboxConfigurationCache } from "../../support/hooks/sandbox-loader.js";
 
 const DEFAULT_ALLOWED_DOMAINS = ["*"];

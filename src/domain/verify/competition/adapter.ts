@@ -12,7 +12,10 @@ import {
   stageExtraContextFiles,
 } from "../../../competition/shared/extra-context.js";
 import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
-import type { TeardownController } from "../../../competition/shared/teardown.js";
+import {
+  registerScratchWorkspaceTeardownPaths,
+  type TeardownController,
+} from "../../../competition/shared/teardown.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import {
@@ -24,18 +27,18 @@ import type { VerifyProgressRenderer } from "../../../render/transcripts/verify.
 import { toErrorMessage } from "../../../utils/errors.js";
 import { pathExists } from "../../../utils/fs.js";
 import { prepareScratchAgentWorkspace } from "../../../workspace/agents.js";
+import {
+  getVerificationRubricExecutionDirectoryPath,
+  getVerificationRubricResultPath,
+} from "../../../workspace/artifact-paths.js";
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
+import { VORATIQ_VERIFICATION_DIR } from "../../../workspace/constants.js";
 import { ensureWorkspaceDependencies } from "../../../workspace/dependencies.js";
 import {
   type AgentWorkspacePaths,
   buildScopedAgentWorkspacePaths,
 } from "../../../workspace/layout.js";
-import {
-  getVerificationRubricExecutionDirectoryPath,
-  getVerificationRubricResultPath,
-  VORATIQ_VERIFICATION_DIR,
-} from "../../../workspace/structure.js";
 import type { ExtractedTokenUsage } from "../../run/model/types.js";
 import type { VerificationRecordMutators } from "../model/mutators.js";
 import {
@@ -147,11 +150,10 @@ export function createVerifyCompetitionAdapter(
           verifierId: candidate.agent.id,
           template: candidate.template.template,
         });
-        registerScratchWorkspaceTeardown(
+        registerScratchWorkspaceTeardownPaths(
           teardown,
           workspacePaths,
-          candidate.agent.id,
-          candidate.template.template,
+          `${candidate.agent.id}/${candidate.template.template}`,
         );
         return { candidate, workspacePaths };
       }),
@@ -601,17 +603,4 @@ function compareVerificationsByTemplateThenVerifierId(
     left.template.localeCompare(right.template) ||
     left.verifierId.localeCompare(right.verifierId)
   );
-}
-
-function registerScratchWorkspaceTeardown(
-  teardown: TeardownController,
-  workspacePaths: AgentWorkspacePaths,
-  verifierId: string,
-  template: string,
-): void {
-  const labelPrefix = `${verifierId}/${template}`;
-  teardown.addPath(workspacePaths.workspacePath, `${labelPrefix} workspace`);
-  teardown.addPath(workspacePaths.contextPath, `${labelPrefix} context`);
-  teardown.addPath(workspacePaths.runtimePath, `${labelPrefix} runtime`);
-  teardown.addPath(workspacePaths.sandboxPath, `${labelPrefix} sandbox`);
 }

@@ -5,12 +5,12 @@ import type { ListJsonOutput, ListOperator } from "../contracts/list.js";
 import { resolveCliContext } from "../preflight/index.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import {
-  resolveWorkspacePath,
   VORATIQ_INTERACTIVE_FILE,
   VORATIQ_MESSAGE_FILE,
   VORATIQ_REDUCTION_FILE,
   VORATIQ_VERIFICATION_FILE,
-} from "../workspace/structure.js";
+} from "../workspace/constants.js";
+import { resolveWorkspacePath } from "../workspace/path-resolvers.js";
 import { parseListInspectionCommandOptions } from "./contract.js";
 import { type Alert, writeCommandOutput } from "./output.js";
 

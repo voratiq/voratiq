@@ -10,10 +10,8 @@ import { readAgentsConfig } from "../configs/agents/loader.js";
 import type { AgentConfigEntry } from "../configs/agents/types.js";
 import { isFileSystemError } from "../utils/fs.js";
 import { normalizeConfigText } from "../utils/yaml.js";
-import {
-  resolveWorkspacePath,
-  VORATIQ_MANAGED_STATE_FILE,
-} from "./structure.js";
+import { VORATIQ_MANAGED_STATE_FILE } from "./constants.js";
+import { resolveWorkspacePath } from "./path-resolvers.js";
 import { serializeAgentsConfigEntries } from "./templates.js";
 
 export const MANAGED_STATE_VERSION = 1;

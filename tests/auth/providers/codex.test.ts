@@ -11,7 +11,7 @@ import os from "node:os";
 import { join } from "node:path";
 
 import { codexAuthProvider } from "../../../src/auth/providers/codex.js";
-import { SANDBOX_DIRNAME } from "../../../src/workspace/structure.js";
+import { SANDBOX_DIRNAME } from "../../../src/workspace/constants.js";
 
 describe("codexAuthProvider.stage", () => {
   it("stages sandbox home and env variables for Codex", async () => {

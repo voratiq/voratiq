@@ -4,11 +4,17 @@ import { TERMINAL_SPEC_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
 import { formatAgentErrorLine } from "../utils/agents.js";
 import { formatAgentBadge } from "../utils/badges.js";
+import type { CliWriter } from "../utils/cli-writer.js";
 import {
   formatRenderLifecycleDuration,
   formatRenderLifecycleRowDuration,
 } from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
+import {
+  clearRefreshIntervalHandle,
+  formatProgressiveRenderErrorDetail,
+  parseProgressTimestamp,
+} from "../utils/progressive-render.js";
 import {
   buildStageFrameLines,
   buildStageFrameSections,
@@ -25,45 +31,7 @@ import {
 } from "../utils/transcript-shell.js";
 import type { StageProgressEventConsumer } from "./stage-progress.js";
 
-type CliWriter = Pick<NodeJS.WriteStream, "write"> & {
-  isTTY?: boolean;
-  columns?: number;
-};
-
 const DASH = "—";
-
-function formatErrorDetail(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  if (error === null || error === undefined) {
-    return "unknown error";
-  }
-  if (
-    typeof error === "number" ||
-    typeof error === "boolean" ||
-    typeof error === "bigint"
-  ) {
-    return `${error}`;
-  }
-  if (typeof error === "symbol") {
-    return error.description ?? error.toString();
-  }
-  if (typeof error === "object") {
-    try {
-      const serialized = JSON.stringify(error);
-      if (serialized) {
-        return serialized;
-      }
-    } catch {
-      // Ignore serialization errors and fall back.
-    }
-  }
-  return "unknown error";
-}
 
 export interface SpecProgressContext {
   sessionId: string;
@@ -173,14 +141,6 @@ export function createSpecRenderer(
   const agentOrder: string[] = [];
   const agentRecords = new Map<string, SpecProgressAgentRecord>();
 
-  function stopRefreshLoop(): void {
-    if (!refreshInterval) {
-      return;
-    }
-    clearInterval(refreshInterval);
-    refreshInterval = undefined;
-  }
-
   function hasRunningAgents(): boolean {
     for (const agent of agentRecords.values()) {
       if (agent.status === "running") {
@@ -192,7 +152,7 @@ export function createSpecRenderer(
 
   function syncRefreshLoop(): void {
     if (!stdout.isTTY || disabled || !context || !hasRunningAgents()) {
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       return;
     }
     if (refreshInterval) {
@@ -201,7 +161,7 @@ export function createSpecRenderer(
     refreshInterval = setInterval(() => {
       guard(() => {
         if (!stdout.isTTY || disabled || !context || !hasRunningAgents()) {
-          stopRefreshLoop();
+          refreshInterval = clearRefreshIntervalHandle(refreshInterval);
           return;
         }
         const nextElapsed = formatSpecElapsed(context, now());
@@ -222,22 +182,16 @@ export function createSpecRenderer(
       action();
     } catch (error) {
       disabled = true;
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       if (!warningLogged) {
         warningLogged = true;
         stderr.write(
-          `[voratiq] Progressive spec output disabled: ${formatErrorDetail(error)}\n`,
+          `[voratiq] Progressive spec output disabled: ${formatProgressiveRenderErrorDetail(
+            error,
+          )}\n`,
         );
       }
     }
-  }
-
-  function safeParse(value?: string): number | undefined {
-    if (!value) {
-      return undefined;
-    }
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? undefined : parsed;
   }
 
   function formatDuration(record: SpecProgressAgentRecord): string {
@@ -257,11 +211,11 @@ export function createSpecRenderer(
       return;
     }
 
-    let earliestStartedAt = safeParse(context.startedAt);
-    let latestCompletedAt = safeParse(context.completedAt);
+    let earliestStartedAt = parseProgressTimestamp(context.startedAt);
+    let latestCompletedAt = parseProgressTimestamp(context.completedAt);
 
     for (const agent of agentRecords.values()) {
-      const startedAt = safeParse(agent.startedAt);
+      const startedAt = parseProgressTimestamp(agent.startedAt);
       if (
         startedAt !== undefined &&
         (earliestStartedAt === undefined || startedAt < earliestStartedAt)
@@ -269,7 +223,7 @@ export function createSpecRenderer(
         earliestStartedAt = startedAt;
       }
 
-      const completedAt = safeParse(agent.completedAt);
+      const completedAt = parseProgressTimestamp(agent.completedAt);
       if (
         completedAt !== undefined &&
         (latestCompletedAt === undefined || completedAt > latestCompletedAt)
@@ -429,7 +383,7 @@ export function createSpecRenderer(
       status?: SpecProgressContext["status"],
       lifecycle?: { startedAt?: string; completedAt?: string },
     ): void {
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       guard(() => {
         if (context && lifecycle) {
           context = {

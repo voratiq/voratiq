@@ -6,11 +6,9 @@ import { describe, expect, it } from "@jest/globals";
 
 import { generateSandboxSettings } from "../../../src/agents/runtime/sandbox.js";
 import type { AgentId } from "../../../src/configs/agents/types.js";
+import { VORATIQ_VERIFICATION_DIR } from "../../../src/workspace/constants.js";
 import { buildAgentWorkspacePaths } from "../../../src/workspace/layout.js";
-import {
-  resolveWorkspacePath,
-  VORATIQ_VERIFICATION_DIR,
-} from "../../../src/workspace/structure.js";
+import { resolveWorkspacePath } from "../../../src/workspace/path-resolvers.js";
 
 describe("generateSandboxSettings", () => {
   it("keeps artifacts and the repo root write-protected while allowing workspace staging", async () => {

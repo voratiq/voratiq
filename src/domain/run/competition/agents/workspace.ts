@@ -9,14 +9,14 @@ import {
 } from "../../../../utils/path.js";
 import { prepareAgentWorkspace } from "../../../../workspace/agents.js";
 import {
+  getAgentSessionDiffPath,
+  getAgentSessionSummaryPath,
+} from "../../../../workspace/artifact-paths.js";
+import { VORATIQ_RUN_DIR } from "../../../../workspace/constants.js";
+import {
   type AgentWorkspacePaths,
   buildAgentWorkspacePaths,
 } from "../../../../workspace/layout.js";
-import {
-  getAgentSessionDiffPath,
-  getAgentSessionSummaryPath,
-  VORATIQ_RUN_DIR,
-} from "../../../../workspace/structure.js";
 
 export const WORKSPACE_SUMMARY_FILENAME = ".summary.txt" as const;
 

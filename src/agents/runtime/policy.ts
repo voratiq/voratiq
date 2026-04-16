@@ -5,7 +5,6 @@ import type {
   SandboxNetworkConfig,
 } from "../../configs/sandbox/types.js";
 import {
-  resolveWorkspacePath,
   VORATIQ_AGENTS_FILE,
   VORATIQ_ENVIRONMENT_FILE,
   VORATIQ_HISTORY_LOCK_FILENAME,
@@ -16,7 +15,8 @@ import {
   VORATIQ_SANDBOX_FILE,
   VORATIQ_SPEC_DIR,
   VORATIQ_VERIFICATION_DIR,
-} from "../../workspace/structure.js";
+} from "../../workspace/constants.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
 import type { SandboxPolicyOverrides } from "./types.js";
 
 export type SandboxStageId = "spec" | "run" | "reduce" | "verify" | "message";

@@ -15,6 +15,7 @@ import {
 import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
 import {
   createTeardownController,
+  registerScratchWorkspaceTeardownPaths,
   runTeardown,
   type TeardownController,
 } from "../../../competition/shared/teardown.js";
@@ -33,14 +34,14 @@ import {
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import {
+  MESSAGE_RESPONSE_FILENAME,
+  VORATIQ_MESSAGE_DIR,
+} from "../../../workspace/constants.js";
+import {
   type AgentWorkspacePaths,
   scaffoldAgentSessionWorkspace,
 } from "../../../workspace/layout.js";
 import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
-import {
-  MESSAGE_RESPONSE_FILENAME,
-  VORATIQ_MESSAGE_DIR,
-} from "../../../workspace/structure.js";
 import type { ExtractedTokenUsage } from "../../run/model/types.js";
 import { buildMessagePrompt } from "./prompt.js";
 
@@ -123,7 +124,7 @@ export function createMessageCompetitionAdapter(
             sessionId: messageId,
             agentId: candidate.id,
           });
-          registerScratchWorkspaceTeardown(
+          registerScratchWorkspaceTeardownPaths(
             teardown,
             workspacePaths,
             candidate.id,
@@ -294,17 +295,6 @@ export function createMessageCompetitionAdapter(
     },
     sortResults: compareMessageExecutionsByAgentId,
   };
-}
-
-function registerScratchWorkspaceTeardown(
-  teardown: ReturnType<typeof createTeardownController>,
-  workspacePaths: AgentWorkspacePaths,
-  agentId: string,
-): void {
-  teardown.addPath(workspacePaths.workspacePath, `${agentId} workspace`);
-  teardown.addPath(workspacePaths.contextPath, `${agentId} context`);
-  teardown.addPath(workspacePaths.runtimePath, `${agentId} runtime`);
-  teardown.addPath(workspacePaths.sandboxPath, `${agentId} sandbox`);
 }
 
 function compareMessageExecutionsByAgentId(

@@ -11,15 +11,15 @@ import {
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import { pathExists } from "../../../utils/fs.js";
 import { createDetachedWorktree, removeWorktree } from "../../../utils/git.js";
+import {
+  MESSAGE_RESPONSE_FILENAME,
+  VORATIQ_VERIFICATION_SESSIONS_DIR,
+} from "../../../workspace/constants.js";
 import { ensureWorkspaceDependencies } from "../../../workspace/dependencies.js";
 import {
   type AgentWorkspacePaths,
   buildAgentWorkspacePaths,
 } from "../../../workspace/layout.js";
-import {
-  MESSAGE_RESPONSE_FILENAME,
-  VORATIQ_VERIFICATION_SESSIONS_DIR,
-} from "../../../workspace/structure.js";
 import { aliasForCandidate } from "./blinding.js";
 import type { ResolvedVerificationTarget } from "./target.js";
 

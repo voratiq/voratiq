@@ -17,13 +17,16 @@ import { createRunRenderer } from "../render/transcripts/run.js";
 import { renderWorkspaceAutoInitializedNotice } from "../render/transcripts/shared.js";
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { mapRunStatusToExitCode } from "../status/index.js";
-import { parsePositiveInteger } from "../utils/validators.js";
 import { parseRunExecutionCommandOptions } from "./contract.js";
 import {
   buildRunOperatorEnvelope,
   createSilentCliWriter,
   writeOperatorResultEnvelope,
 } from "./operator-envelope.js";
+import {
+  collectRepeatedStringOption,
+  parseMaxParallelOption,
+} from "./option-parsers.js";
 import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
 
@@ -169,25 +172,6 @@ interface RunCommandActionOptions {
   json?: boolean;
 }
 
-function collectAgentOption(value: string, previous: string[]): string[] {
-  return [...previous, value];
-}
-
-function collectExtraContextOption(
-  value: string,
-  previous: string[],
-): string[] {
-  return [...previous, value];
-}
-
-function parseMaxParallelOption(value: string): number {
-  return parsePositiveInteger(
-    value,
-    "Expected positive integer after --max-parallel",
-    "--max-parallel must be greater than 0",
-  );
-}
-
 export function createRunCommand(): Command {
   return new Command("run")
     .description("Execute agents against a spec")
@@ -198,7 +182,7 @@ export function createRunCommand(): Command {
         "Set agents directly (repeatable; order preserved)",
       )
         .default([], "")
-        .argParser(collectAgentOption),
+        .argParser(collectRepeatedStringOption),
     )
     .option("--profile <name>", 'Orchestration profile (default: "default")')
     .option(
@@ -213,7 +197,7 @@ export function createRunCommand(): Command {
         "Stage an extra context file into each agent workspace (repeatable)",
       )
         .default([], "")
-        .argParser(collectExtraContextOption),
+        .argParser(collectRepeatedStringOption),
     )
     .option("--json", "Emit a machine-readable result envelope")
     .allowExcessArguments(false)
