@@ -55,6 +55,7 @@ export interface RewriteSpecRecordOptions {
   specsFilePath: string;
   sessionId: string;
   mutate: (record: SpecRecord) => SpecRecord;
+  forceFlush?: boolean;
 }
 
 export interface AppendSpecRecordOptions {
@@ -143,11 +144,16 @@ export async function appendSpecRecord(
 export async function rewriteSpecRecord(
   options: RewriteSpecRecordOptions,
 ): Promise<SpecRecord> {
-  const { root, specsFilePath, sessionId, mutate } = options;
+  const { root, specsFilePath, sessionId, mutate, forceFlush } = options;
   const paths = buildSpecPaths(root, specsFilePath);
 
   try {
-    return await specPersistence.rewriteRecord({ paths, sessionId, mutate });
+    return await specPersistence.rewriteRecord({
+      paths,
+      sessionId,
+      mutate,
+      forceFlush,
+    });
   } catch (error) {
     throw mapSessionStoreError(error, sessionStoreErrorMapper);
   }
