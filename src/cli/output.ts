@@ -1,14 +1,10 @@
+import type { CliWriter } from "../render/utils/cli-writer.js";
 import {
   formatAlertMessage,
   formatCliOutput,
   type FormatCliOutputOptions,
   formatErrorMessage,
 } from "../utils/output.js";
-
-type CliWriter = Pick<NodeJS.WriteStream, "write"> & {
-  isTTY?: boolean;
-  columns?: number;
-};
 
 export type AlertSeverity = "info" | "warn" | "error";
 

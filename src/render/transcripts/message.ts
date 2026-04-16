@@ -3,11 +3,17 @@ import { getAgentStatusStyle, getRunStatusStyle } from "../../status/colors.js";
 import { TERMINAL_MESSAGE_STATUSES } from "../../status/index.js";
 import type { TokenUsageResult } from "../../workspace/chat/token-usage-result.js";
 import { formatAgentErrorLine } from "../utils/agents.js";
+import type { CliWriter } from "../utils/cli-writer.js";
 import {
   formatRenderLifecycleDuration,
   formatRenderLifecycleRowDuration,
 } from "../utils/duration.js";
 import { createInteractiveFrameRenderer } from "../utils/interactive-frame.js";
+import {
+  clearRefreshIntervalHandle,
+  formatProgressiveRenderErrorDetail,
+  parseProgressTimestamp,
+} from "../utils/progressive-render.js";
 import {
   buildStageFrameLines,
   buildStageFrameSections,
@@ -21,11 +27,6 @@ import {
   resolveTranscriptShellStyleFromWriter,
   type TranscriptShellStyleOptions,
 } from "../utils/transcript-shell.js";
-
-type CliWriter = Pick<NodeJS.WriteStream, "write"> & {
-  isTTY?: boolean;
-  columns?: number;
-};
 
 const DASH = "—";
 
@@ -87,39 +88,6 @@ interface MessageRendererOptions {
   suppressTrailingBlankLine?: boolean;
 }
 
-function formatErrorDetail(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  if (error === null || error === undefined) {
-    return "unknown error";
-  }
-  if (
-    typeof error === "number" ||
-    typeof error === "boolean" ||
-    typeof error === "bigint"
-  ) {
-    return `${error}`;
-  }
-  if (typeof error === "symbol") {
-    return error.description ?? error.toString();
-  }
-  if (typeof error === "object") {
-    try {
-      const serialized = JSON.stringify(error);
-      if (serialized) {
-        return serialized;
-      }
-    } catch {
-      // Ignore serialization errors and fall back.
-    }
-  }
-  return "unknown error";
-}
-
 function buildMessageStageShell(options: {
   messageId: string;
   createdAt: string;
@@ -168,14 +136,6 @@ export function createMessageRenderer(
   const recipientOrder: string[] = [];
   const recipientRecords = new Map<string, MessageProgressRecipientRecord>();
 
-  function stopRefreshLoop(): void {
-    if (!refreshInterval) {
-      return;
-    }
-    clearInterval(refreshInterval);
-    refreshInterval = undefined;
-  }
-
   function hasRunningRecipients(): boolean {
     for (const recipient of recipientRecords.values()) {
       if (recipient.status === "running") {
@@ -187,7 +147,7 @@ export function createMessageRenderer(
 
   function syncRefreshLoop(): void {
     if (!stdout.isTTY || disabled || !context || !hasRunningRecipients()) {
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       return;
     }
     if (refreshInterval) {
@@ -196,7 +156,7 @@ export function createMessageRenderer(
     refreshInterval = setInterval(() => {
       guard(() => {
         if (!stdout.isTTY || disabled || !context || !hasRunningRecipients()) {
-          stopRefreshLoop();
+          refreshInterval = clearRefreshIntervalHandle(refreshInterval);
           return;
         }
         const nextElapsed = formatMessageProgressElapsed(context, now());
@@ -217,22 +177,16 @@ export function createMessageRenderer(
       action();
     } catch (error) {
       disabled = true;
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       if (!warningLogged) {
         warningLogged = true;
         stderr.write(
-          `[voratiq] Progressive message output disabled: ${formatErrorDetail(error)}\n`,
+          `[voratiq] Progressive message output disabled: ${formatProgressiveRenderErrorDetail(
+            error,
+          )}\n`,
         );
       }
     }
-  }
-
-  function safeParse(value?: string): number | undefined {
-    if (!value) {
-      return undefined;
-    }
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? undefined : parsed;
   }
 
   function formatDuration(record: MessageProgressRecipientRecord): string {
@@ -252,11 +206,11 @@ export function createMessageRenderer(
       return;
     }
 
-    let earliestStartedAt = safeParse(context.startedAt);
-    let latestCompletedAt = safeParse(context.completedAt);
+    let earliestStartedAt = parseProgressTimestamp(context.startedAt);
+    let latestCompletedAt = parseProgressTimestamp(context.completedAt);
 
     for (const recipient of recipientRecords.values()) {
-      const startedAt = safeParse(recipient.startedAt);
+      const startedAt = parseProgressTimestamp(recipient.startedAt);
       if (
         startedAt !== undefined &&
         (earliestStartedAt === undefined || startedAt < earliestStartedAt)
@@ -264,7 +218,7 @@ export function createMessageRenderer(
         earliestStartedAt = startedAt;
       }
 
-      const completedAt = safeParse(recipient.completedAt);
+      const completedAt = parseProgressTimestamp(recipient.completedAt);
       if (
         completedAt !== undefined &&
         (latestCompletedAt === undefined || completedAt > latestCompletedAt)
@@ -392,7 +346,7 @@ export function createMessageRenderer(
       status?: MessageProgressContext["status"],
       lifecycle?: { startedAt?: string; completedAt?: string },
     ): void {
-      stopRefreshLoop();
+      refreshInterval = clearRefreshIntervalHandle(refreshInterval);
       guard(() => {
         if (context && lifecycle) {
           context = {
