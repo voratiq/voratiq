@@ -13,15 +13,13 @@ import {
   loadYamlConfig,
   writeConfigIfChanged,
 } from "../../utils/yaml.js";
+import { VORATIQ_AGENTS_FILE } from "../../workspace/constants.js";
 import {
   isManagedAgentsFingerprintMatch,
   readManagedState,
 } from "../../workspace/managed-state.js";
-import {
-  formatWorkspacePath,
-  resolveWorkspacePath,
-  VORATIQ_AGENTS_FILE,
-} from "../../workspace/structure.js";
+import { formatWorkspacePath } from "../../workspace/path-formatters.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
 import {
   type AgentPreset,
   buildDefaultAgentsTemplate,

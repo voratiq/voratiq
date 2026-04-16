@@ -19,7 +19,7 @@ import {
   getRunDirectoryPath,
   getSpecSessionDirectoryPath,
   getVerificationSessionDirectoryPath,
-} from "../../workspace/structure.js";
+} from "../../workspace/session-paths.js";
 export {
   formatTargetDisplay,
   formatTargetTablePreview,

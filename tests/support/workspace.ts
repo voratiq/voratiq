@@ -8,11 +8,9 @@ import { promisify } from "node:util";
 import { runCli } from "../../src/bin.js";
 import type { RunRecord } from "../../src/domain/run/model/types.js";
 import { appendRunRecord } from "../../src/domain/run/persistence/adapter.js";
+import { VORATIQ_RUN_FILE } from "../../src/workspace/constants.js";
+import { resolveWorkspacePath } from "../../src/workspace/path-resolvers.js";
 import { createWorkspace } from "../../src/workspace/setup.js";
-import {
-  resolveWorkspacePath,
-  VORATIQ_RUN_FILE,
-} from "../../src/workspace/structure.js";
 
 const execFileAsync = promisify(execFile);
 const KEEP_DEBUG = process.env.VORATIQ_TEST_KEEP_REPO === "1";

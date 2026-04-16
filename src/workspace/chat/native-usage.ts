@@ -1,6 +1,6 @@
 import type { ChatUsageProviderId } from "../../domain/run/model/types.js";
 import { resolvePath } from "../../utils/path.js";
-import { getAgentSessionChatArtifactPath } from "../structure.js";
+import { getAgentSessionChatArtifactPath } from "../artifact-paths.js";
 import type { TokenUsageResult } from "./token-usage-result.js";
 import type { ChatArtifactFormat } from "./types.js";
 import { extractChatUsageFromArtifact } from "./usage-extractor.js";

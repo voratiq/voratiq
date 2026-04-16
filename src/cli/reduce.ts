@@ -36,11 +36,11 @@ import {
 } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
 import {
-  resolveWorkspacePath,
   VORATIQ_MESSAGE_FILE,
   VORATIQ_REDUCTION_FILE,
   VORATIQ_VERIFICATION_FILE,
-} from "../workspace/structure.js";
+} from "../workspace/constants.js";
+import { resolveWorkspacePath } from "../workspace/path-resolvers.js";
 import { parseReduceExecutionCommandOptions } from "./contract.js";
 import {
   buildReduceOperatorEnvelope,

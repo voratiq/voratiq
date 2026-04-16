@@ -62,17 +62,17 @@ import { emitSwarmSessionAcknowledgement } from "../../../utils/swarm-session-ac
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import {
-  type AgentWorkspacePaths,
-  scaffoldAgentSessionWorkspace,
-} from "../../../workspace/layout.js";
-import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
-import {
   MESSAGE_RESPONSE_FILENAME,
   REDUCTION_ARTIFACT_INFO_FILENAME,
   REDUCTION_DATA_FILENAME,
   REDUCTION_FILENAME,
   VORATIQ_REDUCTION_DIR,
-} from "../../../workspace/structure.js";
+} from "../../../workspace/constants.js";
+import {
+  type AgentWorkspacePaths,
+  scaffoldAgentSessionWorkspace,
+} from "../../../workspace/layout.js";
+import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
 
 export type ReduceCompetitionCandidate = AgentDefinition;
 

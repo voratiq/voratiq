@@ -4,11 +4,6 @@ import { dirname } from "node:path";
 import type { AgentId } from "../configs/agents/types.js";
 import { normalizePathForDisplay, resolvePath } from "../utils/path.js";
 import {
-  ARTIFACTS_DIRNAME,
-  CONTEXT_DIRNAME,
-  getAgentSessionArtifactsDirectoryPath,
-  getAgentSessionContextDirectoryPath,
-  getAgentSessionDirectoryPath,
   getAgentSessionManifestPath,
   getAgentSessionRuntimeDirectoryPath,
   getAgentSessionSandboxDirectoryPath,
@@ -16,8 +11,10 @@ import {
   getAgentSessionSandboxSettingsPath,
   getAgentSessionStderrPath,
   getAgentSessionStdoutPath,
-  getAgentSessionWorkspaceDirectoryPath,
-  getRunDirectoryPath,
+} from "./artifact-paths.js";
+import {
+  ARTIFACTS_DIRNAME,
+  CONTEXT_DIRNAME,
   MANIFEST_FILENAME,
   RUNTIME_DIRNAME,
   SANDBOX_DIRNAME,
@@ -26,7 +23,14 @@ import {
   STDOUT_FILENAME,
   VORATIQ_RUN_DIR,
   WORKSPACE_DIRNAME,
-} from "./structure.js";
+} from "./constants.js";
+import {
+  getAgentSessionArtifactsDirectoryPath,
+  getAgentSessionContextDirectoryPath,
+  getAgentSessionDirectoryPath,
+  getAgentSessionWorkspaceDirectoryPath,
+  getRunDirectoryPath,
+} from "./session-paths.js";
 
 export interface RunWorkspacePaths {
   absolute: string;

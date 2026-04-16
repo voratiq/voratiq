@@ -9,7 +9,7 @@ import {
   ARTIFACTS_DIRNAME,
   CHAT_JSON_FILENAME,
   CHAT_JSONL_FILENAME,
-} from "../structure.js";
+} from "../constants.js";
 import { findProviderTranscripts } from "./sources.js";
 import type { ChatArtifactFormat } from "./types.js";
 

@@ -33,14 +33,14 @@ import {
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import {
+  MESSAGE_RESPONSE_FILENAME,
+  VORATIQ_MESSAGE_DIR,
+} from "../../../workspace/constants.js";
+import {
   type AgentWorkspacePaths,
   scaffoldAgentSessionWorkspace,
 } from "../../../workspace/layout.js";
 import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
-import {
-  MESSAGE_RESPONSE_FILENAME,
-  VORATIQ_MESSAGE_DIR,
-} from "../../../workspace/structure.js";
 import type { ExtractedTokenUsage } from "../../run/model/types.js";
 import { buildMessagePrompt } from "./prompt.js";
 

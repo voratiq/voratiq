@@ -12,14 +12,6 @@ import { toErrorMessage } from "../utils/errors.js";
 import { isDirectory, isFile, pathExists } from "../utils/fs.js";
 import { relativeToRoot } from "../utils/path.js";
 import {
-  WorkspaceMissingEntryError,
-  WorkspaceNotInitializedError,
-  WorkspaceSetupError,
-  WorkspaceWrongTypeEntryError,
-} from "./errors.js";
-import { updateManagedState } from "./managed-state.js";
-import {
-  resolveWorkspacePath,
   VORATIQ_AGENTS_FILE,
   VORATIQ_ENVIRONMENT_FILE,
   VORATIQ_INTERACTIVE_DIR,
@@ -45,7 +37,15 @@ import {
   VORATIQ_VERIFICATION_FILE,
   VORATIQ_VERIFICATION_SESSIONS_DIR,
   VORATIQ_VERIFICATION_TEMPLATES_DIR,
-} from "./structure.js";
+} from "./constants.js";
+import {
+  WorkspaceMissingEntryError,
+  WorkspaceNotInitializedError,
+  WorkspaceSetupError,
+  WorkspaceWrongTypeEntryError,
+} from "./errors.js";
+import { updateManagedState } from "./managed-state.js";
+import { resolveWorkspacePath } from "./path-resolvers.js";
 import {
   buildDefaultAgentsTemplate,
   buildDefaultEnvironmentTemplate,

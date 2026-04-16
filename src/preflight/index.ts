@@ -9,15 +9,6 @@ import {
 } from "../utils/git.js";
 import { relativeToRoot } from "../utils/path.js";
 import {
-  collectMissingSandboxDependencies,
-  formatSandboxDependencyList,
-} from "../workspace/sandbox-requirements.js";
-import {
-  repairWorkspaceStructure,
-  validateWorkspace,
-} from "../workspace/setup.js";
-import {
-  resolveWorkspacePath,
   VORATIQ_INTERACTIVE_DIR,
   VORATIQ_INTERACTIVE_FILE,
   VORATIQ_MESSAGE_DIR,
@@ -30,7 +21,16 @@ import {
   VORATIQ_SPEC_FILE,
   VORATIQ_VERIFICATION_DIR,
   VORATIQ_VERIFICATION_FILE,
-} from "../workspace/structure.js";
+} from "../workspace/constants.js";
+import { resolveWorkspacePath } from "../workspace/path-resolvers.js";
+import {
+  collectMissingSandboxDependencies,
+  formatSandboxDependencyList,
+} from "../workspace/sandbox-requirements.js";
+import {
+  repairWorkspaceStructure,
+  validateWorkspace,
+} from "../workspace/setup.js";
 import {
   DirtyWorkingTreeError,
   SandboxDependenciesError,

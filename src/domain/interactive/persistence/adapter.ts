@@ -20,7 +20,7 @@ import {
   getInteractiveSessionDirectoryPath,
   getInteractiveSessionRecordPath,
   getInteractiveSessionsDirectoryPath,
-} from "../../../workspace/structure.js";
+} from "../../../workspace/session-paths.js";
 import type {
   InteractiveSessionIndexEntry,
   InteractiveSessionRecord,

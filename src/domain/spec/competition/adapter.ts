@@ -35,13 +35,13 @@ import {
 import { slugify } from "../../../utils/slug.js";
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
+import { VORATIQ_SPEC_DIR } from "../../../workspace/constants.js";
 import {
   type AgentWorkspacePaths,
   buildAgentSessionWorkspacePaths,
   scaffoldAgentWorkspace,
 } from "../../../workspace/layout.js";
 import { promoteWorkspaceFile } from "../../../workspace/promotion.js";
-import { VORATIQ_SPEC_DIR } from "../../../workspace/structure.js";
 
 const SPEC_MARKDOWN_FILENAME = "spec.md";
 const SPEC_DATA_FILENAME = "spec.json";

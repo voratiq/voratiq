@@ -18,15 +18,15 @@ import {
   readConfigSnapshot,
   writeConfigIfChanged,
 } from "../../utils/yaml.js";
-import { updateManagedState } from "../../workspace/managed-state.js";
-import { createWorkspace } from "../../workspace/setup.js";
 import {
-  formatWorkspacePath,
-  resolveWorkspacePath,
   VORATIQ_AGENTS_FILE,
   VORATIQ_ORCHESTRATION_FILE,
   VORATIQ_SANDBOX_FILE,
-} from "../../workspace/structure.js";
+} from "../../workspace/constants.js";
+import { updateManagedState } from "../../workspace/managed-state.js";
+import { formatWorkspacePath } from "../../workspace/path-formatters.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
+import { createWorkspace } from "../../workspace/setup.js";
 import {
   type AgentPreset,
   listAgentPresetTemplates,

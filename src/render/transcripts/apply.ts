@@ -1,11 +1,11 @@
 import type { ApplyResult } from "../../commands/apply/types.js";
 import { colorize } from "../../utils/colors.js";
-import { formatRunWorkspaceRelative } from "../../workspace/layout.js";
 import {
   buildAgentArtifactPaths,
-  getAgentDirectoryPath,
   getAgentManifestPath,
-} from "../../workspace/structure.js";
+} from "../../workspace/artifact-paths.js";
+import { formatRunWorkspaceRelative } from "../../workspace/layout.js";
+import { getAgentDirectoryPath } from "../../workspace/session-paths.js";
 import type { AgentSectionInput } from "../utils/agents.js";
 import { formatRunTimestamp } from "../utils/records.js";
 import { renderTranscriptWithMetadata } from "./shared.js";

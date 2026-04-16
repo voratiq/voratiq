@@ -3,11 +3,9 @@ import { join } from "node:path";
 import type { VerificationConfig } from "../../configs/verification/types.js";
 import { HintedError } from "../../utils/errors.js";
 import { isDirectory, isFile } from "../../utils/fs.js";
-import {
-  formatWorkspacePath,
-  resolveWorkspacePath,
-  VORATIQ_VERIFICATION_TEMPLATES_DIR,
-} from "../../workspace/structure.js";
+import { VORATIQ_VERIFICATION_TEMPLATES_DIR } from "../../workspace/constants.js";
+import { formatWorkspacePath } from "../../workspace/path-formatters.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
 import { AutoPreflightError } from "./errors.js";
 
 interface RequiredAutoSelector {

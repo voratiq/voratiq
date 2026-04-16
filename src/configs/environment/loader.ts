@@ -2,10 +2,8 @@ import {
   parseYamlDocument,
   type YamlParseErrorDetail,
 } from "../../utils/yaml-reader.js";
-import {
-  resolveWorkspacePath,
-  VORATIQ_ENVIRONMENT_FILE,
-} from "../../workspace/structure.js";
+import { VORATIQ_ENVIRONMENT_FILE } from "../../workspace/constants.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
 import { createConfigLoader } from "../shared/loader-factory.js";
 import { formatYamlErrorDetail } from "../shared/yaml-error-formatter.js";
 import {

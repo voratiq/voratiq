@@ -19,7 +19,7 @@ import {
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { resolvePath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
-import { getSpecSessionDirectoryPath } from "../workspace/structure.js";
+import { getSpecSessionDirectoryPath } from "../workspace/session-paths.js";
 import { parseSpecExecutionCommandOptions } from "./contract.js";
 import {
   buildSpecOperatorEnvelope,

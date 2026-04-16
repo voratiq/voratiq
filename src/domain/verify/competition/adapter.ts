@@ -24,18 +24,18 @@ import type { VerifyProgressRenderer } from "../../../render/transcripts/verify.
 import { toErrorMessage } from "../../../utils/errors.js";
 import { pathExists } from "../../../utils/fs.js";
 import { prepareScratchAgentWorkspace } from "../../../workspace/agents.js";
+import {
+  getVerificationRubricExecutionDirectoryPath,
+  getVerificationRubricResultPath,
+} from "../../../workspace/artifact-paths.js";
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
+import { VORATIQ_VERIFICATION_DIR } from "../../../workspace/constants.js";
 import { ensureWorkspaceDependencies } from "../../../workspace/dependencies.js";
 import {
   type AgentWorkspacePaths,
   buildScopedAgentWorkspacePaths,
 } from "../../../workspace/layout.js";
-import {
-  getVerificationRubricExecutionDirectoryPath,
-  getVerificationRubricResultPath,
-  VORATIQ_VERIFICATION_DIR,
-} from "../../../workspace/structure.js";
 import type { ExtractedTokenUsage } from "../../run/model/types.js";
 import type { VerificationRecordMutators } from "../model/mutators.js";
 import {

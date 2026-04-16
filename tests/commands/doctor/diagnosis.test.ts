@@ -6,8 +6,8 @@ import { describe, expect, it, jest } from "@jest/globals";
 
 import { verifyAgentProviders } from "../../../src/agents/runtime/auth.js";
 import { executeDoctorDiagnosis } from "../../../src/commands/doctor/command.js";
+import { resolveWorkspacePath } from "../../../src/workspace/path-resolvers.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
-import { resolveWorkspacePath } from "../../../src/workspace/structure.js";
 
 jest.mock("../../../src/agents/runtime/auth.js", () => ({
   verifyAgentProviders: jest.fn(),

@@ -3,19 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { readVerificationConfig } from "../../src/configs/verification/loader.js";
+import { VORATIQ_MANAGED_STATE_FILE } from "../../src/workspace/constants.js";
 import {
   WorkspaceMissingEntryError,
   WorkspaceSetupError,
   WorkspaceWrongTypeEntryError,
 } from "../../src/workspace/errors.js";
+import { resolveWorkspacePath } from "../../src/workspace/path-resolvers.js";
 import {
   createWorkspace,
   validateWorkspace,
 } from "../../src/workspace/setup.js";
-import {
-  resolveWorkspacePath,
-  VORATIQ_MANAGED_STATE_FILE,
-} from "../../src/workspace/structure.js";
 import type { CreateWorkspaceResult } from "../../src/workspace/types.js";
 
 async function createTempRepo(): Promise<string> {

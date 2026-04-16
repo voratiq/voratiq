@@ -20,10 +20,8 @@ import { renderWorkspaceAutoInitializedNotice } from "../render/transcripts/shar
 import { createStageStartLineEmitter } from "../render/utils/stage-output.js";
 import { resolvePath } from "../utils/path.js";
 import { parsePositiveInteger } from "../utils/validators.js";
-import {
-  resolveWorkspacePath,
-  VORATIQ_MESSAGE_FILE,
-} from "../workspace/structure.js";
+import { VORATIQ_MESSAGE_FILE } from "../workspace/constants.js";
+import { resolveWorkspacePath } from "../workspace/path-resolvers.js";
 import { parseMessageExecutionCommandOptions } from "./contract.js";
 import {
   buildMessageOperatorEnvelope,

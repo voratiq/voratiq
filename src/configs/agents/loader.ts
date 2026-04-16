@@ -7,7 +7,7 @@ import {
   parseYamlDocument,
   type YamlParseErrorDetail,
 } from "../../utils/yaml-reader.js";
-import { resolveWorkspacePath } from "../../workspace/structure.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
 import { createConfigLoader } from "../shared/loader-factory.js";
 import { formatYamlErrorMessage } from "../shared/yaml-error-formatter.js";
 import {

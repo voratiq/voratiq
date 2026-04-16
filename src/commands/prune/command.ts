@@ -24,18 +24,20 @@ import {
   resolvePath,
 } from "../../utils/path.js";
 import {
+  buildAgentArtifactPaths,
+  getAgentWorkspaceDirectoryPath,
+} from "../../workspace/artifact-paths.js";
+import { VORATIQ_RUN_SESSIONS_DIR } from "../../workspace/constants.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
+import {
   deriveAgentBranches,
   removeRunDirectory,
   removeWorkspaceEntry,
 } from "../../workspace/prune.js";
 import {
-  buildAgentArtifactPaths,
   getAgentDirectoryPath,
-  getAgentWorkspaceDirectoryPath,
   getRunDirectoryPath,
-  resolveWorkspacePath,
-  VORATIQ_RUN_SESSIONS_DIR,
-} from "../../workspace/structure.js";
+} from "../../workspace/session-paths.js";
 import { fetchRunSafely } from "../fetch.js";
 import {
   PruneBranchDeletionError,

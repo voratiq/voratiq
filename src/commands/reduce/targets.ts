@@ -24,7 +24,7 @@ import {
   relativeToRoot,
   resolvePath,
 } from "../../utils/path.js";
-import { REDUCTION_DATA_FILENAME } from "../../workspace/structure.js";
+import { REDUCTION_DATA_FILENAME } from "../../workspace/constants.js";
 
 export interface ReductionTargetValidationInput {
   root: string;

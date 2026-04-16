@@ -7,13 +7,6 @@ import {
   relativeToRoot,
 } from "../../src/utils/path.js";
 import {
-  buildAgentSessionWorkspacePaths,
-  buildAgentWorkspacePaths,
-  resolveRunWorkspacePaths,
-  scaffoldAgentSessionWorkspace,
-  scaffoldAgentWorkspace,
-} from "../../src/workspace/layout.js";
-import {
   getAgentArtifactsDirectoryPath,
   getAgentContextDirectoryPath,
   getAgentManifestPath,
@@ -21,13 +14,22 @@ import {
   getAgentSandboxDirectoryPath,
   getAgentSandboxHomePath,
   getAgentSandboxSettingsPath,
-  getAgentSessionContextDirectoryPath,
-  getAgentSessionWorkspaceDirectoryPath,
   getAgentStderrPath,
   getAgentStdoutPath,
   getAgentWorkspaceDirectoryPath,
-  WORKSPACE_DIRNAME,
-} from "../../src/workspace/structure.js";
+} from "../../src/workspace/artifact-paths.js";
+import { WORKSPACE_DIRNAME } from "../../src/workspace/constants.js";
+import {
+  buildAgentSessionWorkspacePaths,
+  buildAgentWorkspacePaths,
+  resolveRunWorkspacePaths,
+  scaffoldAgentSessionWorkspace,
+  scaffoldAgentWorkspace,
+} from "../../src/workspace/layout.js";
+import {
+  getAgentSessionContextDirectoryPath,
+  getAgentSessionWorkspaceDirectoryPath,
+} from "../../src/workspace/session-paths.js";
 
 type ArtifactKey = Exclude<
   keyof ReturnType<typeof buildAgentWorkspacePaths>,

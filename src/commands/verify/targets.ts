@@ -20,11 +20,11 @@ import { readVerificationRecords } from "../../domain/verify/persistence/adapter
 import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
 import { pathExists } from "../../utils/fs.js";
 import { normalizePathForDisplay, resolvePath } from "../../utils/path.js";
-import { buildAgentWorkspacePaths } from "../../workspace/layout.js";
 import {
   DIFF_FILENAME,
   MESSAGE_RESPONSE_FILENAME,
-} from "../../workspace/structure.js";
+} from "../../workspace/constants.js";
+import { buildAgentWorkspacePaths } from "../../workspace/layout.js";
 
 export type VerifyTargetKind = "spec" | "run" | "reduce" | "message";
 

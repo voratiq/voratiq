@@ -3,7 +3,7 @@ import { readdir } from "node:fs/promises";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 
 import { isMissing } from "../../utils/fs.js";
-import { SANDBOX_DIRNAME } from "../structure.js";
+import { SANDBOX_DIRNAME } from "../constants.js";
 
 type SupportedProvider = "claude" | "codex" | "gemini";
 

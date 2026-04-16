@@ -12,11 +12,9 @@ import {
   isPythonEnvironmentDisabled,
 } from "../../configs/environment/types.js";
 import { persistYamlConfig, readConfigSnapshot } from "../../utils/yaml.js";
-import {
-  formatWorkspacePath,
-  resolveWorkspacePath,
-  VORATIQ_ENVIRONMENT_FILE,
-} from "../../workspace/structure.js";
+import { VORATIQ_ENVIRONMENT_FILE } from "../../workspace/constants.js";
+import { formatWorkspacePath } from "../../workspace/path-formatters.js";
+import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
 import { buildDefaultEnvironmentTemplate } from "../../workspace/templates.js";
 import type {
   DoctorBootstrapConfigureOptions,

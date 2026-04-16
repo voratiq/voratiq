@@ -14,7 +14,7 @@ import {
   getRunDirectoryPath,
   getSpecSessionDirectoryPath,
   getVerificationSessionDirectoryPath,
-} from "../workspace/structure.js";
+} from "../workspace/session-paths.js";
 import { externalExecutionOperators } from "./contract.js";
 import { toCliError } from "./errors.js";
 
