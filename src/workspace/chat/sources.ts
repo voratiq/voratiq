@@ -7,12 +7,12 @@ import { SANDBOX_DIRNAME } from "../constants.js";
 
 type SupportedProvider = "claude" | "codex" | "gemini";
 
-export interface ProviderTranscriptSearchOptions {
+interface ProviderTranscriptSearchOptions {
   agentRoot: string;
   env?: NodeJS.ProcessEnv;
 }
 
-export type TranscriptLocator = (
+type TranscriptLocator = (
   options: ProviderTranscriptSearchOptions,
 ) => Promise<readonly string[]>;
 
@@ -33,7 +33,7 @@ export async function findProviderTranscripts(
   return locator(options);
 }
 
-export async function findClaudeTranscripts(
+async function findClaudeTranscripts(
   options: ProviderTranscriptSearchOptions,
 ): Promise<readonly string[]> {
   return await collectFilesFromRoots(resolveClaudeTranscriptRoots(options), {
@@ -42,7 +42,7 @@ export async function findClaudeTranscripts(
   });
 }
 
-export async function findCodexTranscripts(
+async function findCodexTranscripts(
   options: ProviderTranscriptSearchOptions,
 ): Promise<readonly string[]> {
   return await collectFilesFromRoots(resolveCodexTranscriptRoots(options), {
@@ -51,7 +51,7 @@ export async function findCodexTranscripts(
   });
 }
 
-export async function findGeminiTranscripts(
+async function findGeminiTranscripts(
   options: ProviderTranscriptSearchOptions,
 ): Promise<readonly string[]> {
   const transcripts = new Set<string>();

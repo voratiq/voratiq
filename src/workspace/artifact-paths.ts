@@ -6,8 +6,6 @@ import {
   DIFF_FILENAME,
   MANIFEST_FILENAME,
   PROGRAMMATIC_RESULT_FILENAME,
-  REDUCTION_DATA_FILENAME,
-  REDUCTION_FILENAME,
   RUNTIME_DIRNAME,
   SANDBOX_DIRNAME,
   SANDBOX_SETTINGS_FILENAME,
@@ -152,34 +150,6 @@ export function getAgentSessionSummaryPath(
     agentId,
     ARTIFACTS_DIRNAME,
     SUMMARY_FILENAME,
-  );
-}
-
-export function getAgentSessionReductionPath(
-  domain: string,
-  sessionId: string,
-  agentId: string,
-): string {
-  return formatAgentSessionScopedPath(
-    domain,
-    sessionId,
-    agentId,
-    ARTIFACTS_DIRNAME,
-    REDUCTION_FILENAME,
-  );
-}
-
-export function getAgentSessionReductionDataPath(
-  domain: string,
-  sessionId: string,
-  agentId: string,
-): string {
-  return formatAgentSessionScopedPath(
-    domain,
-    sessionId,
-    agentId,
-    ARTIFACTS_DIRNAME,
-    REDUCTION_DATA_FILENAME,
   );
 }
 
