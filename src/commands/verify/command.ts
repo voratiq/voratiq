@@ -21,9 +21,9 @@ import { buildPersistedExtraContextFields } from "../../extra-context/contract.j
 import { loadOperatorEnvironment } from "../../preflight/environment.js";
 import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import type { VerifyProgressRenderer } from "../../render/transcripts/verify.js";
-import { emitDurableOperatorAcknowledgement } from "../../utils/durable-ack.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
+import { emitSwarmSessionAcknowledgement } from "../../utils/swarm-session-ack.js";
 import {
   resolveWorkspacePath,
   VORATIQ_VERIFICATION_SESSIONS_DIR,
@@ -130,7 +130,7 @@ export async function executeVerifyCommand(
       methods: [],
     },
   });
-  await emitDurableOperatorAcknowledgement({
+  await emitSwarmSessionAcknowledgement({
     operator: "verify",
     sessionId: verificationId,
     status: "queued",

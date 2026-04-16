@@ -28,6 +28,7 @@ import {
   resolveVoratiqCliTarget,
   runVoratiqMcpStdioServer,
   type TransportFailureResult,
+  VORATIQ_GUIDE_RESOURCE_URI,
   VORATIQ_MCP_PROTOCOL_VERSION,
   VORATIQ_SUPPORTED_MCP_PROTOCOL_VERSIONS,
 } from "../../src/mcp/server.js";
@@ -56,6 +57,7 @@ interface InitializeResult {
   protocolVersion: string;
   capabilities: {
     tools: Record<string, unknown>;
+    resources?: Record<string, unknown>;
   };
   instructions?: string;
   serverInfo: {
@@ -204,6 +206,7 @@ describe("bundled MCP server", () => {
       tools: {
         listChanged: true,
       },
+      resources: {},
     });
     expect(initialized.instructions).toContain("Use voratiq_list");
     expect(initialized.serverInfo).toEqual({
@@ -1162,6 +1165,81 @@ describe("bundled MCP server", () => {
       await new Promise((resolve) => setTimeout(resolve, 600));
       await rm(repoDir, { recursive: true, force: true });
     }
+  });
+
+  it("resources/list returns exactly one resource entry with the guide URI", async () => {
+    const handler = await createInitializedHandler(
+      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>,
+    );
+
+    const response = await handler.handleRequest({
+      jsonrpc: "2.0",
+      id: 80,
+      method: "resources/list",
+      params: {},
+    });
+    const result = expectSuccess<{ resources: unknown[] }>(response);
+
+    expect(result.resources).toHaveLength(1);
+    const resource = result.resources[0] as Record<string, unknown>;
+    expect(resource.uri).toBe(VORATIQ_GUIDE_RESOURCE_URI);
+    expect(typeof resource.name).toBe("string");
+    expect(typeof resource.description).toBe("string");
+  });
+
+  it("resources/read returns non-empty guide text for the guide URI", async () => {
+    const handler = await createInitializedHandler(
+      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>,
+    );
+
+    const response = await handler.handleRequest({
+      jsonrpc: "2.0",
+      id: 81,
+      method: "resources/read",
+      params: { uri: VORATIQ_GUIDE_RESOURCE_URI },
+    });
+    const result = expectSuccess<{ contents: unknown[] }>(response);
+
+    expect(result.contents).toHaveLength(1);
+    const content = result.contents[0] as Record<string, unknown>;
+    expect(content.uri).toBe(VORATIQ_GUIDE_RESOURCE_URI);
+    expect(typeof content.text).toBe("string");
+    expect((content.text as string).length).toBeGreaterThan(0);
+
+    const text = content.text as string;
+    expect(text).toContain("spec");
+    expect(text).toContain("run");
+    expect(text).toContain("reduce");
+    expect(text).toContain("verify");
+    expect(text).toContain("message");
+    expect(text).toContain("list");
+    expect(text).toContain("apply");
+    expect(text).toContain("prune");
+    expect(text).toContain("extraContext");
+    expect(text).toContain("maxParallel");
+    expect(text).toContain("durable");
+  });
+
+  it("resources/read returns a JSON-RPC error for an unknown URI", async () => {
+    const handler = await createInitializedHandler(
+      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>,
+    );
+
+    const response = await handler.handleRequest({
+      jsonrpc: "2.0",
+      id: 82,
+      method: "resources/read",
+      params: { uri: "voratiq://unknown" },
+    });
+
+    expect(response).toMatchObject({
+      jsonrpc: "2.0",
+      id: 82,
+      error: {
+        code: -32602,
+        message: expect.stringContaining("Unknown resource URI"),
+      },
+    });
   });
 
   it("keeps control operators synchronous in the default CLI bridge", async () => {

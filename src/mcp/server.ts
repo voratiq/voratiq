@@ -24,7 +24,7 @@ import {
   externalVerifyExecutionInputSchema,
 } from "../cli/contract.js";
 import {
-  buildDurableOperatorAcknowledgementEnvelope,
+  buildSwarmSessionAcknowledgementEnvelope,
   type OperatorResultEnvelope,
   operatorResultEnvelopeSchema,
 } from "../cli/operator-envelope.js";
@@ -37,7 +37,7 @@ import {
 import {
   VORATIQ_MCP_ACK_OPERATOR_ENV,
   VORATIQ_MCP_ACK_PATH_ENV,
-} from "../utils/durable-ack.js";
+} from "../utils/swarm-session-ack.js";
 import { getVoratiqVersion } from "../utils/version.js";
 import {
   createEntrypointVoratiqCliTarget as createEntrypointCliTarget,
@@ -54,8 +54,8 @@ const JSON_RPC_INVALID_REQUEST = -32600;
 const JSON_RPC_METHOD_NOT_FOUND = -32601;
 const JSON_RPC_INVALID_PARAMS = -32602;
 const JSON_RPC_INTERNAL_ERROR = -32603;
-const DURABLE_EARLY_ACK_TIMEOUT_MS = 15_000;
-const DURABLE_EARLY_ACK_POLL_INTERVAL_MS = 100;
+const SWARM_EARLY_ACK_TIMEOUT_MS = 15_000;
+const SWARM_EARLY_ACK_POLL_INTERVAL_MS = 100;
 
 export const VORATIQ_MCP_PROTOCOL_VERSION = "2025-11-25" as const;
 export const VORATIQ_SUPPORTED_MCP_PROTOCOL_VERSIONS = [
@@ -93,12 +93,7 @@ export type VoratiqMcpOperator =
   | "list"
   | "prune";
 
-type DurableExecutionOperator =
-  | "spec"
-  | "run"
-  | "reduce"
-  | "verify"
-  | "message";
+type SwarmExecutionOperator = "spec" | "run" | "reduce" | "verify" | "message";
 
 export type TransportFailureKind =
   | "invalid_input"
@@ -284,7 +279,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_message",
     operator: "message",
     description:
-      "Send an isolated prompt to one or more Voratiq agents and persist their independent replies as a durable message session.",
+      "Send an isolated prompt to one or more Voratiq agents and persist their independent replies as a recorded message session.",
     inputSchemaSource: externalMessageExecutionInputSchema,
     buildArgs: (input) =>
       buildMessageExecutionArgs(input as ExternalMessageExecutionInput),
@@ -331,8 +326,73 @@ const toolDefinitions: readonly McpToolDefinition[] = toolSpecs.map((tool) => ({
     tool.mcpInputSchema ?? toToolInputJsonSchema(tool.inputSchemaSource),
 }));
 
+export const VORATIQ_GUIDE_RESOURCE_URI = "voratiq://guide" as const;
+
+const VORATIQ_GUIDE_RESOURCE_CONTENT = `# Voratiq Operator Guide
+
+Voratiq is a workflow system built around composable operators that launch, evaluate, and manage multi-agent work against a repository. It gives interactive agents a structured way to delegate coding tasks, inspect recorded state, verify outcomes, and apply accepted changes without doing all of that inline.
+
+## Operator Classes
+
+Voratiq operators fall into two main classes:
+
+- **Swarm operators** dispatch agents to produce, synthesize, or evaluate work: spec, run, reduce, verify, message
+- **Control operators** inspect state or mutate accepted outcomes: list, apply, prune
+
+## Swarm Operators
+
+**spec** – Drafts or refines a specification for a task from a description, an existing spec, or related repository context. Launches one or more spec agents and records their outputs as a spec session.
+
+**run** – Executes a spec session by launching run agents that read the spec, work against a sandboxed workspace, and produce artifacts including diffs and transcripts. Records a run session.
+
+**reduce** – Summarizes artifacts from a spec, run, or message session into a single reduced output suitable for comparison or follow-on work. Records a reduce session.
+
+**verify** – Evaluates a spec, run, reduction, or message session and records a structured verdict. This is Voratiq's main decision operator: use it to compare outputs, choose stronger candidates, and decide whether work should be applied, inspected further, rerun, or redirected.
+
+**message** – Sends an isolated prompt to one or more agents and persists each reply independently as a message session. Use for standalone questions, reviews, or exploration that does not require a full spec/run workflow.
+
+## Control Operators
+
+**list** – Lists or inspects recorded sessions for a given operator. This is the primary way to inspect swarm sessions; use it to poll progress, retrieve session IDs, and inspect recorded workflow state.
+
+**apply** – Applies an accepted run diff into the current working tree. Synchronous and non-durable; only invoke after verifying that the target run is in an acceptable state.
+
+**prune** – Removes pruneable run workspaces or all pruneable state. Synchronous and non-durable; requires explicit confirmation.
+
+## Workflow Composition
+
+Operators compose into many workflow shapes rather than one required path. Common patterns include: using message for standalone exploration or review; using spec → verify to compare candidate specs before execution; using spec → run when a task needs structured execution; using run → verify to choose among competing implementations; using reduce when multiple outputs need synthesis before a decision; and using verify whenever a workflow needs a structured recommendation instead of ad hoc judgment. The list operator can be called at any point to inspect recorded state across all operators.
+
+## Swarm Session Behavior
+
+The five swarm operators are spec, run, reduce, verify, and message. Each one creates a recorded session and may return before the session is finished. Once a session has been created, treat that session as the unit of work. A returned sessionId means the work has been launched, not completed. Use voratiq_list to inspect active sessions.
+
+## Status Interpretation
+
+Session status is primary; recipient status is supporting detail.
+
+- **queued** means the session has been accepted and recorded but its work has not started yet.
+- **running** means the session is active and remains the canonical in-flight unit of work.
+- **succeeded** means the session reached a successful terminal state; inspect its outputs and decide what should happen next.
+- **failed** means the session reached a terminal failure state.
+- **unresolved** means the session reached a terminal state without a clear winner or confident decision.
+
+Mixed recipient states do not imply session failure. Some recipients may fail while others continue running, and the session remains active until its session status becomes terminal.
+
+## extraContext Contract
+
+The extraContext field accepts an array of file paths pointing to additional readable files staged alongside the operator workspace. Pass file paths only — not raw text content, and not paths to files that operators already see by default (such as standard repository context). Passing raw content or redundant paths increases token usage without providing new information.
+
+## maxParallel Semantics
+
+The maxParallel field controls the maximum number of agent recipients running in parallel for an operator invocation. Set it deliberately: it directly affects cost and latency. Higher values increase concurrency but also increase total token expenditure and can create contention. Do not treat maxParallel as a free dial to increase throughput without modeling the downstream cost and latency impact.
+
+## Key Discipline Rules
+
+Commit to one workflow objective per session; do not interleave unrelated operator calls in the same sequence. Wait for stage boundaries before acting on results: read voratiq_list output before proceeding from one stage to the next. Use voratiq_list as the primary control plane for inspecting recorded state rather than reading session files directly.` as const;
+
 const VORATIQ_MCP_SERVER_INSTRUCTIONS =
-  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, verify, message, or interactive sessions. Durable workflow tools (voratiq_spec, voratiq_run, voratiq_reduce, voratiq_verify, voratiq_message) may acknowledge once a recorded session is created and continue running afterward; if a durable call times out or returns a non-terminal status, inspect progress with voratiq_list instead of retrying. Use voratiq_apply and voratiq_prune for synchronous control actions. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
+  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, verify, message, or interactive sessions. The swarm operators (voratiq_spec, voratiq_run, voratiq_reduce, voratiq_verify, voratiq_message) create recorded sessions and may acknowledge before finishing; once launched, treat the session as the unit of work. If a swarm call times out or returns a non-terminal status, inspect progress with voratiq_list instead of retrying. Use voratiq_apply and voratiq_prune for synchronous control actions. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
 
 const toolSpecsByName: ReadonlyMap<VoratiqMcpToolName, ToolSpec> = new Map(
   toolSpecs.map((tool) => [tool.name, tool]),
@@ -401,6 +461,7 @@ export function createVoratiqMcpRequestHandler(
             tools: {
               listChanged: true,
             },
+            resources: {},
           },
           instructions: VORATIQ_MCP_SERVER_INSTRUCTIONS,
           serverInfo: {
@@ -464,6 +525,40 @@ export function createVoratiqMcpRequestHandler(
           invokeCliJsonContract,
         });
         return createSuccessResponse(message.id, result);
+      }
+
+      if (message.method === "resources/list") {
+        return createSuccessResponse(message.id, {
+          resources: [
+            {
+              uri: VORATIQ_GUIDE_RESOURCE_URI,
+              name: "Voratiq Operator Guide",
+              description:
+                "Complete reference for Voratiq operators, workflow composition, swarm-session behavior, extraContext contract, and maxParallel semantics.",
+              mimeType: "text/plain",
+            },
+          ],
+        });
+      }
+
+      if (message.method === "resources/read") {
+        const uri = isRecord(message.params) ? message.params.uri : undefined;
+        if (uri === VORATIQ_GUIDE_RESOURCE_URI) {
+          return createSuccessResponse(message.id, {
+            contents: [
+              {
+                uri: VORATIQ_GUIDE_RESOURCE_URI,
+                mimeType: "text/plain",
+                text: VORATIQ_GUIDE_RESOURCE_CONTENT,
+              },
+            ],
+          });
+        }
+        return createErrorResponse(
+          message.id,
+          JSON_RPC_INVALID_PARAMS,
+          `Unknown resource URI: ${String(uri)}`,
+        );
       }
 
       return createErrorResponse(
@@ -976,8 +1071,8 @@ export function createDefaultCliJsonContractInvoker(
   target: VoratiqCliTarget = resolveVoratiqCliTarget(),
 ): InvokeCliJsonContract {
   return async (input) => {
-    if (isDurableExecutionOperator(input.operator)) {
-      return await invokeDurableSubprocessWithEarlyAck({
+    if (isSwarmExecutionOperator(input.operator)) {
+      return await invokeSwarmSubprocessWithEarlyAck({
         command: target.command,
         args: [...target.argsPrefix, ...input.args],
         operator: input.operator,
@@ -1045,10 +1140,10 @@ async function invokeSubprocess(options: {
   });
 }
 
-async function invokeDurableSubprocessWithEarlyAck(options: {
+async function invokeSwarmSubprocessWithEarlyAck(options: {
   command: string;
   args: string[];
-  operator: DurableExecutionOperator;
+  operator: SwarmExecutionOperator;
   cwd: string;
 }): Promise<CliInvocationResult> {
   const ackDir = await mkdtemp(join(tmpdir(), "voratiq-mcp-ack-"));
@@ -1109,10 +1204,10 @@ async function invokeDurableSubprocessWithEarlyAck(options: {
       });
     });
 
-    void waitForDurableSessionObservation({
+    void waitForSwarmSessionObservation({
       ackPath,
-      timeoutMs: DURABLE_EARLY_ACK_TIMEOUT_MS,
-      pollIntervalMs: DURABLE_EARLY_ACK_POLL_INTERVAL_MS,
+      timeoutMs: SWARM_EARLY_ACK_TIMEOUT_MS,
+      pollIntervalMs: SWARM_EARLY_ACK_POLL_INTERVAL_MS,
     })
       .then((observation) => {
         if (!observation) {
@@ -1124,7 +1219,7 @@ async function invokeDurableSubprocessWithEarlyAck(options: {
           kind: "success",
           exitCode: 0,
           stdout: JSON.stringify(
-            buildDurableOperatorAcknowledgementEnvelope({
+            buildSwarmSessionAcknowledgementEnvelope({
               operator: options.operator,
               sessionId: observation.sessionId,
               status: observation.status,
@@ -1137,9 +1232,9 @@ async function invokeDurableSubprocessWithEarlyAck(options: {
   });
 }
 
-function isDurableExecutionOperator(
+function isSwarmExecutionOperator(
   operator: VoratiqMcpOperator,
-): operator is DurableExecutionOperator {
+): operator is SwarmExecutionOperator {
   return (
     operator === "spec" ||
     operator === "run" ||
@@ -1149,7 +1244,7 @@ function isDurableExecutionOperator(
   );
 }
 
-async function waitForDurableSessionObservation(options: {
+async function waitForSwarmSessionObservation(options: {
   ackPath: string;
   timeoutMs: number;
   pollIntervalMs: number;
@@ -1163,7 +1258,7 @@ async function waitForDurableSessionObservation(options: {
   const deadline = Date.now() + options.timeoutMs;
 
   while (Date.now() < deadline) {
-    const observation = await readDurableSessionRecord({
+    const observation = await readSwarmSessionRecord({
       ackPath: options.ackPath,
     });
     if (observation) {
@@ -1175,7 +1270,7 @@ async function waitForDurableSessionObservation(options: {
   return undefined;
 }
 
-async function readDurableSessionRecord(options: { ackPath: string }): Promise<
+async function readSwarmSessionRecord(options: { ackPath: string }): Promise<
   | {
       sessionId: string;
       status: "queued" | "running" | "succeeded" | "failed";

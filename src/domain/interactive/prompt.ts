@@ -1,7 +1,7 @@
 import type { ToolAttachmentStatus } from "./model/types.js";
 
 export const FIRST_PARTY_ATTACHED_LAUNCH_PROMPT =
-  "Context only. Do not respond to this message unless asked. Voratiq MCP tools are attached in this repo. For Voratiq session history and workflow actions, prefer the Voratiq MCP tools over bash, search, or direct file reads." as const;
+  "Voratiq MCP tools are attached to this repository: voratiq_spec, voratiq_run, voratiq_reduce, voratiq_verify, voratiq_message, voratiq_list, voratiq_apply, and voratiq_prune. For Voratiq session history and workflow actions, prefer these tools over bash, search, or direct file reads. Read the guide resource at voratiq://guide for the full operator reference, workflow composition, and usage guidance." as const;
 
 export function resolveFirstPartyLaunchPrompt(
   toolAttachmentStatus: ToolAttachmentStatus,

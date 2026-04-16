@@ -1,8 +1,8 @@
 import type { RunRecordInitResult } from "../../domain/run/competition/phases.js";
 import type { RunRecord, RunSpecTarget } from "../../domain/run/model/types.js";
 import { appendRunRecord } from "../../domain/run/persistence/adapter.js";
-import { emitDurableOperatorAcknowledgement } from "../../utils/durable-ack.js";
 import { normalizePathForDisplay } from "../../utils/path.js";
+import { emitSwarmSessionAcknowledgement } from "../../utils/swarm-session-ack.js";
 import { cleanupRunWorkspace } from "../../workspace/cleanup.js";
 
 export interface RecordInitInput {
@@ -60,7 +60,7 @@ export async function initializeRunRecord(
 
   try {
     await appendRunRecord({ root, runsFilePath, record: initialRecord });
-    await emitDurableOperatorAcknowledgement({
+    await emitSwarmSessionAcknowledgement({
       operator: "run",
       sessionId: runId,
       status: "running",
