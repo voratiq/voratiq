@@ -8,6 +8,7 @@ import {
   getInteractiveSessionRecordSnapshot,
   rewriteInteractiveSessionRecord,
 } from "../../domain/interactive/persistence/adapter.js";
+import { buildRecordLifecycleCompleteFields } from "../../domain/shared/lifecycle.js";
 import { toErrorMessage } from "../../utils/errors.js";
 
 const INTERACTIVE_TERMINATION_WAIT_MS = 1_000;
@@ -177,16 +178,24 @@ function buildTerminatedRecord(
   status: "failed" | "aborted",
   reason?: string,
 ): InteractiveSessionRecord {
+  const lifecycle = buildRecordLifecycleCompleteFields({
+    existing: record,
+    startedAt: record.startedAt ?? record.createdAt,
+    completedAt: new Date().toISOString(),
+  });
+
   if (status === "aborted") {
     return {
       ...record,
       status: "succeeded",
+      ...lifecycle,
     };
   }
 
   return {
     ...record,
     status: "failed",
+    ...lifecycle,
     error: {
       code: "provider_launch_failed",
       message: buildTerminationMessage(status, reason),

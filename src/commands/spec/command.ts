@@ -2,13 +2,10 @@ import { executeCompetitionWithAdapter } from "../../competition/command-adapter
 import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import {
-  buildLifecycleStartFields,
-  buildOperationLifecycleCompleteFields,
-} from "../../domain/shared/lifecycle.js";
-import {
   createSpecCompetitionAdapter,
   type SpecCompetitionExecution,
 } from "../../domain/spec/competition/adapter.js";
+import { createSpecRecordMutators } from "../../domain/spec/model/mutators.js";
 import {
   deriveSpecStatusFromAgents,
   type SpecAgentEntry,
@@ -16,9 +13,7 @@ import {
 } from "../../domain/spec/model/types.js";
 import {
   appendSpecRecord,
-  finalizeSpecRecord,
   flushSpecRecordBuffer,
-  rewriteSpecRecord,
 } from "../../domain/spec/persistence/adapter.js";
 import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import { loadOperatorEnvironment } from "../../preflight/environment.js";
@@ -147,6 +142,11 @@ export async function executeSpecCommand(
     sessionId,
     status: "running",
   });
+  const mutators = createSpecRecordMutators({
+    root,
+    specsFilePath,
+    sessionId,
+  });
   let currentAgents: SpecAgentEntry[] = [...initialAgents];
 
   onStatus?.("Generating specification…");
@@ -175,14 +175,15 @@ export async function executeSpecCommand(
       adapter: {
         ...baseAdapter,
         onPreparationFailure: async (result) => {
-          currentAgents = await persistSpecAgentFailure({
-            root,
-            specsFilePath,
-            sessionId,
+          const updatedRecord = await mutators.recordAgentSnapshot({
             agentId: result.agentId,
+            status: "failed",
+            startedAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
             tokenUsage: result.tokenUsage,
             error: result.error ?? null,
           });
+          currentAgents = [...updatedRecord.agents];
           const failedAgent = currentAgents.find(
             (agent) => agent.agentId === result.agentId,
           );
@@ -197,12 +198,10 @@ export async function executeSpecCommand(
         },
         onCandidateRunning: async (prepared, index) => {
           await baseAdapter.onCandidateRunning?.(prepared, index);
-          currentAgents = await persistSpecAgentRunning({
-            root,
-            specsFilePath,
-            sessionId,
+          const updatedRecord = await mutators.recordAgentRunning({
             agentId: prepared.candidate.id,
           });
+          currentAgents = [...updatedRecord.agents];
           const runningAgent = currentAgents.find(
             (agent) => agent.agentId === prepared.candidate.id,
           );
@@ -213,12 +212,10 @@ export async function executeSpecCommand(
           });
         },
         onCandidateCompleted: async (_prepared, result) => {
-          currentAgents = await persistSpecAgentCompletion({
-            root,
-            specsFilePath,
-            sessionId,
-            result,
-          });
+          const updatedRecord = await mutators.recordAgentSnapshot(
+            toSpecAgentEntry(result),
+          );
+          currentAgents = [...updatedRecord.agents];
           const completedAgent = currentAgents.find(
             (agent) => agent.agentId === result.agentId,
           );
@@ -235,10 +232,7 @@ export async function executeSpecCommand(
     });
   } catch (error) {
     const detail = toErrorMessage(error);
-    await finalizeSpecRecord({
-      root,
-      specsFilePath,
-      sessionId,
+    await mutators.completeSpec({
       status: "failed",
       error: detail,
     });
@@ -258,10 +252,7 @@ export async function executeSpecCommand(
     agentEntries.map((a) => a.status),
   );
 
-  const latestRecord = await finalizeSpecRecord({
-    root,
-    specsFilePath,
-    sessionId,
+  const latestRecord = await mutators.completeSpec({
     status: sessionStatus,
     agents: agentEntries,
     error:
@@ -300,138 +291,6 @@ function collectAgentErrors(agents: readonly SpecAgentEntry[]): string | null {
   return errors.length > 0 ? errors.join("; ") : null;
 }
 
-async function persistSpecAgentRunning(options: {
-  root: string;
-  specsFilePath: string;
-  sessionId: string;
-  agentId: string;
-}): Promise<SpecAgentEntry[]> {
-  const { root, specsFilePath, sessionId, agentId } = options;
-  const timestamp = new Date().toISOString();
-  const updated = await rewriteSpecRecord({
-    root,
-    specsFilePath,
-    sessionId,
-    mutate: (record) => ({
-      ...record,
-      agents: record.agents.map((agent) =>
-        agent.agentId === agentId
-          ? {
-              ...agent,
-              status: "running",
-              ...buildLifecycleStartFields({
-                existingStartedAt: agent.startedAt,
-                timestamp,
-              }),
-              completedAt: undefined,
-              error: null,
-            }
-          : agent,
-      ),
-    }),
-  });
-  return [...updated.agents];
-}
-
-async function persistSpecAgentCompletion(options: {
-  root: string;
-  specsFilePath: string;
-  sessionId: string;
-  result: SpecCompetitionExecution;
-}): Promise<SpecAgentEntry[]> {
-  const { root, specsFilePath, sessionId, result } = options;
-  const completedAt = new Date().toISOString();
-  const updated = await rewriteSpecRecord({
-    root,
-    specsFilePath,
-    sessionId,
-    mutate: (record) => ({
-      ...record,
-      agents: record.agents.map((agent) => {
-        if (agent.agentId !== result.agentId) {
-          return agent;
-        }
-        const startedAt = buildLifecycleStartFields({
-          existingStartedAt: agent.startedAt,
-          timestamp: completedAt,
-        }).startedAt;
-        const completeFields = buildOperationLifecycleCompleteFields({
-          existing: {
-            startedAt,
-            completedAt: agent.completedAt,
-          },
-          completedAt,
-        });
-        if (result.status === "succeeded") {
-          return {
-            ...agent,
-            status: "succeeded",
-            ...completeFields,
-            outputPath: result.outputPath,
-            dataPath: result.dataPath,
-            contentHash: result.contentHash,
-            tokenUsage: result.tokenUsage,
-            error: null,
-          };
-        }
-        return {
-          ...agent,
-          status: "failed",
-          ...completeFields,
-          tokenUsage: result.tokenUsage,
-          error: result.error ?? null,
-        };
-      }),
-    }),
-  });
-  return [...updated.agents];
-}
-
-async function persistSpecAgentFailure(options: {
-  root: string;
-  specsFilePath: string;
-  sessionId: string;
-  agentId: string;
-  tokenUsage?: SpecCompetitionExecution["tokenUsage"];
-  error?: string | null;
-}): Promise<SpecAgentEntry[]> {
-  const { root, specsFilePath, sessionId, agentId, tokenUsage, error } =
-    options;
-  const completedAt = new Date().toISOString();
-  const updated = await rewriteSpecRecord({
-    root,
-    specsFilePath,
-    sessionId,
-    mutate: (record) => ({
-      ...record,
-      agents: record.agents.map((agent) => {
-        if (agent.agentId !== agentId) {
-          return agent;
-        }
-        const startedAt = buildLifecycleStartFields({
-          existingStartedAt: agent.startedAt,
-          timestamp: completedAt,
-        }).startedAt;
-        const completeFields = buildOperationLifecycleCompleteFields({
-          existing: {
-            startedAt,
-            completedAt: agent.completedAt,
-          },
-          completedAt,
-        });
-        return {
-          ...agent,
-          status: "failed",
-          ...completeFields,
-          ...(tokenUsage ? { tokenUsage } : {}),
-          error: error ?? null,
-        };
-      }),
-    }),
-  });
-  return [...updated.agents];
-}
-
 function mapExecutionResultsToSpecAgents(
   executionResults: readonly SpecCompetitionExecution[],
   startedAt: string,
@@ -461,4 +320,28 @@ function mapExecutionResultsToSpecAgents(
       error: result.error ?? null,
     };
   });
+}
+
+function toSpecAgentEntry(result: SpecCompetitionExecution): SpecAgentEntry {
+  const completedAt = new Date().toISOString();
+  if (result.status === "succeeded") {
+    return {
+      agentId: result.agentId,
+      status: "succeeded",
+      completedAt,
+      outputPath: result.outputPath,
+      dataPath: result.dataPath,
+      contentHash: result.contentHash,
+      tokenUsage: result.tokenUsage,
+      error: null,
+    };
+  }
+
+  return {
+    agentId: result.agentId,
+    status: "failed",
+    completedAt,
+    tokenUsage: result.tokenUsage,
+    error: result.error ?? null,
+  };
 }

@@ -248,6 +248,8 @@ export function normalizeListDetailSession(
     const interactiveRecord = record as InteractiveSessionRecord;
     return {
       ...session,
+      startedAt: interactiveRecord.startedAt,
+      completedAt: interactiveRecord.completedAt,
       workspacePath: getInteractiveSessionDirectoryPath(
         interactiveRecord.sessionId,
       ),
@@ -255,6 +257,8 @@ export function normalizeListDetailSession(
         {
           agentId: interactiveRecord.agentId,
           status: interactiveRecord.status,
+          startedAt: interactiveRecord.startedAt,
+          completedAt: interactiveRecord.completedAt,
           outputPath: interactiveRecord.chat?.captured
             ? interactiveRecord.chat.artifactPath
             : undefined,

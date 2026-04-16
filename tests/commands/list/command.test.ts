@@ -1550,12 +1550,14 @@ describe("executeListCommand", () => {
 
   it("renders interactive detail output and json without target metadata", async () => {
     const createdAt = "2026-03-01T00:00:00.000Z";
+    const completedAt = "2026-03-01T00:05:00.000Z";
     await appendInteractiveSessionRecord({
       root: testDir,
       record: buildInteractiveRecord({
         sessionId: "interactive-detail",
         status: "succeeded",
         createdAt,
+        completedAt,
         chat: {
           captured: true,
           format: "jsonl",
@@ -1574,7 +1576,7 @@ describe("executeListCommand", () => {
 
     expect(result.output).toContain("interactive-detail");
     expect(result.output).toContain("SUCCEEDED");
-    expect(result.output).toMatch(/Elapsed\s+—/u);
+    expect(result.output).toMatch(/Elapsed\s+5m/u);
     expect(result.output).toContain(
       `Created    ${formatRunTimestamp(createdAt)}`,
     );
@@ -1595,11 +1597,15 @@ describe("executeListCommand", () => {
         sessionId: "interactive-detail",
         status: "succeeded",
         createdAt: "2026-03-01T00:00:00.000Z",
+        startedAt: "2026-03-01T00:00:00.000Z",
+        completedAt: "2026-03-01T00:05:00.000Z",
         workspacePath: ".voratiq/interactive/sessions/interactive-detail",
         agents: [
           {
             agentId: "agent-a",
             status: "succeeded",
+            startedAt: "2026-03-01T00:00:00.000Z",
+            completedAt: "2026-03-01T00:05:00.000Z",
             artifacts: [
               {
                 kind: "chat",
@@ -1925,9 +1931,16 @@ function buildInteractiveRecord(
     status: InteractiveSessionRecord["status"];
   },
 ): InteractiveSessionRecord {
+  const createdAt = params.createdAt ?? "2026-03-01T00:00:00.000Z";
+  const startedAt = params.startedAt ?? createdAt;
+  const completedAt =
+    params.completedAt ??
+    (params.status === "running" ? undefined : "2026-03-01T00:05:00.000Z");
   return {
     sessionId: params.sessionId,
-    createdAt: params.createdAt ?? "2026-03-01T00:00:00.000Z",
+    createdAt,
+    startedAt,
+    ...(completedAt ? { completedAt } : {}),
     status: params.status,
     agentId: params.agentId ?? "agent-a",
     toolAttachmentStatus: params.toolAttachmentStatus ?? "attached",

@@ -516,7 +516,11 @@ function buildSuccessfulLaunchResult(
     completion: Promise.resolve({
       sessionId: "session-1",
       createdAt: new Date().toISOString(),
+      startedAt: new Date().toISOString(),
       status,
+      ...(status === "running"
+        ? {}
+        : { completedAt: new Date().toISOString() }),
       agentId: "agent",
       toolAttachmentStatus: "not-requested",
     } as InteractiveSessionRecord),

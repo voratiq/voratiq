@@ -753,6 +753,8 @@ function buildBaseRecord(options: {
   status: InteractiveSessionRecord["status"];
   agentId: string;
   toolAttachmentStatus: ToolAttachmentStatus;
+  startedAt?: string;
+  completedAt?: string;
   chat?: InteractiveSessionRecord["chat"];
   error?: InteractiveSessionRecord["error"];
 }): InteractiveSessionRecord {
@@ -762,12 +764,19 @@ function buildBaseRecord(options: {
     status,
     agentId,
     toolAttachmentStatus,
+    startedAt,
+    completedAt,
     chat,
     error,
   } = options;
+  const resolvedStartedAt = startedAt ?? createdAt;
   return {
     sessionId,
     createdAt,
+    startedAt: resolvedStartedAt,
+    ...(status !== "running"
+      ? { completedAt: completedAt ?? resolvedStartedAt }
+      : {}),
     status,
     agentId,
     toolAttachmentStatus,
