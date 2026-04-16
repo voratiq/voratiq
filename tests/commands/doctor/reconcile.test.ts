@@ -159,13 +159,13 @@ describe("executeDoctorReconcile", () => {
         }),
       ]),
     );
-    expect(claudeEntries).toHaveLength(5);
+    expect(claudeEntries).toHaveLength(7);
     for (const entry of claudeEntries) {
       expect(entry.enabled).toBe(true);
       expect(entry.binary).toContain("/bin/claude");
     }
     expect(orchestration.profiles.default.run.agents).toEqual([
-      { id: "claude-opus-4-6" },
+      { id: "claude-opus-4-7-xhigh" },
       { id: "gpt-5-4-high" },
     ]);
     expect(orchestration.profiles.lite.run.agents).toEqual([
@@ -234,7 +234,7 @@ describe("executeDoctorReconcile", () => {
       (entry) => entry.provider === "claude",
     );
 
-    expect(claudeEntries).toHaveLength(5);
+    expect(claudeEntries).toHaveLength(7);
     for (const entry of claudeEntries) {
       expect(entry.enabled).toBe(true);
       expect(entry.binary).toContain("/bin/claude");
