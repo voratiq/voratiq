@@ -727,7 +727,7 @@ describe("external CLI JSON contract", () => {
         {
           level: "warn",
           message:
-            "Warning: Selection policy loaded with warnings.\nVerification did not produce a resolvable candidate; manual selection required.",
+            "Warning: Selection policy loaded with warnings.\nVerification did not produce a resolvable candidate; manual review required.",
         },
         {
           level: "warn",

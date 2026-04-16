@@ -1,5 +1,8 @@
 import type { SelectionDecision } from "./result.js";
 
+const UNRESOLVED_VERIFICATION_MESSAGE =
+  "Verification did not produce a resolvable candidate; manual review required.";
+
 export interface AutoVerificationSelectionProceed {
   kind: "proceed";
 }
@@ -14,10 +17,9 @@ export type AutoVerificationSelectionDisposition =
   | AutoVerificationSelectionActionRequired;
 
 export function classifyAutoVerificationSelection(options: {
-  targetKind: "spec" | "run";
   selection?: SelectionDecision;
 }): AutoVerificationSelectionDisposition {
-  const { targetKind, selection } = options;
+  const { selection } = options;
 
   if (selection?.state === "resolvable") {
     return { kind: "proceed" };
@@ -25,28 +27,6 @@ export function classifyAutoVerificationSelection(options: {
 
   return {
     kind: "action_required",
-    detail: describeActionRequiredSelection({ targetKind, selection }),
+    detail: UNRESOLVED_VERIFICATION_MESSAGE,
   };
-}
-
-function describeActionRequiredSelection(options: {
-  targetKind: "spec" | "run";
-  selection?: SelectionDecision;
-}): string {
-  const { targetKind, selection } = options;
-
-  if (
-    selection?.state === "unresolved" &&
-    selection.unresolvedReasons.some(
-      (reason) => reason.code === "verifier_disagreement",
-    )
-  ) {
-    return targetKind === "spec"
-      ? "Verifiers disagreed on the preferred draft; manual selection required."
-      : "Verifiers disagreed on the preferred candidate; manual selection required.";
-  }
-
-  return targetKind === "spec"
-    ? "Verification did not select a draft; manual selection required."
-    : "Verification did not produce a resolvable candidate; manual selection required.";
 }

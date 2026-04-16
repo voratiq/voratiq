@@ -464,10 +464,10 @@ describe("voratiq verify", () => {
     expect(result.status).toBe("unresolved");
     expect(result.body).toContain("verify-unresolved UNRESOLVED");
     expect(result.warningMessage).toContain(
-      "Verification did not produce a resolvable candidate; manual selection required.",
+      "Verification did not produce a resolvable candidate; manual review required.",
     );
     expect(result.body).toContain(
-      "Verification did not produce a resolvable candidate; manual selection required.",
+      "Verification did not produce a resolvable candidate; manual review required.",
     );
     expect(result.body).not.toContain("To apply a solution:");
   });
@@ -1101,10 +1101,10 @@ describe("voratiq verify", () => {
     expect(result.status).toBe("unresolved");
     expect(result.selectedSpecPath).toBeUndefined();
     expect(result.warningMessage).toContain(
-      "Verification did not select a spec path; manual review required.",
+      "Verification did not produce a resolvable candidate; manual review required.",
     );
     expect(result.body).toContain(
-      "Verification did not select a spec path; manual review required.",
+      "Verification did not produce a resolvable candidate; manual review required.",
     );
     expect(result.body).toContain("verify-spec-unresolved UNRESOLVED");
   });
