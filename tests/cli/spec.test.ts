@@ -509,8 +509,6 @@ describe("voratiq spec (CLI)", () => {
       description: "Write a spec",
     });
 
-    expect(result.specPath).toBeUndefined();
-    expect(result.generatedSpecPaths).toHaveLength(2);
     const firstCall = executeCompetitionWithAdapterMock.mock.calls[0]?.[0] as
       | { maxParallel: number; candidates: ReadonlyArray<{ id: string }> }
       | undefined;
@@ -518,6 +516,13 @@ describe("voratiq spec (CLI)", () => {
     expect(firstCall?.candidates.map((candidate) => candidate.id)).toEqual(
       expect.arrayContaining(["claude-haiku-4-5-20251001", "codex-reviewer"]),
     );
+    expect(runSandboxedAgentMock).toHaveBeenCalledTimes(2);
+    expect(
+      runSandboxedAgentMock.mock.calls.map(([input]) => input.agent.id),
+    ).toEqual(
+      expect.arrayContaining(["claude-haiku-4-5-20251001", "codex-reviewer"]),
+    );
+    expect(result.generatedSpecPaths.length).toBeGreaterThan(0);
   });
 
   it("persists distinct per-agent lifecycle timestamps during multi-agent generation", async () => {

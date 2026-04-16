@@ -9,6 +9,7 @@ export interface ProviderLaunchPreparationInput {
   agent: AgentDefinition;
   root: string;
   toolDeclarations: readonly NativeToolDeclaration[];
+  sessionScopedMcpEnv?: Record<string, string>;
   prompt?: string;
   launchMode?: "default" | "first-party";
   firstPartyMcpResolution?: FirstPartyMcpStatusAndArgs;
@@ -60,19 +61,22 @@ export async function prepareProviderNativeLaunch(
 function prepareCodexLaunch(
   options: ProviderLaunchPreparationInput,
 ): Promise<ProviderLaunchPreparationResult> {
-  const args = applyPositionalPrompt(
-    applyNativeQaLaunchArgs("codex", sanitizeCodexArgs(options.agent)),
-    options.prompt,
-  );
-
   const mcp = resolveFirstPartyMcpStatusAndArgs({
     launchMode: options.launchMode,
     toolDeclarations: options.toolDeclarations,
     firstPartyMcpResolution: options.firstPartyMcpResolution,
   });
+  const args = applyPositionalPrompt(
+    [
+      ...applyNativeQaLaunchArgs("codex", sanitizeCodexArgs(options.agent)),
+      ...buildCodexLaunchScopedMcpEnvArgs(options.sessionScopedMcpEnv),
+      ...mcp.additionalArgs,
+    ],
+    options.prompt,
+  );
 
   return Promise.resolve({
-    args: [...args, ...mcp.additionalArgs],
+    args,
     env: {},
     toolAttachmentStatus: mcp.toolAttachmentStatus,
     artifactCaptureSupported: true,
@@ -225,6 +229,23 @@ function sanitizeGeminiArgs(agent: AgentDefinition): string[] {
     sanitized.push(token);
   }
   return ensureModelArg(sanitized, agent.model);
+}
+
+function buildCodexLaunchScopedMcpEnvArgs(
+  env: Record<string, string> | undefined,
+): string[] {
+  if (!env) {
+    return [];
+  }
+
+  const args: string[] = [];
+  for (const [key, value] of Object.entries(env)) {
+    args.push(
+      "-c",
+      `mcp_servers.${BUNDLED_VORATIQ_TOOL_TARGET_NAME}.env.${key}=${JSON.stringify(value)}`,
+    );
+  }
+  return args;
 }
 
 function ensureModelArg(argv: readonly string[], model: string): string[] {

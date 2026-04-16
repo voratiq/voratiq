@@ -123,31 +123,28 @@ describe("interactive native launch substrate", () => {
       readFile(prepared.prepared.promptPath ?? "", "utf8"),
     ).resolves.toBe(FIRST_PARTY_ATTACHED_LAUNCH_PROMPT);
     expect(prepared.prepared.invocation.env.HOME).toBe(fixture.root);
-    expect(prepared.prepared.invocation.env.CODEX_HOME).toBeUndefined();
-    expect(prepared.prepared.invocation.args).not.toContain("--config");
+    expect(
+      prepared.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ID,
+    ).toBe(sessionId);
+    expect(
+      prepared.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ROOT,
+    ).toBeUndefined();
+    expect(prepared.prepared.invocation.args).toEqual(
+      expect.arrayContaining([
+        "-c",
+        `mcp_servers.voratiq.env.VORATIQ_INTERACTIVE_SESSION_ID="${sessionId}"`,
+      ]),
+    );
     expect(mcpCommandRunner).toHaveBeenCalledWith({
       command: fixture.binaryPath,
       args: ["mcp", "get", "--json", "voratiq"],
       cwd: fixture.root,
     });
+    expect(mcpCommandRunner).toHaveBeenCalledTimes(1);
     const addCall = mcpCommandRunner.mock.calls.find(
       ([input]) => input.args[1] === "add",
     );
-    expect(addCall).toBeDefined();
-    expect(addCall?.[0].args).toEqual([
-      "mcp",
-      "add",
-      "--env",
-      `VORATIQ_INTERACTIVE_SESSION_ID=${sessionId}`,
-      "--env",
-      `VORATIQ_INTERACTIVE_SESSION_ROOT=${prepared.prepared.sessionRoot}`,
-      "voratiq",
-      "--",
-      "node",
-      "/repo/dist/bin.js",
-      "mcp",
-      "--stdio",
-    ]);
+    expect(addCall).toBeUndefined();
 
     const record = await readJson(prepared.prepared.recordPath);
     expect(record).toMatchObject({
@@ -337,10 +334,6 @@ describe("interactive native launch substrate", () => {
         "--scope",
         "user",
         "--trust",
-        "-e",
-        `VORATIQ_INTERACTIVE_SESSION_ID=${sessionId}`,
-        "-e",
-        `VORATIQ_INTERACTIVE_SESSION_ROOT=${prepared.prepared.sessionRoot}`,
         "voratiq",
         "node",
         "/repo/dist/bin.js",
@@ -354,6 +347,12 @@ describe("interactive native launch substrate", () => {
       args: ["mcp", "list"],
       cwd: fixture.root,
     });
+    expect(
+      prepared.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ID,
+    ).toBe(sessionId);
+    expect(
+      prepared.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ROOT,
+    ).toBeUndefined();
   });
 
   it("skips gemini MCP prompt when settings preference is never", async () => {
@@ -750,8 +749,255 @@ describe("interactive native launch substrate", () => {
     await expect(
       readFile(second.prepared.promptPath ?? "", "utf8"),
     ).resolves.toBe(FIRST_PARTY_ATTACHED_LAUNCH_PROMPT);
-    expect(first.prepared.invocation.env.CODEX_HOME).toBeUndefined();
-    expect(second.prepared.invocation.env.CODEX_HOME).toBeUndefined();
+    expect(first.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ID).toBe(
+      sessionOne,
+    );
+    expect(second.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ID).toBe(
+      sessionTwo,
+    );
+    expect(
+      first.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ROOT,
+    ).toBeUndefined();
+    expect(
+      second.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ROOT,
+    ).toBeUndefined();
+    expect(first.prepared.invocation.args).toEqual(
+      expect.arrayContaining([
+        "-c",
+        `mcp_servers.voratiq.env.VORATIQ_INTERACTIVE_SESSION_ID="${sessionOne}"`,
+      ]),
+    );
+    expect(second.prepared.invocation.args).toEqual(
+      expect.arrayContaining([
+        "-c",
+        `mcp_servers.voratiq.env.VORATIQ_INTERACTIVE_SESSION_ID="${sessionTwo}"`,
+      ]),
+    );
+    expect(mcpCommandRunner).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves existing codex MCP config byte-for-byte unchanged when the bundled server is already installed", async () => {
+    const fixture = await createWorkspaceFixture();
+    const sessionId = "20260401-120006-stable";
+    const codexConfigPath = join(fixture.root, "codex-config.toml");
+    const logPath = join(fixture.root, "mcp.log");
+    const before = [
+      "[mcp_servers.voratiq]",
+      'command = "node"',
+      'args = ["/repo/dist/bin.js", "mcp", "--stdio"]',
+      "",
+      "[mcp_servers.voratiq.tools.voratiq_message]",
+      'approval_mode = "untrusted"',
+      "",
+    ].join("\n");
+    await writeFile(codexConfigPath, before, "utf8");
+    await writeFile(
+      fixture.binaryPath,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        `config_path=${JSON.stringify(codexConfigPath)}`,
+        `log_path=${JSON.stringify(logPath)}`,
+        'if [[ "${1:-}" == "mcp" && "${2:-}" == "get" ]]; then',
+        '  printf \'%s\\n\' "$*" >> "$log_path"',
+        "  cat <<'JSON'",
+        '{"name":"voratiq","command":"node","args":["/repo/dist/bin.js","mcp","--stdio"]}',
+        "JSON",
+        "  exit 0",
+        "fi",
+        'if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]; then',
+        '  printf \'%s\\n\' "$*" >> "$log_path"',
+        "  printf '\\nmutated = true\\n' >> \"$config_path\"",
+        "  exit 0",
+        "fi",
+        "exit 0",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await chmod(fixture.binaryPath, 0o755);
+
+    const prepared = await prepareNativeInteractiveSession({
+      root: fixture.root,
+      agentId: "codex-test",
+      sessionId,
+      launchMode: "first-party",
+      voratiqCliTarget: {
+        command: "node",
+        argsPrefix: ["/repo/dist/bin.js"],
+      },
+    });
+
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) {
+      return;
+    }
+
+    await expect(readFile(codexConfigPath, "utf8")).resolves.toBe(before);
+    await expect(readFile(logPath, "utf8")).resolves.toBe(
+      "mcp get --json voratiq\n",
+    );
+  });
+
+  it("keeps concurrent first-party codex preparations isolated in ambient env without shared config writes", async () => {
+    const fixture = await createWorkspaceFixture();
+    const codexConfigPath = join(fixture.root, "codex-config.toml");
+    const logPath = join(fixture.root, "mcp.log");
+    const before = [
+      "[mcp_servers.voratiq]",
+      'command = "node"',
+      'args = ["/repo/dist/bin.js", "mcp", "--stdio"]',
+      "",
+      "[mcp_servers.voratiq.tools.voratiq_message]",
+      'approval_mode = "trusted"',
+      "",
+    ].join("\n");
+    await writeFile(codexConfigPath, before, "utf8");
+    await writeFile(
+      fixture.binaryPath,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        `config_path=${JSON.stringify(codexConfigPath)}`,
+        `log_path=${JSON.stringify(logPath)}`,
+        'if [[ "${1:-}" == "mcp" && "${2:-}" == "get" ]]; then',
+        '  printf \'%s\\n\' "$*" >> "$log_path"',
+        "  cat <<'JSON'",
+        '{"name":"voratiq","command":"node","args":["/repo/dist/bin.js","mcp","--stdio"]}',
+        "JSON",
+        "  exit 0",
+        "fi",
+        'if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]; then',
+        '  printf \'%s\\n\' "$*" >> "$log_path"',
+        "  printf '\\nmutated = true\\n' >> \"$config_path\"",
+        "  exit 0",
+        "fi",
+        "exit 0",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await chmod(fixture.binaryPath, 0o755);
+
+    const [first, second] = await Promise.all([
+      prepareNativeInteractiveSession({
+        root: fixture.root,
+        agentId: "codex-test",
+        sessionId: "20260401-120007-conca",
+        launchMode: "first-party",
+        voratiqCliTarget: {
+          command: "node",
+          argsPrefix: ["/repo/dist/bin.js"],
+        },
+      }),
+      prepareNativeInteractiveSession({
+        root: fixture.root,
+        agentId: "codex-test",
+        sessionId: "20260401-120008-concb",
+        launchMode: "first-party",
+        voratiqCliTarget: {
+          command: "node",
+          argsPrefix: ["/repo/dist/bin.js"],
+        },
+      }),
+    ]);
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) {
+      return;
+    }
+
+    expect(first.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ID).toBe(
+      "20260401-120007-conca",
+    );
+    expect(second.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ID).toBe(
+      "20260401-120008-concb",
+    );
+    expect(
+      first.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ID,
+    ).not.toBe(second.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ID);
+    expect(
+      first.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ROOT,
+    ).toBeUndefined();
+    expect(
+      second.prepared.invocation.env.VORATIQ_INTERACTIVE_SESSION_ROOT,
+    ).toBeUndefined();
+    expect(first.prepared.invocation.args).toEqual(
+      expect.arrayContaining([
+        "-c",
+        'mcp_servers.voratiq.env.VORATIQ_INTERACTIVE_SESSION_ID="20260401-120007-conca"',
+      ]),
+    );
+    expect(second.prepared.invocation.args).toEqual(
+      expect.arrayContaining([
+        "-c",
+        'mcp_servers.voratiq.env.VORATIQ_INTERACTIVE_SESSION_ID="20260401-120008-concb"',
+      ]),
+    );
+    await expect(readFile(codexConfigPath, "utf8")).resolves.toBe(before);
+    await expect(readFile(logPath, "utf8")).resolves.toBe(
+      ["mcp get --json voratiq", "mcp get --json voratiq", ""].join("\n"),
+    );
+  });
+
+  it("passes interactive session lineage as a launch-scoped codex config override", async () => {
+    const fixture = await createWorkspaceFixture();
+    const argvCapturePath = join(fixture.root, "codex-argv.txt");
+    const mcpCommandRunner = jest.fn<ProviderMcpCommandRunner>(() =>
+      Promise.resolve({
+        exitCode: 0,
+        stdout: JSON.stringify({
+          name: "voratiq",
+          command: "node",
+          args: ["/repo/dist/bin.js", "mcp", "--stdio"],
+        }),
+        stderr: "",
+      }),
+    );
+    await writeFile(
+      fixture.binaryPath,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        `capture_path=${JSON.stringify(argvCapturePath)}`,
+        'printf \'%s\\n\' "$@" > "$capture_path"',
+        "exit 0",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await chmod(fixture.binaryPath, 0o755);
+    const sessionId = "20260401-120009-envok";
+
+    const prepared = await prepareNativeInteractiveSession({
+      root: fixture.root,
+      agentId: "codex-test",
+      sessionId,
+      launchMode: "first-party",
+      mcpCommandRunner,
+      voratiqCliTarget: {
+        command: "node",
+        argsPrefix: ["/repo/dist/bin.js"],
+      },
+    });
+    if (!prepared.ok) {
+      throw new Error(prepared.failure.message);
+    }
+    expect(prepared.ok).toBe(true);
+
+    const launched = await spawnPreparedInteractiveSession(prepared.prepared, {
+      stdio: "ignore",
+    });
+    expect(launched.ok).toBe(true);
+    if (!launched.ok) {
+      return;
+    }
+    await launched.completion;
+
+    await expect(readFile(argvCapturePath, "utf8")).resolves.toContain(
+      `mcp_servers.voratiq.env.VORATIQ_INTERACTIVE_SESSION_ID="${sessionId}"`,
+    );
   });
 });
 
