@@ -36,6 +36,8 @@ describe("list target normalization", () => {
     const record: InteractiveSessionRecord = {
       sessionId: "interactive-123",
       createdAt: "2026-03-01T00:00:00.000Z",
+      startedAt: "2026-03-01T00:00:00.000Z",
+      completedAt: "2026-03-01T00:05:00.000Z",
       status: "succeeded",
       agentId: "agent-a",
       toolAttachmentStatus: "attached",

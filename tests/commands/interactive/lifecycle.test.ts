@@ -70,6 +70,7 @@ describe("interactive lifecycle", () => {
     const existingRecord: InteractiveSessionRecord = {
       sessionId: SESSION_ID,
       createdAt: "2026-04-02T00:00:00.000Z",
+      startedAt: "2026-04-02T00:00:00.000Z",
       status: "running",
       agentId: "codex-test",
       toolAttachmentStatus: "attached",
@@ -106,6 +107,8 @@ describe("interactive lifecycle", () => {
     expect(rewriteInteractiveSessionRecordMock).toHaveBeenCalledTimes(1);
     expect(mutatedRecord).toMatchObject({
       status: "succeeded",
+      startedAt: "2026-04-02T00:00:00.000Z",
+      completedAt: expect.any(String),
     });
     expect(disposeInteractiveSessionBufferMock).toHaveBeenCalledWith({
       root: "/repo",
@@ -123,6 +126,7 @@ describe("interactive lifecycle", () => {
     const existingRecord: InteractiveSessionRecord = {
       sessionId: SESSION_ID,
       createdAt: "2026-04-02T00:00:00.000Z",
+      startedAt: "2026-04-02T00:00:00.000Z",
       status: "running",
       agentId: "codex-test",
       toolAttachmentStatus: "attached",
@@ -148,6 +152,8 @@ describe("interactive lifecycle", () => {
     expect(rewriteInteractiveSessionRecordMock).toHaveBeenCalledTimes(1);
     expect(mutatedRecord).toMatchObject({
       status: "failed",
+      startedAt: "2026-04-02T00:00:00.000Z",
+      completedAt: expect.any(String),
       error: {
         code: "provider_launch_failed",
         message: "Interactive session failed after uncaught exception.",
@@ -163,6 +169,8 @@ describe("interactive lifecycle", () => {
       completion: Promise.resolve({
         sessionId: SESSION_ID,
         createdAt: "2026-04-02T00:00:00.000Z",
+        startedAt: "2026-04-02T00:00:00.000Z",
+        completedAt: "2026-04-02T00:00:05.000Z",
         status: "failed",
         agentId: "claude-test",
         toolAttachmentStatus: "attached",
@@ -176,6 +184,8 @@ describe("interactive lifecycle", () => {
     getInteractiveSessionRecordSnapshotMock.mockResolvedValue({
       sessionId: SESSION_ID,
       createdAt: "2026-04-02T00:00:00.000Z",
+      startedAt: "2026-04-02T00:00:00.000Z",
+      completedAt: "2026-04-02T00:00:05.000Z",
       status: "failed",
       agentId: "claude-test",
       toolAttachmentStatus: "attached",
@@ -203,6 +213,8 @@ describe("interactive lifecycle", () => {
     const completedRecord: InteractiveSessionRecord = {
       sessionId: SESSION_ID,
       createdAt: "2026-04-02T00:00:00.000Z",
+      startedAt: "2026-04-02T00:00:00.000Z",
+      completedAt: "2026-04-02T00:00:03.000Z",
       status: "succeeded",
       agentId: "claude-test",
       toolAttachmentStatus: "attached",

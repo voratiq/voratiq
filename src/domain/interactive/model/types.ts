@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { agentIdSchema } from "../../../configs/agents/types.js";
 import { repoRelativeRecordPathSchema } from "../../../persistence/record-path-schema.js";
+import { validateRecordLifecycleTimestamps } from "../../shared/lifecycle.js";
 
 const INTERACTIVE_SESSION_STATUS_VALUES = [
   "running",
@@ -111,6 +112,8 @@ export const interactiveSessionRecordSchema = z
   .object({
     sessionId: z.string().min(1),
     createdAt: z.string().min(1),
+    startedAt: z.string().optional(),
+    completedAt: z.string().optional(),
     status: interactiveSessionStatusSchema,
     agentId: agentIdSchema,
     task: z.string().min(1).optional(),
@@ -118,7 +121,23 @@ export const interactiveSessionRecordSchema = z
     chat: interactiveSessionChatRecordSchema.optional(),
     error: interactiveSessionErrorRecordSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((record, ctx) => {
+    validateRecordLifecycleTimestamps(
+      {
+        status: record.status,
+        createdAt: record.createdAt,
+        startedAt: record.startedAt,
+        completedAt: record.completedAt,
+      },
+      ctx,
+      {
+        queued: [],
+        running: ["running"],
+        terminal: ["succeeded", "failed"],
+      },
+    );
+  });
 export type InteractiveSessionRecord = z.infer<
   typeof interactiveSessionRecordSchema
 >;

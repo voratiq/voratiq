@@ -21,6 +21,10 @@ import {
   getInteractiveSessionRecordPath,
   getInteractiveSessionsDirectoryPath,
 } from "../../../workspace/session-paths.js";
+import {
+  buildLifecycleStartFields,
+  buildRecordLifecycleCompleteFields,
+} from "../../shared/lifecycle.js";
 import type {
   InteractiveSessionIndexEntry,
   InteractiveSessionRecord,
@@ -194,10 +198,30 @@ export async function updateInteractiveSessionStatus(options: {
   return await rewriteInteractiveSessionRecord({
     root,
     sessionId,
-    mutate: (record) => ({
-      ...record,
-      status,
-    }),
+    mutate: (record) => {
+      const timestamp = new Date().toISOString();
+      if (status === "running") {
+        return {
+          ...record,
+          status,
+          ...buildLifecycleStartFields({
+            existingStartedAt: record.startedAt,
+            timestamp,
+          }),
+          completedAt: undefined,
+        };
+      }
+
+      return {
+        ...record,
+        status,
+        ...buildRecordLifecycleCompleteFields({
+          existing: record,
+          startedAt: record.startedAt ?? record.createdAt,
+          completedAt: timestamp,
+        }),
+      };
+    },
     forceFlush: true,
   });
 }

@@ -64,7 +64,10 @@ import {
   formatVerifyElapsed,
   renderVerifyTranscript,
 } from "../../render/transcripts/verify.js";
-import { formatRenderLifecycleRowDuration } from "../../render/utils/duration.js";
+import {
+  formatRenderLifecycleDuration,
+  formatRenderLifecycleRowDuration,
+} from "../../render/utils/duration.js";
 import { pathExists } from "../../utils/fs.js";
 import {
   formatTargetDisplay,
@@ -396,7 +399,12 @@ function renderDetailOutput(
     return renderInteractiveTranscript({
       sessionId: session.sessionId,
       createdAt: session.createdAt,
-      elapsed: DASH,
+      elapsed:
+        formatInteractiveElapsed({
+          status: session.status as InteractiveSessionRecord["status"],
+          startedAt: session.startedAt,
+          completedAt: session.completedAt,
+        }) ?? DASH,
       workspacePath: session.workspacePath,
       status: session.status as InteractiveSessionRecord["status"],
       agents: [
@@ -405,7 +413,7 @@ function renderDetailOutput(
           status:
             (interactiveAgent?.status as InteractiveSessionRecord["status"]) ??
             "failed",
-          duration: DASH,
+          duration: formatInteractiveAgentDuration(interactiveAgent),
           outputPath: interactiveAgent?.outputPath,
         },
       ],
@@ -678,5 +686,33 @@ function formatVerifyAgentDuration(agent: NormalizedListAgent): string {
       completedAt: agent.completedAt,
     },
     terminalStatuses: TERMINAL_VERIFICATION_STATUSES,
+  });
+}
+
+function formatInteractiveElapsed(input: {
+  status: InteractiveSessionRecord["status"];
+  startedAt?: string;
+  completedAt?: string;
+}): string | undefined {
+  return formatRenderLifecycleDuration({
+    lifecycle: input,
+    terminalStatuses: ["succeeded", "failed"],
+  });
+}
+
+function formatInteractiveAgentDuration(
+  agent: NormalizedListAgent | undefined,
+): string {
+  if (!agent) {
+    return DASH;
+  }
+
+  return formatRenderLifecycleRowDuration({
+    lifecycle: {
+      status: agent.status as InteractiveSessionRecord["status"],
+      startedAt: agent.startedAt,
+      completedAt: agent.completedAt,
+    },
+    terminalStatuses: ["succeeded", "failed"],
   });
 }

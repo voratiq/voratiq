@@ -41,6 +41,7 @@ describe("resolveInteractiveSessionEnvLineage", () => {
     getSnapshotMock.mockResolvedValueOnce({
       sessionId: "interactive-live",
       createdAt: "2026-03-01T00:00:00.000Z",
+      startedAt: "2026-03-01T00:00:00.000Z",
       status: "running",
       agentId: "agent-a",
       toolAttachmentStatus: "attached",
@@ -65,6 +66,8 @@ describe("resolveInteractiveSessionEnvLineage", () => {
     getSnapshotMock.mockResolvedValueOnce({
       sessionId: "interactive-done",
       createdAt: "2026-03-01T00:00:00.000Z",
+      startedAt: "2026-03-01T00:00:00.000Z",
+      completedAt: "2026-03-01T00:00:05.000Z",
       status: "succeeded",
       agentId: "agent-a",
       toolAttachmentStatus: "attached",
@@ -82,6 +85,8 @@ describe("resolveInteractiveSessionEnvLineage", () => {
     getSnapshotMock.mockResolvedValueOnce({
       sessionId: "interactive-broken",
       createdAt: "2026-03-01T00:00:00.000Z",
+      startedAt: "2026-03-01T00:00:00.000Z",
+      completedAt: "2026-03-01T00:00:05.000Z",
       status: "failed",
       agentId: "agent-a",
       toolAttachmentStatus: "failed",
@@ -121,6 +126,7 @@ describe("resolveInteractiveSessionEnvLineage", () => {
     getSnapshotMock.mockResolvedValueOnce({
       sessionId: "interactive-trim",
       createdAt: "2026-03-01T00:00:00.000Z",
+      startedAt: "2026-03-01T00:00:00.000Z",
       status: "running",
       agentId: "agent-a",
       toolAttachmentStatus: "attached",
