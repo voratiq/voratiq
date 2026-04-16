@@ -1,6 +1,7 @@
 import {
   formatTargetDisplay,
   formatTargetTablePreview,
+  normalizeListDetailSession,
   normalizeListSession,
   normalizeListTarget,
   TARGET_TABLE_PREVIEW_LENGTH,
@@ -109,6 +110,43 @@ describe("list target normalization", () => {
     expect(
       legacyFileTarget ? formatTargetDisplay(legacyFileTarget) : null,
     ).toBe("file:specs/legacy.md");
+  });
+
+  it("parses run diff statistics into structured changes", () => {
+    const record: RunRecord = createRunRecord({
+      runId: "run-with-diff",
+      agents: [
+        {
+          agentId: "agent-a",
+          model: "model-v1",
+          status: "succeeded",
+          startedAt: "2026-03-01T00:00:00.000Z",
+          completedAt: "2026-03-01T00:01:00.000Z",
+          commitSha: "1234567890abcdef1234567890abcdef12345678",
+          diffStatistics: "3 files changed, 12 insertions(+), 2 deletions(-)",
+          artifacts: {
+            diffAttempted: true,
+            diffCaptured: true,
+            stdoutCaptured: true,
+            stderrCaptured: true,
+            summaryCaptured: true,
+          },
+        },
+      ],
+    });
+
+    const session = normalizeListDetailSession("run", record);
+
+    expect(session.agents).toEqual([
+      expect.objectContaining({
+        diffStatistics: "3 files changed, 12 insertions(+), 2 deletions(-)",
+        changes: {
+          filesChanged: 3,
+          insertions: 12,
+          deletions: 2,
+        },
+      }),
+    ]);
   });
 
   it("normalizes reduce targets to session refs", () => {

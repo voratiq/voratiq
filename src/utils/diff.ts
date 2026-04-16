@@ -35,6 +35,8 @@ function extractStat(pattern: RegExp, input: string): number | undefined {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
+export { extractStat };
+
 /**
  * Produce a compact representation such as `3f +12/-2` for the CHANGES column.
  */

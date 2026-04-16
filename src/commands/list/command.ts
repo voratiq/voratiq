@@ -77,6 +77,7 @@ import {
   normalizeListSession,
   toListJsonTargetRef,
 } from "./normalization.js";
+import { getListRecordId } from "./records.js";
 
 const DEFAULT_LIMIT = 10;
 const DASH = "—";
@@ -662,17 +663,7 @@ function getRecordStatus(record: OperatorRecord): string {
 }
 
 function getRecordId(operator: ListOperator, record: OperatorRecord): string {
-  if (operator === "run") {
-    return (record as RunRecord).runId;
-  }
-  return (
-    record as
-      | InteractiveSessionRecord
-      | SpecRecord
-      | MessageRecord
-      | ReductionRecord
-      | VerificationRecord
-  ).sessionId;
+  return getListRecordId(operator, record);
 }
 
 function formatSessionWarning(warning: { displayPath: string }): string {
