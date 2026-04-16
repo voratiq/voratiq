@@ -130,6 +130,18 @@ const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     extraArgs: ["--effort", "high"],
   },
   {
+    id: "claude-opus-4-7-high",
+    provider: "claude",
+    model: "claude-opus-4-7",
+    extraArgs: ["--effort", "high"],
+  },
+  {
+    id: "claude-opus-4-7-xhigh",
+    provider: "claude",
+    model: "claude-opus-4-7",
+    extraArgs: ["--effort", "xhigh"],
+  },
+  {
     id: "gpt-5-2",
     provider: "codex",
     model: "gpt-5.2",
@@ -219,10 +231,10 @@ const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
 
 const PRO_AGENT_PRESET_ENTRIES: readonly AgentCatalogEntry[] = [
   {
-    id: "claude-opus-4-6",
+    id: "claude-opus-4-7-xhigh",
     provider: "claude",
-    model: "claude-opus-4-6",
-    extraArgs: ["--effort", "high"],
+    model: "claude-opus-4-7",
+    extraArgs: ["--effort", "xhigh"],
   },
   {
     id: "gpt-5-4-high",

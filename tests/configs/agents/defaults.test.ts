@@ -67,6 +67,8 @@ describe("getSupportedAgentDefaults", () => {
       "claude-sonnet-4-6",
       "claude-opus-4-5-20251101",
       "claude-opus-4-6",
+      "claude-opus-4-7-high",
+      "claude-opus-4-7-xhigh",
       "gpt-5-2",
       "gpt-5-2-high",
       "gpt-5-2-xhigh",
