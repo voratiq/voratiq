@@ -4,6 +4,7 @@ import { checkPlatformSupport } from "../../src/agents/runtime/sandbox.js";
 import { runMessageCommand } from "../../src/cli/message.js";
 import { executeMessageCommand } from "../../src/commands/message/command.js";
 import { resolveExtraContextFiles } from "../../src/competition/shared/extra-context.js";
+import { resolveInteractiveSessionEnvLineage } from "../../src/domain/interactive/session-env.js";
 import {
   ensureSandboxDependencies,
   resolveCliContext,
@@ -19,6 +20,10 @@ jest.mock("../../src/commands/message/command.js", () => ({
 
 jest.mock("../../src/competition/shared/extra-context.js", () => ({
   resolveExtraContextFiles: jest.fn(),
+}));
+
+jest.mock("../../src/domain/interactive/session-env.js", () => ({
+  resolveInteractiveSessionEnvLineage: jest.fn(),
 }));
 
 jest.mock("../../src/preflight/index.js", () => {
@@ -37,6 +42,9 @@ const executeMessageCommandMock = jest.mocked(executeMessageCommand);
 const resolveExtraContextFilesMock = jest.mocked(resolveExtraContextFiles);
 const ensureSandboxDependenciesMock = jest.mocked(ensureSandboxDependencies);
 const resolveCliContextMock = jest.mocked(resolveCliContext);
+const resolveInteractiveSessionEnvLineageMock = jest.mocked(
+  resolveInteractiveSessionEnvLineage,
+);
 
 describe("voratiq message", () => {
   beforeEach(() => {
@@ -44,6 +52,9 @@ describe("voratiq message", () => {
     checkPlatformSupportMock.mockReturnValue(undefined);
     ensureSandboxDependenciesMock.mockReturnValue(undefined);
     resolveExtraContextFilesMock.mockResolvedValue([]);
+    resolveInteractiveSessionEnvLineageMock.mockResolvedValue({
+      kind: "ignore",
+    });
     resolveCliContextMock.mockResolvedValue({
       root: "/repo",
       workspacePaths: {
@@ -118,6 +129,44 @@ describe("voratiq message", () => {
           ".voratiq/message/sessions/message-123/alpha/artifacts/response.md",
       },
     ]);
+  });
+
+  it("forwards the trusted interactive session as target", async () => {
+    resolveInteractiveSessionEnvLineageMock.mockResolvedValueOnce({
+      kind: "trusted",
+      sessionId: "interactive-live",
+    });
+
+    await runMessageCommand({
+      prompt: "Review this change.",
+      json: true,
+    });
+
+    expect(executeMessageCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: {
+          kind: "interactive",
+          sessionId: "interactive-live",
+        },
+      }),
+    );
+  });
+
+  it("omits target when the env lineage guard returns ignore", async () => {
+    resolveInteractiveSessionEnvLineageMock.mockResolvedValueOnce({
+      kind: "ignore",
+    });
+
+    await runMessageCommand({
+      prompt: "Review this change.",
+      json: true,
+    });
+
+    expect(executeMessageCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: undefined,
+      }),
+    );
   });
 
   it("returns the detail-only transcript body for TTY output", async () => {

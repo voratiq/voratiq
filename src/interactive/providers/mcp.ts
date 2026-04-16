@@ -137,6 +137,23 @@ export async function resolveFirstPartyMcpStatus(options: {
     );
   }
   if (initialInspection.missingToolDeclarations.length === 0) {
+    // Refresh session-scoped env (e.g. VORATIQ_INTERACTIVE_SESSION_ID) on the
+    // already-registered MCP entry so the spawned subprocess receives env values
+    // that match the current interactive session. The `mcp add` invocation is
+    // idempotent across all three providers; the existing inspection only
+    // verifies command+args, so we cannot detect env drift otherwise.
+    const declarationsWithEnv = options.toolDeclarations.filter(
+      (tool) => tool.env && Object.keys(tool.env).length > 0,
+    );
+    if (declarationsWithEnv.length > 0) {
+      await installVoratiqMcpForProvider({
+        adapter,
+        providerBinary,
+        root: options.root,
+        toolDeclarations: declarationsWithEnv,
+        runCommand,
+      });
+    }
     return {
       toolAttachmentStatus: "attached",
       additionalArgs: [],

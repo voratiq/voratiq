@@ -112,7 +112,6 @@ export const messageRecordSchema = z
     baseRevisionSha: z.string().optional(),
     prompt: z.string(),
     target: messageTargetSchema.optional(),
-    sourceInteractiveSessionId: z.string().optional(),
     extraContext: z.array(persistedExtraContextPathSchema).optional(),
     extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),
     recipients: z

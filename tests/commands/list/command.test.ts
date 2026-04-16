@@ -2018,7 +2018,6 @@ function buildMessageRecord(params: {
   sessionId: string;
   status: MessageRecord["status"];
   target?: MessageRecord["target"];
-  sourceInteractiveSessionId?: string;
   recipients?: MessageRecord["recipients"];
 }): MessageRecord {
   const createdAt = "2026-03-01T00:00:00.000Z";
@@ -2035,9 +2034,6 @@ function buildMessageRecord(params: {
     status: params.status,
     prompt: "Review this change.",
     ...(params.target ? { target: params.target } : {}),
-    ...(params.sourceInteractiveSessionId
-      ? { sourceInteractiveSessionId: params.sourceInteractiveSessionId }
-      : {}),
     recipients: params.recipients ?? [
       {
         agentId: "agent-a",

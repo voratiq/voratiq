@@ -36,11 +36,15 @@ const providerLaunchAdapters: Record<string, ProviderLaunchAdapter> = {
 export function createBundledVoratiqToolDeclaration(options: {
   command: string;
   argsPrefix: readonly string[];
+  env?: Record<string, string>;
 }): NativeToolDeclaration {
   return {
     name: BUNDLED_VORATIQ_TOOL_TARGET_NAME,
     command: options.command,
     args: [...options.argsPrefix, "mcp", "--stdio"],
+    ...(options.env && Object.keys(options.env).length > 0
+      ? { env: { ...options.env } }
+      : {}),
   };
 }
 
