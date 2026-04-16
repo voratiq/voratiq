@@ -6,11 +6,15 @@ title: Getting Started
 
 Voratiq gives multi-agent workflows structure, verification, and a record of what happened.
 
-This guide walks through a real session in a fresh repo.
+This guide shows you when this kind of framework is useful. We'll walk through two workflows that use multi-agent behavior in different ways to produce better results.
 
-Here, the goal was to build a small CLI utility that turns a prompt into an image file.
+First, in the planning workflow, a swarm widens the search space: multiple agents explore the problem from different angles, which gives us more options before we narrow them into a plan.
 
-We'll run two workflows. First, an exploration and design workflow where we explore options, narrow them down, draft a spec, and verify the best draft. Then, an implementation workflow where we generate code, compare the candidates, and apply the winner. Each step leaves behind artifacts that the next one can consume, and the project stays small enough that the whole loop is easy to follow.
+Second, in the execution workflow, a swarm gives us alternatives to compare: multiple agents generate concrete solutions to the same task, then we choose the best one.
+
+Verification is what makes both workflows manageable. A swarm can produce more drafts, specs, and implementations than is practical to review manually, so verification compares the outputs and helps surface the best candidates.
+
+To show how this works, we'll build a small image generation CLI from scratch.
 
 To get started, install Voratiq:
 
