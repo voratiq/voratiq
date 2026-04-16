@@ -85,15 +85,6 @@ function replayAutoCommandEvent(event: AutoCommandEvent): void {
     writeCommandOutput({ body: renderCliError(toCliError(event.error)) });
     return;
   }
-
-  const warningBody = formatAlertMessage(
-    "Action required",
-    "yellow",
-    event.detail,
-  );
-  writeCommandOutput({
-    body: event.separateWithDivider ? `---\n\n${warningBody}` : warningBody,
-  });
 }
 
 async function persistAutoOutcome(options: {

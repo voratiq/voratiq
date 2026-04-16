@@ -298,7 +298,6 @@ export async function executeAutoCommand(
           hardFailure = true;
         } else if (specVerifyResult.selection) {
           const specSelectionDisposition = classifyAutoVerificationSelection({
-            targetKind: "spec",
             selection: specVerifyResult.selection,
           });
           if (specSelectionDisposition.kind !== "action_required") {
@@ -447,7 +446,6 @@ export async function executeAutoCommand(
 
       if (verifySelection?.state === "unresolved") {
         const verifySelectionDisposition = classifyAutoVerificationSelection({
-          targetKind: "run",
           selection: verifySelection,
         });
         applyAutoVerificationSelectionDisposition({
@@ -493,7 +491,6 @@ export async function executeAutoCommand(
       }
 
       classifyAutoVerificationSelection({
-        targetKind: "run",
         selection: verifySelection,
       });
 

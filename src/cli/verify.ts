@@ -90,6 +90,9 @@ export interface VerifyCommandResult {
   warningMessage?: string;
 }
 
+const UNRESOLVED_VERIFICATION_MESSAGE =
+  "Verification did not produce a resolvable candidate; manual review required.";
+
 function resolveVerifyManualActionMessage(options: {
   targetKind: VerificationRecord["target"]["kind"];
   status: VerificationRecord["status"];
@@ -102,18 +105,14 @@ function resolveVerifyManualActionMessage(options: {
   }
 
   if (targetKind === "spec" && !selectedSpecPath) {
-    return "Verification did not select a spec path; manual review required.";
+    return UNRESOLVED_VERIFICATION_MESSAGE;
   }
 
   if (selection?.decision.state !== "unresolved") {
     return undefined;
   }
 
-  if (targetKind === "run") {
-    return "Verification did not produce a resolvable candidate; manual selection required.";
-  }
-
-  return "Verification did not produce a resolvable result; manual review required.";
+  return UNRESOLVED_VERIFICATION_MESSAGE;
 }
 
 export async function runVerifyCommand(

@@ -1372,9 +1372,7 @@ describe("voratiq auto", () => {
     expect(output).toContain("Agent: verifier-b");
     expect(output).toContain("Verifier: run-verification");
     expect(output).toContain("Error: verifier violated output contract");
-    expect(output).toContain(
-      "Action required: Verification did not produce a resolvable candidate; manual selection required.",
-    );
+    expect(output).not.toContain("Action required:");
     expect(output).toContain("Auto ACTION_REQUIRED");
     expect(runApplyCommandMock).not.toHaveBeenCalled();
   });
@@ -1537,9 +1535,7 @@ describe("voratiq auto", () => {
     expect(output).toContain(
       "Warning: No run candidate passed programmatic verification; proceeding with run-verification consensus.",
     );
-    expect(output).toContain(
-      "Action required: Verification reported warnings for the selected candidate; automatic apply halted. Review the verify output and apply manually if appropriate.",
-    );
+    expect(output).not.toContain("Action required:");
     expect(output).toContain("Auto ACTION_REQUIRED");
   });
 
@@ -1689,12 +1685,7 @@ describe("voratiq auto", () => {
     expect(output).toContain("To apply a solution:");
     expect(output).toContain("voratiq apply --run run-123 --agent <agent-id>");
     expect((output.match(/To apply a solution:/gu) ?? []).length).toBe(1);
-    expect(output).toContain(
-      "---\n\nAction required: Verifiers disagreed on the preferred candidate; manual selection required.",
-    );
-    expect(output).toContain(
-      "Action required: Verifiers disagreed on the preferred candidate; manual selection required.",
-    );
+    expect(output).not.toContain("Action required:");
     expect(output).toContain("Auto ACTION_REQUIRED");
     expect(process.exitCode).toBe(1);
   });
@@ -1762,9 +1753,7 @@ describe("voratiq auto", () => {
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     const output = stripAnsi(stdout.join(""));
-    expect(output).toContain(
-      "Action required: Verifiers disagreed on the preferred candidate; manual selection required.",
-    );
+    expect(output).not.toContain("Action required:");
     expect(output).toContain("Auto ACTION_REQUIRED");
     expect(process.exitCode).toBe(1);
   });
@@ -1840,9 +1829,7 @@ describe("voratiq auto", () => {
     expect(runApplyCommandMock).not.toHaveBeenCalled();
     const output = stripAnsi(stdout.join(""));
     expect(output).toContain("VERIFY BODY");
-    expect(output).toContain(
-      "Action required: Verifiers disagreed on the preferred candidate; manual selection required.",
-    );
+    expect(output).not.toContain("Action required:");
     expect(output).toContain("Auto ACTION_REQUIRED");
     expect(process.exitCode).toBe(1);
   });
@@ -2000,9 +1987,7 @@ describe("voratiq auto", () => {
     });
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
-    expect(stripAnsi(stdout.join(""))).toContain(
-      "Action required: Verification did not produce a resolvable candidate; manual selection required.",
-    );
+    expect(stripAnsi(stdout.join(""))).not.toContain("Action required:");
     expect(stripAnsi(stdout.join(""))).toContain("Auto ACTION_REQUIRED");
     expect(process.exitCode).toBe(1);
   });
@@ -2110,9 +2095,7 @@ describe("voratiq auto", () => {
     });
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
-    expect(stripAnsi(stdout.join(""))).toContain(
-      "Verification did not produce a resolvable candidate; manual selection required.",
-    );
+    expect(stripAnsi(stdout.join(""))).not.toContain("Action required:");
     expect(stripAnsi(stdout.join(""))).toContain("Auto ACTION_REQUIRED");
     expect(process.exitCode).toBe(1);
   });
@@ -2153,9 +2136,7 @@ describe("voratiq auto", () => {
     });
 
     expect(runApplyCommandMock).not.toHaveBeenCalled();
-    expect(stripAnsi(stdout.join(""))).toContain(
-      "Verification did not produce a resolvable candidate; manual selection required.",
-    );
+    expect(stripAnsi(stdout.join(""))).not.toContain("Action required:");
     expect(stripAnsi(stdout.join(""))).toContain("Auto ACTION_REQUIRED");
     expect(process.exitCode).toBe(1);
   });

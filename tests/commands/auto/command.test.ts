@@ -255,13 +255,13 @@ describe("executeAutoCommand", () => {
     expect(result.auto.status).toBe("action_required");
     expect(result.apply.status).toBe("skipped");
     expect(result.auto.detail).toBe(
-      "Verifiers disagreed on the preferred candidate; manual selection required.",
+      "Verification did not produce a resolvable candidate; manual review required.",
     );
     expect(result.events).toContainEqual(
       expect.objectContaining({
         kind: "action_required",
         detail:
-          "Verifiers disagreed on the preferred candidate; manual selection required.",
+          "Verification did not produce a resolvable candidate; manual review required.",
       }),
     );
     expect(findEventIndex(result.events, "body")).toBeLessThan(
@@ -322,16 +322,16 @@ describe("executeAutoCommand", () => {
     expect(result.auto.status).toBe("action_required");
     expect(result.apply.status).toBe("skipped");
     expect(result.auto.detail).toBe(
-      "Verifiers disagreed on the preferred candidate; manual selection required.",
+      "Verification did not produce a resolvable candidate; manual review required.",
     );
     expect(result.summary.verify.detail).toBe(
-      "Verifiers disagreed on the preferred candidate; manual selection required.",
+      "Verification did not produce a resolvable candidate; manual review required.",
     );
     expect(result.events).toContainEqual(
       expect.objectContaining({
         kind: "action_required",
         detail:
-          "Verifiers disagreed on the preferred candidate; manual selection required.",
+          "Verification did not produce a resolvable candidate; manual review required.",
       }),
     );
     expect(findEventIndex(result.events, "body")).toBeLessThan(
@@ -378,7 +378,7 @@ describe("executeAutoCommand", () => {
     expect(result.apply.status).toBe("skipped");
     expect(result.summary.verify.status).toBe("succeeded");
     expect(result.summary.verify.detail).toBe(
-      "Verification did not produce a resolvable candidate; manual selection required.",
+      "Verification did not produce a resolvable candidate; manual review required.",
     );
   });
 
@@ -473,16 +473,16 @@ describe("executeAutoCommand", () => {
     expect(result.auto.status).toBe("action_required");
     expect(result.apply.status).toBe("skipped");
     expect(result.auto.detail).toBe(
-      "Verifiers disagreed on the preferred draft; manual selection required.",
+      "Verification did not produce a resolvable candidate; manual review required.",
     );
     expect(result.summary.spec.detail).toBe(
-      "Verifiers disagreed on the preferred draft; manual selection required.",
+      "Verification did not produce a resolvable candidate; manual review required.",
     );
     expect(result.events).toContainEqual(
       expect.objectContaining({
         kind: "action_required",
         detail:
-          "Verifiers disagreed on the preferred draft; manual selection required.",
+          "Verification did not produce a resolvable candidate; manual review required.",
       }),
     );
     expect(findEventIndex(result.events, "body")).toBeLessThan(
@@ -684,13 +684,13 @@ describe("executeAutoCommand", () => {
 
     expect(result.auto.status).toBe("action_required");
     expect(result.summary.verify.detail).toBe(
-      "Verification did not produce a resolvable candidate; manual selection required.",
+      "Verification did not produce a resolvable candidate; manual review required.",
     );
     expect(result.events).toContainEqual(
       expect.objectContaining({
         kind: "action_required",
         detail:
-          "Verification did not produce a resolvable candidate; manual selection required.",
+          "Verification did not produce a resolvable candidate; manual review required.",
       }),
     );
     expect(findEventIndex(result.events, "body")).toBeLessThan(
