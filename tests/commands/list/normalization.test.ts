@@ -280,14 +280,13 @@ describe("list target normalization", () => {
     );
   });
 
-  it("keeps messages without persisted targets as no-target baselines", () => {
+  it("keeps messages without targets as no-target records", () => {
     const record = {
       sessionId: "message-no-target",
       createdAt: "2026-03-01T00:00:00.000Z",
       startedAt: "2026-03-01T00:00:00.000Z",
       completedAt: "2026-03-01T00:00:03.000Z",
       status: "succeeded",
-      sourceInteractiveSessionId: "interactive-legacy",
       prompt: "Review this change.",
       recipients: [
         {
@@ -297,6 +296,34 @@ describe("list target normalization", () => {
           completedAt: "2026-03-01T00:00:03.000Z",
           outputPath:
             ".voratiq/message/sessions/message-no-target/agent-a/artifacts/response.md",
+          error: null,
+        },
+      ],
+      error: null,
+    } as MessageRecord;
+
+    const target = normalizeListTarget("message", record);
+
+    expect(target).toBeUndefined();
+    expect(target ? formatTargetDisplay(target) : null).toBeNull();
+  });
+
+  it("returns undefined for messages with no target and no legacy lineage", () => {
+    const record = {
+      sessionId: "message-bare",
+      createdAt: "2026-03-01T00:00:00.000Z",
+      startedAt: "2026-03-01T00:00:00.000Z",
+      completedAt: "2026-03-01T00:00:03.000Z",
+      status: "succeeded",
+      prompt: "Review this change.",
+      recipients: [
+        {
+          agentId: "agent-a",
+          status: "succeeded",
+          startedAt: "2026-03-01T00:00:00.000Z",
+          completedAt: "2026-03-01T00:00:03.000Z",
+          outputPath:
+            ".voratiq/message/sessions/message-bare/agent-a/artifacts/response.md",
           error: null,
         },
       ],

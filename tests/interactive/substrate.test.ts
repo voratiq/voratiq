@@ -130,6 +130,24 @@ describe("interactive native launch substrate", () => {
       args: ["mcp", "get", "--json", "voratiq"],
       cwd: fixture.root,
     });
+    const addCall = mcpCommandRunner.mock.calls.find(
+      ([input]) => input.args[1] === "add",
+    );
+    expect(addCall).toBeDefined();
+    expect(addCall?.[0].args).toEqual([
+      "mcp",
+      "add",
+      "--env",
+      `VORATIQ_INTERACTIVE_SESSION_ID=${sessionId}`,
+      "--env",
+      `VORATIQ_INTERACTIVE_SESSION_ROOT=${prepared.prepared.sessionRoot}`,
+      "voratiq",
+      "--",
+      "node",
+      "/repo/dist/bin.js",
+      "mcp",
+      "--stdio",
+    ]);
 
     const record = await readJson(prepared.prepared.recordPath);
     expect(record).toMatchObject({
@@ -319,6 +337,10 @@ describe("interactive native launch substrate", () => {
         "--scope",
         "user",
         "--trust",
+        "-e",
+        `VORATIQ_INTERACTIVE_SESSION_ID=${sessionId}`,
+        "-e",
+        `VORATIQ_INTERACTIVE_SESSION_ROOT=${prepared.prepared.sessionRoot}`,
         "voratiq",
         "node",
         "/repo/dist/bin.js",
@@ -669,8 +691,15 @@ describe("interactive native launch substrate", () => {
     const fixture = await createWorkspaceFixture();
     const sessionOne = "20260401-120004-codexa";
     const sessionTwo = "20260401-120005-codexb";
-    const mcpCommandRunner = jest.fn<ProviderMcpCommandRunner>(() =>
-      Promise.resolve({
+    const mcpCommandRunner = jest.fn<ProviderMcpCommandRunner>((input) => {
+      if (input.args[1] === "add") {
+        return Promise.resolve({
+          exitCode: 0,
+          stdout: "Added server voratiq\n",
+          stderr: "",
+        });
+      }
+      return Promise.resolve({
         exitCode: 0,
         stdout: JSON.stringify({
           name: "voratiq",
@@ -678,8 +707,8 @@ describe("interactive native launch substrate", () => {
           args: ["/repo/dist/bin.js", "mcp", "--stdio"],
         }),
         stderr: "",
-      }),
-    );
+      });
+    });
 
     const first = await prepareNativeInteractiveSession({
       root: fixture.root,

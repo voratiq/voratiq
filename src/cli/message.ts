@@ -6,6 +6,7 @@ import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
 import { executeMessageCommand } from "../commands/message/command.js";
 import { buildMarkdownPreviewLines } from "../commands/shared/preview.js";
 import { resolveExtraContextFiles } from "../competition/shared/extra-context.js";
+import { resolveInteractiveSessionEnvLineage } from "../domain/interactive/session-env.js";
 import {
   ensureSandboxDependencies,
   resolveCliContext,
@@ -112,6 +113,11 @@ export async function runMessageCommand(
     stderr: rendererStderr,
   });
 
+  const envLineage = await resolveInteractiveSessionEnvLineage({
+    root,
+    envValue: process.env.VORATIQ_INTERACTIVE_SESSION_ID,
+  });
+
   const execution = await executeMessageCommand({
     root,
     messagesFilePath:
@@ -122,8 +128,13 @@ export async function runMessageCommand(
     profileName: profile,
     maxParallel,
     extraContextFiles,
-    sourceInteractiveSessionId:
-      process.env.VORATIQ_INTERACTIVE_SESSION_ID?.trim() || undefined,
+    target:
+      envLineage.kind === "trusted"
+        ? {
+            kind: "interactive",
+            sessionId: envLineage.sessionId,
+          }
+        : undefined,
     renderer,
   });
 

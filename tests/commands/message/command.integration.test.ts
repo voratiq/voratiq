@@ -286,7 +286,7 @@ describe("executeMessageCommand integration", () => {
     expect(executeCompetitionWithAdapterMock).not.toHaveBeenCalled();
   });
 
-  it("persists an interactive target from sourceInteractiveSessionId", async () => {
+  it("persists an interactive target when provided explicitly", async () => {
     const completedRecord: MessageRecord = {
       sessionId: "message-xyz",
       createdAt: "2026-01-01T00:00:00.000Z",
@@ -299,7 +299,6 @@ describe("executeMessageCommand integration", () => {
         kind: "interactive",
         sessionId: "interactive-123",
       },
-      sourceInteractiveSessionId: "interactive-123",
       recipients: [
         {
           agentId: "alpha",
@@ -327,13 +326,15 @@ describe("executeMessageCommand integration", () => {
       root: "/repo",
       messagesFilePath: "/repo/.voratiq/message/index.json",
       prompt: "Review this change.",
-      sourceInteractiveSessionId: "interactive-123",
+      target: {
+        kind: "interactive",
+        sessionId: "interactive-123",
+      },
     });
 
     expect(appendMessageRecordMock).toHaveBeenCalledWith(
       expect.objectContaining({
         record: expect.objectContaining({
-          sourceInteractiveSessionId: "interactive-123",
           target: {
             kind: "interactive",
             sessionId: "interactive-123",
@@ -356,7 +357,6 @@ describe("executeMessageCommand integration", () => {
         kind: "run",
         sessionId: "run-123",
       },
-      sourceInteractiveSessionId: "interactive-123",
       recipients: [
         {
           agentId: "alpha",
@@ -384,7 +384,6 @@ describe("executeMessageCommand integration", () => {
       root: "/repo",
       messagesFilePath: "/repo/.voratiq/message/index.json",
       prompt: "Review this change.",
-      sourceInteractiveSessionId: "interactive-123",
       target: {
         kind: "run",
         sessionId: "run-123",
@@ -394,7 +393,6 @@ describe("executeMessageCommand integration", () => {
     expect(appendMessageRecordMock).toHaveBeenCalledWith(
       expect.objectContaining({
         record: expect.objectContaining({
-          sourceInteractiveSessionId: "interactive-123",
           target: {
             kind: "run",
             sessionId: "run-123",
@@ -402,6 +400,8 @@ describe("executeMessageCommand integration", () => {
         }),
       }),
     );
+    const appended = appendMessageRecordMock.mock.calls[0]?.[0]?.record;
+    expect("sourceInteractiveSessionId" in (appended ?? {})).toBe(false);
   });
 
   it("persists lane-level targets when an upstream agent lane is provided", async () => {

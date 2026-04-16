@@ -197,6 +197,10 @@ export async function prepareNativeInteractiveSession(
       createBundledVoratiqToolDeclaration({
         command: cliTarget.command,
         argsPrefix: cliTarget.argsPrefix,
+        env: {
+          VORATIQ_INTERACTIVE_SESSION_ID: sessionId,
+          VORATIQ_INTERACTIVE_SESSION_ROOT: paths.sessionRoot,
+        },
       }),
     ];
     if (isFirstPartyProviderId(providerId)) {
