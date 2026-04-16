@@ -152,6 +152,25 @@ describe("voratiq message", () => {
     );
   });
 
+  it("passes the current interactive session env value into the lineage guard", async () => {
+    const previousSessionId = process.env.VORATIQ_INTERACTIVE_SESSION_ID;
+    process.env.VORATIQ_INTERACTIVE_SESSION_ID = "interactive-live";
+
+    try {
+      await runMessageCommand({
+        prompt: "Review this change.",
+        json: true,
+      });
+    } finally {
+      process.env.VORATIQ_INTERACTIVE_SESSION_ID = previousSessionId;
+    }
+
+    expect(resolveInteractiveSessionEnvLineageMock).toHaveBeenCalledWith({
+      root: "/repo",
+      envValue: "interactive-live",
+    });
+  });
+
   it("omits target when the env lineage guard returns ignore", async () => {
     resolveInteractiveSessionEnvLineageMock.mockResolvedValueOnce({
       kind: "ignore",

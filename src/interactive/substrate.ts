@@ -197,10 +197,6 @@ export async function prepareNativeInteractiveSession(
       createBundledVoratiqToolDeclaration({
         command: cliTarget.command,
         argsPrefix: cliTarget.argsPrefix,
-        env: {
-          VORATIQ_INTERACTIVE_SESSION_ID: sessionId,
-          VORATIQ_INTERACTIVE_SESSION_ROOT: paths.sessionRoot,
-        },
       }),
     ];
     if (isFirstPartyProviderId(providerId)) {
@@ -266,6 +262,12 @@ export async function prepareNativeInteractiveSession(
       agent,
       root: options.root,
       toolDeclarations,
+      sessionScopedMcpEnv:
+        providerId === "codex"
+          ? {
+              VORATIQ_INTERACTIVE_SESSION_ID: sessionId,
+            }
+          : undefined,
       prompt,
       launchMode: options.launchMode,
       firstPartyMcpResolution,
@@ -286,8 +288,8 @@ export async function prepareNativeInteractiveSession(
     ...process.env,
     ...providerLaunch.env,
     VORATIQ_INTERACTIVE_SESSION_ID: sessionId,
-    VORATIQ_INTERACTIVE_SESSION_ROOT: paths.sessionRoot,
   };
+  delete invocationEnv.VORATIQ_INTERACTIVE_SESSION_ROOT;
 
   let artifactCaptureContext:
     | Awaited<ReturnType<typeof prepareProviderArtifactCaptureContext>>

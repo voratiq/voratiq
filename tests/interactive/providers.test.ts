@@ -286,6 +286,43 @@ describe("interactive providers", () => {
     expect(mcpCommandRunner).toHaveBeenCalledTimes(1);
   });
 
+  it("does not refresh an installed codex MCP entry just because the declaration carries env metadata", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "voratiq-interactive-providers-"),
+    );
+    tempRoots.push(root);
+    const mcpCommandRunner = jest.fn<ProviderMcpCommandRunner>(() =>
+      Promise.resolve({
+        exitCode: 0,
+        stdout: JSON.stringify({
+          name: "voratiq",
+          command: "node",
+          args: ["/repo/dist/bin.js", "mcp", "--stdio"],
+        }),
+        stderr: "",
+      }),
+    );
+
+    const result = await resolveFirstPartyMcpStatus({
+      providerId: "codex",
+      root,
+      toolDeclarations: [
+        buildTool("voratiq", "node", {
+          VORATIQ_INTERACTIVE_SESSION_ID: "interactive-123",
+        }),
+      ],
+      mcpCommandRunner,
+    });
+
+    expect(result.toolAttachmentStatus).toBe("attached");
+    expect(mcpCommandRunner).toHaveBeenCalledTimes(1);
+    expect(mcpCommandRunner).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        args: expect.arrayContaining(["add"]),
+      }),
+    );
+  });
+
   it("fails when an effective claude MCP entry conflicts with the expected command", async () => {
     const root = await mkdtemp(
       join(tmpdir(), "voratiq-interactive-providers-"),
@@ -816,10 +853,15 @@ describe("interactive providers", () => {
   });
 });
 
-function buildTool(name: string, command = "node"): NativeToolDeclaration {
+function buildTool(
+  name: string,
+  command = "node",
+  env?: Record<string, string>,
+): NativeToolDeclaration {
   return {
     name,
     command,
     args: ["/repo/dist/bin.js", "mcp", "--stdio"],
+    ...(env ? { env } : {}),
   };
 }
