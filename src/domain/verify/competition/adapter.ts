@@ -12,7 +12,10 @@ import {
   stageExtraContextFiles,
 } from "../../../competition/shared/extra-context.js";
 import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
-import type { TeardownController } from "../../../competition/shared/teardown.js";
+import {
+  registerScratchWorkspaceTeardownPaths,
+  type TeardownController,
+} from "../../../competition/shared/teardown.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
 import {
@@ -147,11 +150,10 @@ export function createVerifyCompetitionAdapter(
           verifierId: candidate.agent.id,
           template: candidate.template.template,
         });
-        registerScratchWorkspaceTeardown(
+        registerScratchWorkspaceTeardownPaths(
           teardown,
           workspacePaths,
-          candidate.agent.id,
-          candidate.template.template,
+          `${candidate.agent.id}/${candidate.template.template}`,
         );
         return { candidate, workspacePaths };
       }),
@@ -601,17 +603,4 @@ function compareVerificationsByTemplateThenVerifierId(
     left.template.localeCompare(right.template) ||
     left.verifierId.localeCompare(right.verifierId)
   );
-}
-
-function registerScratchWorkspaceTeardown(
-  teardown: TeardownController,
-  workspacePaths: AgentWorkspacePaths,
-  verifierId: string,
-  template: string,
-): void {
-  const labelPrefix = `${verifierId}/${template}`;
-  teardown.addPath(workspacePaths.workspacePath, `${labelPrefix} workspace`);
-  teardown.addPath(workspacePaths.contextPath, `${labelPrefix} context`);
-  teardown.addPath(workspacePaths.runtimePath, `${labelPrefix} runtime`);
-  teardown.addPath(workspacePaths.sandboxPath, `${labelPrefix} sandbox`);
 }

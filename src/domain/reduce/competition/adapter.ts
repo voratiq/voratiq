@@ -16,6 +16,7 @@ import {
 import { composeStageSandboxPolicy } from "../../../competition/shared/sandbox-policy.js";
 import {
   createTeardownController,
+  registerScratchWorkspaceTeardownPaths,
   runTeardown,
 } from "../../../competition/shared/teardown.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
@@ -232,7 +233,7 @@ export function createReduceCompetitionAdapter(
           sessionId: reductionId,
           agentId: candidate.id,
         });
-        registerScratchWorkspaceTeardown(
+        registerScratchWorkspaceTeardownPaths(
           teardown,
           workspacePaths,
           candidate.id,
@@ -577,17 +578,6 @@ export function createReduceCompetitionAdapter(
       return left.agentId.localeCompare(right.agentId);
     },
   };
-}
-
-function registerScratchWorkspaceTeardown(
-  teardown: ReturnType<typeof createTeardownController>,
-  workspacePaths: AgentWorkspacePaths,
-  agentId: string,
-): void {
-  teardown.addPath(workspacePaths.workspacePath, `${agentId} workspace`);
-  teardown.addPath(workspacePaths.contextPath, `${agentId} context`);
-  teardown.addPath(workspacePaths.runtimePath, `${agentId} runtime`);
-  teardown.addPath(workspacePaths.sandboxPath, `${agentId} sandbox`);
 }
 
 async function rewriteOrAppendReductionRecord(options: {
