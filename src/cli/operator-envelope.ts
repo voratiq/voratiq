@@ -458,7 +458,7 @@ export function buildMessageOperatorEnvelope(
   });
 }
 
-export function buildDurableOperatorAcknowledgementEnvelope(options: {
+export function buildSwarmSessionAcknowledgementEnvelope(options: {
   operator: Extract<
     EnvelopeOperator,
     "spec" | "run" | "reduce" | "verify" | "message"
@@ -504,7 +504,7 @@ export function buildDurableOperatorAcknowledgementEnvelope(options: {
       {
         level: "info",
         message:
-          "Durable operator acknowledged. Use `voratiq_list` to inspect progress instead of retrying.",
+          "Recorded swarm session acknowledged. Use `voratiq_list` to inspect progress instead of retrying.",
       },
     ],
   });

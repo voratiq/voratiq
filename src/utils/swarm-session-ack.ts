@@ -3,24 +3,19 @@ import { rename, writeFile } from "node:fs/promises";
 export const VORATIQ_MCP_ACK_PATH_ENV = "VORATIQ_MCP_ACK_PATH";
 export const VORATIQ_MCP_ACK_OPERATOR_ENV = "VORATIQ_MCP_ACK_OPERATOR";
 
-export type DurableAckOperator =
-  | "spec"
-  | "run"
-  | "reduce"
-  | "verify"
-  | "message";
+export type SwarmAckOperator = "spec" | "run" | "reduce" | "verify" | "message";
 
-export type DurableAckStatus =
+export type SwarmAckStatus =
   | "queued"
   | "running"
   | "succeeded"
   | "failed"
   | "unresolved";
 
-export async function emitDurableOperatorAcknowledgement(options: {
-  operator: DurableAckOperator;
+export async function emitSwarmSessionAcknowledgement(options: {
+  operator: SwarmAckOperator;
   sessionId: string;
-  status: DurableAckStatus;
+  status: SwarmAckStatus;
 }): Promise<void> {
   const ackPath = process.env[VORATIQ_MCP_ACK_PATH_ENV];
   const ackOperator = process.env[VORATIQ_MCP_ACK_OPERATOR_ENV];

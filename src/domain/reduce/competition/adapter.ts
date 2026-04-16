@@ -52,13 +52,13 @@ import { readVerificationRecords } from "../../../domain/verify/persistence/adap
 import { buildPersistedExtraContextFields } from "../../../extra-context/contract.js";
 import type { ReduceProgressRenderer } from "../../../render/transcripts/reduce.js";
 import { emitStageProgressEvent } from "../../../render/transcripts/stage-progress.js";
-import { emitDurableOperatorAcknowledgement } from "../../../utils/durable-ack.js";
 import { toErrorMessage } from "../../../utils/errors.js";
 import {
   normalizePathForDisplay,
   relativeToRoot,
   resolvePath,
 } from "../../../utils/path.js";
+import { emitSwarmSessionAcknowledgement } from "../../../utils/swarm-session-ack.js";
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import {
@@ -214,7 +214,7 @@ export function createReduceCompetitionAdapter(
         reductionsFilePath,
         record,
       });
-      await emitDurableOperatorAcknowledgement({
+      await emitSwarmSessionAcknowledgement({
         operator: "reduce",
         sessionId: reductionId,
         status: "queued",
