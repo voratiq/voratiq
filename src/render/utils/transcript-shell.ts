@@ -61,11 +61,11 @@ export type TranscriptBadgeVariant =
   | "agent";
 
 const BRAND_COLOR = "164;203;153";
-const VERIFY_COLOR = "255;238;140";
+const VERIFY_COLOR = "251;228;141";
 const REDUCE_COLOR = "226;159;115";
 const SPEC_COLOR = "144;190;228";
-const MESSAGE_COLOR = "252;251;248";
-const INTERACTIVE_COLOR = "219;221;224";
+const MESSAGE_COLOR = "188;180;230";
+const INTERACTIVE_COLOR = "250;250;250";
 
 const BADGE_STYLES: Record<TranscriptBadgeVariant, BadgeStyle> = {
   run: {
