@@ -50,6 +50,7 @@ import {
   assertNoVerificationIdentityLeak,
   assertRubricResultSelectorsMatchAliasMap,
   buildForbiddenVerificationIdentityTokens,
+  normalizeVerificationResultForLeakCheck,
   parseRubricResultPayload,
 } from "./blinding.js";
 import { buildRubricPrompt, type RubricTemplateContents } from "./prompt.js";
@@ -373,8 +374,12 @@ export function createVerifyCompetitionAdapter(
 
       const raw = await readFile(outputPath, "utf8");
       try {
-        assertNoVerificationIdentityLeak({
+        const leakCheckText = normalizeVerificationResultForLeakCheck({
           text: raw,
+          workspacePath: workspacePaths.workspacePath,
+        });
+        assertNoVerificationIdentityLeak({
+          text: leakCheckText,
           forbidden: buildForbiddenVerificationIdentityTokens({
             resolvedTarget,
             allowed: [
