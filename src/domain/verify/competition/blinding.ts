@@ -155,6 +155,18 @@ export function assertNoVerificationIdentityLeak(options: {
   );
 }
 
+export function normalizeVerificationResultForLeakCheck(options: {
+  text: string;
+  workspacePath: string;
+}): string {
+  const { text, workspacePath } = options;
+  if (!workspacePath) {
+    return text;
+  }
+
+  return text.split(workspacePath).join("/workspace");
+}
+
 function containsBoundedToken(text: string, token: string): boolean {
   if (!token) {
     return false;

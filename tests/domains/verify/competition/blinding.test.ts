@@ -3,6 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   assertNoVerificationIdentityLeak,
   buildForbiddenVerificationIdentityTokens,
+  normalizeVerificationResultForLeakCheck,
   overlapSafeAllowlist,
 } from "../../../../src/domain/verify/competition/blinding.js";
 import type { ResolvedVerificationTarget } from "../../../../src/domain/verify/competition/target.js";
@@ -259,5 +260,48 @@ describe("buildForbiddenVerificationIdentityTokens", () => {
         resolvedTarget: target,
       }).sort(),
     ).toEqual(["agent-a", "agent-b"]);
+  });
+});
+
+describe("normalizeVerificationResultForLeakCheck", () => {
+  it("rewrites verifier workspace prefixes to a generic workspace path", () => {
+    const normalized = normalizeVerificationResultForLeakCheck({
+      text: JSON.stringify({
+        evidence_refs: [
+          "/repo/.voratiq/verify/sessions/verify-123/gpt-5-4-mini/run-verification/workspace/inputs/candidates/v_alias/diff.patch",
+        ],
+      }),
+      workspacePath:
+        "/repo/.voratiq/verify/sessions/verify-123/gpt-5-4-mini/run-verification/workspace",
+    });
+
+    expect(normalized).toContain(
+      "/workspace/inputs/candidates/v_alias/diff.patch",
+    );
+    expect(normalized).not.toContain(
+      "/repo/.voratiq/verify/sessions/verify-123/gpt-5-4-mini/run-verification/workspace",
+    );
+  });
+
+  it("still allows non-path identity leaks to be detected after normalization", () => {
+    const forbidden = ["gpt-5-4-mini"];
+    const normalized = normalizeVerificationResultForLeakCheck({
+      text: JSON.stringify({
+        rationale:
+          "The best candidate was produced by gpt-5-4-mini because it looked cleaner.",
+        evidence_refs: [
+          "/repo/.voratiq/verify/sessions/verify-123/gpt-5-4-mini/run-verification/workspace/inputs/candidates/v_alias/diff.patch",
+        ],
+      }),
+      workspacePath:
+        "/repo/.voratiq/verify/sessions/verify-123/gpt-5-4-mini/run-verification/workspace",
+    });
+
+    expect(() =>
+      assertNoVerificationIdentityLeak({
+        text: normalized,
+        forbidden,
+      }),
+    ).toThrow(/forbidden candidate identity token/);
   });
 });
