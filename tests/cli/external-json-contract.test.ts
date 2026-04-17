@@ -249,8 +249,10 @@ describe("external CLI JSON contract", () => {
                 status: "succeeded",
                 startedAt: "2026-03-31T10:00:00.000Z",
                 completedAt: "2026-03-31T10:00:05.000Z",
-                outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
-                dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+                outputPath:
+                  ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
+                dataPath:
+                  ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.json",
               },
             ],
           },
@@ -260,8 +262,10 @@ describe("external CLI JSON contract", () => {
               status: "succeeded",
               startedAt: "2026-03-31T10:00:00.000Z",
               completedAt: "2026-03-31T10:00:05.000Z",
-              outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
-              dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+              outputPath:
+                ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
+              dataPath:
+                ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.json",
             },
           ],
         });
@@ -283,7 +287,7 @@ describe("external CLI JSON contract", () => {
             kind: "spec",
             role: "candidate",
             agentId: "agent-a",
-            path: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+            path: ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
           },
         ],
       },
@@ -741,7 +745,7 @@ describe("external CLI JSON contract", () => {
     executeRunCommandMock.mockResolvedValue({
       runId: "run-session-backed",
       spec: {
-        path: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+        path: ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
         target: {
           kind: "spec",
           sessionId: "spec-123",
@@ -759,7 +763,7 @@ describe("external CLI JSON contract", () => {
     const result = await invokeCli([
       "run",
       "--spec",
-      ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+      ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
       "--json",
     ]);
     const envelope = normalizeEnvelope(parseJson<JsonEnvelope>(result));
@@ -785,7 +789,7 @@ describe("external CLI JSON contract", () => {
         {
           kind: "spec",
           role: "input",
-          path: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+          path: ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
         },
       ],
     });

@@ -267,13 +267,13 @@ Open implementation choice the spec should address explicitly:
     },
     {
       "kind": "spec",
-      "path": ".voratiq/spec/sessions/20260414-164551-utbtk/claude-opus-4-6/artifacts/minimal-image-cli-v1.md",
+      "path": ".voratiq/spec/sessions/20260414-164551-utbtk/claude-opus-4-6/artifacts/spec.md",
       "role": "candidate",
       "agentId": "claude-opus-4-6"
     },
     {
       "kind": "spec",
-      "path": ".voratiq/spec/sessions/20260414-164551-utbtk/gpt-5-4-high/artifacts/minimal-image-cli-v1.md",
+      "path": ".voratiq/spec/sessions/20260414-164551-utbtk/gpt-5-4-high/artifacts/spec.md",
       "role": "candidate",
       "agentId": "gpt-5-4-high"
     }
@@ -284,6 +284,7 @@ Open implementation choice the spec should address explicitly:
 </details>
 
 Compared with the earlier `message` prompt, this pinned down the file layout, success criteria, non-goals, and the transport decision.
+Each recorded candidate keeps the canonical filename `artifacts/spec.md`; the in-file title plus the session and agent ids identify the draft.
 
 ### Verify the spec before implementation
 
@@ -372,7 +373,7 @@ flowchart LR
 Verification preferred the draft behind alias `v_hys9tn7qsedh`, which mapped back to the `claude-opus-4-6` spec artifact. The agent then ran that artifact directly:
 
 ```text
-voratiq.voratiq_run({"specPath":".voratiq/spec/sessions/20260414-164551-utbtk/claude-opus-4-6/artifacts/minimal-image-cli-v1.md"})
+voratiq.voratiq_run({"specPath":".voratiq/spec/sessions/20260414-164551-utbtk/claude-opus-4-6/artifacts/spec.md"})
 ```
 
 The successful run session was:

@@ -33,7 +33,6 @@ import {
   normalizePathForDisplay,
   relativeToRoot,
 } from "../../../utils/path.js";
-import { slugify } from "../../../utils/slug.js";
 import { extractProviderNativeTokenUsageForSession } from "../../../workspace/chat/native-usage.js";
 import type { TokenUsageResult } from "../../../workspace/chat/token-usage-result.js";
 import { VORATIQ_SPEC_DIR } from "../../../workspace/constants.js";
@@ -247,23 +246,20 @@ export function createSpecCompetitionAdapter(
           SPEC_DATA_FILENAME,
         );
         const markdownContent = await readFile(stagedMarkdownPath, "utf8");
-        const specData = parseSpecData(await readFile(stagedDataPath, "utf8"));
-        const artifactBasename = slugify(specData.title, "spec");
-        const artifactMarkdownFilename = `${artifactBasename}.md`;
-        const artifactDataFilename = `${artifactBasename}.json`;
+        parseSpecData(await readFile(stagedDataPath, "utf8"));
 
         const markdownPromoteResult = await promoteWorkspaceFile({
           workspacePath: workspacePaths.workspacePath,
           artifactsPath: workspacePaths.artifactsPath,
           stagedRelativePath: SPEC_MARKDOWN_FILENAME,
-          artifactRelativePath: artifactMarkdownFilename,
+          artifactRelativePath: SPEC_MARKDOWN_FILENAME,
           deleteStaged: true,
         });
         const dataPromoteResult = await promoteWorkspaceFile({
           workspacePath: workspacePaths.workspacePath,
           artifactsPath: workspacePaths.artifactsPath,
           stagedRelativePath: SPEC_DATA_FILENAME,
-          artifactRelativePath: artifactDataFilename,
+          artifactRelativePath: SPEC_DATA_FILENAME,
           deleteStaged: true,
         });
 

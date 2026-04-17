@@ -82,7 +82,8 @@ describe("initializeRunRecord", () => {
               kind: "spec",
               sessionId: "spec-123",
               agentId: "agent-a",
-              outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+              outputPath:
+                ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
               contentHash:
                 "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             },
@@ -117,7 +118,8 @@ describe("initializeRunRecord", () => {
                   kind: "spec",
                   sessionId: "spec-123",
                   agentId: "agent-a",
-                  outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+                  outputPath:
+                    ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
                   contentHash:
                     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 },

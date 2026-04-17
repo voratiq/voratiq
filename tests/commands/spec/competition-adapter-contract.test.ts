@@ -152,9 +152,9 @@ function toWorkspacePaths(id: string): AgentWorkspacePaths {
 }
 
 function normalizeSpecPath(id: string): string {
-  return `.voratiq/spec/sessions/spec-session/${id}/artifacts/task-spec.md`;
+  return `.voratiq/spec/sessions/spec-session/${id}/artifacts/spec.md`;
 }
 
 function normalizeSpecDataPath(id: string): string {
-  return `.voratiq/spec/sessions/spec-session/${id}/artifacts/task-spec.json`;
+  return `.voratiq/spec/sessions/spec-session/${id}/artifacts/spec.json`;
 }

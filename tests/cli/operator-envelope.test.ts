@@ -18,7 +18,9 @@ describe("operator envelope helpers", () => {
   it("builds a spec envelope with a session id and spec path", () => {
     const envelope = buildSpecOperatorEnvelope({
       sessionId: "spec-123",
-      generatedSpecPaths: [".voratiq/spec/sessions/spec-123/agent-a/spec.md"],
+      generatedSpecPaths: [
+        ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
+      ],
     });
 
     expect(envelope).toMatchObject({
@@ -40,7 +42,7 @@ describe("operator envelope helpers", () => {
           kind: "spec",
           role: "candidate",
           agentId: "agent-a",
-          path: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+          path: ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
         },
       ]),
     );
@@ -80,7 +82,7 @@ describe("operator envelope helpers", () => {
   it("includes the upstream spec session when a run is session-backed", () => {
     const envelope = buildRunOperatorEnvelope({
       runId: "run-123",
-      specPath: ".voratiq/spec/sessions/spec-456/agent-a/spec.md",
+      specPath: ".voratiq/spec/sessions/spec-456/agent-a/artifacts/spec.md",
       specTarget: {
         kind: "spec",
         sessionId: "spec-456",
@@ -90,7 +92,8 @@ describe("operator envelope helpers", () => {
             kind: "spec",
             sessionId: "spec-456",
             agentId: "agent-a",
-            outputPath: ".voratiq/spec/sessions/spec-456/agent-a/spec.md",
+            outputPath:
+              ".voratiq/spec/sessions/spec-456/agent-a/artifacts/spec.md",
             contentHash:
               "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           },
@@ -107,7 +110,7 @@ describe("operator envelope helpers", () => {
         kind: "spec",
         sessionId: "spec-456",
         agentId: "agent-a",
-        outputPath: ".voratiq/spec/sessions/spec-456/agent-a/spec.md",
+        outputPath: ".voratiq/spec/sessions/spec-456/agent-a/artifacts/spec.md",
         contentHash:
           "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       },
@@ -127,7 +130,8 @@ describe("operator envelope helpers", () => {
             kind: "spec",
             sessionId: "spec-456",
             agentId: "agent-a",
-            outputPath: ".voratiq/spec/sessions/spec-456/agent-a/spec.md",
+            outputPath:
+              ".voratiq/spec/sessions/spec-456/agent-a/artifacts/spec.md",
             contentHash:
               "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           },
@@ -146,7 +150,7 @@ describe("operator envelope helpers", () => {
         kind: "spec",
         sessionId: "spec-456",
         agentId: "agent-a",
-        outputPath: ".voratiq/spec/sessions/spec-456/agent-a/spec.md",
+        outputPath: ".voratiq/spec/sessions/spec-456/agent-a/artifacts/spec.md",
         contentHash:
           "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       },
