@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
+import { SANDBOX_STAGE_IDS } from "../../../src/agents/runtime/operator-access.js";
 import {
   buildSandboxPolicy,
   normalizeFilesystemPolicy,
@@ -15,6 +16,16 @@ const SETTINGS_PATH =
   "/repo/.voratiq/run/sessions/run-123/codex/runtime/sandbox.json";
 
 describe("sandbox policy normalization", () => {
+  it("keeps sandbox stage ids in canonical operator order", () => {
+    expect(SANDBOX_STAGE_IDS).toEqual([
+      "spec",
+      "run",
+      "reduce",
+      "verify",
+      "message",
+    ]);
+  });
+
   it("collapses parent+child deny entries per list", () => {
     const normalized = normalizeFilesystemPolicy({
       workspacePath: WORKSPACE,
@@ -129,7 +140,10 @@ describe("sandbox policy normalization", () => {
 });
 
 describe("shared sandbox builder", () => {
-  function build(stageId: "run" | "spec" | "verify", overrides = {}) {
+  function build(
+    stageId: "run" | "spec" | "message" | "reduce" | "verify",
+    overrides = {},
+  ) {
     return buildSandboxPolicy({
       stageId,
       root: ROOT,
@@ -153,9 +167,11 @@ describe("shared sandbox builder", () => {
     });
   }
 
-  it("applies shared baseline by stage (run/spec/verify) with deterministic keys", () => {
+  it("applies shared baseline by stage with explicit operator cases", () => {
     const runPolicy = build("run");
     const specPolicy = build("spec");
+    const messagePolicy = build("message");
+    const reducePolicy = build("reduce");
     const verifyPolicy = build("verify");
 
     expect(Object.keys(runPolicy.filesystem)).toEqual([
@@ -174,6 +190,7 @@ describe("shared sandbox builder", () => {
         "/repo/.voratiq/verify",
       ]),
     );
+    expect(runPolicy.filesystem.denyRead).not.toContain("/repo/dist");
 
     expect(specPolicy.filesystem.denyWrite).toEqual(
       expect.arrayContaining([
@@ -183,8 +200,26 @@ describe("shared sandbox builder", () => {
       ]),
     );
     expect(specPolicy.filesystem.denyRead).toEqual(
-      specPolicy.filesystem.denyWrite,
+      expect.arrayContaining(["/repo/.git"]),
     );
+    expect(specPolicy.filesystem.denyWrite).not.toContain("/repo/.git");
+
+    expect(messagePolicy.filesystem.denyWrite).toEqual(
+      expect.arrayContaining(["/repo/.voratiq/run", "/repo/.voratiq/spec"]),
+    );
+    expect(messagePolicy.filesystem.denyRead).toEqual(
+      expect.arrayContaining(["/repo/.git"]),
+    );
+    expect(messagePolicy.filesystem.denyWrite).not.toContain("/repo/.git");
+
+    expect(reducePolicy.filesystem.denyWrite).toEqual(
+      expect.arrayContaining(["/repo/.voratiq/run", "/repo/.voratiq/spec"]),
+    );
+    expect(reducePolicy.filesystem.denyRead).toEqual(
+      expect.arrayContaining(["/repo/.git"]),
+    );
+    expect(reducePolicy.filesystem.denyWrite).not.toContain("/repo/.git");
+    expect(reducePolicy.filesystem.denyRead).not.toContain("/repo/dist");
 
     expect(verifyPolicy.filesystem.denyWrite).toEqual(
       expect.arrayContaining([
@@ -197,6 +232,7 @@ describe("shared sandbox builder", () => {
       expect.arrayContaining(["/repo/.git"]),
     );
     expect(verifyPolicy.filesystem.denyWrite).not.toContain("/repo/.git");
+    expect(verifyPolicy.filesystem.denyRead).not.toContain("/repo/dist");
   });
 
   it("collapses stage overlay child denies when baseline already denies parent", () => {

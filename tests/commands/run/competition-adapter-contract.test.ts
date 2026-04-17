@@ -146,6 +146,7 @@ function toPreparedExecution(agent: AgentDefinition): PreparedAgentExecution {
     root: "/repo",
     runId: "run-id",
     prompt: "spec",
+    hasStagedContext: false,
     environment,
   };
 }

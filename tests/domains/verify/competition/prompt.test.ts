@@ -36,6 +36,10 @@ describe("buildRubricPrompt", () => {
     expect(prompt).toContain(
       "You are running headlessly. Do not pause for user interaction.",
     );
+    expect(prompt).toContain("- Read access: `/workspace`.");
+    expect(prompt).toContain(
+      "- Write access: `/workspace` except read-only staged paths `/workspace/context`, `/workspace/inputs`, `/workspace/reference_repo`.",
+    );
   });
 
   it("builds message-target prompts from the staged prompt and response artifacts", () => {

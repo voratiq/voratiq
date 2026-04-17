@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import { detectAgentProcessFailureDetail } from "../../../agents/runtime/failures.js";
 import { runSandboxedAgent } from "../../../agents/runtime/harness.js";
@@ -252,19 +252,20 @@ export function createVerifyCompetitionAdapter(
         }),
       });
 
-      const sandboxPolicy = composeStageSandboxPolicy({
-        stageWriteProtectedPaths: [
-          workspacePaths.contextPath,
-          join(workspacePaths.workspacePath, "context"),
-          join(workspacePaths.workspacePath, "inputs"),
-          sharedInputs.sharedInputsAbsolute,
-          ...(sharedInputsUseReferenceRepo(sharedInputs)
-            ? [
-                join(workspacePaths.workspacePath, "reference_repo"),
-                sharedInputs.referenceRepoAbsolute,
-              ]
-            : []),
-        ],
+      const sandboxPolicy = await composeStageSandboxPolicy({
+        stageId: "verify",
+        root,
+        workspacePath: workspacePaths.workspacePath,
+        runtimePath: workspacePaths.runtimePath,
+        sandboxHomePath: workspacePaths.sandboxHomePath,
+        contextPath: workspacePaths.contextPath,
+        includeStagedContext: true,
+        verifierInputsAbsolute: sharedInputs.sharedInputsAbsolute,
+        verifierReferenceRepoAbsolute: sharedInputsUseReferenceRepo(
+          sharedInputs,
+        )
+          ? sharedInputs.referenceRepoAbsolute
+          : undefined,
       });
 
       const result = await runSandboxedAgent({

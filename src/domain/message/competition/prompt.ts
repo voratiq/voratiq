@@ -37,8 +37,9 @@ export function buildMessagePrompt(options: BuildMessagePromptOptions): string {
   ];
 
   appendConstraints(lines, {
-    readAccess: repoRootPath,
-    writeAccess: workspacePath,
+    stageId: "message",
+    repoRootPath,
+    workspacePath,
   });
   appendExtraContextPromptSection(lines, extraContextFiles);
   appendOutputRequirements(

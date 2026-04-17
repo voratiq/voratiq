@@ -252,8 +252,8 @@ export function createReduceCompetitionAdapter(
           targetOperator: target.type,
           targetId: target.id,
           artifactInfoPath: REDUCTION_ARTIFACT_INFO_FILENAME,
-          repoRootPath: workspacePaths.workspacePath,
           workspacePath: workspacePaths.workspacePath,
+          contextPath: workspacePaths.contextPath,
           extraContextFiles,
         });
 
@@ -316,9 +316,14 @@ export function createReduceCompetitionAdapter(
     ): Promise<ReductionCompetitionExecution> => {
       const { candidate, workspacePaths, prompt, outputPath, dataPath } =
         prepared;
-      const sandboxPolicy = composeStageSandboxPolicy({
-        stageWriteProtectedPaths: [],
-        stageReadProtectedPaths: [],
+      const sandboxPolicy = await composeStageSandboxPolicy({
+        stageId: "reduce",
+        root,
+        workspacePath: workspacePaths.workspacePath,
+        runtimePath: workspacePaths.runtimePath,
+        sandboxHomePath: workspacePaths.sandboxHomePath,
+        contextPath: workspacePaths.contextPath,
+        includeStagedContext: extraContextFiles.length > 0,
       });
       const result = await runSandboxedAgent({
         root,

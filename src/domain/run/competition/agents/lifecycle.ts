@@ -40,6 +40,7 @@ export async function executeAgentLifecycle(
     baseRevisionSha,
     root,
     prompt,
+    hasStagedContext,
     environment,
   } = execution;
   let manifestEnv: Record<string, string> = {};
@@ -82,6 +83,16 @@ export async function executeAgentLifecycle(
       }
     };
 
+    const sandboxPolicy = await composeStageSandboxPolicy({
+      stageId: "run",
+      root,
+      workspacePath: workspacePaths.workspacePath,
+      runtimePath: workspacePaths.runtimePath,
+      sandboxHomePath: workspacePaths.sandboxHomePath,
+      contextPath: workspacePaths.contextPath,
+      includeStagedContext: hasStagedContext,
+    });
+
     const processResult = await runSandboxedAgent({
       root,
       sessionId: execution.runId,
@@ -102,7 +113,7 @@ export async function executeAgentLifecycle(
       },
       captureChat: true,
       teardownAuthOnExit: false,
-      ...composeStageSandboxPolicy({}),
+      ...sandboxPolicy,
       onWatchdogTrigger,
     });
 

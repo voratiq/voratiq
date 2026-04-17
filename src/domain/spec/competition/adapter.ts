@@ -169,6 +169,15 @@ export function createSpecCompetitionAdapter(
     },
     executeCandidate: async (prepared): Promise<SpecCompetitionExecution> => {
       const { candidate, workspacePaths, prompt } = prepared;
+      const sandboxPolicy = await composeStageSandboxPolicy({
+        stageId: "spec",
+        root,
+        workspacePath: workspacePaths.workspacePath,
+        runtimePath: workspacePaths.runtimePath,
+        sandboxHomePath: workspacePaths.sandboxHomePath,
+        contextPath: workspacePaths.contextPath,
+        includeStagedContext: extraContextFiles.length > 0,
+      });
 
       try {
         const result = await runSandboxedAgent({
@@ -191,7 +200,7 @@ export function createSpecCompetitionAdapter(
           },
           captureChat: true,
           teardownAuthOnExit: false,
-          ...composeStageSandboxPolicy(),
+          ...sandboxPolicy,
         });
         const tokenUsageResult =
           await extractProviderNativeTokenUsageForSession({

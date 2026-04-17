@@ -12,8 +12,8 @@ export interface BuildReducePromptOptions {
   targetOperator: "spec" | "run" | "reduce" | "verify" | "message";
   targetId: string;
   artifactInfoPath: string;
-  repoRootPath: string;
   workspacePath: string;
+  contextPath?: string;
   extraContextFiles?: readonly ResolvedExtraContextFile[];
 }
 
@@ -22,8 +22,8 @@ export function buildReducePrompt(options: BuildReducePromptOptions): string {
     targetOperator,
     targetId,
     artifactInfoPath,
-    repoRootPath,
     workspacePath,
+    contextPath,
     extraContextFiles = [],
   } = options;
 
@@ -93,8 +93,10 @@ export function buildReducePrompt(options: BuildReducePromptOptions): string {
   ];
 
   appendConstraints(lines, {
-    readAccess: repoRootPath,
-    writeAccess: workspacePath,
+    stageId: "reduce",
+    workspacePath,
+    supplementalReadAccess:
+      contextPath && extraContextFiles.length > 0 ? [contextPath] : [],
   });
   appendExtraContextPromptSection(lines, extraContextFiles);
   appendOutputRequirements(

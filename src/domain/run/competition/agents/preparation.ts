@@ -61,6 +61,7 @@ export async function prepareAgentForExecution(
   const prompt = buildRunPrompt({
     specContent,
     workspacePath: workspacePaths.workspacePath,
+    contextPath: workspacePaths.contextPath,
     extraContextFiles,
   });
 
@@ -74,6 +75,7 @@ export async function prepareAgentForExecution(
       root,
       runId,
       prompt,
+      hasStagedContext: extraContextFiles.length > 0,
       environment,
     },
   };
