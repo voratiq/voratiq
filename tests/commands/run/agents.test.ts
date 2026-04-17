@@ -478,6 +478,7 @@ async function createPreparedExecution(agentId = "agent-id"): Promise<{
     root,
     runId,
     prompt: "# test prompt\n",
+    hasStagedContext: false,
     environment,
     progress,
   };

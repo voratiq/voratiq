@@ -7,19 +7,20 @@ import type {
 import {
   VORATIQ_AGENTS_FILE,
   VORATIQ_ENVIRONMENT_FILE,
-  VORATIQ_HISTORY_LOCK_FILENAME,
   VORATIQ_ORCHESTRATION_FILE,
-  VORATIQ_REDUCTION_DIR,
-  VORATIQ_RUN_DIR,
-  VORATIQ_RUN_FILE,
   VORATIQ_SANDBOX_FILE,
-  VORATIQ_SPEC_DIR,
-  VORATIQ_VERIFICATION_DIR,
 } from "../../workspace/constants.js";
 import { resolveWorkspacePath } from "../../workspace/path-resolvers.js";
+import {
+  getOperatorAccessProfile,
+  resolveProtectedMetadataPath,
+  resolveProtectedOperatorDir,
+  resolveRepositoryGitPath,
+  type SandboxStageId,
+} from "./operator-access.js";
 import type { SandboxPolicyOverrides } from "./types.js";
 
-export type SandboxStageId = "spec" | "run" | "reduce" | "verify" | "message";
+export type { SandboxStageId } from "./operator-access.js";
 
 export interface BuildSandboxPolicyInput {
   stageId: SandboxStageId;
@@ -204,70 +205,42 @@ function buildBaselineFilesystemPolicy(options: {
     resolveWorkspacePath(root, VORATIQ_ORCHESTRATION_FILE),
     resolveWorkspacePath(root, VORATIQ_SANDBOX_FILE),
   ];
-  const stageRoots = resolveStageRoots(stageId, root);
+  const stagePaths = resolveStageProtectedPaths(stageId, root);
 
   // Default deny rules stay symmetric; read-only divergences are explicit.
-  const symmetricDeny = [...commonSensitivePaths, ...stageRoots.symmetric];
+  const symmetricDeny = [...commonSensitivePaths, ...stagePaths.symmetric];
   return {
     allowWrite: [],
-    denyRead: [...symmetricDeny, ...stageRoots.readOnly],
+    denyRead: [...symmetricDeny, ...stagePaths.readOnly],
     denyWrite: [...symmetricDeny],
   };
 }
 
-function resolveStageRoots(
+function resolveStageProtectedPaths(
   stageId: SandboxStageId,
   root: string,
 ): {
   symmetric: string[];
   readOnly: string[];
 } {
-  if (stageId === "run") {
-    return {
-      symmetric: [
-        resolveAbsolute(root, ".git"),
-        resolveWorkspacePath(root, VORATIQ_RUN_FILE),
-        resolveWorkspacePath(
-          root,
-          VORATIQ_RUN_DIR,
-          VORATIQ_HISTORY_LOCK_FILENAME,
-        ),
-        resolveWorkspacePath(root, VORATIQ_VERIFICATION_DIR),
-      ],
-      readOnly: [],
-    };
-  }
+  const profile = getOperatorAccessProfile(stageId);
+  const symmetric = [
+    ...profile.protectedOperatorDirs.map((key) =>
+      resolveProtectedOperatorDir(root, key),
+    ),
+    ...profile.protectedMetadataPaths.map((key) =>
+      resolveProtectedMetadataPath(root, key),
+    ),
+  ];
 
-  if (stageId === "spec") {
-    return {
-      symmetric: [
-        resolveWorkspacePath(root, VORATIQ_RUN_DIR),
-        resolveWorkspacePath(root, VORATIQ_VERIFICATION_DIR),
-        resolveWorkspacePath(root, VORATIQ_REDUCTION_DIR),
-      ],
-      readOnly: [],
-    };
-  }
-
-  if (stageId === "verify") {
-    return {
-      symmetric: [
-        resolveWorkspacePath(root, VORATIQ_RUN_DIR),
-        resolveWorkspacePath(root, VORATIQ_SPEC_DIR),
-        resolveWorkspacePath(root, VORATIQ_REDUCTION_DIR),
-      ],
-      // Verification agents should never inspect repository metadata during
-      // blinded review.
-      readOnly: [resolveAbsolute(root, ".git")],
-    };
+  if (profile.gitAccess === "deny-read-write") {
+    symmetric.unshift(resolveRepositoryGitPath(root));
   }
 
   return {
-    symmetric: [
-      resolveWorkspacePath(root, VORATIQ_RUN_DIR),
-      resolveWorkspacePath(root, VORATIQ_SPEC_DIR),
-    ],
-    readOnly: [resolveAbsolute(root, ".git")],
+    symmetric,
+    readOnly:
+      profile.gitAccess === "deny-read" ? [resolveRepositoryGitPath(root)] : [],
   };
 }
 

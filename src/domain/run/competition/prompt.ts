@@ -11,11 +11,17 @@ import {
 export interface BuildRunPromptOptions {
   specContent: string;
   workspacePath: string;
+  contextPath?: string;
   extraContextFiles?: readonly ResolvedExtraContextFile[];
 }
 
 export function buildRunPrompt(options: BuildRunPromptOptions): string {
-  const { specContent, workspacePath, extraContextFiles = [] } = options;
+  const {
+    specContent,
+    workspacePath,
+    contextPath,
+    extraContextFiles = [],
+  } = options;
 
   const lines = [
     "Implement the following task:",
@@ -26,8 +32,10 @@ export function buildRunPrompt(options: BuildRunPromptOptions): string {
   ];
 
   appendConstraints(lines, {
-    readAccess: workspacePath,
-    writeAccess: workspacePath,
+    stageId: "run",
+    workspacePath,
+    supplementalReadAccess:
+      contextPath && extraContextFiles.length > 0 ? [contextPath] : [],
   });
   appendExtraContextPromptSection(lines, extraContextFiles);
   appendOutputRequirements(lines, [

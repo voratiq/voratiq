@@ -337,7 +337,7 @@ Voratiq is a workflow system built around composable operators that launch, eval
 Voratiq operators fall into two main classes:
 
 - **Swarm operators** dispatch agents to produce, synthesize, or evaluate work: spec, run, reduce, verify, message
-- **Control operators** inspect state or mutate accepted outcomes: list, apply, prune
+- **Control operators** inspect state or mutate accepted outcomes: apply, list, prune
 
 ## Swarm Operators
 

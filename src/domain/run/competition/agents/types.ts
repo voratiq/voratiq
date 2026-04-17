@@ -31,6 +31,7 @@ export interface PreparedAgentExecution {
   root: string;
   runId: string;
   prompt: string;
+  hasStagedContext: boolean;
   environment: EnvironmentConfig;
   progress?: AgentProgressCallbacks;
 }

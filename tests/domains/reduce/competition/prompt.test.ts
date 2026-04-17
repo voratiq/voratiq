@@ -8,7 +8,6 @@ describe("buildReducePrompt", () => {
       targetOperator: "run",
       targetId: "run-1",
       artifactInfoPath: "artifact-information.json",
-      repoRootPath: "/repo/.voratiq/reduce/sessions/reduce-1/alpha/workspace",
       workspacePath: "/repo/.voratiq/reduce/sessions/reduce-1/alpha/workspace",
     });
 
@@ -31,7 +30,6 @@ describe("buildReducePrompt", () => {
       targetOperator: "run",
       targetId: "run-1",
       artifactInfoPath: "artifact-information.json",
-      repoRootPath: "/repo/.voratiq/reduce/sessions/reduce-1/alpha/workspace",
       workspacePath: "/repo/.voratiq/reduce/sessions/reduce-1/alpha/workspace",
       extraContextFiles: [
         {

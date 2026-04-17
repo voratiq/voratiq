@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import type { ResolvedExtraContextFile } from "../../../competition/shared/extra-context.js";
 import {
@@ -46,6 +46,7 @@ export function buildRubricPrompt(options: {
   extraContextFiles: readonly ResolvedExtraContextFile[];
 }): string {
   const { template, target, staged, extraContextFiles } = options;
+  const promptWorkspacePath = "/workspace";
   const lines: string[] = [];
 
   lines.push(
@@ -122,7 +123,14 @@ export function buildRubricPrompt(options: {
     "```",
   );
 
-  appendConstraints(lines);
+  appendConstraints(lines, {
+    stageId: "verify",
+    workspacePath: promptWorkspacePath,
+    readOnlyWritePaths: buildVerifyReadonlyMountPaths({
+      workspacePath: promptWorkspacePath,
+      staged,
+    }),
+  });
   appendOutputRequirements(
     lines,
     buildWorkspaceArtifactRequirements([
@@ -153,4 +161,19 @@ export function buildRubricPrompt(options: {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function buildVerifyReadonlyMountPaths(options: {
+  workspacePath: string;
+  staged: StagedVerificationInputs;
+}): string[] {
+  const { workspacePath, staged } = options;
+  const readonlyPaths = [
+    join(workspacePath, "context"),
+    join(workspacePath, "inputs"),
+  ];
+  if ("referenceRepoPath" in staged) {
+    readonlyPaths.push(join(workspacePath, "reference_repo"));
+  }
+  return readonlyPaths;
 }

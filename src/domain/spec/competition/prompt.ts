@@ -64,8 +64,9 @@ export function buildSpecPrompt(options: BuildSpecPromptOptions): string {
   );
 
   appendConstraints(lines, {
-    readAccess: repoRootPath,
-    writeAccess: workspacePath,
+    stageId: "spec",
+    repoRootPath,
+    workspacePath,
   });
   appendExtraContextPromptSection(lines, extraContextFiles);
   appendOutputRequirements(

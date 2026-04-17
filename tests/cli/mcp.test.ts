@@ -1218,6 +1218,8 @@ describe("bundled MCP server", () => {
     expect(text).toContain("extraContext");
     expect(text).toContain("maxParallel");
     expect(text).toContain("durable");
+    expect(text).toContain("spec, run, reduce, verify, message");
+    expect(text).toContain("apply, list, prune");
   });
 
   it("resources/read returns a JSON-RPC error for an unknown URI", async () => {

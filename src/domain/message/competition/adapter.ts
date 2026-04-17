@@ -172,6 +172,15 @@ export function createMessageCompetitionAdapter(
     ): Promise<MessageCompetitionExecution> => {
       const { candidate, workspacePaths, prompt: builtPrompt } = prepared;
       const startedAt = new Date().toISOString();
+      const sandboxPolicy = await composeStageSandboxPolicy({
+        stageId: "message",
+        root,
+        workspacePath: workspacePaths.workspacePath,
+        runtimePath: workspacePaths.runtimePath,
+        sandboxHomePath: workspacePaths.sandboxHomePath,
+        contextPath: workspacePaths.contextPath,
+        includeStagedContext: extraContextFiles.length > 0,
+      });
 
       try {
         const result = await runSandboxedAgent({
@@ -194,7 +203,7 @@ export function createMessageCompetitionAdapter(
           },
           captureChat: true,
           teardownAuthOnExit: false,
-          ...composeStageSandboxPolicy(),
+          ...sandboxPolicy,
         });
 
         const tokenUsageResult =
