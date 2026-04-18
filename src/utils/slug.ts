@@ -9,8 +9,3 @@ export function sanitizeSlug(value: string): string {
     .replace(/-+$/u, "");
   return normalized;
 }
-
-export function slugify(value: string, fallback: string): string {
-  const normalized = sanitizeSlug(value);
-  return normalized.length > 0 ? normalized : fallback;
-}

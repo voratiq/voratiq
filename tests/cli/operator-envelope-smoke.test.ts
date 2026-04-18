@@ -168,7 +168,8 @@ describe("operator envelope json smoke chain", () => {
   });
 
   it("chains spec -> run -> verify using only parsed envelope fields", async () => {
-    const specArtifactPath = ".voratiq/spec/sessions/spec-123/agent-a/spec.md";
+    const specArtifactPath =
+      ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md";
 
     executeSpecCommandMock.mockResolvedValue({
       sessionId: "spec-123",
@@ -187,7 +188,8 @@ describe("operator envelope json smoke chain", () => {
             startedAt: "2026-03-27T12:00:00.000Z",
             completedAt: "2026-03-27T12:00:05.000Z",
             outputPath: specArtifactPath,
-            dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+            dataPath:
+              ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.json",
           },
         ],
       },
@@ -198,13 +200,15 @@ describe("operator envelope json smoke chain", () => {
           startedAt: "2026-03-27T12:00:00.000Z",
           completedAt: "2026-03-27T12:00:05.000Z",
           outputPath: specArtifactPath,
-          dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+          dataPath:
+            ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.json",
         },
       ],
     });
 
     ensureSpecPathMock.mockResolvedValue({
-      absolutePath: "/repo/.voratiq/spec/sessions/spec-123/agent-a/spec.md",
+      absolutePath:
+        "/repo/.voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
       displayPath: specArtifactPath,
     });
 

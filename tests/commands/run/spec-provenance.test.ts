@@ -13,6 +13,34 @@ import * as specPersistence from "../../../src/domain/spec/persistence/adapter.j
 import { appendSpecRecord } from "../../../src/domain/spec/persistence/adapter.js";
 import { createWorkspace } from "../../../src/workspace/setup.js";
 
+function canonicalSpecRelativePath(
+  sessionId: string,
+  agentId: string,
+): `.voratiq/spec/sessions/${string}/${string}/artifacts/spec.md` {
+  return `.voratiq/spec/sessions/${sessionId}/${agentId}/artifacts/spec.md`;
+}
+
+function canonicalSpecDataRelativePath(
+  sessionId: string,
+  agentId: string,
+): `.voratiq/spec/sessions/${string}/${string}/artifacts/spec.json` {
+  return `.voratiq/spec/sessions/${sessionId}/${agentId}/artifacts/spec.json`;
+}
+
+function legacySpecRelativePath(
+  sessionId: string,
+  agentId: string,
+): `.voratiq/spec/sessions/${string}/${string}/spec.md` {
+  return `.voratiq/spec/sessions/${sessionId}/${agentId}/spec.md`;
+}
+
+function legacySpecDataRelativePath(
+  sessionId: string,
+  agentId: string,
+): `.voratiq/spec/sessions/${string}/${string}/spec.json` {
+  return `.voratiq/spec/sessions/${sessionId}/${agentId}/spec.json`;
+}
+
 describe("resolveRunSpecTarget", () => {
   it("returns a spec target when the run input matches a generated spec artifact", async () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-run-spec-target-"));
@@ -20,6 +48,8 @@ describe("resolveRunSpecTarget", () => {
     try {
       await createWorkspace(root);
       const body = "# Canonical spec\n";
+      const outputPath = canonicalSpecRelativePath("spec-123", "agent-a");
+      const dataPath = canonicalSpecDataRelativePath("spec-123", "agent-a");
       const artifactPath = join(
         root,
         ".voratiq",
@@ -27,10 +57,19 @@ describe("resolveRunSpecTarget", () => {
         "sessions",
         "spec-123",
         "agent-a",
+        "artifacts",
         "spec.md",
       );
       await mkdir(
-        join(root, ".voratiq", "spec", "sessions", "spec-123", "agent-a"),
+        join(
+          root,
+          ".voratiq",
+          "spec",
+          "sessions",
+          "spec-123",
+          "agent-a",
+          "artifacts",
+        ),
         {
           recursive: true,
         },
@@ -53,8 +92,8 @@ describe("resolveRunSpecTarget", () => {
               status: "succeeded",
               startedAt: "2026-01-01T00:00:00.000Z",
               completedAt: "2026-01-01T00:01:00.000Z",
-              outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
-              dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+              outputPath,
+              dataPath,
               contentHash: hashBody(body),
             },
           ],
@@ -66,7 +105,7 @@ describe("resolveRunSpecTarget", () => {
           root,
           specsFilePath: join(root, ".voratiq", "spec", "index.json"),
           specAbsolutePath: artifactPath,
-          specDisplayPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+          specDisplayPath: outputPath,
         }),
       ).resolves.toMatchObject({
         kind: "spec",
@@ -76,7 +115,7 @@ describe("resolveRunSpecTarget", () => {
           source: {
             sessionId: "spec-123",
             agentId: "agent-a",
-            outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+            outputPath,
             contentHash: hashBody(body),
           },
         },
@@ -92,6 +131,8 @@ describe("resolveRunSpecTarget", () => {
     try {
       await createWorkspace(root);
       const body = "# Canonical spec\n";
+      const outputPath = legacySpecRelativePath("spec-legacy", "agent-a");
+      const dataPath = legacySpecDataRelativePath("spec-legacy", "agent-a");
       const artifactPath = join(
         root,
         ".voratiq",
@@ -125,8 +166,8 @@ describe("resolveRunSpecTarget", () => {
               status: "succeeded",
               startedAt: "2026-01-01T00:00:00.000Z",
               completedAt: "2026-01-01T00:01:00.000Z",
-              outputPath: ".voratiq/spec/sessions/spec-legacy/agent-a/spec.md",
-              dataPath: ".voratiq/spec/sessions/spec-legacy/agent-a/spec.json",
+              outputPath,
+              dataPath,
             },
           ],
         },
@@ -137,7 +178,7 @@ describe("resolveRunSpecTarget", () => {
           root,
           specsFilePath: join(root, ".voratiq", "spec", "index.json"),
           specAbsolutePath: artifactPath,
-          specDisplayPath: ".voratiq/spec/sessions/spec-legacy/agent-a/spec.md",
+          specDisplayPath: outputPath,
         }),
       ).resolves.toEqual({
         kind: "spec",
@@ -155,6 +196,8 @@ describe("resolveRunSpecTarget", () => {
       await createWorkspace(root);
       const canonicalBody = "# Canonical spec\n";
       const editedBody = "# Canonical spec\n\nEdited in place.\n";
+      const outputPath = canonicalSpecRelativePath("spec-123", "agent-a");
+      const dataPath = canonicalSpecDataRelativePath("spec-123", "agent-a");
       const artifactPath = join(
         root,
         ".voratiq",
@@ -162,11 +205,20 @@ describe("resolveRunSpecTarget", () => {
         "sessions",
         "spec-123",
         "agent-a",
+        "artifacts",
         "spec.md",
       );
 
       await mkdir(
-        join(root, ".voratiq", "spec", "sessions", "spec-123", "agent-a"),
+        join(
+          root,
+          ".voratiq",
+          "spec",
+          "sessions",
+          "spec-123",
+          "agent-a",
+          "artifacts",
+        ),
         {
           recursive: true,
         },
@@ -189,8 +241,8 @@ describe("resolveRunSpecTarget", () => {
               status: "succeeded",
               startedAt: "2026-01-01T00:00:00.000Z",
               completedAt: "2026-01-01T00:01:00.000Z",
-              outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
-              dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+              outputPath,
+              dataPath,
               contentHash: hashBody(canonicalBody),
             },
           ],
@@ -202,7 +254,7 @@ describe("resolveRunSpecTarget", () => {
           root,
           specsFilePath: join(root, ".voratiq", "spec", "index.json"),
           specAbsolutePath: artifactPath,
-          specDisplayPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+          specDisplayPath: outputPath,
         }),
       ).resolves.toEqual({
         kind: "spec",
@@ -213,7 +265,7 @@ describe("resolveRunSpecTarget", () => {
             kind: "spec",
             sessionId: "spec-123",
             agentId: "agent-a",
-            outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+            outputPath,
             contentHash: hashBody(canonicalBody),
           },
           currentContentHash: hashBody(editedBody),
@@ -231,6 +283,8 @@ describe("resolveRunSpecTarget", () => {
       await createWorkspace(root);
       const body = "# Derived spec\n";
       const copiedPath = join(root, ".voratiq", "spec", "copied.md");
+      const outputPath = canonicalSpecRelativePath("spec-123", "agent-a");
+      const dataPath = canonicalSpecDataRelativePath("spec-123", "agent-a");
       const artifactPath = join(
         root,
         ".voratiq",
@@ -238,6 +292,7 @@ describe("resolveRunSpecTarget", () => {
         "sessions",
         "spec-123",
         "agent-a",
+        "artifacts",
         "spec.md",
       );
 
@@ -257,8 +312,8 @@ describe("resolveRunSpecTarget", () => {
               status: "succeeded",
               startedAt: "2026-01-01T00:00:00.000Z",
               completedAt: "2026-01-01T00:01:00.000Z",
-              outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
-              dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+              outputPath,
+              dataPath,
               contentHash: hashBody(body),
             },
           ],
@@ -266,7 +321,15 @@ describe("resolveRunSpecTarget", () => {
       });
 
       await mkdir(
-        join(root, ".voratiq", "spec", "sessions", "spec-123", "agent-a"),
+        join(
+          root,
+          ".voratiq",
+          "spec",
+          "sessions",
+          "spec-123",
+          "agent-a",
+          "artifacts",
+        ),
         {
           recursive: true,
         },
@@ -305,7 +368,7 @@ describe("resolveRunSpecTarget", () => {
             kind: "spec",
             sessionId: "spec-123",
             agentId: "agent-a",
-            outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+            outputPath,
             contentHash: hashBody(body),
           },
           currentContentHash: hashBody(body),
@@ -324,6 +387,8 @@ describe("resolveRunSpecTarget", () => {
       const originalBody = "# Original spec\n";
       const copiedBody = "# Original spec\n\nEdited.\n";
       const copiedPath = join(root, ".voratiq", "spec", "copied.md");
+      const outputPath = canonicalSpecRelativePath("spec-123", "agent-a");
+      const dataPath = canonicalSpecDataRelativePath("spec-123", "agent-a");
       const artifactPath = join(
         root,
         ".voratiq",
@@ -331,6 +396,7 @@ describe("resolveRunSpecTarget", () => {
         "sessions",
         "spec-123",
         "agent-a",
+        "artifacts",
         "spec.md",
       );
 
@@ -350,8 +416,8 @@ describe("resolveRunSpecTarget", () => {
               status: "succeeded",
               startedAt: "2026-01-01T00:00:00.000Z",
               completedAt: "2026-01-01T00:01:00.000Z",
-              outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
-              dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+              outputPath,
+              dataPath,
               contentHash: hashBody(originalBody),
             },
           ],
@@ -359,7 +425,15 @@ describe("resolveRunSpecTarget", () => {
       });
 
       await mkdir(
-        join(root, ".voratiq", "spec", "sessions", "spec-123", "agent-a"),
+        join(
+          root,
+          ".voratiq",
+          "spec",
+          "sessions",
+          "spec-123",
+          "agent-a",
+          "artifacts",
+        ),
         {
           recursive: true,
         },
@@ -398,7 +472,7 @@ describe("resolveRunSpecTarget", () => {
             kind: "spec",
             sessionId: "spec-123",
             agentId: "agent-a",
-            outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
+            outputPath,
             contentHash: hashBody(originalBody),
           },
           currentContentHash: hashBody(copiedBody),
@@ -416,6 +490,8 @@ describe("resolveRunSpecTarget", () => {
       await createWorkspace(root);
       const body = "# Derived spec\n";
       const copiedPath = join(root, ".voratiq", "spec", "copied.md");
+      const outputPath = legacySpecRelativePath("spec-legacy", "agent-a");
+      const dataPath = legacySpecDataRelativePath("spec-legacy", "agent-a");
       const artifactPath = join(
         root,
         ".voratiq",
@@ -442,8 +518,8 @@ describe("resolveRunSpecTarget", () => {
               status: "succeeded",
               startedAt: "2026-01-01T00:00:00.000Z",
               completedAt: "2026-01-01T00:01:00.000Z",
-              outputPath: ".voratiq/spec/sessions/spec-legacy/agent-a/spec.md",
-              dataPath: ".voratiq/spec/sessions/spec-legacy/agent-a/spec.json",
+              outputPath,
+              dataPath,
             },
           ],
         },
@@ -496,6 +572,7 @@ describe("resolveRunSpecTarget", () => {
       await createWorkspace(root);
       const copiedBody = "# Canonical spec\n";
       const copiedPath = join(root, ".voratiq", "spec", "copied.md");
+      const outputPath = canonicalSpecRelativePath("spec-123", "agent-a");
 
       await mkdir(join(root, ".voratiq", "spec"), { recursive: true });
       await writeFile(
@@ -507,7 +584,7 @@ describe("resolveRunSpecTarget", () => {
           "    operator: spec",
           "    sessionId: spec-123",
           "    agentId: agent-a",
-          "    outputPath: .voratiq/spec/sessions/spec-123/agent-a/spec.md",
+          `    outputPath: ${outputPath}`,
           `    contentHash: ${hashBody("# Different source body\n")}`,
           "---",
           copiedBody,
@@ -655,6 +732,8 @@ describe("resolveRunSpecTarget", () => {
       await createWorkspace(root);
       const specPath = join(root, ".voratiq", "spec", "copied.md");
       const body = "# Task\n\nImplement the feature.\n";
+      const outputPath = canonicalSpecRelativePath("spec-123", "agent-a");
+      const dataPath = canonicalSpecDataRelativePath("spec-123", "agent-a");
 
       await appendSpecRecord({
         root,
@@ -672,8 +751,8 @@ describe("resolveRunSpecTarget", () => {
               status: "succeeded",
               startedAt: "2026-01-01T00:00:00.000Z",
               completedAt: "2026-01-01T00:01:00.000Z",
-              outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
-              dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+              outputPath,
+              dataPath,
             },
           ],
         },
@@ -722,6 +801,8 @@ describe("resolveRunSpecTarget", () => {
       const body = "# Task\n\nImplement the feature.\n";
       const sourceBody = "# Canonical task\n";
       const specPath = join(root, ".voratiq", "spec", "copied.md");
+      const outputPath = canonicalSpecRelativePath("spec-123", "agent-a");
+      const dataPath = canonicalSpecDataRelativePath("spec-123", "agent-a");
       const artifactPath = join(
         root,
         ".voratiq",
@@ -729,6 +810,7 @@ describe("resolveRunSpecTarget", () => {
         "sessions",
         "spec-123",
         "agent-a",
+        "artifacts",
         "spec.md",
       );
 
@@ -748,15 +830,23 @@ describe("resolveRunSpecTarget", () => {
               status: "succeeded",
               startedAt: "2026-01-01T00:00:00.000Z",
               completedAt: "2026-01-01T00:01:00.000Z",
-              outputPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.md",
-              dataPath: ".voratiq/spec/sessions/spec-123/agent-a/spec.json",
+              outputPath,
+              dataPath,
             },
           ],
         },
       });
 
       await mkdir(
-        join(root, ".voratiq", "spec", "sessions", "spec-123", "agent-a"),
+        join(
+          root,
+          ".voratiq",
+          "spec",
+          "sessions",
+          "spec-123",
+          "agent-a",
+          "artifacts",
+        ),
         {
           recursive: true,
         },
@@ -816,13 +906,13 @@ describe("resolveRunSpecTarget", () => {
       const readSpecRecordsSpy = jest
         .spyOn(specPersistence, "readSpecRecords")
         .mockRejectedValue(new Error("boom"));
+      const outputPath = canonicalSpecRelativePath("spec-123", "agent-a");
 
       await expect(
         resolveRunSpecTarget({
           root,
           specsFilePath: join(root, ".voratiq", "spec", "index.json"),
-          specDisplayPath:
-            ".voratiq/spec/sessions/spec-123/agent-a/feature-spec.md",
+          specDisplayPath: outputPath,
         }),
       ).resolves.toEqual({
         kind: "file",

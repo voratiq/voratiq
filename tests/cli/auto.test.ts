@@ -1846,8 +1846,8 @@ describe("voratiq auto", () => {
     runSpecCommandMock.mockResolvedValue({
       sessionId: "spec-session-123",
       generatedSpecPaths: [
-        ".voratiq/spec/sessions/spec-123/alpha/artifacts/migration-plan.md",
-        ".voratiq/spec/sessions/spec-123/beta/artifacts/migration-plan-v2.md",
+        ".voratiq/spec/sessions/spec-123/alpha/artifacts/spec.md",
+        ".voratiq/spec/sessions/spec-123/beta/artifacts/spec.md",
       ],
       body: "SPEC BODY",
     });
@@ -1862,7 +1862,7 @@ describe("voratiq auto", () => {
                 body: "SPEC VERIFY BODY",
               }),
               selectedSpecPath:
-                ".voratiq/spec/sessions/spec-123/beta/artifacts/migration-plan-v2.md",
+                ".voratiq/spec/sessions/spec-123/beta/artifacts/spec.md",
               exitCode: 0,
             }
           : {
@@ -1886,8 +1886,7 @@ describe("voratiq auto", () => {
     expect(result.exitCode).toBe(0);
     expect(runRunCommandMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        specPath:
-          ".voratiq/spec/sessions/spec-123/beta/artifacts/migration-plan-v2.md",
+        specPath: ".voratiq/spec/sessions/spec-123/beta/artifacts/spec.md",
       }),
     );
     const output = stripAnsi(stdout.join(""));

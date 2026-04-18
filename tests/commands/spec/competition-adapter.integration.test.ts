@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -234,8 +234,8 @@ describe("spec competition adapter native token usage integration", () => {
     expect(results[0]?.tokenUsage).toBeUndefined();
   });
 
-  it("derives final artifact filenames from spec.json title instead of the prompt hint title", async () => {
-    const root = await mkdtemp(join(tmpdir(), "voratiq-spec-title-slug-"));
+  it("persists canonical artifact filenames regardless of the spec.json title", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-spec-canonical-"));
     tempRoots.push(root);
     await createWorkspace(root);
 
@@ -298,11 +298,108 @@ describe("spec competition adapter native token usage integration", () => {
         agentId: "spec-agent",
         status: "succeeded",
         outputPath:
-          ".voratiq/spec/sessions/spec-title-slug/spec-agent/artifacts/generated-truth-title.md",
+          ".voratiq/spec/sessions/spec-title-slug/spec-agent/artifacts/spec.md",
         dataPath:
-          ".voratiq/spec/sessions/spec-title-slug/spec-agent/artifacts/generated-truth-title.json",
+          ".voratiq/spec/sessions/spec-title-slug/spec-agent/artifacts/spec.json",
       }),
     ]);
+  });
+
+  it("marks the agent failed when staged spec.json fails validation and skips artifact promotion", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-spec-invalid-data-"));
+    tempRoots.push(root);
+    await createWorkspace(root);
+
+    runSandboxedAgentMock.mockImplementation(async (input) => {
+      await writeFile(
+        join(input.paths.workspacePath, "spec.md"),
+        "# Prompt Hint Title\n",
+        "utf8",
+      );
+      await writeFile(
+        join(input.paths.workspacePath, "spec.json"),
+        JSON.stringify(
+          {
+            title: "",
+            objective: "Define the spec outcome.",
+            scope: ["Describe the requested work."],
+            acceptanceCriteria: ["Do the thing."],
+            constraints: ["Stay within repo context."],
+            exitSignal: "The spec is ready to execute.",
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+      return {
+        exitCode: 0,
+        signal: null,
+        sandboxSettings: minimalSandboxSettings(),
+        manifestEnv: {},
+      };
+    });
+
+    const adapter = createSpecCompetitionAdapter({
+      root,
+      sessionId: "spec-invalid-data",
+      description: "Generate a spec",
+      environment: {},
+    });
+
+    const candidates: SpecCompetitionCandidate[] = [
+      {
+        id: "spec-agent",
+        provider: "codex",
+        model: "gpt-5",
+        binary: "node",
+        argv: [],
+      },
+    ];
+
+    const results = await executeCompetitionWithAdapter({
+      candidates,
+      maxParallel: 1,
+      adapter,
+    });
+
+    expect(results).toEqual([
+      expect.objectContaining({
+        agentId: "spec-agent",
+        status: "failed",
+        error: expect.stringContaining("Schema validation failed:"),
+      }),
+    ]);
+    await expect(
+      readFile(
+        join(
+          root,
+          ".voratiq",
+          "spec",
+          "sessions",
+          "spec-invalid-data",
+          "spec-agent",
+          "artifacts",
+          "spec.md",
+        ),
+        "utf8",
+      ),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(
+      readFile(
+        join(
+          root,
+          ".voratiq",
+          "spec",
+          "sessions",
+          "spec-invalid-data",
+          "spec-agent",
+          "artifacts",
+          "spec.json",
+        ),
+        "utf8",
+      ),
+    ).rejects.toMatchObject({ code: "ENOENT" });
   });
 });
 

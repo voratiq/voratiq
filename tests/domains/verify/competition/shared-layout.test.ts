@@ -34,7 +34,7 @@ describe("prepareSharedVerificationInputs", () => {
     jest.clearAllMocks();
   });
 
-  it("removes shared inputs root when preparation fails after setup", async () => {
+  it("removes shared inputs root when preparation fails after setup for legacy slugged spec records", async () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-verify-shared-layout-"));
     const verificationId = "verify-failed-prep";
     const missingSpecOutputPath =
@@ -401,7 +401,7 @@ describe("prepareSharedVerificationInputs", () => {
     }
   });
 
-  it("stages spec deliverables and excludes raw execution artifacts", async () => {
+  it("stages spec deliverables from recorded paths, including legacy slugged artifacts", async () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-verify-shared-spec-"));
     const verificationId = "verify-spec-artifacts";
     const agentId = "agent-spec";
