@@ -97,13 +97,19 @@ export function createSpecRecordMutators(
         root,
         specsFilePath,
         sessionId,
-        mutate: (existing) => ({
-          ...existing,
-          status,
-          ...buildRecordLifecycleCompleteFields({ existing }),
-          ...(agents ? { agents: [...agents] } : {}),
-          ...(error !== undefined ? { error } : {}),
-        }),
+        mutate: (existing) => {
+          if (existing.status !== "running") {
+            return existing;
+          }
+
+          return {
+            ...existing,
+            status,
+            ...buildRecordLifecycleCompleteFields({ existing }),
+            ...(agents ? { agents: [...agents] } : {}),
+            ...(error !== undefined ? { error } : {}),
+          };
+        },
         forceFlush: true,
       }),
     readRecord: async () =>

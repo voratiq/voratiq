@@ -109,4 +109,47 @@ describe("createMessageRecordMutators", () => {
         ".voratiq/message/sessions/message-456/agent-a/artifacts/response.md",
     });
   });
+
+  it("does not overwrite an already-terminal message session", async () => {
+    const messageId = "message-789";
+    let currentRecord: MessageRecord = {
+      sessionId: messageId,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:00:05.000Z",
+      status: "aborted",
+      baseRevisionSha: "abc123",
+      prompt: "Review this change.",
+      recipients: [
+        {
+          agentId: "agent-a",
+          status: "aborted",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:00:05.000Z",
+          error: "aborted",
+        },
+      ],
+      error: "aborted",
+    };
+
+    rewriteMessageRecordMock.mockImplementation(({ mutate }) => {
+      currentRecord = mutate(currentRecord);
+      return Promise.resolve(currentRecord);
+    });
+
+    const mutators = createMessageRecordMutators({
+      root: "/repo",
+      messagesFilePath: "/repo/.voratiq/message/index.json",
+      messageId,
+    });
+
+    const result = await mutators.completeMessage({
+      status: "failed",
+      error: "boom",
+    });
+
+    expect(result).toEqual(currentRecord);
+    expect(currentRecord.status).toBe("aborted");
+    expect(currentRecord.error).toBe("aborted");
+  });
 });

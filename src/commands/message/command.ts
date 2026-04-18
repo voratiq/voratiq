@@ -127,52 +127,53 @@ export async function executeMessageCommand(
       status: "queued",
     }),
   );
-
-  await appendMessageRecord({
-    root,
-    messagesFilePath,
-    record: {
-      sessionId: messageId,
-      createdAt,
-      startedAt,
-      status: "running",
-      baseRevisionSha,
-      prompt,
-      recipients: initialRecipients,
-      ...buildPersistedExtraContextFields(extraContextFiles),
-      ...(persistedTarget ? { target: persistedTarget } : {}),
-    },
-  });
-  await emitSwarmSessionAcknowledgement({
-    operator: "message",
+  const initialRecord: MessageRecord = {
     sessionId: messageId,
-    status: "running",
-  });
-
-  renderer?.begin({
-    messageId,
     createdAt,
     startedAt,
-    workspacePath: `.voratiq/message/sessions/${messageId}`,
     status: "running",
-  });
-
+    baseRevisionSha,
+    prompt,
+    recipients: initialRecipients,
+    ...buildPersistedExtraContextFields(extraContextFiles),
+    ...(persistedTarget ? { target: persistedTarget } : {}),
+  };
   const teardown = createTeardownController(`message \`${messageId}\``);
   registerActiveMessage({
     root,
     messagesFilePath,
     messageId,
+    initialRecord,
     teardown,
   });
 
-  const mutators = createMessageRecordMutators({
-    root,
-    messagesFilePath,
-    messageId,
-  });
-
-  let executions: MessageCompetitionExecution[];
   try {
+    await appendMessageRecord({
+      root,
+      messagesFilePath,
+      record: initialRecord,
+    });
+    await emitSwarmSessionAcknowledgement({
+      operator: "message",
+      sessionId: messageId,
+      status: "running",
+    });
+
+    renderer?.begin({
+      messageId,
+      createdAt,
+      startedAt,
+      workspacePath: `.voratiq/message/sessions/${messageId}`,
+      status: "running",
+    });
+
+    const mutators = createMessageRecordMutators({
+      root,
+      messagesFilePath,
+      messageId,
+    });
+
+    let executions: MessageCompetitionExecution[];
     const baseAdapter = createMessageCompetitionAdapter({
       root,
       messageId,
@@ -243,6 +244,11 @@ export async function executeMessageCommand(
       executions,
     };
   } catch (error) {
+    const mutators = createMessageRecordMutators({
+      root,
+      messagesFilePath,
+      messageId,
+    });
     await mutators
       .completeMessage({
         status: "failed",

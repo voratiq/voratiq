@@ -1,7 +1,11 @@
 import type { TeardownController } from "../../competition/shared/teardown.js";
 import { runTeardown } from "../../competition/shared/teardown.js";
-import type { MessageRecipientEntry } from "../../domain/message/model/types.js";
+import type {
+  MessageRecipientEntry,
+  MessageRecord,
+} from "../../domain/message/model/types.js";
 import {
+  appendMessageRecord,
   flushMessageRecordBuffer,
   readMessageRecords,
   rewriteMessageRecord,
@@ -10,7 +14,12 @@ import {
   buildOperationLifecycleCompleteFields,
   buildRecordLifecycleCompleteFields,
 } from "../../domain/shared/lifecycle.js";
+import {
+  SessionRecordMutationError,
+  SessionRecordNotFoundError,
+} from "../../persistence/errors.js";
 import { toErrorMessage } from "../../utils/errors.js";
+import { registerActiveSessionTeardown } from "../shared/teardown-registry.js";
 
 export const MESSAGE_ABORT_DETAIL =
   "Message generation aborted before completion.";
@@ -20,14 +29,24 @@ interface ActiveMessageContext {
   root: string;
   messagesFilePath: string;
   messageId: string;
+  initialRecord?: MessageRecord;
   teardown?: TeardownController;
 }
 
 let activeMessage: ActiveMessageContext | undefined;
 let terminationInFlight = false;
+let clearRegisteredMessageTeardown: (() => void) | undefined;
 
 export function registerActiveMessage(context: ActiveMessageContext): void {
   activeMessage = context;
+  clearRegisteredMessageTeardown?.();
+  clearRegisteredMessageTeardown = registerActiveSessionTeardown({
+    key: `message:${context.messageId}`,
+    label: "message",
+    terminate: async (status) => {
+      await terminateActiveMessage(status);
+    },
+  });
 }
 
 export function clearActiveMessage(messageId: string): void {
@@ -36,6 +55,8 @@ export function clearActiveMessage(messageId: string): void {
   }
 
   if (!terminationInFlight) {
+    clearRegisteredMessageTeardown?.();
+    clearRegisteredMessageTeardown = undefined;
     activeMessage = undefined;
   }
 }
@@ -60,6 +81,24 @@ export async function terminateActiveMessage(
     }).then((records) => records[0]);
 
     if (!existingRecord) {
+      if (!context.initialRecord) {
+        return;
+      }
+
+      const completedAt = new Date().toISOString();
+      const detail =
+        status === "aborted" ? MESSAGE_ABORT_DETAIL : MESSAGE_FAILURE_DETAIL;
+      await persistMissingTerminatedMessageRecord({
+        context,
+        status,
+        completedAt,
+        detail,
+      });
+
+      await flushMessageRecordBuffer({
+        messagesFilePath: context.messagesFilePath,
+        sessionId: context.messageId,
+      });
       return;
     }
 
@@ -67,51 +106,28 @@ export async function terminateActiveMessage(
     const detail =
       status === "aborted" ? MESSAGE_ABORT_DETAIL : MESSAGE_FAILURE_DETAIL;
 
-    await rewriteMessageRecord({
-      root: context.root,
-      messagesFilePath: context.messagesFilePath,
-      sessionId: context.messageId,
-      mutate: (existing) => {
-        const recipients = existing.recipients.map((recipient) =>
-          finalizeMessageRecipient({
-            recipient,
-            status,
-            completedAt,
-            detail,
-          }),
-        );
+    try {
+      await rewriteMessageAsTerminated({
+        context,
+        status,
+        completedAt,
+        detail,
+      });
+    } catch (error) {
+      if (
+        !(error instanceof SessionRecordNotFoundError) ||
+        !context.initialRecord
+      ) {
+        throw error;
+      }
 
-        const inProgress =
-          existing.status === "queued" || existing.status === "running";
-        if (!inProgress) {
-          if (
-            recipients.every(
-              (recipient, index) => recipient === existing.recipients[index],
-            )
-          ) {
-            return existing;
-          }
-
-          return {
-            ...existing,
-            recipients,
-          };
-        }
-
-        return {
-          ...existing,
-          status,
-          recipients,
-          ...buildRecordLifecycleCompleteFields({
-            existing,
-            startedAt: existing.startedAt ?? completedAt,
-            completedAt,
-          }),
-          error: existing.error ?? detail,
-        };
-      },
-      forceFlush: true,
-    });
+      await persistMissingTerminatedMessageRecord({
+        context,
+        status,
+        completedAt,
+        detail,
+      });
+    }
 
     await flushMessageRecordBuffer({
       messagesFilePath: context.messagesFilePath,
@@ -127,6 +143,8 @@ export async function terminateActiveMessage(
     try {
       await finalizeRegisteredMessageTeardown(context);
     } finally {
+      clearRegisteredMessageTeardown?.();
+      clearRegisteredMessageTeardown = undefined;
       terminationInFlight = false;
       activeMessage = undefined;
     }
@@ -140,6 +158,10 @@ export async function terminateActiveMessage(
 export async function finalizeActiveMessage(messageId: string): Promise<void> {
   if (!activeMessage || activeMessage.messageId !== messageId) {
     clearActiveMessage(messageId);
+    return;
+  }
+
+  if (terminationInFlight) {
     return;
   }
 
@@ -173,6 +195,127 @@ function finalizeMessageRecipient(options: {
     }),
     error: recipient.error ?? detail,
   };
+}
+
+function buildTerminatedMessageRecord(options: {
+  record: MessageRecord;
+  status: "failed" | "aborted";
+  completedAt: string;
+  detail: string;
+}): MessageRecord {
+  const { record, status, completedAt, detail } = options;
+  return {
+    ...record,
+    status,
+    ...buildRecordLifecycleCompleteFields({
+      existing: record,
+      startedAt: record.startedAt ?? completedAt,
+      completedAt,
+    }),
+    recipients: record.recipients.map((recipient) =>
+      finalizeMessageRecipient({
+        recipient,
+        status,
+        completedAt,
+        detail,
+      }),
+    ),
+    error: record.error ?? detail,
+  };
+}
+
+async function rewriteMessageAsTerminated(options: {
+  context: ActiveMessageContext;
+  status: "failed" | "aborted";
+  completedAt: string;
+  detail: string;
+}): Promise<void> {
+  const { context, status, completedAt, detail } = options;
+  await rewriteMessageRecord({
+    root: context.root,
+    messagesFilePath: context.messagesFilePath,
+    sessionId: context.messageId,
+    mutate: (existing) => {
+      const recipients = existing.recipients.map((recipient) =>
+        finalizeMessageRecipient({
+          recipient,
+          status,
+          completedAt,
+          detail,
+        }),
+      );
+
+      const inProgress =
+        existing.status === "queued" || existing.status === "running";
+      if (!inProgress) {
+        if (
+          recipients.every(
+            (recipient, index) => recipient === existing.recipients[index],
+          )
+        ) {
+          return existing;
+        }
+
+        return {
+          ...existing,
+          recipients,
+        };
+      }
+
+      return {
+        ...existing,
+        status,
+        recipients,
+        ...buildRecordLifecycleCompleteFields({
+          existing,
+          startedAt: existing.startedAt ?? completedAt,
+          completedAt,
+        }),
+        error: existing.error ?? detail,
+      };
+    },
+    forceFlush: true,
+  });
+}
+
+async function persistMissingTerminatedMessageRecord(options: {
+  context: ActiveMessageContext;
+  status: "failed" | "aborted";
+  completedAt: string;
+  detail: string;
+}): Promise<void> {
+  const { context, status, completedAt, detail } = options;
+
+  try {
+    await appendMessageRecord({
+      root: context.root,
+      messagesFilePath: context.messagesFilePath,
+      record: buildTerminatedMessageRecord({
+        record: context.initialRecord!,
+        status,
+        completedAt,
+        detail,
+      }),
+    });
+  } catch (error) {
+    if (!isAlreadyExistsMutationError(error)) {
+      throw error;
+    }
+
+    await rewriteMessageAsTerminated({
+      context,
+      status,
+      completedAt,
+      detail,
+    });
+  }
+}
+
+function isAlreadyExistsMutationError(error: unknown): boolean {
+  return (
+    error instanceof SessionRecordMutationError &&
+    error.detail.includes("already exists")
+  );
 }
 
 async function finalizeRegisteredMessageTeardown(

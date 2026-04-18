@@ -18,6 +18,7 @@ import {
   createTeardownController,
   registerScratchWorkspaceTeardownPaths,
   runTeardown,
+  type TeardownController,
 } from "../../../competition/shared/teardown.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
@@ -72,6 +73,7 @@ export interface CreateSpecCompetitionAdapterInput {
   readonly specTitle?: string;
   readonly environment: EnvironmentConfig;
   readonly extraContextFiles?: readonly ResolvedExtraContextFile[];
+  readonly teardown?: TeardownController;
 }
 
 export function createSpecCompetitionAdapter(
@@ -88,9 +90,12 @@ export function createSpecCompetitionAdapter(
     specTitle,
     environment,
     extraContextFiles = [],
+    teardown: providedTeardown,
   } = input;
 
-  const teardown = createTeardownController(`spec \`${sessionId}\``);
+  const teardown =
+    providedTeardown ?? createTeardownController(`spec \`${sessionId}\``);
+  const ownsTeardown = providedTeardown === undefined;
   teardown.addAction({
     key: `spec-auth:${sessionId}`,
     label: "session auth",
@@ -291,7 +296,9 @@ export function createSpecCompetitionAdapter(
       }
     },
     finalizeCompetition: async () => {
-      await runTeardown(teardown);
+      if (ownsTeardown) {
+        await runTeardown(teardown);
+      }
     },
     sortResults: compareSpecExecutionsByAgentId,
   };

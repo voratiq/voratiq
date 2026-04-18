@@ -10,16 +10,22 @@ import type {
   VerificationRecord,
 } from "../../domain/verify/model/types.js";
 import {
+  appendVerificationRecord,
   flushVerificationRecordBuffer,
   readVerificationRecords,
   rewriteVerificationRecord,
 } from "../../domain/verify/persistence/adapter.js";
+import {
+  SessionRecordMutationError,
+  SessionRecordNotFoundError,
+} from "../../persistence/errors.js";
 import type { VerificationStatus } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import {
   getVerificationProgrammaticResultPath,
   getVerificationRubricResultPath,
 } from "../../workspace/artifact-paths.js";
+import { registerActiveSessionTeardown } from "../shared/teardown-registry.js";
 
 export const VERIFY_ABORT_DETAIL = "Verification aborted before completion.";
 
@@ -27,16 +33,26 @@ interface ActiveVerificationContext {
   root: string;
   verificationsFilePath: string;
   verificationId: string;
+  initialRecord?: VerificationRecord;
   teardown?: TeardownController;
 }
 
 let activeVerification: ActiveVerificationContext | undefined;
 let terminationInFlight = false;
+let clearRegisteredVerificationTeardown: (() => void) | undefined;
 
 export function registerActiveVerification(
   context: ActiveVerificationContext,
 ): void {
   activeVerification = context;
+  clearRegisteredVerificationTeardown?.();
+  clearRegisteredVerificationTeardown = registerActiveSessionTeardown({
+    key: `verify:${context.verificationId}`,
+    label: "verify",
+    terminate: async (status) => {
+      await terminateActiveVerification(status);
+    },
+  });
 }
 
 export function clearActiveVerification(verificationId: string): void {
@@ -45,6 +61,8 @@ export function clearActiveVerification(verificationId: string): void {
   }
 
   if (!terminationInFlight) {
+    clearRegisteredVerificationTeardown?.();
+    clearRegisteredVerificationTeardown = undefined;
     activeVerification = undefined;
   }
 }
@@ -61,14 +79,27 @@ export async function terminateActiveVerification(
   let persistenceError: Error | undefined;
 
   try {
-    const existingRecord = await readVerificationRecords({
-      root: context.root,
-      verificationsFilePath: context.verificationsFilePath,
-      limit: 1,
-      predicate: (record) => record.sessionId === context.verificationId,
-    }).then((records) => records[0]);
+    const existingRecord = await readActiveVerificationRecord(context);
 
     if (!existingRecord) {
+      if (!context.initialRecord) {
+        return;
+      }
+
+      const completedAt = new Date().toISOString();
+      const detail =
+        status === "aborted" ? VERIFY_ABORT_DETAIL : "Verification failed.";
+      await persistMissingTerminatedVerificationRecord({
+        context,
+        status,
+        completedAt,
+        detail,
+      });
+
+      await flushVerificationRecordBuffer({
+        verificationsFilePath: context.verificationsFilePath,
+        sessionId: context.verificationId,
+      });
       return;
     }
 
@@ -85,50 +116,28 @@ export async function terminateActiveVerification(
       detail,
     });
 
-    await rewriteVerificationRecord({
-      root: context.root,
-      verificationsFilePath: context.verificationsFilePath,
-      sessionId: context.verificationId,
-      mutate: (existing) => {
-        const methods = existing.methods.map((method) =>
-          finalizeVerificationMethodRef({
-            verificationId: context.verificationId,
-            method,
-            target: existing.target,
-            status,
-            completedAt,
-            detail,
-          }),
-        );
+    try {
+      await rewriteVerificationAsTerminated({
+        context,
+        status,
+        completedAt,
+        detail,
+      });
+    } catch (error) {
+      if (
+        !(error instanceof SessionRecordNotFoundError) ||
+        !context.initialRecord
+      ) {
+        throw error;
+      }
 
-        const inProgress =
-          existing.status === "queued" || existing.status === "running";
-        if (!inProgress) {
-          if (
-            methods.every((method, index) => method === existing.methods[index])
-          ) {
-            return existing;
-          }
-          return {
-            ...existing,
-            methods,
-          };
-        }
-
-        return {
-          ...existing,
-          status,
-          methods,
-          ...buildRecordLifecycleCompleteFields({
-            existing,
-            startedAt: existing.startedAt ?? completedAt,
-            completedAt,
-          }),
-          error: existing.error ?? detail,
-        };
-      },
-      forceFlush: true,
-    });
+      await persistMissingTerminatedVerificationRecord({
+        context,
+        status,
+        completedAt,
+        detail,
+      });
+    }
 
     await flushVerificationRecordBuffer({
       verificationsFilePath: context.verificationsFilePath,
@@ -144,6 +153,8 @@ export async function terminateActiveVerification(
     try {
       await finalizeRegisteredVerificationTeardown(context);
     } finally {
+      clearRegisteredVerificationTeardown?.();
+      clearRegisteredVerificationTeardown = undefined;
       terminationInFlight = false;
       activeVerification = undefined;
     }
@@ -154,6 +165,152 @@ export async function terminateActiveVerification(
   }
 }
 
+async function readActiveVerificationRecord(
+  context: ActiveVerificationContext,
+): Promise<VerificationRecord | undefined> {
+  return await readVerificationRecords({
+    root: context.root,
+    verificationsFilePath: context.verificationsFilePath,
+    limit: 1,
+    predicate: (record) => record.sessionId === context.verificationId,
+  }).then((records) => records[0]);
+}
+
+function buildTerminatedVerificationRecord(options: {
+  record: VerificationRecord;
+  status: Extract<VerificationStatus, "failed" | "aborted">;
+  completedAt: string;
+  detail: string;
+}): VerificationRecord {
+  const { record, status, completedAt, detail } = options;
+  return {
+    ...record,
+    status,
+    ...buildRecordLifecycleCompleteFields({
+      existing: record,
+      startedAt: record.startedAt ?? completedAt,
+      completedAt,
+    }),
+    methods: record.methods.map((method) =>
+      finalizeVerificationMethodRef({
+        verificationId: record.sessionId,
+        method,
+        target: record.target,
+        status,
+        completedAt,
+        detail,
+      }),
+    ),
+    error: record.error ?? detail,
+  };
+}
+
+async function rewriteVerificationAsTerminated(options: {
+  context: ActiveVerificationContext;
+  status: Extract<VerificationStatus, "failed" | "aborted">;
+  completedAt: string;
+  detail: string;
+}): Promise<void> {
+  const { context, status, completedAt, detail } = options;
+  await rewriteVerificationRecord({
+    root: context.root,
+    verificationsFilePath: context.verificationsFilePath,
+    sessionId: context.verificationId,
+    mutate: (existing) => {
+      const methods = existing.methods.map((method) =>
+        finalizeVerificationMethodRef({
+          verificationId: context.verificationId,
+          method,
+          target: existing.target,
+          status,
+          completedAt,
+          detail,
+        }),
+      );
+
+      const inProgress =
+        existing.status === "queued" || existing.status === "running";
+      if (!inProgress) {
+        if (
+          methods.every((method, index) => method === existing.methods[index])
+        ) {
+          return existing;
+        }
+        return {
+          ...existing,
+          methods,
+        };
+      }
+
+      return {
+        ...existing,
+        status,
+        methods,
+        ...buildRecordLifecycleCompleteFields({
+          existing,
+          startedAt: existing.startedAt ?? completedAt,
+          completedAt,
+        }),
+        error: existing.error ?? detail,
+      };
+    },
+    forceFlush: true,
+  });
+}
+
+async function persistMissingTerminatedVerificationRecord(options: {
+  context: ActiveVerificationContext;
+  status: Extract<VerificationStatus, "failed" | "aborted">;
+  completedAt: string;
+  detail: string;
+}): Promise<void> {
+  const { context, status, completedAt, detail } = options;
+
+  try {
+    await appendVerificationRecord({
+      root: context.root,
+      verificationsFilePath: context.verificationsFilePath,
+      record: buildTerminatedVerificationRecord({
+        record: context.initialRecord!,
+        status,
+        completedAt,
+        detail,
+      }),
+    });
+  } catch (error) {
+    if (!isAlreadyExistsMutationError(error)) {
+      throw error;
+    }
+
+    const existingRecord = await readActiveVerificationRecord(context);
+    if (!existingRecord) {
+      throw error;
+    }
+
+    await materializeTerminalVerificationArtifacts({
+      root: context.root,
+      verificationId: context.verificationId,
+      record: existingRecord,
+      status,
+      completedAt,
+      detail,
+    });
+    await rewriteVerificationAsTerminated({
+      context,
+      status,
+      completedAt,
+      detail,
+    });
+  }
+}
+
+function isAlreadyExistsMutationError(error: unknown): boolean {
+  return (
+    error instanceof SessionRecordMutationError &&
+    error.detail.includes("already exists")
+  );
+}
+
 export async function finalizeActiveVerification(
   verificationId: string,
 ): Promise<void> {
@@ -162,6 +319,10 @@ export async function finalizeActiveVerification(
     activeVerification.verificationId !== verificationId
   ) {
     clearActiveVerification(verificationId);
+    return;
+  }
+
+  if (terminationInFlight) {
     return;
   }
 

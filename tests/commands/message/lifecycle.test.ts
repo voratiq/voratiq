@@ -22,18 +22,22 @@ import {
 import { createTeardownController } from "../../../src/competition/shared/teardown.js";
 import type { MessageRecord } from "../../../src/domain/message/model/types.js";
 import {
+  appendMessageRecord,
   flushMessageRecordBuffer,
   readMessageRecords,
   rewriteMessageRecord,
 } from "../../../src/domain/message/persistence/adapter.js";
+import { SessionRecordMutationError } from "../../../src/persistence/errors.js";
 import { pathExists } from "../../../src/utils/fs.js";
 
 jest.mock("../../../src/domain/message/persistence/adapter.js", () => ({
+  appendMessageRecord: jest.fn(),
   readMessageRecords: jest.fn(),
   rewriteMessageRecord: jest.fn(),
   flushMessageRecordBuffer: jest.fn(),
 }));
 
+const appendMessageRecordMock = jest.mocked(appendMessageRecord);
 const readMessageRecordsMock = jest.mocked(readMessageRecords);
 const rewriteMessageRecordMock = jest.mocked(rewriteMessageRecord);
 const flushMessageRecordBufferMock = jest.mocked(flushMessageRecordBuffer);
@@ -44,6 +48,7 @@ describe("message lifecycle", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    appendMessageRecordMock.mockResolvedValue(undefined);
     flushMessageRecordBufferMock.mockResolvedValue(undefined);
   });
 
@@ -187,6 +192,60 @@ describe("message lifecycle", () => {
         }),
       ]),
     );
+  });
+
+  it("rewrites the message record when fallback append loses an early persistence race", async () => {
+    const initialRecord: MessageRecord = {
+      sessionId: MESSAGE_ID,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:05.000Z",
+      status: "queued",
+      prompt: "Review this change.",
+      recipients: [
+        {
+          agentId: "agent-a",
+          status: "queued",
+        },
+      ],
+      error: null,
+    };
+    const persistedRecord: MessageRecord = {
+      ...initialRecord,
+      startedAt: "2026-01-01T00:00:05.000Z",
+      status: "running",
+      recipients: [
+        {
+          agentId: "agent-a",
+          status: "running",
+          startedAt: "2026-01-01T00:00:06.000Z",
+        },
+      ],
+    };
+
+    registerActiveMessage({
+      root: "/repo",
+      messagesFilePath: "/repo/.voratiq/message/index.json",
+      messageId: MESSAGE_ID,
+      initialRecord,
+    });
+    readMessageRecordsMock.mockResolvedValue([]);
+    appendMessageRecordMock.mockRejectedValueOnce(
+      new SessionRecordMutationError(
+        `Session ${MESSAGE_ID} already exists at /repo/.voratiq/message/index.json.`,
+      ),
+    );
+    rewriteMessageRecordMock.mockImplementation(({ mutate }) =>
+      Promise.resolve(mutate(persistedRecord)),
+    );
+
+    await terminateActiveMessage("aborted");
+
+    expect(appendMessageRecordMock).toHaveBeenCalledTimes(1);
+    expect(rewriteMessageRecordMock).toHaveBeenCalledTimes(1);
+    expect(flushMessageRecordBufferMock).toHaveBeenCalledWith({
+      messagesFilePath: "/repo/.voratiq/message/index.json",
+      sessionId: MESSAGE_ID,
+    });
   });
 
   it("is a no-op when no active message is registered", async () => {

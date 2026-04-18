@@ -13,6 +13,7 @@ import { loadRepoSettings } from "../../../src/configs/settings/loader.js";
 import * as reduceAdapter from "../../../src/domain/reduce/competition/adapter.js";
 import type { ReductionRecord } from "../../../src/domain/reduce/model/types.js";
 import {
+  appendReductionRecord,
   flushReductionRecordBuffer,
   readReductionRecords,
 } from "../../../src/domain/reduce/persistence/adapter.js";
@@ -60,6 +61,7 @@ jest.mock("../../../src/commands/reduce/targets.js", () => ({
 }));
 
 jest.mock("../../../src/domain/reduce/persistence/adapter.js", () => ({
+  appendReductionRecord: jest.fn(),
   flushReductionRecordBuffer: jest.fn(),
   readReductionRecords: jest.fn(),
 }));
@@ -80,6 +82,7 @@ const verifyAgentProvidersMock = jest.mocked(verifyAgentProviders);
 const assertReductionTargetEligibleMock = jest.mocked(
   assertReductionTargetEligible,
 );
+const appendReductionRecordMock = jest.mocked(appendReductionRecord);
 const flushReductionRecordBufferMock = jest.mocked(flushReductionRecordBuffer);
 const readReductionRecordsMock = jest.mocked(readReductionRecords);
 
@@ -93,6 +96,7 @@ describe("executeReduceCommand integration", () => {
       mcp: { codex: "ask", claude: "ask", gemini: "ask" },
     });
     loadEnvironmentConfigMock.mockReturnValue({});
+    appendReductionRecordMock.mockResolvedValue(undefined);
     flushReductionRecordBufferMock.mockResolvedValue(undefined);
     loadAgentCatalogDiagnosticsMock.mockReturnValue({
       enabledAgents: [
