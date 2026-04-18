@@ -82,7 +82,6 @@ export function createRunRecord(overrides: Partial<RunRecord> = {}): RunRecord {
     createdAt,
     agents: [createAgentInvocationRecord()],
     applyStatus: undefined,
-    deletedAt: null,
     ...overrides,
   };
 
@@ -111,7 +110,6 @@ export function createRunRecord(overrides: Partial<RunRecord> = {}): RunRecord {
 
   return record;
 }
-
 export function createRunReport(overrides: Partial<RunReport> = {}): RunReport {
   const createdAt =
     overrides.createdAt ?? new Date("2025-10-23T17:00:00.000Z").toISOString();

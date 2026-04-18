@@ -406,7 +406,6 @@ async function registerCommands(
     "auto",
     "apply",
     "list",
-    "prune",
     "doctor",
     "mcp",
   ]);
@@ -431,7 +430,6 @@ async function registerCommands(
     program.addCommand((await import("./cli/auto.js")).createAutoCommand());
     program.addCommand((await import("./cli/apply.js")).createApplyCommand());
     program.addCommand((await import("./cli/list.js")).createListCommand());
-    program.addCommand((await import("./cli/prune.js")).createPruneCommand());
     program.addCommand((await import("./cli/doctor.js")).createDoctorCommand());
     program.addCommand((await import("./cli/mcp.js")).createMcpCommand());
     return;
@@ -467,9 +465,6 @@ async function registerCommands(
       break;
     case "list":
       program.addCommand((await import("./cli/list.js")).createListCommand());
-      break;
-    case "prune":
-      program.addCommand((await import("./cli/prune.js")).createPruneCommand());
       break;
     case "doctor":
       program.addCommand(

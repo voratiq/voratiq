@@ -14,7 +14,6 @@ import { executeApplyCommand } from "../../src/commands/apply/command.js";
 import { ApplyBaseMismatchError } from "../../src/commands/apply/errors.js";
 import { executeListCommand } from "../../src/commands/list/command.js";
 import { executeMessageCommand } from "../../src/commands/message/command.js";
-import { executePruneAllCommand } from "../../src/commands/prune/command.js";
 import { executeReduceCommand } from "../../src/commands/reduce/command.js";
 import { executeRunCommand } from "../../src/commands/run/command.js";
 import { executeSpecCommand } from "../../src/commands/spec/command.js";
@@ -93,11 +92,6 @@ jest.mock("../../src/commands/apply/command.js", () => ({
   executeApplyCommand: jest.fn(),
 }));
 
-jest.mock("../../src/commands/prune/command.js", () => ({
-  executePruneAllCommand: jest.fn(),
-  executePruneCommand: jest.fn(),
-}));
-
 jest.mock("../../src/cli/confirmation.js", () => ({
   createConfirmationWorkflow: jest.fn(),
 }));
@@ -126,7 +120,6 @@ const loadVerificationSelectionPolicyOutputMock = jest.mocked(
   loadVerificationSelectionPolicyOutput,
 );
 const executeApplyCommandMock = jest.mocked(executeApplyCommand);
-const executePruneAllCommandMock = jest.mocked(executePruneAllCommand);
 const createConfirmationWorkflowMock = jest.mocked(createConfirmationWorkflow);
 const executeListCommandMock = jest.mocked(executeListCommand);
 const executeMessageCommandMock = jest.mocked(executeMessageCommand);
@@ -627,22 +620,6 @@ describe("external CLI JSON contract", () => {
         ],
       },
     },
-    {
-      operator: "prune",
-      argv: ["prune", "--all", "--yes", "--json"],
-      setup: () => {
-        executePruneAllCommandMock.mockResolvedValue({
-          status: "pruned",
-          runIds: ["run-123"],
-        });
-      },
-      expected: {
-        version: 1,
-        operator: "prune",
-        status: "succeeded",
-        artifacts: [],
-      },
-    },
   ])(
     "emits a stable success envelope for $operator",
     async ({ argv, setup, expected }) => {
@@ -850,24 +827,6 @@ describe("external CLI JSON contract", () => {
       code: "apply_base_mismatch_error",
       message:
         "Repository HEAD `def987654321` no longer matches run base `abc123456789`.",
-    });
-  });
-
-  it("emits a failed prune envelope when json mode is not explicitly confirmed", async () => {
-    const result = await invokeCli(["prune", "--all", "--json"]);
-    const envelope = normalizeEnvelope(parseJson<JsonEnvelope>(result));
-
-    expect(result.exitCode).toBe(1);
-    expect(envelope).toStrictEqual({
-      version: 1,
-      operator: "prune",
-      status: "failed",
-      timestamp: "<timestamp>",
-      artifacts: [],
-      error: {
-        code: "cli_error",
-        message: "JSON-mode prune requires explicit confirmation.",
-      },
     });
   });
 

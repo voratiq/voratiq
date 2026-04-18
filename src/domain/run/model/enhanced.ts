@@ -44,7 +44,6 @@ export interface RunRecordEnhanced {
   rootPath: string;
   spec: RunSpecDescriptor;
   agents: AgentInvocationEnhanced[];
-  deletedAt?: string | null;
   applyStatus?: RunApplyStatus;
   auto?: RunAutoOutcome;
 }
@@ -116,10 +115,6 @@ export function buildRunRecordEnhanced(record: RunRecord): RunRecordEnhanced {
     spec: record.spec,
     agents,
   };
-
-  if (Object.prototype.hasOwnProperty.call(record, "deletedAt")) {
-    enhanced.deletedAt = record.deletedAt ?? null;
-  }
   if (record.applyStatus) {
     enhanced.applyStatus = record.applyStatus;
   }

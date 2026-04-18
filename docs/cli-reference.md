@@ -17,7 +17,6 @@ title: CLI Reference
 | `auto`    | Run the common coding workflow                                            |
 | `apply`   | Apply a selected diff from a run                                          |
 | `list`    | Inspect recorded sessions                                                 |
-| `prune`   | Clean up heavy artifacts and worktrees from old runs                      |
 | `doctor`  | Diagnose and repair workspace or preflight setup                          |
 | `mcp`     | Run the bundled Voratiq MCP server                                        |
 
@@ -340,34 +339,6 @@ voratiq list --run
 
 ```bash
 voratiq list --verify 20251031-232802-abc123
-```
-
-## `voratiq prune`
-
-Remove run workspaces and optionally purge old artifacts.
-
-### Usage
-
-```bash
-voratiq prune (--run <run-id> | --all) [options]
-```
-
-### Options
-
-- `--run <run-id>`: Run ID to prune
-- `--all`: Prune all non-pruned runs
-- `--purge`: Delete associated configs and artifacts too
-- `-y, --yes`: Skip interactive confirmations
-- `--json`: Emit a machine-readable result envelope
-
-### Examples
-
-```bash
-voratiq prune --run 20251031-232802-abc123
-```
-
-```bash
-voratiq prune --run 20251031-232802-abc123 --purge -y
 ```
 
 ## `voratiq doctor`

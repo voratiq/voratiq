@@ -140,6 +140,30 @@ export async function removeWorktree(options: {
   });
 }
 
+export async function pruneWorktrees(root: string): Promise<void> {
+  await runGitCommand(["worktree", "prune"], { cwd: root });
+}
+
+export async function branchExists(
+  root: string,
+  branch: string,
+): Promise<boolean> {
+  const output = await runGitCommand(["branch", "--list", branch], {
+    cwd: root,
+  });
+  return output.length > 0;
+}
+
+export async function deleteBranch(options: {
+  root: string;
+  branch: string;
+}): Promise<void> {
+  const { root, branch } = options;
+  await runGitCommand(["branch", "-D", branch], {
+    cwd: root,
+  });
+}
+
 export async function gitAddAll(
   cwd: string,
   excludedPaths?: readonly string[],

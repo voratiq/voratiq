@@ -397,8 +397,7 @@ function buildRunTarget(options: {
   const { runId, specPath, candidateId } = options;
   const runRecord = createRunRecord({
     runId,
-    status: "pruned",
-    deletedAt: new Date().toISOString(),
+    status: "succeeded",
     spec: { path: specPath },
     agents: [
       createAgentInvocationRecord({

@@ -52,6 +52,7 @@ export interface AgentProcessOptions {
     reason: string,
     failFast?: SandboxFailFastInfo,
   ) => void;
+  onSpawnedProcess?: (child: ChildProcess) => void;
 }
 
 export interface AgentProcessResult {
@@ -161,6 +162,7 @@ export async function runAgentProcess(
     resolveRunInvocation,
     providerId = "",
     onWatchdogTrigger,
+    onSpawnedProcess,
   } = options;
 
   const stdoutStream = createWriteStream(stdoutPath, { flags: "w" });
@@ -210,6 +212,7 @@ export async function runAgentProcess(
       stderr: { writable: stderrStream },
       detached: true,
       onSpawn: (child: ChildProcess) => {
+        onSpawnedProcess?.(child);
         watchdogController = createWatchdog(child, stderrStream, {
           providerId,
           onWatchdogTrigger,

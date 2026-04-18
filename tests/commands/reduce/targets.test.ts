@@ -15,15 +15,15 @@ import {
 } from "../../support/factories/run-records.js";
 
 describe("assertReductionTargetEligible (run target)", () => {
-  it("allows pruned runs when durable artifacts are still present", async () => {
-    const root = await mkdtemp(join(tmpdir(), "voratiq-reduce-pruned-"));
+  it("allows succeeded runs when durable artifacts are still present", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-reduce-run-"));
 
     try {
       await createWorkspace(root);
 
-      const runId = "run-pruned";
+      const runId = "run-succeeded";
       const agentId = "agent-1";
-      const specPath = "specs/reduce-pruned.md";
+      const specPath = "specs/reduce-run.md";
 
       await seedRunArtifacts({
         root,
@@ -40,9 +40,8 @@ describe("assertReductionTargetEligible (run target)", () => {
         runsFilePath,
         record: createRunRecord({
           runId,
+          status: "succeeded",
           spec: { path: specPath },
-          status: "pruned",
-          deletedAt: new Date().toISOString(),
           agents: [
             createAgentInvocationRecord({
               agentId,
@@ -74,17 +73,15 @@ describe("assertReductionTargetEligible (run target)", () => {
     }
   });
 
-  it("fails pruned runs with artifact-specific errors when durable artifacts are missing", async () => {
-    const root = await mkdtemp(
-      join(tmpdir(), "voratiq-reduce-pruned-missing-"),
-    );
+  it("fails succeeded runs with artifact-specific errors when durable artifacts are missing", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-reduce-run-missing-"));
 
     try {
       await createWorkspace(root);
 
-      const runId = "run-pruned-missing";
+      const runId = "run-succeeded-missing";
       const agentId = "agent-1";
-      const specPath = "specs/reduce-pruned-missing.md";
+      const specPath = "specs/reduce-run-missing.md";
 
       await seedRunArtifacts({
         root,
@@ -101,9 +98,8 @@ describe("assertReductionTargetEligible (run target)", () => {
         runsFilePath,
         record: createRunRecord({
           runId,
+          status: "succeeded",
           spec: { path: specPath },
-          status: "pruned",
-          deletedAt: new Date().toISOString(),
           agents: [
             createAgentInvocationRecord({
               agentId,

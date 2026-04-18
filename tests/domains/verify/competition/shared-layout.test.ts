@@ -108,12 +108,12 @@ describe("prepareSharedVerificationInputs", () => {
     }
   });
 
-  it("stages rubric inputs for pruned run targets from durable artifacts", async () => {
+  it("stages rubric inputs for run targets from durable artifacts", async () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-verify-shared-run-"));
-    const verificationId = "verify-run-pruned";
+    const verificationId = "verify-run";
     const runId = "run-123";
     const agentId = "agent-1";
-    const specPath = "specs/run-pruned.md";
+    const specPath = "specs/run.md";
 
     try {
       await writeFile(
@@ -159,8 +159,7 @@ describe("prepareSharedVerificationInputs", () => {
           },
           runRecord: createRunRecord({
             runId,
-            status: "pruned",
-            deletedAt: new Date().toISOString(),
+            status: "succeeded",
             spec: { path: specPath },
             agents: [
               createAgentInvocationRecord({
@@ -292,8 +291,7 @@ describe("prepareSharedVerificationInputs", () => {
           },
           runRecord: createRunRecord({
             runId,
-            status: "pruned",
-            deletedAt: new Date().toISOString(),
+            status: "succeeded",
             spec: { path: specPath },
             agents: [
               createAgentInvocationRecord({
@@ -376,8 +374,7 @@ describe("prepareSharedVerificationInputs", () => {
             },
             runRecord: createRunRecord({
               runId,
-              status: "pruned",
-              deletedAt: new Date().toISOString(),
+              status: "succeeded",
               spec: { path: specPath },
               agents: [
                 createAgentInvocationRecord({
@@ -676,8 +673,7 @@ describe("prepareSharedVerificationInputs", () => {
           },
           runRecord: createRunRecord({
             runId,
-            status: "pruned",
-            deletedAt: new Date().toISOString(),
+            status: "succeeded",
             spec: { path: specPath },
             agents: [
               createAgentInvocationRecord({

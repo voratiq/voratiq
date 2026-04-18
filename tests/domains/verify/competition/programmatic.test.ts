@@ -61,11 +61,11 @@ describe("executeAndPersistProgrammaticMethod", () => {
     jest.clearAllMocks();
   });
 
-  it("reconstructs a temporary workspace for pruned run candidates", async () => {
-    const root = await mkdtemp(join(tmpdir(), "voratiq-programmatic-pruned-"));
+  it("reconstructs a temporary workspace for run candidates", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-programmatic-run-"));
 
     try {
-      const runId = "run-pruned";
+      const runId = "run-succeeded";
       const candidateId = "agent-1";
       const artifactsDir = join(
         root,
@@ -136,7 +136,7 @@ describe("executeAndPersistProgrammaticMethod", () => {
 
   it("fails clearly when a recorded diff artifact is missing during reconstruction", async () => {
     const root = await mkdtemp(
-      join(tmpdir(), "voratiq-programmatic-pruned-missing-"),
+      join(tmpdir(), "voratiq-programmatic-run-missing-"),
     );
 
     try {
@@ -176,7 +176,7 @@ describe("executeAndPersistProgrammaticMethod", () => {
 
   it("treats an empty retained diff as a valid no-op during reconstruction", async () => {
     const root = await mkdtemp(
-      join(tmpdir(), "voratiq-programmatic-pruned-empty-diff-"),
+      join(tmpdir(), "voratiq-programmatic-run-empty-diff-"),
     );
 
     try {
@@ -398,8 +398,7 @@ function buildRunTarget(options: {
     options.candidateIds ?? (options.candidateId ? [options.candidateId] : []);
   const runRecord: RunRecord = createRunRecord({
     runId,
-    status: "pruned",
-    deletedAt: new Date().toISOString(),
+    status: "succeeded",
     agents: candidateIds.map((candidateId) =>
       createAgentInvocationRecord({
         agentId: candidateId,

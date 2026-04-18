@@ -6,12 +6,12 @@ import { join } from "node:path";
 import { jest } from "@jest/globals";
 
 import { RunDirectoryExistsError } from "../../src/domain/run/competition/errors.js";
-import { cleanupRunWorkspace } from "../../src/workspace/cleanup.js";
-import { WorkspaceSetupError } from "../../src/workspace/errors.js";
 import {
+  cleanupRunWorkspace,
   removeRunDirectory,
   removeWorkspaceEntry,
-} from "../../src/workspace/prune.js";
+} from "../../src/workspace/cleanup.js";
+import { WorkspaceSetupError } from "../../src/workspace/errors.js";
 import { prepareRunWorkspace } from "../../src/workspace/run.js";
 
 jest.mock("node:fs/promises", () => {

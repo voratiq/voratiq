@@ -5,7 +5,6 @@ import {
   lstat,
   mkdir,
   readFile,
-  realpath,
   writeFile,
 } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -317,13 +316,16 @@ suite("agent integrations", () => {
       agentEnhanced!.baseDirectory,
       "workspace",
     );
+    const stdoutPath = agentEnhanced!.assets.stdoutPath;
+    expect(typeof stdoutPath).toBe("string");
     const executionSnapshot = await loadExecutionSnapshot(
-      expectedWorkspacePath,
+      join(repoRoot, stdoutPath as string),
     );
     expect(executionSnapshot.binary).toBe(agentScriptPath);
-    const resolvedWorkspacePath = await realpath(expectedWorkspacePath);
-    const snapshotWorkspacePath = await realpath(executionSnapshot.workspace);
-    expect(snapshotWorkspacePath).toBe(resolvedWorkspacePath);
+    expect(normalizeWorkspacePath(executionSnapshot.workspace)).toBe(
+      normalizeWorkspacePath(expectedWorkspacePath),
+    );
+    await expect(access(expectedWorkspacePath)).rejects.toThrow();
     await expect(
       access(join(repoRoot, agentEnhanced!.runtimeManifestPath)),
     ).rejects.toThrow();
@@ -370,13 +372,19 @@ suite("agent integrations", () => {
   }
 
   async function loadExecutionSnapshot(
-    workspacePath: string,
+    stdoutPath: string,
   ): Promise<AgentExecutionSnapshot> {
-    const snapshotRaw = await readFile(
-      join(workspacePath, "execution-snapshot.json"),
-      "utf8",
-    );
-    const snapshotUnknown = JSON.parse(snapshotRaw) as unknown;
+    const stdout = await readFile(stdoutPath, "utf8");
+    const marker = "SNAPSHOT:";
+    const snapshotLine = stdout
+      .split(/\r?\n/u)
+      .find((line) => line.startsWith(marker));
+    if (!snapshotLine) {
+      throw new Error("Expected execution snapshot in stdout");
+    }
+    const snapshotUnknown = JSON.parse(
+      snapshotLine.slice(marker.length),
+    ) as unknown;
     if (!isAgentExecutionSnapshot(snapshotUnknown)) {
       throw new Error("Unexpected agent execution snapshot structure");
     }
@@ -416,6 +424,10 @@ function isAgentExecutionSnapshot(
   );
 }
 
+function normalizeWorkspacePath(path: string): string {
+  return path.replace(/^\/private(?=\/var\/)/u, "");
+}
+
 async function expectNoRegularSecrets(secretPath: string): Promise<void> {
   const exists = await pathExists(secretPath);
   expect(exists).toBe(false);
@@ -435,18 +447,15 @@ const workspace = process.cwd();
 const content = 'gemini agent summary';
 fs.writeFileSync(path.join(workspace, '.summary.txt'), content, 'utf8');
 fs.writeFileSync(path.join(workspace, 'artifact.txt'), content, 'utf8');
-fs.writeFileSync(
-  path.join(workspace, 'execution-snapshot.json'),
-  JSON.stringify({
-    binary: process.argv[1],
-    argv: process.argv.slice(2),
-    workspace,
-    env: Object.fromEntries(
-      Object.entries(process.env).filter(([, value]) => typeof value === 'string'),
-    ),
-  }),
-  'utf8',
-);
+const executionSnapshot = JSON.stringify({
+  binary: process.argv[1],
+  argv: process.argv.slice(2),
+  workspace,
+  env: Object.fromEntries(
+    Object.entries(process.env).filter(([, value]) => typeof value === 'string'),
+  ),
+});
+console.log('SNAPSHOT:' + executionSnapshot);
 console.log('stdout from gemini fixture');
 console.error('stderr from gemini fixture');
 `;

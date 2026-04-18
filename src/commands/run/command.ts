@@ -6,7 +6,11 @@ import {
   RunCommandError,
   RunProcessStreamError,
 } from "../../domain/run/competition/errors.js";
-import { toRunReport } from "../../domain/run/competition/reports.js";
+import {
+  type AgentExecutionState,
+  toAgentReport,
+  toRunReport,
+} from "../../domain/run/competition/reports.js";
 import { generateRunId } from "../../domain/run/model/id.js";
 import {
   createAgentRecordMutators,
@@ -27,14 +31,21 @@ import type { RunProgressRenderer } from "../../render/transcripts/run.js";
 import { deriveRunStatusFromAgents } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { normalizePathForDisplay, relativeToRoot } from "../../utils/path.js";
+import { getAgentManifestPath } from "../../workspace/artifact-paths.js";
 import {
   type AgentWorkspacePaths,
   buildAgentWorkspacePaths,
   formatRunWorkspaceRelative,
 } from "../../workspace/layout.js";
 import { prepareRunWorkspace } from "../../workspace/run.js";
+import { getAgentDirectoryPath } from "../../workspace/session-paths.js";
 import { resolveStageCompetitors } from "../shared/resolve-stage-competitors.js";
-import { finalizeActiveRun, registerActiveRun } from "./lifecycle.js";
+import {
+  clearActiveRun,
+  finalizeActiveRun,
+  markActiveRunRecordPersisted,
+  registerActiveRun,
+} from "./lifecycle.js";
 import { initializeRunRecord } from "./record-init.js";
 import { validateAndPrepare } from "./validation.js";
 
@@ -101,20 +112,6 @@ export async function executeRunCommand(
 
   const runRoot = runWorkspace.absolute;
 
-  const { recordPersisted } = await initializeRunRecord({
-    root,
-    runsFilePath,
-    runId,
-    specDisplayPath,
-    specTarget: validation.specTarget,
-    baseRevisionSha: validation.baseRevisionSha,
-    repoDisplayPath,
-    createdAt,
-    startedAt,
-    runRoot,
-    ...buildPersistedExtraContextFields(extraContextFiles),
-  });
-
   const teardown = createTeardownController(`run \`${runId}\``);
   teardown.addAction({
     key: `run-auth:${runId}`,
@@ -130,7 +127,13 @@ export async function executeRunCommand(
       runId,
       agentId: agent.id,
     });
-    registerRunWorkspaceTeardown(teardown, workspacePaths, agent.id);
+    registerRunWorkspaceTeardown(
+      teardown,
+      root,
+      workspacePaths,
+      runId,
+      agent.id,
+    );
     return {
       agentId: agent.id,
       providerId: agent.provider,
@@ -138,13 +141,45 @@ export async function executeRunCommand(
     };
   });
 
+  let resolveRecordInit!: (persisted: boolean) => void;
+  const recordInitPromise = new Promise<boolean>((resolve) => {
+    resolveRecordInit = resolve;
+  });
+
   registerActiveRun({
     root,
     runsFilePath,
     runId,
+    recordPersisted: false,
+    recordInitPromise,
     teardown,
     agents: agentAbortContexts,
   });
+
+  let recordPersisted = false;
+  try {
+    ({ recordPersisted } = await initializeRunRecord({
+      root,
+      runsFilePath,
+      runId,
+      specDisplayPath,
+      specTarget: validation.specTarget,
+      baseRevisionSha: validation.baseRevisionSha,
+      repoDisplayPath,
+      createdAt,
+      startedAt,
+      runRoot,
+      ...buildPersistedExtraContextFields(extraContextFiles),
+    }));
+    resolveRecordInit(recordPersisted);
+    if (recordPersisted) {
+      markActiveRunRecordPersisted(runId);
+    }
+  } catch (error) {
+    resolveRecordInit(false);
+    clearActiveRun(runId);
+    throw error;
+  }
 
   if (renderer) {
     renderer.begin({
@@ -166,6 +201,8 @@ export async function executeRunCommand(
   let agentRecords: AgentInvocationRecord[] = [];
 
   let executionError: unknown;
+  let flushError: unknown;
+  let finalizeError: unknown;
   let runReport: RunReport | undefined;
 
   try {
@@ -201,15 +238,21 @@ export async function executeRunCommand(
           agents: mergeFinalAgentRecords(existing.agents, agentRecords),
           status: derivedRunStatus,
           ...buildRecordLifecycleCompleteFields({ existing }),
-          deletedAt: null,
         };
       },
     });
 
-    runReport = toRunReport(
+    const finalAgentReports = reconcileAgentReports(
+      runId,
       updatedRunRecord,
       executionResult.agentReports,
-      executionResult.hadAgentFailure,
+    );
+    runReport = toRunReport(
+      updatedRunRecord,
+      finalAgentReports,
+      finalAgentReports.some(
+        (agent) => agent.status === "failed" || agent.status === "errored",
+      ),
     );
   } catch (error) {
     executionError = error;
@@ -232,7 +275,6 @@ export async function executeRunCommand(
                   : existing.agents,
               status: "errored",
               ...buildRecordLifecycleCompleteFields({ existing }),
-              deletedAt: null,
             };
           },
         });
@@ -240,8 +282,21 @@ export async function executeRunCommand(
         // Ignore secondary failures while preserving the original error.
       }
     }
-  } finally {
+  }
+
+  try {
+    await flushRunRecordBuffer({
+      runsFilePath,
+      runId,
+    });
+  } catch (error) {
+    flushError = error;
+  }
+
+  try {
     await finalizeActiveRun(runId);
+  } catch (error) {
+    finalizeError = error;
   }
 
   if (executionError) {
@@ -251,28 +306,49 @@ export async function executeRunCommand(
     throw new RunProcessStreamError(toErrorMessage(executionError));
   }
 
+  if (flushError) {
+    throw new RunProcessStreamError(toErrorMessage(flushError));
+  }
+
+  if (finalizeError) {
+    if (!runReport) {
+      throw new RunProcessStreamError(toErrorMessage(finalizeError));
+    }
+    console.warn(
+      `[voratiq] Run \`${runId}\` completed, but post-run cleanup failed: ${toErrorMessage(finalizeError)}`,
+    );
+  }
+
   if (!runReport) {
     throw new RunProcessStreamError(
       `Run \`${runId}\` did not produce a report.`,
     );
   }
 
-  await flushRunRecordBuffer({
-    runsFilePath,
-    runId,
-  });
-
   return runReport;
 }
 
 function registerRunWorkspaceTeardown(
   teardown: ReturnType<typeof createTeardownController>,
+  root: string,
   workspacePaths: AgentWorkspacePaths,
+  runId: string,
   agentId: string,
 ): void {
+  teardown.addWorktree({
+    root,
+    worktreePath: workspacePaths.workspacePath,
+    label: `${agentId} workspace`,
+  });
   teardown.addPath(workspacePaths.contextPath, `${agentId} context`);
   teardown.addPath(workspacePaths.runtimePath, `${agentId} runtime`);
   teardown.addPath(workspacePaths.sandboxPath, `${agentId} sandbox`);
+  teardown.addBranch({
+    root,
+    branch: `voratiq/run/${runId}/${agentId}`,
+    worktreePath: workspacePaths.workspacePath,
+    label: `${agentId} branch`,
+  });
 }
 
 function mergeFinalAgentRecords(
@@ -293,4 +369,56 @@ function mergeFinalAgentRecords(
   }
 
   return [...merged.values()];
+}
+
+function reconcileAgentReports(
+  runId: string,
+  record: RunRecord,
+  reports: RunReport["agents"],
+): RunReport["agents"] {
+  const reportsByAgentId = new Map(
+    reports.map((report) => [report.agentId, report]),
+  );
+
+  return record.agents.map((agent) => {
+    const existingReport = reportsByAgentId.get(agent.agentId);
+    if (!existingReport) {
+      return {
+        agentId: agent.agentId,
+        status: agent.status,
+        tokenUsage: agent.tokenUsage,
+        tokenUsageResult: {
+          status: "unavailable",
+          reason: "chat_not_captured",
+          provider: "unknown",
+          modelId: agent.model,
+        },
+        runtimeManifestPath: getAgentManifestPath(runId, agent.agentId),
+        baseDirectory: getAgentDirectoryPath(runId, agent.agentId),
+        assets: {},
+        startedAt: agent.startedAt ?? record.startedAt ?? record.createdAt,
+        completedAt:
+          agent.completedAt ??
+          record.completedAt ??
+          agent.startedAt ??
+          record.startedAt ??
+          record.createdAt,
+        diffStatistics: agent.diffStatistics,
+        error: agent.error,
+        warnings: agent.warnings,
+        diffAttempted: false,
+        diffCaptured: false,
+      };
+    }
+
+    const derivations: AgentExecutionState = {
+      diffAttempted: existingReport.diffAttempted,
+      diffCaptured: existingReport.diffCaptured,
+      diffStatistics: existingReport.diffStatistics,
+      tokenUsage: existingReport.tokenUsage,
+      tokenUsageResult: existingReport.tokenUsageResult,
+    };
+
+    return toAgentReport(runId, agent, derivations);
+  });
 }

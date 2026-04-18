@@ -112,67 +112,39 @@ describe("buildRunPredicate", () => {
     expect(predicate(nonMatchingRecord)).toBe(false);
   });
 
-  it("excludes deleted runs by default", () => {
-    const predicate = buildRunPredicate({});
-    const activeRecord = createMockRunRecord({ deletedAt: undefined });
-    const deletedRecord = createMockRunRecord({
-      deletedAt: "2024-01-01T00:00:00.000Z",
-      status: "pruned",
-    });
+  it("filters to queued and running runs when activeOnly is true", () => {
+    const predicate = buildRunPredicate({ activeOnly: true });
 
-    expect(predicate(activeRecord)).toBe(true);
-    expect(predicate(deletedRecord)).toBe(false);
-  });
-
-  it("includes deleted runs when includeDeleted is true", () => {
-    const predicate = buildRunPredicate({ includeDeleted: true });
-    const activeRecord = createMockRunRecord({ deletedAt: undefined });
-    const deletedRecord = createMockRunRecord({
-      deletedAt: "2024-01-01T00:00:00.000Z",
-      status: "pruned",
-    });
-
-    expect(predicate(activeRecord)).toBe(true);
-    expect(predicate(deletedRecord)).toBe(true);
+    expect(predicate(createMockRunRecord({ status: "queued" }))).toBe(true);
+    expect(predicate(createMockRunRecord({ status: "running" }))).toBe(true);
+    expect(predicate(createMockRunRecord({ status: "succeeded" }))).toBe(false);
   });
 
   it("applies multiple filters together", () => {
     const filters: RunQueryFilters = {
       runId: "target-run",
       agentId: "claude",
-      includeDeleted: false,
     };
     const predicate = buildRunPredicate(filters);
 
     const fullyMatchingRecord = createMockRunRecord({
       runId: "target-run",
       agents: [createMockAgentRecord({ agentId: "claude" })],
-      deletedAt: undefined,
     });
 
     const wrongRunId = createMockRunRecord({
       runId: "other-run",
       agents: [createMockAgentRecord({ agentId: "claude" })],
-      deletedAt: undefined,
     });
 
     const wrongAgentId = createMockRunRecord({
       runId: "target-run",
       agents: [createMockAgentRecord({ agentId: "gemini" })],
-      deletedAt: undefined,
-    });
-
-    const deletedRecord = createMockRunRecord({
-      runId: "target-run",
-      agents: [createMockAgentRecord({ agentId: "claude" })],
-      deletedAt: "2024-01-01T00:00:00.000Z",
-      status: "pruned",
     });
 
     expect(predicate(fullyMatchingRecord)).toBe(true);
     expect(predicate(wrongRunId)).toBe(false);
     expect(predicate(wrongAgentId)).toBe(false);
-    expect(predicate(deletedRecord)).toBe(false);
   });
 });
 
@@ -181,8 +153,6 @@ describe("fetchRuns", () => {
     const records = [
       createMockRunRecord({
         runId: "run-1",
-        deletedAt: "2024-01-01T00:00:00.000Z",
-        status: "pruned",
       }),
       createMockRunRecord({ runId: "run-2" }),
       createMockRunRecord({ runId: "run-3" }),
@@ -262,23 +232,6 @@ describe("fetchRunsSafely", () => {
     ).rejects.toThrow(RunRecordNotFoundError);
   });
 
-  it("returns deleted run when includeDeleted is true", async () => {
-    const deletedRecord = createMockRunRecord({
-      runId: "deleted-run",
-      deletedAt: "2024-01-01T00:00:00.000Z",
-    });
-    mockedReadRunRecords.mockResolvedValue([deletedRecord]);
-
-    const result = await fetchRunsSafely({
-      root: "/root",
-      runsFilePath: "/root/.voratiq/run/index.json",
-      runId: "deleted-run",
-      filters: { includeDeleted: true },
-    });
-
-    expect(result.records[0]?.runId).toBe("deleted-run");
-    expect(result.records[0]?.deletedAt).toBe("2024-01-01T00:00:00.000Z");
-  });
   it("throws when storage reports malformed records", async () => {
     mockedReadRunRecords.mockImplementation((options) => {
       options.onWarning?.({

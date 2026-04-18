@@ -19,7 +19,6 @@ const baseRunRecord = {
       commitSha: "def456",
     },
   ],
-  deletedAt: null,
 } as const;
 
 describe("runRecordSchema", () => {
@@ -29,6 +28,26 @@ describe("runRecordSchema", () => {
 
   it("parses records without applyStatus", () => {
     expect(() => runRecordSchema.parse(baseRunRecord)).not.toThrow();
+  });
+
+  it("rejects legacy pruned records from the live run schema", () => {
+    expect(() =>
+      runRecordSchema.parse({
+        ...baseRunRecord,
+        status: "pruned",
+        deletedAt: "2025-01-01T00:06:00.000Z",
+      }),
+    ).toThrow();
+  });
+
+  it("rejects legacy pruned records", () => {
+    expect(() =>
+      runRecordSchema.parse({
+        ...baseRunRecord,
+        status: "pruned",
+        deletedAt: "2025-01-01T00:06:00.000Z",
+      }),
+    ).toThrow();
   });
 
   it("parses session-backed spec descriptors", () => {

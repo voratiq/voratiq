@@ -718,7 +718,6 @@ async function prepareRunTargetContext(options: {
     root,
     runsFilePath,
     runId: target.id,
-    filters: { includeDeleted: true },
   }).catch((error) => {
     if (error instanceof RunRecordNotFoundError) {
       throw new RunNotFoundCliError(target.id);

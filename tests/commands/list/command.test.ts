@@ -57,7 +57,7 @@ describe("executeListCommand", () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  it("renders run table view with default hidden statuses", async () => {
+  it("renders run table view with only aborted runs hidden by default", async () => {
     await appendRunRecord({
       root: testDir,
       runsFilePath,
@@ -65,16 +65,6 @@ describe("executeListCommand", () => {
         runId: "run-visible",
         status: "succeeded",
         createdAt: "2026-03-01T00:00:00.000Z",
-      }),
-    });
-    await appendRunRecord({
-      root: testDir,
-      runsFilePath,
-      record: buildRunRecord({
-        runId: "run-pruned",
-        status: "pruned",
-        createdAt: "2026-03-01T00:01:00.000Z",
-        deletedAt: "2026-03-02T00:00:00.000Z",
       }),
     });
     await appendRunRecord({
@@ -100,7 +90,6 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("CREATED");
     expect(result.output).toContain("run-visible");
     expect(result.output).toContain("file:specs/task.md");
-    expect(result.output).not.toContain("run-pruned");
     expect(result.output).not.toContain("run-aborted");
     expect(result.json).toMatchObject({
       operator: "run",
@@ -117,22 +106,13 @@ describe("executeListCommand", () => {
     });
   });
 
-  it("includes run aborted and pruned statuses with --verbose", async () => {
+  it("includes run aborted statuses with --verbose", async () => {
     await appendRunRecord({
       root: testDir,
       runsFilePath,
       record: buildRunRecord({
         runId: "run-visible",
         status: "succeeded",
-      }),
-    });
-    await appendRunRecord({
-      root: testDir,
-      runsFilePath,
-      record: buildRunRecord({
-        runId: "run-pruned",
-        status: "pruned",
-        deletedAt: "2026-03-02T00:00:00.000Z",
       }),
     });
     await appendRunRecord({
@@ -152,18 +132,13 @@ describe("executeListCommand", () => {
     );
 
     expect(result.output).toContain("run-visible");
-    expect(result.output).toContain("run-pruned");
     expect(result.output).toContain("run-aborted");
-    expect(result.output).toContain("PRUNED");
+    expect(result.output).toContain("SUCCEEDED");
     expect(result.output).toContain("ABORTED");
     expect(result.json).toMatchObject({
       operator: "run",
       mode: "list",
-      sessions: [
-        { sessionId: "run-aborted" },
-        { sessionId: "run-pruned" },
-        { sessionId: "run-visible" },
-      ],
+      sessions: [{ sessionId: "run-aborted" }, { sessionId: "run-visible" }],
     });
   });
 
@@ -213,34 +188,32 @@ describe("executeListCommand", () => {
     });
   });
 
-  it("renders run detail view for a pruned run", async () => {
-    const record = buildRunRecord({
-      runId: "run-pruned",
-      status: "pruned",
-      deletedAt: "2026-03-02T00:00:00.000Z",
-    });
+  it("renders run detail view for a succeeded run", async () => {
     await appendRunRecord({
       root: testDir,
       runsFilePath,
-      record,
+      record: buildRunRecord({
+        runId: "run-succeeded",
+        status: "succeeded",
+      }),
     });
 
     const result = await executeListCommand(
       buildInput({
         operator: "run",
-        sessionId: "run-pruned",
+        sessionId: "run-succeeded",
       }),
     );
 
     expect(result.mode).toBe("detail");
-    expect(result.output).toContain("run-pruned");
-    expect(result.output).toContain("PRUNED");
+    expect(result.output).toContain("run-succeeded");
+    expect(result.output).toContain("SUCCEEDED");
     expect(result.output).toContain("Workspace");
     expect(result.output).toContain("Target");
     expect(result.output).toContain("file:specs/task.md");
     expect(result.output).toContain("Agent: agent-a");
     expect(result.output).toContain(
-      "Output: .voratiq/run/sessions/run-pruned/agent-a/artifacts/diff.patch",
+      "Output: .voratiq/run/sessions/run-succeeded/agent-a/artifacts/diff.patch",
     );
     expect(result.output).not.toContain("Base Revision");
     expect(result.output).not.toContain("\nSpec");
@@ -248,7 +221,7 @@ describe("executeListCommand", () => {
       operator: "run",
       mode: "detail",
       session: {
-        sessionId: "run-pruned",
+        sessionId: "run-succeeded",
         target: {
           kind: "file",
           path: "specs/task.md",
@@ -261,7 +234,7 @@ describe("executeListCommand", () => {
               expect.objectContaining({
                 kind: "diff",
                 role: "output",
-                path: ".voratiq/run/sessions/run-pruned/agent-a/artifacts/diff.patch",
+                path: ".voratiq/run/sessions/run-succeeded/agent-a/artifacts/diff.patch",
               }),
             ],
           }),
@@ -1733,7 +1706,7 @@ describe("executeListCommand", () => {
       expect(capturedOptions!.predicate).toBeUndefined();
     });
 
-    it("default-filter predicate excludes aborted and pruned statuses", async () => {
+    it("default-filter predicate excludes aborted statuses", async () => {
       await appendRunRecord({
         root: testDir,
         runsFilePath,
@@ -1759,15 +1732,9 @@ describe("executeListCommand", () => {
         runId: "test",
         status: "aborted",
       });
-      const pruned = buildRunRecord({
-        runId: "test",
-        status: "pruned",
-        deletedAt: "2026-03-02T00:00:00.000Z",
-      });
 
       expect(predicate(visible)).toBe(true);
       expect(predicate(aborted)).toBe(false);
-      expect(predicate(pruned)).toBe(false);
     });
 
     it("detail mode does not use the table-mode bounded predicate", async () => {
@@ -1897,7 +1864,6 @@ function buildRunRecord(params: {
   runId: string;
   status: RunRecord["status"];
   createdAt?: string;
-  deletedAt?: string | null;
 }): RunRecord {
   return createRunRecord({
     runId: params.runId,
@@ -1921,7 +1887,6 @@ function buildRunRecord(params: {
               },
       },
     ],
-    deletedAt: params.deletedAt ?? null,
   });
 }
 

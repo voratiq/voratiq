@@ -331,8 +331,13 @@ suite("voratiq run (integration)", () => {
           assets.stderrPath,
           "Agent stderr pointer missing",
         );
+        const diffPointer = expectDefined(
+          assets.diffPath,
+          "Agent diff pointer missing",
+        );
         const stdoutPath = join(repoRoot, ...stdoutPointer.split("/"));
         const stderrPath = join(repoRoot, ...stderrPointer.split("/"));
+        const diffPath = join(repoRoot, ...diffPointer.split("/"));
         expect(agent.status).toBe("succeeded");
         expect(agent.diffAttempted).toBe(true);
         expect(agent.diffCaptured).toBe(true);
@@ -342,19 +347,9 @@ suite("voratiq run (integration)", () => {
 
         await expect(readFile(stdoutPath, "utf8")).resolves.toContain("stdout");
         await expect(readFile(stderrPath, "utf8")).resolves.toContain("stderr");
-
-        const workspaceArtifact = join(
-          repoRoot,
-          ".voratiq",
-          "run",
-          "sessions",
-          runReport.runId,
-          agent.agentId,
-          "workspace",
-          "artifact.txt",
+        await expect(readFile(diffPath, "utf8")).resolves.toContain(
+          "Implement the following task:",
         );
-        const artifactContent = await readFile(workspaceArtifact, "utf8");
-        expect(artifactContent).toContain("Implement the following task:");
       }
 
       const indexPath = join(repoRoot, ".voratiq", "run", "index.json");
@@ -571,58 +566,62 @@ suite("voratiq run (integration)", () => {
     RUN_INTEGRATION_TIMEOUT_MS,
   );
 
-  it("resolves run agents from the selected profile when --profile is provided", async () => {
-    await createWorkspace(repoRoot);
-    await writeAgentsConfig(workspace, agentScriptPath);
-    await writeOrchestrationConfig(repoRoot, {
-      profiles: {
-        default: {
-          runAgentIds: ["claude"],
-          verifyAgentIds: [],
-          specAgentIds: [],
+  it(
+    "resolves run agents from the selected profile when --profile is provided",
+    async () => {
+      await createWorkspace(repoRoot);
+      await writeAgentsConfig(workspace, agentScriptPath);
+      await writeOrchestrationConfig(repoRoot, {
+        profiles: {
+          default: {
+            runAgentIds: ["claude"],
+            verifyAgentIds: [],
+            specAgentIds: [],
+          },
+          quality: {
+            runAgentIds: ["gemini", "codex"],
+            verifyAgentIds: [],
+            specAgentIds: [],
+          },
         },
-        quality: {
-          runAgentIds: ["gemini", "codex"],
-          verifyAgentIds: [],
-          specAgentIds: [],
-        },
-      },
-    });
+      });
 
-    const specRelativePath = "specs/profile-selection.md";
-    const specPath = join(repoRoot, specRelativePath);
-    await mkdir(join(repoRoot, "specs"), { recursive: true });
-    await writeFile(specPath, "# Profile selection\n", "utf8");
+      const specRelativePath = "specs/profile-selection.md";
+      const specPath = join(repoRoot, specRelativePath);
+      await mkdir(join(repoRoot, "specs"), { recursive: true });
+      await writeFile(specPath, "# Profile selection\n", "utf8");
 
-    const executeCompetitionSpy = jest.spyOn(
-      commandAdapter,
-      "executeCompetitionWithAdapter",
-    );
-    try {
-      const originalCwd = process.cwd();
-      process.chdir(repoRoot);
+      const executeCompetitionSpy = jest.spyOn(
+        commandAdapter,
+        "executeCompetitionWithAdapter",
+      );
       try {
-        await runRunCommand({
-          specPath: specRelativePath,
-          profile: "quality",
-        });
-      } finally {
-        process.chdir(originalCwd);
-      }
+        const originalCwd = process.cwd();
+        process.chdir(repoRoot);
+        try {
+          await runRunCommand({
+            specPath: specRelativePath,
+            profile: "quality",
+          });
+        } finally {
+          process.chdir(originalCwd);
+        }
 
-      const lastCall = executeCompetitionSpy.mock.calls.at(-1);
-      expect(lastCall).toBeDefined();
-      const args = lastCall?.[0] as
-        | { candidates?: Array<{ id?: string }> }
-        | undefined;
-      expect(args?.candidates?.map((candidate) => candidate.id)).toEqual([
-        "gemini",
-        "codex",
-      ]);
-    } finally {
-      executeCompetitionSpy.mockRestore();
-    }
-  });
+        const lastCall = executeCompetitionSpy.mock.calls.at(-1);
+        expect(lastCall).toBeDefined();
+        const args = lastCall?.[0] as
+          | { candidates?: Array<{ id?: string }> }
+          | undefined;
+        expect(args?.candidates?.map((candidate) => candidate.id)).toEqual([
+          "gemini",
+          "codex",
+        ]);
+      } finally {
+        executeCompetitionSpy.mockRestore();
+      }
+    },
+    RUN_INTEGRATION_TIMEOUT_MS,
+  );
 
   it("uses run --agent override instead of orchestration defaults", async () => {
     await createWorkspace(repoRoot);
@@ -1020,60 +1019,69 @@ suite("voratiq run (integration)", () => {
     expect(summarylessAgent?.diffAttempted).toBe(false);
   });
 
-  it("reports no-workspace-changes when an agent exits without edits", async () => {
-    await createWorkspace(repoRoot);
-    const noChangeScriptPath = await createNoChangeAgentScript(repoRoot);
-    await writeAgentsConfig(workspace, agentScriptPath, {
-      codex: { binary: noChangeScriptPath },
-    });
+  it(
+    "reports no-workspace-changes when an agent exits without edits",
+    async () => {
+      await createWorkspace(repoRoot);
+      const noChangeScriptPath = await createNoChangeAgentScript(repoRoot);
+      await writeAgentsConfig(workspace, agentScriptPath, {
+        codex: { binary: noChangeScriptPath },
+      });
 
-    const specPath = join(repoRoot, "specs", "no-edits.md");
-    await mkdir(join(repoRoot, "specs"), { recursive: true });
-    await writeFile(specPath, "# No edits\nDo nothing.\n", "utf8");
+      const specPath = join(repoRoot, "specs", "no-edits.md");
+      await mkdir(join(repoRoot, "specs"), { recursive: true });
+      await writeFile(specPath, "# No edits\nDo nothing.\n", "utf8");
 
-    const runReport = await executeRunCommand({
-      root: repoRoot,
-      runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
-      specAbsolutePath: specPath,
-      specDisplayPath: relative(repoRoot, specPath),
-    });
+      const runReport = await executeRunCommand({
+        root: repoRoot,
+        runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
+        specAbsolutePath: specPath,
+        specDisplayPath: relative(repoRoot, specPath),
+      });
 
-    const noChangeAgent = runReport.agents.find(
-      (agent) => agent.agentId === "codex",
-    );
-    expect(noChangeAgent).toBeDefined();
-    expect(noChangeAgent?.status).toBe("failed");
-    expect(noChangeAgent?.error).toBe(
-      "Agent process failed. No workspace changes detected.",
-    );
-    expect(noChangeAgent?.diffAttempted).toBe(false);
-  });
+      const noChangeAgent = runReport.agents.find(
+        (agent) => agent.agentId === "codex",
+      );
+      expect(noChangeAgent).toBeDefined();
+      expect(noChangeAgent?.status).toBe("failed");
+      expect(noChangeAgent?.error).toBe(
+        "Agent process failed. No workspace changes detected.",
+      );
+      expect(noChangeAgent?.diffAttempted).toBe(false);
+    },
+    RUN_INTEGRATION_TIMEOUT_MS,
+  );
 
-  it("marks signal-terminated agents as failures", async () => {
-    await createWorkspace(repoRoot);
-    const signalScriptPath = await createSignalTerminatingAgentScript(repoRoot);
-    await writeAgentsConfig(workspace, agentScriptPath, {
-      codex: { binary: signalScriptPath },
-    });
+  it(
+    "marks signal-terminated agents as failures",
+    async () => {
+      await createWorkspace(repoRoot);
+      const signalScriptPath =
+        await createSignalTerminatingAgentScript(repoRoot);
+      await writeAgentsConfig(workspace, agentScriptPath, {
+        codex: { binary: signalScriptPath },
+      });
 
-    const specPath = join(repoRoot, "specs", "signal.md");
-    await mkdir(join(repoRoot, "specs"), { recursive: true });
-    await writeFile(specPath, "# Signal\nTest signal termination.\n", "utf8");
+      const specPath = join(repoRoot, "specs", "signal.md");
+      await mkdir(join(repoRoot, "specs"), { recursive: true });
+      await writeFile(specPath, "# Signal\nTest signal termination.\n", "utf8");
 
-    const runReport = await executeRunCommand({
-      root: repoRoot,
-      runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
-      specAbsolutePath: specPath,
-      specDisplayPath: relative(repoRoot, specPath),
-    });
+      const runReport = await executeRunCommand({
+        root: repoRoot,
+        runsFilePath: join(repoRoot, ".voratiq", "run", "index.json"),
+        specAbsolutePath: specPath,
+        specDisplayPath: relative(repoRoot, specPath),
+      });
 
-    const signalAgent = runReport.agents.find(
-      (agent) => agent.agentId === "codex",
-    );
-    expect(signalAgent).toBeDefined();
-    expect(signalAgent?.status).toBe("failed");
-    expect(signalAgent?.error).toBe("Agent process failed. (exit code 1)");
-  });
+      const signalAgent = runReport.agents.find(
+        (agent) => agent.agentId === "codex",
+      );
+      expect(signalAgent).toBeDefined();
+      expect(signalAgent?.status).toBe("failed");
+      expect(signalAgent?.error).toBe("Agent process failed. (exit code 1)");
+    },
+    RUN_INTEGRATION_TIMEOUT_MS,
+  );
 
   it("surfaces git status failures from the failure classifier", async () => {
     await createWorkspace(repoRoot);

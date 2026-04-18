@@ -129,6 +129,7 @@ export async function executeApplyCommand(
         runsFilePath,
         runId,
         agentId,
+        shouldPersist: true,
         ignoredBaseMismatch,
         status: "failed",
         detail: extractApplyFailureDetail(error),
@@ -154,6 +155,7 @@ export async function executeApplyCommand(
         runsFilePath,
         runId,
         agentId,
+        shouldPersist: true,
         ignoredBaseMismatch,
         status: "failed",
         detail: extractCommitFailureDetail(error),
@@ -167,6 +169,7 @@ export async function executeApplyCommand(
     runsFilePath,
     runId,
     agentId,
+    shouldPersist: true,
     ignoredBaseMismatch,
     status: "succeeded",
     appliedCommitSha,
@@ -313,6 +316,7 @@ interface RecordApplyStatusOptions {
   runsFilePath: string;
   runId: string;
   agentId: string;
+  shouldPersist: boolean;
   status: RunApplyStatus["status"];
   ignoredBaseMismatch: boolean;
   appliedCommitSha?: string;
@@ -327,11 +331,16 @@ async function recordApplyStatus(
     runsFilePath,
     runId,
     agentId,
+    shouldPersist,
     status,
     ignoredBaseMismatch,
     appliedCommitSha,
     detail,
   } = options;
+
+  if (!shouldPersist) {
+    return;
+  }
 
   const appliedAt = new Date().toISOString();
   const normalizedDetail =

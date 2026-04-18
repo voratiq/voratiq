@@ -55,7 +55,6 @@ export async function initializeRunRecord(
     rootPath: repoDisplayPath,
     agents: [],
     status: "running",
-    deletedAt: null,
   };
 
   try {

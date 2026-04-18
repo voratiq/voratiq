@@ -181,12 +181,6 @@ export interface ApplyEnvelopeInput {
   ignoredBaseMismatch: boolean;
 }
 
-export interface PruneEnvelopeInput {
-  status: "pruned" | "noop" | "aborted";
-  runId?: string;
-  runPath?: string;
-}
-
 export function buildOperatorEnvelope(options: {
   operator: EnvelopeOperator;
   status: EnvelopeStatus;
@@ -541,32 +535,6 @@ export function buildApplyOperatorEnvelope(
           },
         ]
       : undefined,
-  });
-}
-
-export function buildPruneOperatorEnvelope(
-  options: PruneEnvelopeInput,
-): OperatorResultEnvelope {
-  return buildOperatorEnvelope({
-    operator: "prune",
-    status:
-      options.status === "aborted"
-        ? "failed"
-        : ("succeeded" satisfies EnvelopeStatus),
-    ids: options.runId
-      ? {
-          runId: options.runId,
-        }
-      : undefined,
-    artifacts: options.runPath
-      ? [
-          {
-            kind: "run",
-            role: "target",
-            path: options.runPath,
-          },
-        ]
-      : [],
   });
 }
 

@@ -68,7 +68,6 @@ export interface RunQueryFilters {
   runId?: string;
   agentId?: string;
   specPath?: string;
-  includeDeleted?: boolean;
   activeOnly?: boolean;
 }
 
@@ -278,8 +277,10 @@ export function buildRunPredicate(
     predicates.push((record) => record.spec.path === specPath);
   }
 
-  if (filters.activeOnly || !filters.includeDeleted) {
-    predicates.push((record) => record.status !== "pruned");
+  if (filters.activeOnly) {
+    predicates.push(
+      (record) => record.status === "queued" || record.status === "running",
+    );
   }
 
   return (record: RunRecord) =>

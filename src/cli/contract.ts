@@ -25,7 +25,6 @@ export const externalExecutionOperators = [
   "verify",
   "message",
   "apply",
-  "prune",
 ] as const;
 
 export const externalInspectionOperators = listOperators;
@@ -116,23 +115,6 @@ export const externalApplyExecutionInputSchema = z
   })
   .strict();
 
-const externalPruneExecutionBaseSchema = z
-  .object({
-    purge: z.boolean().optional(),
-    confirmed: z.literal(true),
-  })
-  .strict();
-
-export const externalPruneExecutionInputSchema = z.discriminatedUnion("scope", [
-  externalPruneExecutionBaseSchema.extend({
-    scope: z.literal("run"),
-    runId: nonEmptyStringSchema,
-  }),
-  externalPruneExecutionBaseSchema.extend({
-    scope: z.literal("all"),
-  }),
-]);
-
 const externalListInspectionBaseSchema = z
   .object({
     operator: externalInspectionOperatorSchema,
@@ -164,7 +146,6 @@ export const externalExecutionInputSchemas = {
   verify: externalVerifyExecutionInputSchema,
   message: externalMessageExecutionInputSchema,
   apply: externalApplyExecutionInputSchema,
-  prune: externalPruneExecutionInputSchema,
 } as const;
 
 export const externalInspectionInputSchemas = {
@@ -192,9 +173,6 @@ export type ExternalVerifyExecutionInput = z.infer<
 >;
 export type ExternalApplyExecutionInput = z.infer<
   typeof externalApplyExecutionInputSchema
->;
-export type ExternalPruneExecutionInput = z.infer<
-  typeof externalPruneExecutionInputSchema
 >;
 export type ExternalListInspectionInput = z.infer<
   typeof externalListInspectionInputSchema
@@ -326,26 +304,9 @@ const listCommandActionOptionsSchema = z
   })
   .strict();
 
-const pruneCommandActionOptionsSchema = z
-  .object({
-    run: nonEmptyStringSchema.optional(),
-    all: z.boolean().optional(),
-    purge: z.boolean().optional(),
-    yes: z.boolean().optional(),
-    json: z.boolean().optional(),
-  })
-  .strict();
-
 type ListCommandActionOptionsInput = z.input<
   typeof listCommandActionOptionsSchema
 >;
-
-export interface PruneCommandSelection {
-  runId?: string;
-  all: boolean;
-  purge?: boolean;
-  yes?: boolean;
-}
 
 export function parseSpecExecutionCommandOptions(
   options: unknown,
@@ -515,30 +476,6 @@ export function parseApplyExecutionCommandOptions(
   );
 }
 
-export function parseExternalPruneExecutionInput(
-  input: unknown,
-): ExternalPruneExecutionInput {
-  const result = externalPruneExecutionInputSchema.safeParse(input);
-  if (result.success) {
-    return result.data;
-  }
-
-  const requiresConfirmation = result.error.issues.some(
-    (issue) =>
-      issue.path.length === 1 &&
-      issue.path[0] === "confirmed" &&
-      issue.code === "invalid_value",
-  );
-  if (requiresConfirmation) {
-    throw new Error("JSON-mode prune requires explicit confirmation.");
-  }
-
-  const firstIssue = result.error.issues[0];
-  throw new Error(
-    firstIssue?.message ?? "Invalid external prune execution input.",
-  );
-}
-
 export function parseListInspectionCommandOptions(
   options: unknown,
   command: Command,
@@ -573,30 +510,6 @@ export function parseListInspectionCommandOptions(
     },
     command,
   );
-}
-
-export function parsePruneCommandSelection(
-  options: unknown,
-  command: Command,
-): PruneCommandSelection {
-  const parsed = parseCommandOptions(
-    pruneCommandActionOptionsSchema,
-    options,
-    command,
-  );
-  const hasRun = typeof parsed.run === "string" && parsed.run.length > 0;
-  const wantsAll = Boolean(parsed.all);
-
-  if (!hasRun && !wantsAll) {
-    failCommand(command, "either --run <run-id> or --all must be provided");
-  }
-
-  return {
-    runId: parsed.run,
-    all: wantsAll,
-    purge: normalizeOptionalBoolean(parsed.purge),
-    yes: normalizeOptionalBoolean(parsed.yes),
-  };
 }
 
 function parseCommandOptions<T>(

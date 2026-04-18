@@ -7,7 +7,6 @@ export const RUN_STATUS_VALUES = [
   "failed",
   "errored",
   "aborted",
-  "pruned",
 ] as const;
 
 export type RunStatus = (typeof RUN_STATUS_VALUES)[number];

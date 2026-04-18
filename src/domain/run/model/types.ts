@@ -358,22 +358,24 @@ export const autoOutcomeSchema = z.object({
 
 export type RunAutoOutcome = z.infer<typeof autoOutcomeSchema>;
 
-export const runRecordSchema = z
-  .object({
-    runId: z.string(),
-    baseRevisionSha: z.string(),
-    rootPath: repoRelativeRecordPathSchema,
-    spec: runSpecDescriptorSchema,
-    extraContext: z.array(persistedExtraContextPathSchema).optional(),
-    extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),
+const runRecordBaseSchema = z.object({
+  runId: z.string(),
+  baseRevisionSha: z.string(),
+  rootPath: repoRelativeRecordPathSchema,
+  spec: runSpecDescriptorSchema,
+  extraContext: z.array(persistedExtraContextPathSchema).optional(),
+  extraContextMetadata: z.array(extraContextMetadataEntrySchema).optional(),
+  createdAt: z.string(),
+  startedAt: z.string().optional(),
+  completedAt: z.string().optional(),
+  agents: z.array(agentInvocationRecordSchema),
+  applyStatus: applyStatusSchema.optional(),
+  auto: autoOutcomeSchema.optional(),
+});
+
+export const runRecordSchema = runRecordBaseSchema
+  .extend({
     status: runStatusSchema,
-    createdAt: z.string(),
-    startedAt: z.string().optional(),
-    completedAt: z.string().optional(),
-    agents: z.array(agentInvocationRecordSchema),
-    applyStatus: applyStatusSchema.optional(),
-    auto: autoOutcomeSchema.optional(),
-    deletedAt: z.string().nullable().optional(),
   })
   .superRefine((record, ctx) => {
     // Enforce the canonical queued/running/terminal timestamp contract.

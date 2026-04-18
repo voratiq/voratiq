@@ -142,7 +142,7 @@ describe("createAgentRecordMutators", () => {
     expect(agentRecord.warnings).toEqual(["noop update"]);
   });
 
-  it("coerces terminal snapshots to aborted when termination is active", async () => {
+  it("preserves terminal snapshots when termination is active", async () => {
     const runId = "run-termination";
     let currentRecord: RunRecord = {
       runId,
@@ -180,8 +180,9 @@ describe("createAgentRecordMutators", () => {
     if (!record) {
       throw new Error("Expected agent record to exist");
     }
-    expect(record.status).toBe("aborted");
-    expect(record.warnings).toContain("Run aborted before agent completed.");
+    expect(record.status).toBe("failed");
+    expect(record.error).toBe("Agent process failed");
+    expect(record.warnings).toBeUndefined();
     expect(record.completedAt).toBe("2025-11-05T13:02:00.000Z");
   });
 
@@ -228,7 +229,7 @@ describe("createAgentRecordMutators", () => {
     expect(currentRecord.agents[0]?.artifacts?.summaryCaptured).toBe(true);
   });
 
-  it("rejects terminal snapshots missing canonical lifecycle timestamps during abort normalization", async () => {
+  it("preserves terminal snapshots during abort without re-normalizing lifecycle fields", async () => {
     const runId = "run-termination-invalid";
     let currentRecord: RunRecord = {
       runId,
@@ -253,17 +254,23 @@ describe("createAgentRecordMutators", () => {
 
     getActiveTerminationStatusMock.mockReturnValue("aborted");
 
-    await expect(
-      mutators.recordAgentSnapshot({
+    await mutators.recordAgentSnapshot({
+      agentId: "alpha",
+      model: "gpt-4",
+      status: "failed",
+      completedAt: "2025-11-05T13:02:00.000Z",
+      error: "Agent process failed",
+    });
+
+    expect(rewriteRunRecordMock).toHaveBeenCalledTimes(1);
+    expect(currentRecord.agents[0]).toEqual(
+      expect.objectContaining({
         agentId: "alpha",
-        model: "gpt-4",
         status: "failed",
         completedAt: "2025-11-05T13:02:00.000Z",
         error: "Agent process failed",
       }),
-    ).rejects.toThrow(/canonical lifecycle timestamps/u);
-
-    expect(rewriteRunRecordMock).not.toHaveBeenCalled();
+    );
   });
 
   it("preserves provider-native token usage across snapshot merges", async () => {

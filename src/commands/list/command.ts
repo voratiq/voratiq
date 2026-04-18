@@ -68,6 +68,7 @@ import {
   formatRenderLifecycleDuration,
   formatRenderLifecycleRowDuration,
 } from "../../render/utils/duration.js";
+import type { RunStatus } from "../../status/index.js";
 import { pathExists } from "../../utils/fs.js";
 import {
   formatTargetDisplay,
@@ -280,7 +281,7 @@ function renderDetailOutput(
   if (operator === "run") {
     return renderRunTranscript({
       runId: session.sessionId,
-      status: session.status as RunRecord["status"],
+      status: session.status as RunStatus,
       workspacePath: session.workspacePath,
       createdAt: session.createdAt,
       startedAt: session.startedAt,
@@ -493,14 +494,10 @@ function toJsonAgent(agent: NormalizedListAgent) {
 }
 
 function shouldIncludeInDefaultTable(
-  operator: ListOperator,
+  _operator: ListOperator,
   status: string,
 ): boolean {
   if (status === "aborted") {
-    return false;
-  }
-
-  if (operator === "run" && status === "pruned") {
     return false;
   }
 

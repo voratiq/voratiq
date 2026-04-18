@@ -2,7 +2,6 @@ import {
   buildApplyOperatorEnvelope,
   buildFailedOperatorEnvelope,
   buildMessageOperatorEnvelope,
-  buildPruneOperatorEnvelope,
   buildReduceOperatorEnvelope,
   buildRunOperatorEnvelope,
   buildSpecOperatorEnvelope,
@@ -370,29 +369,6 @@ describe("operator envelope helpers", () => {
         },
       ]),
     );
-  });
-
-  it("maps prune aborts to failed envelopes", () => {
-    const envelope = buildPruneOperatorEnvelope({
-      status: "aborted",
-      runId: "run-123",
-      runPath: ".voratiq/run/sessions/run-123",
-    });
-
-    expect(envelope).toMatchObject({
-      operator: "prune",
-      status: "failed",
-      ids: {
-        runId: "run-123",
-      },
-    });
-    expect(envelope.artifacts).toEqual([
-      {
-        kind: "run",
-        role: "target",
-        path: ".voratiq/run/sessions/run-123",
-      },
-    ]);
   });
 
   it("includes session and output artifacts in message envelopes", () => {

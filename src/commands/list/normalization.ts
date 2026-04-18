@@ -428,6 +428,10 @@ function parseDiffStatistics(value?: string): ListJsonChanges | undefined {
 }
 
 function getRecordStatus(record: ListOperatorRecord): string {
+  if ("runId" in record) {
+    return record.status;
+  }
+
   return record.status;
 }
 

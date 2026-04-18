@@ -4,7 +4,6 @@ import {
   externalExecutionOperators,
   externalInspectionInputSchemas,
   externalInspectionOperators,
-  parseExternalPruneExecutionInput,
 } from "../../src/cli/contract.js";
 
 describe("external adapter contract definitions", () => {
@@ -16,7 +15,6 @@ describe("external adapter contract definitions", () => {
       "verify",
       "message",
       "apply",
-      "prune",
     ]);
     expect(externalInspectionOperators).toEqual([
       "spec",
@@ -114,26 +112,5 @@ describe("external adapter contract definitions", () => {
         mode: "detail",
       }).success,
     ).toBe(false);
-  });
-
-  it("requires explicit confirmation for external prune execution input", () => {
-    expect(() =>
-      parseExternalPruneExecutionInput({
-        scope: "all",
-        confirmed: false,
-      }),
-    ).toThrow("JSON-mode prune requires explicit confirmation.");
-
-    expect(
-      parseExternalPruneExecutionInput({
-        scope: "run",
-        runId: "run-123",
-        confirmed: true,
-      }),
-    ).toEqual({
-      scope: "run",
-      runId: "run-123",
-      confirmed: true,
-    });
   });
 });

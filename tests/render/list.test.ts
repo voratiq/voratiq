@@ -47,11 +47,10 @@ describe("renderRunList", () => {
   it("renders status values for each record", () => {
     const records: RunRecord[] = [
       buildRunRecord({
-        runId: "20251016-140000-prune",
+        runId: "20251016-140000-failed",
         specPath: "specs/onboarding-ux.md",
         createdAt: "2025-10-16T14:00:00.000Z",
-        status: "pruned",
-        deletedAt: "2025-10-17T12:00:00.000Z",
+        status: "failed",
       }),
       buildRunRecord({
         runId: "20251016-133651-woeqr",
@@ -67,7 +66,7 @@ describe("renderRunList", () => {
     expect(
       lines.some(
         (line) =>
-          line.includes("20251016-140000-prune") && line.includes("PRUNED"),
+          line.includes("20251016-140000-failed") && line.includes("FAILED"),
       ),
     ).toBe(true);
     expect(
@@ -476,7 +475,6 @@ function buildRunRecord(params: {
   specPath: string;
   createdAt: string;
   status?: RunRecord["status"];
-  deletedAt?: string | null;
 }): RunRecord {
   return createRunRecord({
     runId: params.runId,
@@ -485,7 +483,6 @@ function buildRunRecord(params: {
     status: params.status ?? "succeeded",
     createdAt: params.createdAt,
     agents: [],
-    deletedAt: params.deletedAt ?? null,
   });
 }
 
