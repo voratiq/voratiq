@@ -114,42 +114,15 @@ export async function executeVerifyCommand(
     verifierAgentCount: verificationAgents.length,
     requestedMaxParallel: maxParallel,
   });
-
-  await appendVerificationRecord({
-    root,
-    verificationsFilePath,
-    record: {
-      sessionId: verificationId,
-      createdAt,
-      status: "queued",
-      target: resolvedTarget.target,
-      ...buildPersistedExtraContextFields(extraContextFiles),
-      ...(aliasMap ? { blinded: { enabled: true as const, aliasMap } } : {}),
-      methods: [],
-    },
-  });
-  await emitSwarmSessionAcknowledgement({
-    operator: "verify",
+  const initialRecord: VerificationRecord = {
     sessionId: verificationId,
-    status: "queued",
-  });
-
-  renderer?.begin({
-    verificationId,
     createdAt,
-    startedAt: createdAt,
-    workspacePath: normalizePathForDisplay(
-      relativeToRoot(
-        root,
-        resolveWorkspacePath(
-          root,
-          VORATIQ_VERIFICATION_SESSIONS_DIR,
-          verificationId,
-        ),
-      ),
-    ),
-    status: "running",
-  });
+    status: "queued",
+    target: resolvedTarget.target,
+    ...buildPersistedExtraContextFields(extraContextFiles),
+    ...(aliasMap ? { blinded: { enabled: true as const, aliasMap } } : {}),
+    methods: [],
+  };
 
   const teardown = createTeardownController(`verify \`${verificationId}\``);
   teardown.addAction({
@@ -164,16 +137,46 @@ export async function executeVerifyCommand(
     root,
     verificationsFilePath,
     verificationId,
+    initialRecord,
     teardown,
   });
-  const mutators = createVerificationRecordMutators({
-    root,
-    verificationsFilePath,
-    verificationId,
-  });
-  await mutators.recordVerificationRunning(createdAt);
 
   try {
+    await appendVerificationRecord({
+      root,
+      verificationsFilePath,
+      record: initialRecord,
+    });
+    await emitSwarmSessionAcknowledgement({
+      operator: "verify",
+      sessionId: verificationId,
+      status: "queued",
+    });
+
+    renderer?.begin({
+      verificationId,
+      createdAt,
+      startedAt: createdAt,
+      workspacePath: normalizePathForDisplay(
+        relativeToRoot(
+          root,
+          resolveWorkspacePath(
+            root,
+            VORATIQ_VERIFICATION_SESSIONS_DIR,
+            verificationId,
+          ),
+        ),
+      ),
+      status: "running",
+    });
+
+    const mutators = createVerificationRecordMutators({
+      root,
+      verificationsFilePath,
+      verificationId,
+    });
+    await mutators.recordVerificationRunning(createdAt);
+
     const [programmaticResult, rubricResult] = await Promise.allSettled([
       executeAndPersistProgrammaticMethod({
         root,
@@ -236,6 +239,11 @@ export async function executeVerifyCommand(
 
     return { verificationId, record };
   } catch (error) {
+    const mutators = createVerificationRecordMutators({
+      root,
+      verificationsFilePath,
+      verificationId,
+    });
     const failedRecord = await completeVerificationRecord({
       mutators,
       status: "failed",

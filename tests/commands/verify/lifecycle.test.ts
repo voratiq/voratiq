@@ -23,13 +23,16 @@ import { createTeardownController } from "../../../src/competition/shared/teardo
 import { writeVerificationArtifact } from "../../../src/domain/verify/competition/artifacts.js";
 import type { VerificationRecord } from "../../../src/domain/verify/model/types.js";
 import {
+  appendVerificationRecord,
   flushVerificationRecordBuffer,
   readVerificationRecords,
   rewriteVerificationRecord,
 } from "../../../src/domain/verify/persistence/adapter.js";
+import { SessionRecordMutationError } from "../../../src/persistence/errors.js";
 import { pathExists } from "../../../src/utils/fs.js";
 
 jest.mock("../../../src/domain/verify/persistence/adapter.js", () => ({
+  appendVerificationRecord: jest.fn(),
   readVerificationRecords: jest.fn(),
   rewriteVerificationRecord: jest.fn(),
   flushVerificationRecordBuffer: jest.fn(),
@@ -45,6 +48,7 @@ jest.mock("../../../src/agents/runtime/registry.js", () => ({
 
 const readVerificationRecordsMock = jest.mocked(readVerificationRecords);
 const rewriteVerificationRecordMock = jest.mocked(rewriteVerificationRecord);
+const appendVerificationRecordMock = jest.mocked(appendVerificationRecord);
 const flushVerificationRecordBufferMock = jest.mocked(
   flushVerificationRecordBuffer,
 );
@@ -57,6 +61,7 @@ describe("verify lifecycle", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    appendVerificationRecordMock.mockResolvedValue(undefined);
     flushVerificationRecordBufferMock.mockResolvedValue(undefined);
     writeVerificationArtifactMock.mockResolvedValue(undefined);
     teardownSessionAuthMock.mockResolvedValue(undefined);
@@ -190,6 +195,70 @@ describe("verify lifecycle", () => {
     expect(rewriteVerificationRecordMock).not.toHaveBeenCalled();
     expect(flushVerificationRecordBufferMock).not.toHaveBeenCalled();
     expect(teardownSessionAuthMock).not.toHaveBeenCalled();
+  });
+
+  it("rewrites the verification record when fallback append loses an early persistence race", async () => {
+    const initialRecord: VerificationRecord = {
+      sessionId: VERIFICATION_ID,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      status: "queued",
+      target: {
+        kind: "run",
+        sessionId: "run-123",
+        candidateIds: ["agent-a"],
+      },
+      methods: [
+        {
+          method: "programmatic",
+          slug: "programmatic",
+          scope: { kind: "run" },
+          status: "queued",
+        },
+      ],
+    };
+    const persistedRecord: VerificationRecord = {
+      ...initialRecord,
+      startedAt: "2026-01-01T00:00:05.000Z",
+      status: "running",
+      methods: [
+        {
+          method: "programmatic",
+          slug: "programmatic",
+          scope: { kind: "run" },
+          status: "running",
+          startedAt: "2026-01-01T00:00:06.000Z",
+        },
+      ],
+    };
+
+    registerActiveVerification({
+      root: "/repo",
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
+      verificationId: VERIFICATION_ID,
+      initialRecord,
+    });
+    readVerificationRecordsMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([persistedRecord]);
+    appendVerificationRecordMock.mockRejectedValueOnce(
+      new SessionRecordMutationError(
+        `Session ${VERIFICATION_ID} already exists at /repo/.voratiq/verify/index.json.`,
+      ),
+    );
+    rewriteVerificationRecordMock.mockImplementation(({ mutate }) =>
+      Promise.resolve(mutate(persistedRecord)),
+    );
+
+    await terminateActiveVerification("aborted");
+
+    expect(appendVerificationRecordMock).toHaveBeenCalledTimes(1);
+    expect(readVerificationRecordsMock).toHaveBeenCalledTimes(2);
+    expect(rewriteVerificationRecordMock).toHaveBeenCalledTimes(1);
+    expect(writeVerificationArtifactMock).toHaveBeenCalledTimes(1);
+    expect(flushVerificationRecordBufferMock).toHaveBeenCalledWith({
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
+      sessionId: VERIFICATION_ID,
+    });
   });
 
   it("prunes verify scratch state while retaining artifacts on finalization", async () => {

@@ -151,115 +151,13 @@ async function flushPendingHistory(): Promise<void> {
   }
 }
 
-async function terminateActiveRunSafe(
-  status: "failed" | "aborted",
-  context: string,
-): Promise<Error | null> {
-  try {
-    const { terminateActiveRun } = await import("./commands/run/lifecycle.js");
-    await terminateActiveRun(status);
-    return null;
-  } catch (error) {
-    const { toErrorMessage } = await import("./utils/errors.js");
-    const normalizedError =
-      error instanceof Error ? error : new Error(toErrorMessage(error));
-    console.error(
-      `[voratiq] Failed to teardown run after ${context}: ${toErrorMessage(error)}`,
-    );
-    return normalizedError;
-  }
-}
-
-async function terminateActiveVerificationSafe(
-  status: "failed" | "aborted",
-  context: string,
-): Promise<Error | null> {
-  try {
-    const { terminateActiveVerification } =
-      await import("./commands/verify/lifecycle.js");
-    await terminateActiveVerification(status);
-    return null;
-  } catch (error) {
-    const { toErrorMessage } = await import("./utils/errors.js");
-    const normalizedError =
-      error instanceof Error ? error : new Error(toErrorMessage(error));
-    console.error(
-      `[voratiq] Failed to teardown verification after ${context}: ${toErrorMessage(error)}`,
-    );
-    return normalizedError;
-  }
-}
-
-async function terminateActiveInteractiveSafe(
-  status: "failed" | "aborted",
-  context: string,
-): Promise<Error | null> {
-  try {
-    const { terminateActiveInteractive } =
-      await import("./commands/interactive/lifecycle.js");
-    await terminateActiveInteractive(status, context);
-    return null;
-  } catch (error) {
-    const { toErrorMessage } = await import("./utils/errors.js");
-    const normalizedError =
-      error instanceof Error ? error : new Error(toErrorMessage(error));
-    console.error(
-      `[voratiq] Failed to teardown interactive session after ${context}: ${toErrorMessage(error)}`,
-    );
-    return normalizedError;
-  }
-}
-
-async function terminateActiveMessageSafe(
-  status: "failed" | "aborted",
-  context: string,
-): Promise<Error | null> {
-  try {
-    const { terminateActiveMessage } =
-      await import("./commands/message/lifecycle.js");
-    await terminateActiveMessage(status);
-    return null;
-  } catch (error) {
-    const { toErrorMessage } = await import("./utils/errors.js");
-    const normalizedError =
-      error instanceof Error ? error : new Error(toErrorMessage(error));
-    console.error(
-      `[voratiq] Failed to teardown message after ${context}: ${toErrorMessage(error)}`,
-    );
-    return normalizedError;
-  }
-}
-
 async function terminateActiveSessionsSafe(
   status: "failed" | "aborted",
   context: string,
 ): Promise<Error | null> {
-  const runError = await terminateActiveRunSafe(status, context);
-  const verificationError = await terminateActiveVerificationSafe(
-    status,
-    context,
-  );
-  const interactiveError = await terminateActiveInteractiveSafe(
-    status,
-    context,
-  );
-  const messageError = await terminateActiveMessageSafe(status, context);
-
-  const errors = [
-    runError,
-    verificationError,
-    interactiveError,
-    messageError,
-  ].filter((error): error is Error => error instanceof Error);
-
-  if (errors.length > 1) {
-    return new AggregateError(
-      errors,
-      `Failed to teardown active sessions after ${context}`,
-    );
-  }
-
-  return errors[0] ?? null;
+  const { terminateRegisteredActiveSessions } =
+    await import("./commands/shared/teardown-registry.js");
+  return await terminateRegisteredActiveSessions(status, context);
 }
 
 function renderRootLauncherGitGuidance(options: {

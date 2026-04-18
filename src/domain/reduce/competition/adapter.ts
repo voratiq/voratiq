@@ -18,6 +18,7 @@ import {
   createTeardownController,
   registerScratchWorkspaceTeardownPaths,
   runTeardown,
+  type TeardownController,
 } from "../../../competition/shared/teardown.js";
 import type { AgentDefinition } from "../../../configs/agents/types.js";
 import type { EnvironmentConfig } from "../../../configs/environment/types.js";
@@ -120,6 +121,7 @@ export interface CreateReduceCompetitionAdapterInput {
   readonly environment: EnvironmentConfig;
   readonly extraContextFiles?: readonly ResolvedExtraContextFile[];
   readonly renderer?: ReduceProgressRenderer;
+  readonly teardown?: TeardownController;
 }
 
 export function createReduceCompetitionAdapter(
@@ -142,10 +144,13 @@ export function createReduceCompetitionAdapter(
     environment,
     extraContextFiles = [],
     renderer,
+    teardown: providedTeardown,
   } = input;
 
   let failure: unknown;
-  const teardown = createTeardownController(`reduce \`${reductionId}\``);
+  const teardown =
+    providedTeardown ?? createTeardownController(`reduce \`${reductionId}\``);
+  const ownsTeardown = providedTeardown === undefined;
   teardown.addAction({
     key: `reduce-auth:${reductionId}`,
     label: "session auth",
@@ -575,7 +580,9 @@ export function createReduceCompetitionAdapter(
         });
       }
 
-      await runTeardown(teardown);
+      if (ownsTeardown) {
+        await runTeardown(teardown);
+      }
     },
     sortResults: (left, right) => {
       if (left.status !== right.status) {

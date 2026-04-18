@@ -1,5 +1,6 @@
 import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
 import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
+import { createTeardownController } from "../../competition/shared/teardown.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import type { AgentDefinition } from "../../configs/agents/types.js";
 import {
@@ -11,13 +12,24 @@ import type {
   ReductionTarget,
 } from "../../domain/reduce/model/types.js";
 import {
+  appendReductionRecord,
   flushReductionRecordBuffer,
   readReductionRecords,
 } from "../../domain/reduce/persistence/adapter.js";
+import { buildPersistedExtraContextFields } from "../../extra-context/contract.js";
 import { loadOperatorEnvironment } from "../../preflight/environment.js";
 import { prepareConfiguredOperatorReadiness } from "../../preflight/operator.js";
 import type { ReduceProgressRenderer } from "../../render/transcripts/reduce.js";
 import { toErrorMessage } from "../../utils/errors.js";
+import {
+  normalizePathForDisplay,
+  relativeToRoot,
+  resolvePath,
+} from "../../utils/path.js";
+import {
+  REDUCTION_DATA_FILENAME,
+  REDUCTION_FILENAME,
+} from "../../workspace/constants.js";
 import { resolveEffectiveMaxParallel } from "../shared/max-parallel.js";
 import { resolveReductionCompetitors } from "../shared/resolve-reduction-competitors.js";
 import { generateSessionId } from "../shared/session-id.js";
@@ -26,6 +38,7 @@ import {
   ReduceGenerationFailedError,
   ReducePreflightError,
 } from "./errors.js";
+import { finalizeActiveReduce, registerActiveReduce } from "./lifecycle.js";
 import { assertReductionTargetEligible } from "./targets.js";
 
 export interface ReduceCommandInput {
@@ -106,83 +119,123 @@ export async function executeReduceCommand(
     competitorCount: reducers.length,
     requestedMaxParallel,
   });
-
-  renderer?.begin({
-    reductionId,
+  const teardown = createTeardownController(`reduce \`${reductionId}\``);
+  const initialRecord: ReductionRecord = {
+    sessionId: reductionId,
+    target,
     createdAt,
-    workspacePath: `.voratiq/reduce/sessions/${reductionId}`,
-    status: "running",
-  });
-
-  let executionError: unknown;
-  let reductionResults: ReductionCompetitionExecution[] | undefined;
-
-  try {
-    reductionResults = await executeCompetitionWithAdapter({
-      candidates: reducers,
-      maxParallel: effectiveMaxParallel,
-      adapter: createReduceCompetitionAdapter({
+    status: "queued",
+    reducers: reducers.map((reducer) => ({
+      agentId: reducer.id,
+      status: "queued",
+      outputPath: buildReductionOutputPath({
         root,
         reductionId,
-        createdAt,
-        reductionsFilePath,
-        specsFilePath,
-        runsFilePath,
-        messagesFilePath,
-        verificationsFilePath,
-        target,
-        environment,
-        extraContextFiles,
-        renderer,
+        reducerAgentId: reducer.id,
       }),
-    });
-  } catch (error) {
-    executionError = error;
-  } finally {
-    await flushReductionRecordBuffer({
-      reductionsFilePath,
-      sessionId: reductionId,
-    }).catch(() => {});
-  }
+      dataPath: buildReductionDataPath({
+        root,
+        reductionId,
+        reducerAgentId: reducer.id,
+      }),
+    })),
+    ...buildPersistedExtraContextFields(extraContextFiles),
+  };
 
-  if (executionError) {
-    renderer?.complete("failed");
-    throw new ReduceGenerationFailedError([
-      `Reduction session \`${reductionId}\` failed: ${toErrorMessage(executionError)}`,
-    ]);
-  }
-
-  if (!reductionResults || reductionResults.length === 0) {
-    renderer?.complete("failed");
-    throw new ReduceGenerationFailedError([
-      `Reduction session \`${reductionId}\` did not produce any result.`,
-    ]);
-  }
-
-  const persistedRecord = await readReductionSessionRecord({
+  registerActiveReduce({
     root,
     reductionsFilePath,
     reductionId,
+    initialRecord,
+    teardown,
   });
 
-  if (!persistedRecord) {
-    renderer?.complete("failed");
-    throw new ReduceGenerationFailedError([
-      `Reduction session \`${reductionId}\` record not found after execution.`,
-    ]);
+  try {
+    await appendReductionRecord({
+      root,
+      reductionsFilePath,
+      record: initialRecord,
+    });
+    renderer?.begin({
+      reductionId,
+      createdAt,
+      workspacePath: `.voratiq/reduce/sessions/${reductionId}`,
+      status: "running",
+    });
+
+    let executionError: unknown;
+    let reductionResults: ReductionCompetitionExecution[] | undefined;
+
+    try {
+      reductionResults = await executeCompetitionWithAdapter({
+        candidates: reducers,
+        maxParallel: effectiveMaxParallel,
+        adapter: createReduceCompetitionAdapter({
+          root,
+          reductionId,
+          createdAt,
+          reductionsFilePath,
+          specsFilePath,
+          runsFilePath,
+          messagesFilePath,
+          verificationsFilePath,
+          target,
+          environment,
+          extraContextFiles,
+          renderer,
+          teardown,
+        }),
+      });
+    } catch (error) {
+      executionError = error;
+    } finally {
+      await flushReductionRecordBuffer({
+        reductionsFilePath,
+        sessionId: reductionId,
+      }).catch(() => {});
+    }
+
+    if (executionError) {
+      renderer?.complete("failed");
+      throw new ReduceGenerationFailedError([
+        `Reduction session \`${reductionId}\` failed: ${toErrorMessage(executionError)}`,
+      ]);
+    }
+
+    if (!reductionResults || reductionResults.length === 0) {
+      renderer?.complete("failed");
+      throw new ReduceGenerationFailedError([
+        `Reduction session \`${reductionId}\` did not produce any result.`,
+      ]);
+    }
+
+    const persistedRecord = await readReductionSessionRecord({
+      root,
+      reductionsFilePath,
+      reductionId,
+    });
+
+    if (!persistedRecord) {
+      renderer?.complete("failed");
+      throw new ReduceGenerationFailedError([
+        `Reduction session \`${reductionId}\` record not found after execution.`,
+      ]);
+    }
+
+    renderer?.complete(persistedRecord.status, {
+      startedAt: persistedRecord.startedAt,
+      completedAt: persistedRecord.completedAt,
+    });
+
+    return {
+      reductionId,
+      target,
+      reducerAgentIds: reducers.map((reducer) => reducer.id),
+      reductions: reductionResults,
+    };
+  } finally {
+    await finalizeActiveReduce(reductionId);
   }
-
-  renderer?.complete(persistedRecord.status, {
-    startedAt: persistedRecord.startedAt,
-    completedAt: persistedRecord.completedAt,
-  });
-
-  return {
-    reductionId,
-    target,
-    reducerAgentIds: reducers.map((reducer) => reducer.id),
-    reductions: reductionResults,
-  };
 }
 
 function resolveReduceAgentPlan(options: {
@@ -224,4 +277,38 @@ async function readReductionSessionRecord(options: {
     predicate: (record) => record.sessionId === reductionId,
   });
   return records[0];
+}
+
+function buildReductionOutputPath(options: {
+  root: string;
+  reductionId: string;
+  reducerAgentId: string;
+}): string {
+  const { root, reductionId, reducerAgentId } = options;
+  return normalizePathForDisplay(
+    relativeToRoot(
+      root,
+      resolvePath(
+        root,
+        `.voratiq/reduce/sessions/${reductionId}/${reducerAgentId}/artifacts/${REDUCTION_FILENAME}`,
+      ),
+    ),
+  );
+}
+
+function buildReductionDataPath(options: {
+  root: string;
+  reductionId: string;
+  reducerAgentId: string;
+}): string {
+  const { root, reductionId, reducerAgentId } = options;
+  return normalizePathForDisplay(
+    relativeToRoot(
+      root,
+      resolvePath(
+        root,
+        `.voratiq/reduce/sessions/${reductionId}/${reducerAgentId}/artifacts/${REDUCTION_DATA_FILENAME}`,
+      ),
+    ),
+  );
 }

@@ -20,6 +20,7 @@ import { TERMINABLE_RUN_STATUSES } from "../../status/index.js";
 import { toErrorMessage } from "../../utils/errors.js";
 import { preserveProviderChatTranscripts } from "../../workspace/chat/artifacts.js";
 import type { ChatArtifactFormat } from "../../workspace/chat/types.js";
+import { registerActiveSessionTeardown } from "../shared/teardown-registry.js";
 
 interface ActiveRunContext {
   root: string;
@@ -37,9 +38,18 @@ interface ActiveRunAgentContext {
 
 let activeRun: ActiveRunContext | undefined;
 let terminationInFlight = false;
+let clearRegisteredRunTeardown: (() => void) | undefined;
 
 export function registerActiveRun(context: ActiveRunContext): void {
   activeRun = context;
+  clearRegisteredRunTeardown?.();
+  clearRegisteredRunTeardown = registerActiveSessionTeardown({
+    key: `run:${context.runId}`,
+    label: "run",
+    terminate: async (status) => {
+      await terminateActiveRun(status);
+    },
+  });
 }
 
 export function clearActiveRun(runId: string): void {
@@ -48,6 +58,8 @@ export function clearActiveRun(runId: string): void {
   }
 
   if (!terminationInFlight) {
+    clearRegisteredRunTeardown?.();
+    clearRegisteredRunTeardown = undefined;
     activeRun = undefined;
   }
 }
@@ -180,6 +192,8 @@ export async function terminateActiveRun(
   try {
     await finalizeRegisteredRunTeardown(context);
   } finally {
+    clearRegisteredRunTeardown?.();
+    clearRegisteredRunTeardown = undefined;
     terminationInFlight = false;
     setActiveTerminationStatus(context.runId, undefined);
     activeRun = undefined;
@@ -193,6 +207,10 @@ export async function terminateActiveRun(
 export async function finalizeActiveRun(runId: string): Promise<void> {
   if (!activeRun || activeRun.runId !== runId) {
     clearActiveRun(runId);
+    return;
+  }
+
+  if (terminationInFlight) {
     return;
   }
 

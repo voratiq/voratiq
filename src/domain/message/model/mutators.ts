@@ -65,12 +65,18 @@ export function createMessageRecordMutators(
         root,
         messagesFilePath,
         sessionId: messageId,
-        mutate: (existing) => ({
-          ...existing,
-          status,
-          ...buildRecordLifecycleCompleteFields({ existing }),
-          ...(error !== undefined ? { error } : {}),
-        }),
+        mutate: (existing) => {
+          if (existing.status !== "queued" && existing.status !== "running") {
+            return existing;
+          }
+
+          return {
+            ...existing,
+            status,
+            ...buildRecordLifecycleCompleteFields({ existing }),
+            ...(error !== undefined ? { error } : {}),
+          };
+        },
         forceFlush: true,
       }),
     readRecord: async () =>

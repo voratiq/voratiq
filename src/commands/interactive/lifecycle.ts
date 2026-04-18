@@ -10,6 +10,7 @@ import {
 } from "../../domain/interactive/persistence/adapter.js";
 import { buildRecordLifecycleCompleteFields } from "../../domain/shared/lifecycle.js";
 import { toErrorMessage } from "../../utils/errors.js";
+import { registerActiveSessionTeardown } from "../shared/teardown-registry.js";
 
 const INTERACTIVE_TERMINATION_WAIT_MS = 1_000;
 
@@ -24,11 +25,20 @@ interface ActiveInteractiveContext {
 
 let activeInteractive: ActiveInteractiveContext | undefined;
 let terminationInFlight = false;
+let clearRegisteredInteractiveTeardown: (() => void) | undefined;
 
 export function registerActiveInteractive(
   context: ActiveInteractiveContext,
 ): void {
   activeInteractive = context;
+  clearRegisteredInteractiveTeardown?.();
+  clearRegisteredInteractiveTeardown = registerActiveSessionTeardown({
+    key: `interactive:${context.sessionId}`,
+    label: "interactive",
+    terminate: async (status, reason) => {
+      await terminateActiveInteractive(status, reason);
+    },
+  });
 }
 
 export function clearActiveInteractive(sessionId: string): void {
@@ -37,6 +47,8 @@ export function clearActiveInteractive(sessionId: string): void {
   }
 
   if (!terminationInFlight) {
+    clearRegisteredInteractiveTeardown?.();
+    clearRegisteredInteractiveTeardown = undefined;
     activeInteractive = undefined;
   }
 }
@@ -103,6 +115,8 @@ export async function terminateActiveInteractive(
       await runTeardown(context.teardown);
     } finally {
       context.terminationStatus = undefined;
+      clearRegisteredInteractiveTeardown?.();
+      clearRegisteredInteractiveTeardown = undefined;
       terminationInFlight = false;
       activeInteractive = undefined;
     }

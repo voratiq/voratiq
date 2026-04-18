@@ -1,5 +1,6 @@
 import { executeCompetitionWithAdapter } from "../../competition/command-adapter.js";
 import type { ResolvedExtraContextFile } from "../../competition/shared/extra-context.js";
+import { createTeardownController } from "../../competition/shared/teardown.js";
 import { AgentNotFoundError } from "../../configs/agents/errors.js";
 import {
   createSpecCompetitionAdapter,
@@ -30,6 +31,7 @@ import {
   SpecGenerationFailedError,
   SpecPreflightError,
 } from "./errors.js";
+import { finalizeActiveSpec, registerActiveSpec } from "./lifecycle.js";
 
 export interface ExecuteSpecCommandInput {
   root: string;
@@ -132,156 +134,171 @@ export async function executeSpecCommand(
     ...buildPersistedExtraContextFields(extraContextFiles),
   };
 
-  await appendSpecRecord({
+  const teardown = createTeardownController(`spec \`${sessionId}\``);
+  registerActiveSpec({
     root,
     specsFilePath,
-    record,
+    specId: sessionId,
+    initialRecord: record,
+    teardown,
   });
-  await emitSwarmSessionAcknowledgement({
-    operator: "spec",
-    sessionId,
-    status: "running",
-  });
-  const mutators = createSpecRecordMutators({
-    root,
-    specsFilePath,
-    sessionId,
-  });
-  let currentAgents: SpecAgentEntry[] = [...initialAgents];
-
-  onStatus?.("Generating specification…");
-  renderer?.begin({
-    sessionId,
-    createdAt,
-    startedAt,
-    workspacePath: `.voratiq/spec/sessions/${sessionId}`,
-    status: "running",
-  });
-
-  let executionResults: SpecCompetitionExecution[];
 
   try {
-    const baseAdapter = createSpecCompetitionAdapter({
+    await appendSpecRecord({
       root,
+      specsFilePath,
+      record,
+    });
+    await emitSwarmSessionAcknowledgement({
+      operator: "spec",
       sessionId,
-      description,
-      specTitle,
-      environment,
-      extraContextFiles,
+      status: "running",
     });
-    executionResults = await executeCompetitionWithAdapter({
-      candidates: [...competitors],
-      maxParallel: effectiveMaxParallel,
-      adapter: {
-        ...baseAdapter,
-        onPreparationFailure: async (result) => {
-          const updatedRecord = await mutators.recordAgentSnapshot({
-            agentId: result.agentId,
-            status: "failed",
-            startedAt: new Date().toISOString(),
-            completedAt: new Date().toISOString(),
-            tokenUsage: result.tokenUsage,
-            error: result.error ?? null,
-          });
-          currentAgents = [...updatedRecord.agents];
-          const failedAgent = currentAgents.find(
-            (agent) => agent.agentId === result.agentId,
-          );
-          renderer?.update({
-            agentId: result.agentId,
-            status: "failed",
-            startedAt: failedAgent?.startedAt,
-            completedAt: failedAgent?.completedAt,
-            tokenUsage: result.tokenUsage,
-            tokenUsageResult: result.tokenUsageResult,
-          });
-        },
-        onCandidateRunning: async (prepared, index) => {
-          await baseAdapter.onCandidateRunning?.(prepared, index);
-          const updatedRecord = await mutators.recordAgentRunning({
-            agentId: prepared.candidate.id,
-          });
-          currentAgents = [...updatedRecord.agents];
-          const runningAgent = currentAgents.find(
-            (agent) => agent.agentId === prepared.candidate.id,
-          );
-          renderer?.update({
-            agentId: prepared.candidate.id,
-            status: "running",
-            startedAt: runningAgent?.startedAt,
-          });
-        },
-        onCandidateCompleted: async (_prepared, result) => {
-          const updatedRecord = await mutators.recordAgentSnapshot(
-            toSpecAgentEntry(result),
-          );
-          currentAgents = [...updatedRecord.agents];
-          const completedAgent = currentAgents.find(
-            (agent) => agent.agentId === result.agentId,
-          );
-          renderer?.update({
-            agentId: result.agentId,
-            status: completedAgent?.status ?? result.status,
-            startedAt: completedAgent?.startedAt,
-            completedAt: completedAgent?.completedAt,
-            tokenUsage: result.tokenUsage,
-            tokenUsageResult: result.tokenUsageResult,
-          });
-        },
-      },
+    const mutators = createSpecRecordMutators({
+      root,
+      specsFilePath,
+      sessionId,
     });
-  } catch (error) {
-    const detail = toErrorMessage(error);
-    await mutators.completeSpec({
-      status: "failed",
-      error: detail,
+    let currentAgents: SpecAgentEntry[] = [...initialAgents];
+
+    onStatus?.("Generating specification…");
+    renderer?.begin({
+      sessionId,
+      createdAt,
+      startedAt,
+      workspacePath: `.voratiq/spec/sessions/${sessionId}`,
+      status: "running",
     });
-    renderer?.complete("failed");
-    await flushSpecRecordBuffer({ specsFilePath, sessionId });
-    throw new SpecGenerationFailedError([detail]);
-  }
 
-  const agentEntries = currentAgents.some(
-    (agent) => agent.status === "succeeded" || agent.status === "failed",
-  )
-    ? currentAgents
-    : mapExecutionResultsToSpecAgents(executionResults, startedAt);
+    let executionResults: SpecCompetitionExecution[];
 
-  // Derive session status from agent outcomes.
-  const sessionStatus = deriveSpecStatusFromAgents(
-    agentEntries.map((a) => a.status),
-  );
+    try {
+      const baseAdapter = createSpecCompetitionAdapter({
+        root,
+        sessionId,
+        description,
+        specTitle,
+        environment,
+        extraContextFiles,
+        teardown,
+      });
+      executionResults = await executeCompetitionWithAdapter({
+        candidates: [...competitors],
+        maxParallel: effectiveMaxParallel,
+        adapter: {
+          ...baseAdapter,
+          onPreparationFailure: async (result) => {
+            const updatedRecord = await mutators.recordAgentSnapshot({
+              agentId: result.agentId,
+              status: "failed",
+              startedAt: new Date().toISOString(),
+              completedAt: new Date().toISOString(),
+              tokenUsage: result.tokenUsage,
+              error: result.error ?? null,
+            });
+            currentAgents = [...updatedRecord.agents];
+            const failedAgent = currentAgents.find(
+              (agent) => agent.agentId === result.agentId,
+            );
+            renderer?.update({
+              agentId: result.agentId,
+              status: "failed",
+              startedAt: failedAgent?.startedAt,
+              completedAt: failedAgent?.completedAt,
+              tokenUsage: result.tokenUsage,
+              tokenUsageResult: result.tokenUsageResult,
+            });
+          },
+          onCandidateRunning: async (prepared, index) => {
+            await baseAdapter.onCandidateRunning?.(prepared, index);
+            const updatedRecord = await mutators.recordAgentRunning({
+              agentId: prepared.candidate.id,
+            });
+            currentAgents = [...updatedRecord.agents];
+            const runningAgent = currentAgents.find(
+              (agent) => agent.agentId === prepared.candidate.id,
+            );
+            renderer?.update({
+              agentId: prepared.candidate.id,
+              status: "running",
+              startedAt: runningAgent?.startedAt,
+            });
+          },
+          onCandidateCompleted: async (_prepared, result) => {
+            const updatedRecord = await mutators.recordAgentSnapshot(
+              toSpecAgentEntry(result),
+            );
+            currentAgents = [...updatedRecord.agents];
+            const completedAgent = currentAgents.find(
+              (agent) => agent.agentId === result.agentId,
+            );
+            renderer?.update({
+              agentId: result.agentId,
+              status: completedAgent?.status ?? result.status,
+              startedAt: completedAgent?.startedAt,
+              completedAt: completedAgent?.completedAt,
+              tokenUsage: result.tokenUsage,
+              tokenUsageResult: result.tokenUsageResult,
+            });
+          },
+        },
+      });
+    } catch (error) {
+      const detail = toErrorMessage(error);
+      await mutators.completeSpec({
+        status: "failed",
+        error: detail,
+      });
+      renderer?.complete("failed");
+      await flushSpecRecordBuffer({ specsFilePath, sessionId });
+      throw new SpecGenerationFailedError([detail]);
+    }
 
-  const latestRecord = await mutators.completeSpec({
-    status: sessionStatus,
-    agents: agentEntries,
-    error:
-      sessionStatus === "failed" ? collectAgentErrors(agentEntries) : undefined,
-  });
+    const agentEntries = currentAgents.some(
+      (agent) => agent.status === "succeeded" || agent.status === "failed",
+    )
+      ? currentAgents
+      : mapExecutionResultsToSpecAgents(executionResults, startedAt);
 
-  await flushSpecRecordBuffer({ specsFilePath, sessionId });
-  renderer?.complete(latestRecord.status, {
-    startedAt: latestRecord.startedAt,
-    completedAt: latestRecord.completedAt,
-  });
-
-  if (sessionStatus === "failed") {
-    const errorDetails = agentEntries
-      .filter((a) => a.error)
-      .map((a) => `${a.agentId}: ${a.error}`);
-    throw new SpecGenerationFailedError(
-      errorDetails.length > 0
-        ? errorDetails
-        : ["All agents failed to generate a specification."],
+    const sessionStatus = deriveSpecStatusFromAgents(
+      agentEntries.map((a) => a.status),
     );
-  }
 
-  return {
-    sessionId,
-    status: latestRecord.status,
-    record: latestRecord,
-    agents: latestRecord.agents,
-  };
+    const latestRecord = await mutators.completeSpec({
+      status: sessionStatus,
+      agents: agentEntries,
+      error:
+        sessionStatus === "failed"
+          ? collectAgentErrors(agentEntries)
+          : undefined,
+    });
+
+    await flushSpecRecordBuffer({ specsFilePath, sessionId });
+    renderer?.complete(latestRecord.status, {
+      startedAt: latestRecord.startedAt,
+      completedAt: latestRecord.completedAt,
+    });
+
+    if (sessionStatus === "failed") {
+      const errorDetails = agentEntries
+        .filter((a) => a.error)
+        .map((a) => `${a.agentId}: ${a.error}`);
+      throw new SpecGenerationFailedError(
+        errorDetails.length > 0
+          ? errorDetails
+          : ["All agents failed to generate a specification."],
+      );
+    }
+
+    return {
+      sessionId,
+      status: latestRecord.status,
+      record: latestRecord,
+      agents: latestRecord.agents,
+    };
+  } finally {
+    await finalizeActiveSpec(sessionId);
+  }
 }
 
 function collectAgentErrors(agents: readonly SpecAgentEntry[]): string | null {

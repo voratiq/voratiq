@@ -4,6 +4,7 @@ describe("CLI process guards", () => {
   let originalExitCode: number | string | undefined;
 
   beforeEach(() => {
+    jest.resetModules();
     originalExitCode = process.exitCode;
   });
 

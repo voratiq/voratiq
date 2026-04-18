@@ -113,4 +113,46 @@ describe("createSpecRecordMutators", () => {
       error: "boom",
     });
   });
+
+  it("does not overwrite an already-terminal spec session", async () => {
+    const sessionId = "spec-789";
+    let currentRecord: SpecRecord = {
+      sessionId,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:00:05.000Z",
+      status: "aborted",
+      description: "Generate task spec",
+      agents: [
+        {
+          agentId: "agent-a",
+          status: "failed",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-01T00:00:05.000Z",
+          error: "aborted",
+        },
+      ],
+      error: "aborted",
+    };
+
+    rewriteSpecRecordMock.mockImplementation(({ mutate }) => {
+      currentRecord = mutate(currentRecord);
+      return Promise.resolve(currentRecord);
+    });
+
+    const mutators = createSpecRecordMutators({
+      root: "/repo",
+      specsFilePath: "/repo/.voratiq/spec/index.json",
+      sessionId,
+    });
+
+    const result = await mutators.completeSpec({
+      status: "failed",
+      error: "boom",
+    });
+
+    expect(result).toEqual(currentRecord);
+    expect(currentRecord.status).toBe("aborted");
+    expect(currentRecord.error).toBe("aborted");
+  });
 });
