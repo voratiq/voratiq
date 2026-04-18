@@ -18,8 +18,10 @@ import {
   getRunCommand,
   runAgentProcess,
 } from "../../../src/agents/runtime/launcher.js";
+import { composeStageSandboxPolicy } from "../../../src/competition/shared/sandbox-policy.js";
 import type { AgentId } from "../../../src/configs/agents/types.js";
 import { buildRunAgentWorkspacePaths } from "../../../src/domain/run/competition/agents/workspace.js";
+import { ensureWorkspaceDependencies } from "../../../src/workspace/dependencies.js";
 import {
   buildAgentWorkspacePaths,
   scaffoldAgentWorkspace,
@@ -31,6 +33,9 @@ import {
 
 const PROBE_SCRIPT_PATH = fileURLToPath(
   new URL("../../fixtures/sandbox/probe-write.py", import.meta.url),
+);
+const PROBE_READ_SCRIPT_PATH = fileURLToPath(
+  new URL("../../fixtures/sandbox/probe-read.js", import.meta.url),
 );
 
 const TEMP_PREFIX = "voratiq-sandbox-run-";
@@ -178,6 +183,28 @@ async function runWriteProbe(
   return { result, stderr };
 }
 
+async function runReadProbe(options: {
+  context: SandboxProbeContext;
+  targetPath: string;
+}): Promise<{ result: RunAgentResult; stderr: string; stdout: string }> {
+  const { context, targetPath } = options;
+  const { workspacePaths } = context;
+  const result = await runAgentProcess({
+    runtimeManifestPath: workspacePaths.runtimeManifestPath,
+    agentRoot: workspacePaths.agentRoot,
+    stdoutPath: workspacePaths.stdoutPath,
+    stderrPath: workspacePaths.stderrPath,
+    sandboxSettingsPath: workspacePaths.sandboxSettingsPath,
+    resolveRunInvocation: () => ({
+      command: process.execPath,
+      args: [PROBE_READ_SCRIPT_PATH, targetPath],
+    }),
+  });
+  const stderr = await readFile(workspacePaths.stderrPath, "utf8");
+  const stdout = await readFile(workspacePaths.stdoutPath, "utf8");
+  return { result, stderr, stdout };
+}
+
 sandboxTest("denies writes to blocked workspace paths", async () => {
   const blockedRelative = "blocked";
   const context = await setupSandboxProbe({
@@ -229,3 +256,75 @@ sandboxTest("allows writes to allowed workspace paths", async () => {
     await context.cleanup();
   }
 });
+
+sandboxTest(
+  "allows reads through staged workspace dependency symlinks under run isolation",
+  async () => {
+    const context = await setupSandboxProbe({
+      targetRelativePath: "probe.txt",
+      sandboxConfig: buildSandboxFilesystemConfig({}),
+    });
+
+    try {
+      const repoNodeModulesPath = join(context.root, "node_modules");
+      await mkdir(join(repoNodeModulesPath, "jest", "bin"), {
+        recursive: true,
+      });
+      await writeFile(
+        join(repoNodeModulesPath, "jest", "bin", "jest.js"),
+        "module.exports = 'sandbox-read-ok';\n",
+        "utf8",
+      );
+
+      const environment = {
+        node: { dependencyRoots: ["node_modules"] },
+      };
+      await ensureWorkspaceDependencies({
+        root: context.root,
+        workspacePath: context.workspacePaths.workspacePath,
+        environment,
+      });
+
+      const sandboxPolicy = await composeStageSandboxPolicy({
+        stageId: "run",
+        root: context.root,
+        workspacePath: context.workspacePaths.workspacePath,
+        runtimePath: context.workspacePaths.runtimePath,
+        sandboxHomePath: context.workspacePaths.sandboxHomePath,
+        environment,
+      });
+
+      await configureSandboxSettings({
+        stageId: "run",
+        sandboxHomePath: context.workspacePaths.sandboxHomePath,
+        workspacePath: context.workspacePaths.workspacePath,
+        providerId: TEST_AGENT_ID,
+        root: context.root,
+        sandboxSettingsPath: context.workspacePaths.sandboxSettingsPath,
+        runtimePath: context.workspacePaths.runtimePath,
+        artifactsPath: context.workspacePaths.artifactsPath,
+        extraWriteProtectedPaths: sandboxPolicy.extraWriteProtectedPaths,
+        extraReadProtectedPaths: sandboxPolicy.extraReadProtectedPaths,
+      });
+
+      const { result, stderr, stdout } = await runReadProbe({
+        context,
+        targetPath: join(
+          context.workspacePaths.workspacePath,
+          "node_modules",
+          "jest",
+          "bin",
+          "jest.js",
+        ),
+      });
+      if (isSandboxLocalBindingPermissionError(stderr)) {
+        return;
+      }
+      expect(result.exitCode).toBe(0);
+      expect(stdout).toContain("sandbox-read-ok");
+      expect(stderr).not.toMatch(/Operation not permitted|Cannot find module/i);
+    } finally {
+      await context.cleanup();
+    }
+  },
+);

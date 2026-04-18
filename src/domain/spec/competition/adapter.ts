@@ -174,6 +174,7 @@ export function createSpecCompetitionAdapter(
         workspacePath: workspacePaths.workspacePath,
         runtimePath: workspacePaths.runtimePath,
         sandboxHomePath: workspacePaths.sandboxHomePath,
+        environment,
         contextPath: workspacePaths.contextPath,
         includeStagedContext: extraContextFiles.length > 0,
       });

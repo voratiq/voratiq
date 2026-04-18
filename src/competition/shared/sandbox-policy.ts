@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readdir, realpath } from "node:fs/promises";
 import {
   isAbsolute,
   join,
@@ -11,6 +11,11 @@ import {
   type ReadonlyWorkspaceMountKey,
   type SandboxStageId,
 } from "../../agents/runtime/operator-access.js";
+import {
+  type EnvironmentConfig,
+  getNodeDependencyRoots,
+  getPythonEnvironmentPath,
+} from "../../configs/environment/types.js";
 import { assertPathWithinRoot } from "../../utils/path.js";
 
 export interface ComposeStageSandboxPolicyInput {
@@ -19,6 +24,7 @@ export interface ComposeStageSandboxPolicyInput {
   workspacePath: string;
   runtimePath: string;
   sandboxHomePath: string;
+  environment?: EnvironmentConfig;
   contextPath?: string;
   includeStagedContext?: boolean;
   verifierInputsAbsolute?: string;
@@ -35,6 +41,7 @@ interface AllowedRepositoryRootOptions {
   workspacePath: string;
   runtimePath: string;
   sandboxHomePath: string;
+  environment?: EnvironmentConfig;
   contextPath?: string;
   includeStagedContext: boolean;
   verifierInputsAbsolute?: string;
@@ -48,11 +55,12 @@ export async function composeStageSandboxPolicy(
   const includeContextRoot =
     input.includeStagedContext === true ||
     profile.readonlyWorkspaceMounts.includes("context");
-  const allowReadRoots = buildAllowedRepositoryReadRoots({
+  const allowReadRoots = await buildAllowedRepositoryReadRoots({
     root: input.root,
     workspacePath: input.workspacePath,
     runtimePath: input.runtimePath,
     sandboxHomePath: input.sandboxHomePath,
+    environment: input.environment,
     contextPath: input.contextPath,
     includeStagedContext: includeContextRoot,
     verifierInputsAbsolute: input.verifierInputsAbsolute,
@@ -77,9 +85,9 @@ export async function composeStageSandboxPolicy(
   };
 }
 
-function buildAllowedRepositoryReadRoots(
+async function buildAllowedRepositoryReadRoots(
   options: AllowedRepositoryRootOptions,
-): string[] {
+): Promise<string[]> {
   const roots = [
     options.workspacePath,
     options.runtimePath,
@@ -99,7 +107,43 @@ function buildAllowedRepositoryReadRoots(
     roots.push(options.verifierReferenceRepoAbsolute);
   }
 
+  roots.push(...(await collectEnvironmentReadRoots(options)));
   return dedupePaths(roots);
+}
+
+async function collectEnvironmentReadRoots(
+  options: AllowedRepositoryRootOptions,
+): Promise<string[]> {
+  const roots: string[] = [];
+  const { root, environment } = options;
+
+  if (!environment) {
+    return roots;
+  }
+
+  for (const dependencyRoot of getNodeDependencyRoots(environment)) {
+    const absolutePath = resolveAbsolute(root, dependencyRoot);
+    roots.push(absolutePath);
+    roots.push(...(await resolveRealpathVariants(absolutePath)));
+  }
+
+  const pythonPath = getPythonEnvironmentPath(environment);
+  if (pythonPath) {
+    const absolutePath = resolveAbsolute(root, pythonPath);
+    roots.push(absolutePath);
+    roots.push(...(await resolveRealpathVariants(absolutePath)));
+  }
+
+  return dedupePaths(roots);
+}
+
+async function resolveRealpathVariants(path: string): Promise<string[]> {
+  try {
+    const resolved = await realpath(path);
+    return resolved === path ? [] : [resolved];
+  } catch {
+    return [];
+  }
 }
 
 function buildReadonlyWorkspaceMountPaths(options: {

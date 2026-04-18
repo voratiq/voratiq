@@ -89,6 +89,7 @@ export async function executeAgentLifecycle(
       workspacePath: workspacePaths.workspacePath,
       runtimePath: workspacePaths.runtimePath,
       sandboxHomePath: workspacePaths.sandboxHomePath,
+      environment,
       contextPath: workspacePaths.contextPath,
       includeStagedContext: hasStagedContext,
     });
