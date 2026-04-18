@@ -259,6 +259,7 @@ export function createVerifyCompetitionAdapter(
         workspacePath: workspacePaths.workspacePath,
         runtimePath: workspacePaths.runtimePath,
         sandboxHomePath: workspacePaths.sandboxHomePath,
+        environment,
         contextPath: workspacePaths.contextPath,
         includeStagedContext: true,
         verifierInputsAbsolute: sharedInputs.sharedInputsAbsolute,
