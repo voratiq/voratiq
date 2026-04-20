@@ -150,7 +150,6 @@ async function resolveRunVerifyTarget(
     root,
     runsFilePath,
     runId: target.sessionId,
-    filters: { includeDeleted: true },
   }).catch((error) => {
     if (error instanceof RunRecordNotFoundError) {
       throw new RunNotFoundCliError(target.sessionId);
@@ -163,7 +162,7 @@ async function resolveRunVerifyTarget(
     throw new RunNotFoundCliError(target.sessionId);
   }
 
-  if (!isRunStatusCompleteForVerification(record.status)) {
+  if (!hasRealTerminalRunOutcome(record.status)) {
     throw new CliError(
       `Run \`${target.sessionId}\` is not complete.`,
       [`Status: \`${record.status}\`.`],
@@ -218,10 +217,8 @@ async function resolveRunVerifyTarget(
   };
 }
 
-function isRunStatusCompleteForVerification(
-  status: RunRecord["status"],
-): boolean {
-  return status === "pruned" || TERMINAL_RUN_STATUSES.includes(status);
+function hasRealTerminalRunOutcome(status: RunRecord["status"]): boolean {
+  return TERMINAL_RUN_STATUSES.includes(status);
 }
 
 async function resolveReductionVerifyTarget(
@@ -553,7 +550,6 @@ async function resolveReductionReferenceRepo(options: {
         root,
         runsFilePath,
         runId: reductionRecord.target.id,
-        filters: { includeDeleted: true },
       }).catch((error) => {
         if (error instanceof RunRecordNotFoundError) {
           throw new RunNotFoundCliError(reductionRecord.target.id);
@@ -588,7 +584,6 @@ async function resolveReductionReferenceRepo(options: {
             root,
             runsFilePath,
             runId: verificationRecord.target.sessionId,
-            filters: { includeDeleted: true },
           }).catch((error) => {
             if (error instanceof RunRecordNotFoundError) {
               throw new RunNotFoundCliError(

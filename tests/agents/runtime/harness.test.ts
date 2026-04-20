@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,8 +22,10 @@ import {
 } from "../../../src/agents/runtime/launcher.js";
 import { writeAgentManifest } from "../../../src/agents/runtime/manifest.js";
 import {
+  registerSessionProcess,
   registerStagedAuthContext,
   teardownRegisteredAuthContext,
+  unregisterSessionProcess,
 } from "../../../src/agents/runtime/registry.js";
 import type { AgentRuntimeHarnessInput } from "../../../src/agents/runtime/types.js";
 
@@ -44,8 +47,10 @@ jest.mock("../../../src/agents/runtime/manifest.js", () => ({
 }));
 
 jest.mock("../../../src/agents/runtime/registry.js", () => ({
+  registerSessionProcess: jest.fn(),
   registerStagedAuthContext: jest.fn(),
   teardownRegisteredAuthContext: jest.fn(),
+  unregisterSessionProcess: jest.fn(),
 }));
 
 const stageAgentAuthMock = jest.mocked(stageAgentAuth);
@@ -53,10 +58,12 @@ const captureAgentChatArtifactsMock = jest.mocked(captureAgentChatArtifacts);
 const configureSandboxSettingsMock = jest.mocked(configureSandboxSettings);
 const runAgentProcessMock = jest.mocked(runAgentProcess);
 const writeAgentManifestMock = jest.mocked(writeAgentManifest);
+const registerSessionProcessMock = jest.mocked(registerSessionProcess);
 const registerStagedAuthContextMock = jest.mocked(registerStagedAuthContext);
 const teardownRegisteredAuthContextMock = jest.mocked(
   teardownRegisteredAuthContext,
 );
+const unregisterSessionProcessMock = jest.mocked(unregisterSessionProcess);
 
 const tempRoots: string[] = [];
 
@@ -127,6 +134,8 @@ describe("runSandboxedAgent auth teardown", () => {
       }),
     );
     expect(registerStagedAuthContextMock).toHaveBeenCalledTimes(1);
+    expect(registerSessionProcessMock).not.toHaveBeenCalled();
+    expect(unregisterSessionProcessMock).not.toHaveBeenCalled();
     expect(teardownRegisteredAuthContextMock).toHaveBeenCalledTimes(1);
     expect(teardownRegisteredAuthContextMock).toHaveBeenCalledWith(
       "run-1",
@@ -143,9 +152,44 @@ describe("runSandboxedAgent auth teardown", () => {
     });
 
     expect(registerStagedAuthContextMock).toHaveBeenCalledTimes(1);
+    expect(unregisterSessionProcessMock).not.toHaveBeenCalled();
     expect(teardownRegisteredAuthContextMock).not.toHaveBeenCalled();
   });
+
+  it("keeps a hard-aborted child registered until it actually exits", async () => {
+    const input = await createHarnessInput();
+    const child = createMockChildProcess(4242);
+    runAgentProcessMock.mockImplementation((options) => {
+      options.onSpawnedProcess?.(child);
+      return Promise.resolve({
+        exitCode: 1,
+        signal: "SIGKILL",
+        watchdog: undefined,
+        failFast: undefined,
+      });
+    });
+
+    await runSandboxedAgent(input);
+
+    expect(registerSessionProcessMock).toHaveBeenCalledWith("run-1", child);
+    expect(unregisterSessionProcessMock).not.toHaveBeenCalledWith(
+      "run-1",
+      child,
+    );
+  });
 });
+
+function createMockChildProcess(pid: number) {
+  const child =
+    new EventEmitter() as import("node:child_process").ChildProcess &
+      EventEmitter;
+  Object.assign(child, {
+    pid,
+    exitCode: null,
+    signalCode: null,
+  });
+  return child;
+}
 
 async function createHarnessInput(): Promise<AgentRuntimeHarnessInput> {
   const root = await mkdtemp(join(tmpdir(), "voratiq-harness-"));

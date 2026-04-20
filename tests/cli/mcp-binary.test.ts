@@ -96,7 +96,6 @@ describe("bundled MCP binary smoke", () => {
       "voratiq_message",
       "voratiq_apply",
       "voratiq_list",
-      "voratiq_prune",
     ]);
   }, 120_000);
 });

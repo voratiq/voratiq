@@ -40,7 +40,6 @@ Control operators manage state, inspect results, or apply selected outcomes.
 | -------- | ----------------------------------------- | -------------------------------------------------------- |
 | `apply`  | Apply a selected result into the worktree | Apply the chosen run candidate diff                      |
 | `list`   | Inspect recorded sessions and artifacts   | Reopen the final frame for a message or verify session   |
-| `prune`  | Clean up old state                        | Remove stale run workspaces and artifacts                |
 | `doctor` | Diagnose or repair workspace state        | Bootstrap `.voratiq/` or reconcile managed config safely |
 
 ### Entry
@@ -73,7 +72,6 @@ flowchart LR
   V[verify]
   M[message]
   A[apply]
-  P[prune]
 
   I --> S
   I --> R
@@ -88,7 +86,6 @@ flowchart LR
   D --> V
   M --> V
   V --> A
-  R --> P
 ```
 
 The diagram shows common connections, not one required pipeline.
@@ -151,4 +148,4 @@ Example run session:
 └── ...
 ```
 
-Heavy artifacts can be cleaned up with `voratiq prune`. The session history remains useful as an audit trail.
+Durable run artifacts remain the post-run contract even after workspace scratch state is cleaned up, so recorded history stays usable as an audit trail and as input to follow-on operations like `apply`, `reduce`, and `verify`.

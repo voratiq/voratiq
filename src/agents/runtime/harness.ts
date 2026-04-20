@@ -1,3 +1,4 @@
+import type { ChildProcess } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 
@@ -15,8 +16,10 @@ import {
 import { configureSandboxSettings, runAgentProcess } from "./launcher.js";
 import { writeAgentManifest } from "./manifest.js";
 import {
+  registerSessionProcess,
   registerStagedAuthContext,
   teardownRegisteredAuthContext,
+  unregisterSessionProcess,
 } from "./registry.js";
 import { DEFAULT_DENIAL_BACKOFF } from "./sandbox.js";
 import type {
@@ -64,6 +67,7 @@ export async function runSandboxedAgent(
   let authContext:
     | Awaited<ReturnType<typeof stageAgentAuth>>["context"]
     | undefined;
+  let spawnedProcess: ChildProcess | undefined;
 
   try {
     const staged = await stageAgentAuth({
@@ -115,6 +119,10 @@ export async function runSandboxedAgent(
       providerId,
       denialBackoff,
       onWatchdogTrigger,
+      onSpawnedProcess: (child) => {
+        spawnedProcess = child;
+        registerSessionProcess(sessionId, child);
+      },
     });
 
     const chat = captureChat
@@ -142,6 +150,12 @@ export async function runSandboxedAgent(
       error instanceof Error ? error.message : toErrorMessage(error),
     );
   } finally {
+    if (
+      spawnedProcess &&
+      (spawnedProcess.exitCode !== null || spawnedProcess.signalCode !== null)
+    ) {
+      unregisterSessionProcess(sessionId, spawnedProcess);
+    }
     await rm(promptPath, { force: true }).catch(() => {});
     if (teardownAuthOnExit || !sessionId) {
       await teardownRegisteredAuthContext(

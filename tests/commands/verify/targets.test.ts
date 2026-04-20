@@ -26,25 +26,25 @@ async function writeWorkspaceArtifact(
 }
 
 describe("resolveVerifyTarget (run target)", () => {
-  it("resolves pruned runs instead of rejecting by deletedAt", async () => {
-    const root = await mkdtemp(join(tmpdir(), "voratiq-verify-pruned-target-"));
+  it("resolves succeeded runs with retained artifacts", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-verify-run-target-"));
 
     try {
       await createWorkspace(root);
 
-      const runId = "run-pruned-verify";
-      const specPath = "specs/run-pruned-verify.md";
+      const runId = "run-succeeded-verify";
+      const specPath = "specs/run-succeeded-verify.md";
       const specAbsolute = join(root, specPath);
       await mkdir(dirname(specAbsolute), { recursive: true });
       await writeFile(specAbsolute, "# verify\n", "utf8");
       await writeWorkspaceArtifact(
         root,
-        ".voratiq/run/sessions/run-pruned-verify/agent-a/artifacts/diff.patch",
+        ".voratiq/run/sessions/run-succeeded-verify/agent-a/artifacts/diff.patch",
         "diff --git a/a b/a\n",
       );
       await writeWorkspaceArtifact(
         root,
-        ".voratiq/run/sessions/run-pruned-verify/agent-b/artifacts/diff.patch",
+        ".voratiq/run/sessions/run-succeeded-verify/agent-b/artifacts/diff.patch",
         "diff --git a/a b/a\n",
       );
 
@@ -54,8 +54,7 @@ describe("resolveVerifyTarget (run target)", () => {
         runsFilePath,
         record: createRunRecord({
           runId,
-          status: "pruned",
-          deletedAt: new Date().toISOString(),
+          status: "succeeded",
           spec: { path: specPath },
           agents: [
             createAgentInvocationRecord({ agentId: "agent-b" }),

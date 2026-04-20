@@ -154,20 +154,26 @@ describe("run history writer", () => {
 
     expect(snapshotRunRecordBuffers()).toHaveLength(0);
 
-    const deletedAt = "2025-11-18T18:00:00.000Z";
     await rewriteRunRecord({
       root,
       runsFilePath,
       runId,
       mutate: (record) => ({
         ...record,
-        deletedAt,
+        applyStatus: {
+          agentId: "agent-1",
+          status: "succeeded",
+          appliedAt: "2025-11-18T18:00:00.000Z",
+          ignoredBaseMismatch: false,
+        },
       }),
     });
 
     expect(snapshotRunRecordBuffers()).toHaveLength(0);
     const flushedSnapshot = await readRecord(recordPath);
-    expect(flushedSnapshot.deletedAt).toBe(deletedAt);
+    expect(flushedSnapshot.applyStatus?.appliedAt).toBe(
+      "2025-11-18T18:00:00.000Z",
+    );
   });
 });
 

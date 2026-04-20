@@ -142,6 +142,19 @@ export function mergeAgentRecords(
   existing: AgentInvocationRecord | undefined,
   incoming: AgentInvocationRecord,
 ): AgentInvocationRecord {
+  if (existing?.status === "aborted") {
+    const existingWarnings = existing.warnings ?? [];
+    const abortedByRunTermination =
+      existingWarnings.includes(RUN_ABORT_WARNING);
+    if (
+      abortedByRunTermination &&
+      TERMINAL_AGENT_STATUSES.includes(incoming.status) &&
+      incoming.status !== "aborted"
+    ) {
+      return existing;
+    }
+  }
+
   if (
     existing &&
     TERMINAL_AGENT_STATUSES.includes(existing.status) &&
@@ -217,18 +230,8 @@ function normalizeSnapshotForTermination(
     return record;
   }
 
-  if (!TERMINAL_AGENT_STATUSES.includes(record.status)) {
+  if (!IN_PROGRESS_AGENT_STATUSES.includes(record.status)) {
     return record;
-  }
-
-  if (record.status === "aborted") {
-    return record;
-  }
-
-  if (!record.startedAt || !record.completedAt) {
-    throw new Error(
-      `Terminal agent snapshot for ${record.agentId} is missing canonical lifecycle timestamps.`,
-    );
   }
 
   const warnings = record.warnings ?? [];
@@ -240,8 +243,7 @@ function normalizeSnapshotForTermination(
   return {
     ...record,
     status: "aborted",
-    startedAt: record.startedAt,
-    completedAt: record.completedAt,
     warnings: abortWarnings,
+    error: undefined,
   };
 }

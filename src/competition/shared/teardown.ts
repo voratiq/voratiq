@@ -1,7 +1,13 @@
 import { rm } from "node:fs/promises";
 
 import { toErrorMessage } from "../../utils/errors.js";
-import { getGitStderr, removeWorktree } from "../../utils/git.js";
+import {
+  branchExists,
+  deleteBranch,
+  getGitStderr,
+  pruneWorktrees,
+  removeWorktree,
+} from "../../utils/git.js";
 
 export interface TeardownDiagnostic {
   readonly label: string;
@@ -21,6 +27,13 @@ export type TeardownResource =
       readonly label?: string;
     }
   | {
+      readonly kind: "branch";
+      readonly root: string;
+      readonly branch: string;
+      readonly worktreePath?: string;
+      readonly label?: string;
+    }
+  | {
       readonly kind: "action";
       readonly key: string;
       readonly label: string;
@@ -33,6 +46,12 @@ export interface TeardownController {
   addWorktree(options: {
     root: string;
     worktreePath: string;
+    label?: string;
+  }): void;
+  addBranch(options: {
+    root: string;
+    branch: string;
+    worktreePath?: string;
     label?: string;
   }): void;
   addAction(options: {
@@ -71,6 +90,16 @@ export function createTeardownController(label: string): TeardownController {
         ...(resourceLabel ? { label: resourceLabel } : {}),
       });
     },
+    addBranch(options) {
+      const { root, branch, worktreePath, label: resourceLabel } = options;
+      resources.set(`branch:${root}:${branch}`, {
+        kind: "branch",
+        root,
+        branch,
+        ...(worktreePath ? { worktreePath } : {}),
+        ...(resourceLabel ? { label: resourceLabel } : {}),
+      });
+    },
     addAction(options) {
       resources.set(`action:${options.key}`, {
         kind: "action",
@@ -104,12 +133,28 @@ export async function runTeardown(
   }
 
   const diagnostics: TeardownDiagnostic[] = [];
+  const failedWorktrees = new Set<string>();
   for (const resource of controller.listResources()) {
+    if (
+      resource.kind === "branch" &&
+      resource.worktreePath &&
+      failedWorktrees.has(
+        worktreeResourceKey(resource.root, resource.worktreePath),
+      )
+    ) {
+      continue;
+    }
+
     try {
       await cleanupTeardownResource(resource);
     } catch (error) {
       const label = resourceLabel(resource);
       diagnostics.push({ label, error });
+      if (resource.kind === "worktree") {
+        failedWorktrees.add(
+          worktreeResourceKey(resource.root, resource.worktreePath),
+        );
+      }
       console.warn(
         `[voratiq] Failed to teardown ${controller.label} ${label}: ${toErrorMessage(error)}`,
       );
@@ -117,6 +162,10 @@ export async function runTeardown(
   }
 
   return diagnostics;
+}
+
+function worktreeResourceKey(root: string, worktreePath: string): string {
+  return `${root}:${worktreePath}`;
 }
 
 async function cleanupTeardownResource(
@@ -128,6 +177,9 @@ async function cleanupTeardownResource(
       return;
     case "worktree":
       await cleanupWorktree(resource);
+      return;
+    case "branch":
+      await cleanupBranch(resource);
       return;
     case "action":
       await resource.cleanup();
@@ -145,12 +197,36 @@ async function cleanupWorktree(
     });
     return;
   } catch (error) {
-    if (!isIgnorableMissingWorktreeError(error)) {
-      throw error;
+    try {
+      await rm(resource.worktreePath, { recursive: true, force: true });
+      return;
+    } catch {
+      if (!isIgnorableMissingWorktreeError(error)) {
+        throw error;
+      }
     }
   }
+}
 
-  await rm(resource.worktreePath, { recursive: true, force: true });
+async function cleanupBranch(
+  resource: Extract<TeardownResource, { kind: "branch" }>,
+): Promise<void> {
+  await pruneWorktrees(resource.root);
+  if (!(await branchExists(resource.root, resource.branch))) {
+    return;
+  }
+
+  try {
+    await deleteBranch({
+      root: resource.root,
+      branch: resource.branch,
+    });
+  } catch (error) {
+    if (isIgnorableMissingBranchError(error)) {
+      return;
+    }
+    throw error;
+  }
 }
 
 function isIgnorableMissingWorktreeError(error: unknown): boolean {
@@ -160,6 +236,15 @@ function isIgnorableMissingWorktreeError(error: unknown): boolean {
     stderr.includes("not a working tree") ||
     stderr.includes("does not exist") ||
     stderr.includes("no such file or directory")
+  );
+}
+
+function isIgnorableMissingBranchError(error: unknown): boolean {
+  const stderr = getGitStderr(error)?.toLowerCase() ?? "";
+  return (
+    stderr.includes("not found") ||
+    stderr.includes("unknown branch") ||
+    (stderr.includes("branch") && stderr.includes("not exist"))
   );
 }
 
@@ -173,6 +258,8 @@ function resourceLabel(resource: TeardownResource): string {
       return `path \`${resource.path}\``;
     case "worktree":
       return `worktree \`${resource.worktreePath}\``;
+    case "branch":
+      return `branch \`${resource.branch}\``;
     case "action":
       return `resource \`${resource.label}\``;
   }

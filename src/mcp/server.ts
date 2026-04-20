@@ -12,8 +12,6 @@ import {
   externalInspectionOperatorSchema,
   type ExternalMessageExecutionInput,
   externalMessageExecutionInputSchema,
-  type ExternalPruneExecutionInput,
-  externalPruneExecutionInputSchema,
   type ExternalReduceExecutionInput,
   externalReduceExecutionInputSchema,
   type ExternalRunExecutionInput,
@@ -78,8 +76,7 @@ export type VoratiqMcpExecutionToolName =
   | "voratiq_reduce"
   | "voratiq_verify"
   | "voratiq_message"
-  | "voratiq_apply"
-  | "voratiq_prune";
+  | "voratiq_apply";
 
 export type VoratiqMcpToolName = VoratiqMcpExecutionToolName | "voratiq_list";
 
@@ -90,8 +87,7 @@ export type VoratiqMcpOperator =
   | "verify"
   | "message"
   | "apply"
-  | "list"
-  | "prune";
+  | "list";
 
 type SwarmExecutionOperator = "spec" | "run" | "reduce" | "verify" | "message";
 
@@ -306,17 +302,6 @@ const toolSpecs: readonly ToolSpec[] = [
       buildListInspectionArgs(input as McpListInspectionInput),
     outputContract: "list",
   },
-  {
-    name: "voratiq_prune",
-    operator: "prune",
-    description:
-      "Prune Voratiq run workspaces or all pruneable run state after confirmation.",
-    inputSchemaSource: externalPruneExecutionInputSchema,
-    mcpInputSchema: createPruneMcpInputSchema(),
-    buildArgs: (input) =>
-      buildPruneExecutionArgs(input as ExternalPruneExecutionInput),
-    outputContract: "execution",
-  },
 ] as const;
 
 const toolDefinitions: readonly McpToolDefinition[] = toolSpecs.map((tool) => ({
@@ -337,7 +322,7 @@ Voratiq is a workflow system built around composable operators that launch, eval
 Voratiq operators fall into two main classes:
 
 - **Swarm operators** dispatch agents to produce, synthesize, or evaluate work: spec, run, reduce, verify, message
-- **Control operators** inspect state or mutate accepted outcomes: apply, list, prune
+- **Control operators** inspect state or mutate accepted outcomes: apply, list
 
 ## Swarm Operators
 
@@ -356,8 +341,6 @@ Voratiq operators fall into two main classes:
 **list** – Lists or inspects recorded sessions for a given operator. This is the primary way to inspect swarm sessions; use it to poll progress, retrieve session IDs, and inspect recorded workflow state.
 
 **apply** – Applies an accepted run diff into the current working tree. Synchronous and non-durable; only invoke after verifying that the target run is in an acceptable state.
-
-**prune** – Removes pruneable run workspaces or all pruneable state. Synchronous and non-durable; requires explicit confirmation.
 
 ## Workflow Composition
 
@@ -392,7 +375,7 @@ The maxParallel field controls the maximum number of agent recipients running in
 Commit to one workflow objective per session; do not interleave unrelated operator calls in the same sequence. Wait for stage boundaries before acting on results: read voratiq_list output before proceeding from one stage to the next. Use voratiq_list as the primary control plane for inspecting recorded state rather than reading session files directly.` as const;
 
 const VORATIQ_MCP_SERVER_INSTRUCTIONS =
-  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, verify, message, or interactive sessions. The swarm operators (voratiq_spec, voratiq_run, voratiq_reduce, voratiq_verify, voratiq_message) create recorded sessions and may acknowledge before finishing; once launched, treat the session as the unit of work. If a swarm call times out or returns a non-terminal status, inspect progress with voratiq_list instead of retrying. Use voratiq_apply and voratiq_prune for synchronous control actions. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
+  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, verify, message, or interactive sessions. The swarm operators (voratiq_spec, voratiq_run, voratiq_reduce, voratiq_verify, voratiq_message) create recorded sessions and may acknowledge before finishing; once launched, treat the session as the unit of work. If a swarm call times out or returns a non-terminal status, inspect progress with voratiq_list instead of retrying. Use voratiq_apply for synchronous control actions. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
 
 const toolSpecsByName: ReadonlyMap<VoratiqMcpToolName, ToolSpec> = new Map(
   toolSpecs.map((tool) => [tool.name, tool]),
@@ -1004,16 +987,6 @@ function buildApplyExecutionArgs(input: ExternalApplyExecutionInput): string[] {
   return args;
 }
 
-function buildPruneExecutionArgs(input: ExternalPruneExecutionInput): string[] {
-  const args =
-    input.scope === "all"
-      ? ["prune", "--all"]
-      : ["prune", "--run", input.runId];
-  appendOptionalTrueFlag(args, "--purge", input.purge);
-  args.push("--yes", "--json");
-  return args;
-}
-
 function buildListInspectionArgs(input: McpListInspectionInput): string[] {
   const args = ["list", `--${input.operator}`];
   if (input.mode === "detail") {
@@ -1332,25 +1305,6 @@ function toToolInputJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   }) as Record<string, unknown>;
   delete jsonSchema.$schema;
   return jsonSchema;
-}
-
-function createPruneMcpInputSchema(): Record<string, unknown> {
-  return toToolInputJsonSchema(
-    z
-      .object({
-        scope: z.enum(["run", "all"]),
-        runId: z
-          .string()
-          .min(1)
-          .optional()
-          .describe("Required when scope is `run`."),
-        purge: z.boolean().optional(),
-        confirmed: z
-          .literal(true)
-          .describe("Must be true to confirm prune operations."),
-      })
-      .strict(),
-  );
 }
 
 function createListMcpInputSchema(): Record<string, unknown> {

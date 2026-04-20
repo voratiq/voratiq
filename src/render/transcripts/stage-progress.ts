@@ -7,8 +7,7 @@ export type StageProgressStatus =
   | "failed"
   | "errored"
   | "aborted"
-  | "skipped"
-  | "pruned";
+  | "skipped";
 
 export interface StageProgressBeginEvent<TContext extends object> {
   type: "stage.begin";

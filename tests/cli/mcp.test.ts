@@ -91,7 +91,7 @@ describe("bundled MCP server", () => {
     process.env.PATH = originalPath;
   });
 
-  it("exposes exactly eight tool definitions with contract-derived schemas", () => {
+  it("exposes exactly seven tool definitions with contract-derived schemas", () => {
     const definitions = getVoratiqMcpToolDefinitions();
     expect(definitions.map((definition) => definition.name)).toEqual([
       "voratiq_spec",
@@ -101,7 +101,6 @@ describe("bundled MCP server", () => {
       "voratiq_message",
       "voratiq_apply",
       "voratiq_list",
-      "voratiq_prune",
     ]);
 
     const expectedInputSchemas = {
@@ -111,30 +110,6 @@ describe("bundled MCP server", () => {
       voratiq_verify: toInputSchema(externalVerifyExecutionInputSchema),
       voratiq_message: toInputSchema(externalMessageExecutionInputSchema),
       voratiq_apply: toInputSchema(externalApplyExecutionInputSchema),
-      voratiq_prune: {
-        type: "object",
-        properties: {
-          scope: {
-            type: "string",
-            enum: ["run", "all"],
-          },
-          runId: {
-            type: "string",
-            minLength: 1,
-            description: "Required when scope is `run`.",
-          },
-          purge: {
-            type: "boolean",
-          },
-          confirmed: {
-            type: "boolean",
-            const: true,
-            description: "Must be true to confirm prune operations.",
-          },
-        },
-        required: ["scope", "confirmed"],
-        additionalProperties: false,
-      },
       voratiq_list: {
         type: "object",
         properties: {
@@ -229,7 +204,6 @@ describe("bundled MCP server", () => {
       "voratiq_message",
       "voratiq_apply",
       "voratiq_list",
-      "voratiq_prune",
     ]);
     expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
   });
@@ -269,7 +243,7 @@ describe("bundled MCP server", () => {
       params: {},
     });
     const tools = expectSuccess<ToolListResult>(toolsResponse);
-    expect(tools.tools).toHaveLength(8);
+    expect(tools.tools).toHaveLength(7);
     expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
   });
 
@@ -299,7 +273,7 @@ describe("bundled MCP server", () => {
       params: {},
     });
     const tools = expectSuccess<ToolListResult>(toolsResponse);
-    expect(tools.tools).toHaveLength(8);
+    expect(tools.tools).toHaveLength(7);
     expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
   });
 
@@ -379,7 +353,7 @@ describe("bundled MCP server", () => {
       jsonrpc: "2.0",
       method: "notifications/tools/list_changed",
     });
-    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(8);
+    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(7);
     expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
   });
 
@@ -430,7 +404,7 @@ describe("bundled MCP server", () => {
       jsonrpc: "2.0",
       method: "notifications/tools/list_changed",
     });
-    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(8);
+    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(7);
   });
 
   it("accepts newline-delimited JSON-RPC requests and replies with newline-delimited JSON", async () => {
@@ -474,7 +448,7 @@ describe("bundled MCP server", () => {
       jsonrpc: "2.0",
       method: "notifications/tools/list_changed",
     });
-    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(8);
+    expect(expectSuccess<ToolListResult>(responses[2]).tools).toHaveLength(7);
   });
 
   it("routes execution tools through voratiq <operator> --json and returns envelope output", async () => {
@@ -890,31 +864,6 @@ describe("bundled MCP server", () => {
     expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
   });
 
-  it("rejects prune without confirmed: true as invalid_input before spawning", async () => {
-    const invokeCliJsonContractMock =
-      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>;
-    const handler = await createInitializedHandler(invokeCliJsonContractMock);
-
-    const response = await handler.handleRequest({
-      jsonrpc: "2.0",
-      id: 6,
-      method: "tools/call",
-      params: {
-        name: "voratiq_prune",
-        arguments: {
-          scope: "all",
-        },
-      },
-    });
-    const result = expectSuccess<CallToolResult>(response);
-    const failure = result.structuredContent as TransportFailureResult;
-
-    expect(failure.failureKind).toBe("invalid_input");
-    expect(failure.operator).toBe("prune");
-    expect(result.isError).toBe(true);
-    expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
-  });
-
   it.each([
     {
       name: "spawn_failed",
@@ -1214,12 +1163,11 @@ describe("bundled MCP server", () => {
     expect(text).toContain("message");
     expect(text).toContain("list");
     expect(text).toContain("apply");
-    expect(text).toContain("prune");
     expect(text).toContain("extraContext");
     expect(text).toContain("maxParallel");
     expect(text).toContain("durable");
     expect(text).toContain("spec, run, reduce, verify, message");
-    expect(text).toContain("apply, list, prune");
+    expect(text).toContain("apply, list");
   });
 
   it("resources/read returns a JSON-RPC error for an unknown URI", async () => {

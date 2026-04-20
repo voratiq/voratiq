@@ -27,7 +27,6 @@ const runStatusStyles: Record<RunStatus, StatusStyle> = {
   failed: { cli: "red" },
   errored: { cli: "red" },
   aborted: { cli: "yellow" },
-  pruned: { cli: "gray" },
   running: { cli: "cyan" },
   queued: { cli: "gray" },
 };

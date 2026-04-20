@@ -2,7 +2,7 @@ import type {
   AgentInvocationRecord,
   RunReport,
 } from "../../domain/run/model/types.js";
-import { TERMINAL_RUN_STATUSES } from "../../status/index.js";
+import { type RunStatus, TERMINAL_RUN_STATUSES } from "../../status/index.js";
 import { formatCompactDiffStatistics } from "../../utils/diff.js";
 import {
   formatAgentDuration,
@@ -77,7 +77,7 @@ export interface RunTranscriptAgentRecord {
 
 export interface RunTranscriptOptions {
   runId: string;
-  status: RunReport["status"];
+  status: RunStatus;
   workspacePath: string;
   createdAt: string;
   startedAt?: string;
@@ -92,7 +92,7 @@ const DASH = "—";
 
 export function formatRunElapsed(
   source: {
-    status: RunReport["status"];
+    status: RunStatus;
     startedAt?: string;
     completedAt?: string;
   },

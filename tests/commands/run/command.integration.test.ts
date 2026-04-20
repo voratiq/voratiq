@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { executeRunCommand } from "../../../src/commands/run/command.js";
 import {
+  clearActiveRun,
   finalizeActiveRun,
+  markActiveRunRecordPersisted,
   registerActiveRun,
 } from "../../../src/commands/run/lifecycle.js";
 import { initializeRunRecord } from "../../../src/commands/run/record-init.js";
@@ -15,7 +17,10 @@ import type { ResolvedExtraContextFile } from "../../../src/competition/shared/e
 import type { AgentDefinition } from "../../../src/configs/agents/types.js";
 import { executeAgents } from "../../../src/domain/run/competition/agent-execution.js";
 import type { AgentExecutionPhaseResult } from "../../../src/domain/run/competition/phases.js";
-import { toRunReport } from "../../../src/domain/run/competition/reports.js";
+import {
+  toAgentReport,
+  toRunReport,
+} from "../../../src/domain/run/competition/reports.js";
 import { generateRunId } from "../../../src/domain/run/model/id.js";
 import {
   type AgentRecordMutators,
@@ -28,7 +33,10 @@ import type {
   RunRecord,
   RunReport,
 } from "../../../src/domain/run/model/types.js";
-import { rewriteRunRecord } from "../../../src/domain/run/persistence/adapter.js";
+import {
+  flushRunRecordBuffer,
+  rewriteRunRecord,
+} from "../../../src/domain/run/persistence/adapter.js";
 import { prepareRunWorkspace } from "../../../src/workspace/run.js";
 
 jest.mock("../../../src/commands/run/validation.js", () => ({
@@ -67,11 +75,14 @@ jest.mock("../../../src/domain/run/persistence/adapter.js", () => ({
 }));
 
 jest.mock("../../../src/domain/run/competition/reports.js", () => ({
+  toAgentReport: jest.fn(),
   toRunReport: jest.fn(),
 }));
 
 jest.mock("../../../src/commands/run/lifecycle.js", () => ({
+  clearActiveRun: jest.fn(),
   registerActiveRun: jest.fn(),
+  markActiveRunRecordPersisted: jest.fn(),
   finalizeActiveRun: jest.fn(),
 }));
 
@@ -89,9 +100,15 @@ const initializeRunRecordMock = jest.mocked(initializeRunRecord);
 const createAgentRecordMutatorsMock = jest.mocked(createAgentRecordMutators);
 const mergeAgentRecordsMock = jest.mocked(mergeAgentRecords);
 const executeAgentsMock = jest.mocked(executeAgents);
+const flushRunRecordBufferMock = jest.mocked(flushRunRecordBuffer);
 const rewriteRunRecordMock = jest.mocked(rewriteRunRecord);
+const toAgentReportMock = jest.mocked(toAgentReport);
 const toRunReportMock = jest.mocked(toRunReport);
+const clearActiveRunMock = jest.mocked(clearActiveRun);
 const registerActiveRunMock = jest.mocked(registerActiveRun);
+const markActiveRunRecordPersistedMock = jest.mocked(
+  markActiveRunRecordPersisted,
+);
 const finalizeActiveRunMock = jest.mocked(finalizeActiveRun);
 const resolveStageCompetitorsMock = jest.mocked(resolveStageCompetitors);
 const generateRunIdMock = jest.mocked(generateRunId);
@@ -108,7 +125,26 @@ function buildUnavailableTokenUsageResult(modelId = "unknown") {
 describe("executeRunCommand integration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    markActiveRunRecordPersistedMock.mockReset();
     finalizeActiveRunMock.mockResolvedValue(undefined);
+    flushRunRecordBufferMock.mockResolvedValue(undefined);
+    toAgentReportMock.mockImplementation((_runId, record, derivations) => ({
+      agentId: record.agentId,
+      status: record.status,
+      tokenUsage: record.tokenUsage ?? derivations.tokenUsage,
+      tokenUsageResult: derivations.tokenUsageResult,
+      runtimeManifestPath: `/repo/${record.agentId}.manifest.json`,
+      baseDirectory: `/repo/${record.agentId}`,
+      assets: {},
+      startedAt: record.startedAt ?? "2025-11-10T00:00:00.000Z",
+      completedAt:
+        record.completedAt ?? record.startedAt ?? "2025-11-10T00:00:00.000Z",
+      diffStatistics: derivations.diffStatistics,
+      error: record.error,
+      warnings: record.warnings,
+      diffAttempted: derivations.diffAttempted,
+      diffCaptured: derivations.diffCaptured,
+    }));
     mergeAgentRecordsMock.mockImplementation(
       (
         existing: AgentInvocationRecord | undefined,
@@ -172,7 +208,6 @@ describe("executeRunCommand integration", () => {
       createdAt,
       startedAt: createdAt,
       agents: [],
-      deletedAt: null,
     };
     initializeRunRecordMock.mockResolvedValue({
       initialRecord,
@@ -275,6 +310,50 @@ describe("executeRunCommand integration", () => {
         ],
       }),
     );
+    const registerOrder =
+      registerActiveRunMock.mock.invocationCallOrder[0] ??
+      Number.POSITIVE_INFINITY;
+    const initializeOrder =
+      initializeRunRecordMock.mock.invocationCallOrder[0] ??
+      Number.NEGATIVE_INFINITY;
+    expect(registerOrder).toBeLessThan(initializeOrder);
+    const registeredContext = registerActiveRunMock.mock.calls[0]?.[0];
+    expect(registeredContext?.teardown?.listResources()).toEqual([
+      {
+        kind: "action",
+        key: "run-auth:run-xyz",
+        label: "session auth",
+        cleanup: expect.any(Function),
+      },
+      {
+        kind: "worktree",
+        root: "/repo",
+        worktreePath: "/repo/.voratiq/run/sessions/run-xyz/alpha/workspace",
+        label: "alpha workspace",
+      },
+      {
+        kind: "path",
+        path: "/repo/.voratiq/run/sessions/run-xyz/alpha/context",
+        label: "alpha context",
+      },
+      {
+        kind: "path",
+        path: "/repo/.voratiq/run/sessions/run-xyz/alpha/runtime",
+        label: "alpha runtime",
+      },
+      {
+        kind: "path",
+        path: "/repo/.voratiq/run/sessions/run-xyz/alpha/sandbox",
+        label: "alpha sandbox",
+      },
+      {
+        kind: "branch",
+        root: "/repo",
+        branch: "voratiq/run/run-xyz/alpha",
+        worktreePath: "/repo/.voratiq/run/sessions/run-xyz/alpha/workspace",
+        label: "alpha branch",
+      },
+    ]);
     expect(executeAgentsMock).toHaveBeenCalledWith(
       expect.objectContaining({
         runId: "run-xyz",
@@ -283,8 +362,246 @@ describe("executeRunCommand integration", () => {
       }),
     );
     expect(rewriteRunRecordMock).toHaveBeenCalled();
+    expect(flushRunRecordBufferMock).toHaveBeenCalledWith({
+      runsFilePath: "/repo/runs.json",
+      runId: "run-xyz",
+    });
     expect(finalizeActiveRunMock).toHaveBeenCalledWith("run-xyz");
+    const flushOrder =
+      flushRunRecordBufferMock.mock.invocationCallOrder[0] ??
+      Number.POSITIVE_INFINITY;
+    const finalizeOrder =
+      finalizeActiveRunMock.mock.invocationCallOrder[0] ??
+      Number.NEGATIVE_INFINITY;
+    expect(flushOrder).toBeLessThan(finalizeOrder);
     expect(report).toEqual(runReport);
+  });
+
+  it("still finalizes teardown when flushing the run record buffer fails", async () => {
+    generateRunIdMock.mockReturnValue("run-flush-fail");
+    validateAndPrepareMock.mockResolvedValue({
+      specContent: "Implement feature",
+      specTarget: { kind: "file" },
+      baseRevisionSha: "abc123",
+      agents: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+      effectiveMaxParallel: 1,
+      environment: {},
+    });
+    prepareRunWorkspaceMock.mockResolvedValue({
+      runWorkspace: {
+        absolute: "/tmp/run-workspace",
+        relative: ".voratiq/run/sessions/run-flush-fail",
+      },
+    });
+    initializeRunRecordMock.mockResolvedValue({
+      initialRecord: {
+        runId: "run-flush-fail",
+        baseRevisionSha: "abc123",
+        rootPath: ".",
+        spec: { path: "spec.md" },
+        status: "running",
+        createdAt: "2025-11-10T00:00:00.000Z",
+        startedAt: "2025-11-10T00:00:00.000Z",
+        agents: [],
+      },
+      recordPersisted: true,
+    });
+    createAgentRecordMutatorsMock.mockReturnValue({
+      recordAgentQueued: jest.fn(() => Promise.resolve()),
+      recordAgentSnapshot: jest.fn(() => Promise.resolve()),
+    });
+    executeAgentsMock.mockResolvedValue({
+      agentRecords: [
+        {
+          agentId: "alpha",
+          model: "claude-3",
+          status: "succeeded",
+        },
+      ],
+      agentReports: [
+        {
+          agentId: "alpha",
+          status: "succeeded",
+          tokenUsageResult: buildUnavailableTokenUsageResult("claude-3"),
+          runtimeManifestPath: "/repo/agent.json",
+          baseDirectory: "/repo/agent",
+          assets: {
+            stdoutPath: "/repo/stdout.log",
+            stderrPath: "/repo/stderr.log",
+          },
+          startedAt: "2025-11-10T00:00:00.000Z",
+          completedAt: "2025-11-10T00:10:00.000Z",
+          diffAttempted: false,
+          diffCaptured: false,
+        },
+      ],
+      hadAgentFailure: false,
+    });
+    rewriteRunRecordMock.mockResolvedValue({
+      runId: "run-flush-fail",
+      baseRevisionSha: "abc123",
+      rootPath: ".",
+      spec: { path: "spec.md" },
+      status: "succeeded",
+      createdAt: "2025-11-10T00:00:00.000Z",
+      agents: [],
+    });
+    toRunReportMock.mockReturnValue({
+      runId: "run-flush-fail",
+      spec: { path: "spec.md" },
+      status: "succeeded",
+      createdAt: "2025-11-10T00:00:00.000Z",
+      baseRevisionSha: "abc123",
+      agents: [],
+      hadAgentFailure: false,
+    });
+    flushRunRecordBufferMock.mockRejectedValue(new Error("flush failed"));
+
+    await expect(
+      executeRunCommand({
+        root: "/repo",
+        runsFilePath: "/repo/runs.json",
+        specAbsolutePath: "/repo/spec.md",
+        specDisplayPath: "spec.md",
+      }),
+    ).rejects.toThrow("flush failed");
+
+    expect(finalizeActiveRunMock).toHaveBeenCalledWith("run-flush-fail");
+  });
+
+  it("clears the active run when initial record persistence fails", async () => {
+    generateRunIdMock.mockReturnValue("run-init-fail");
+    validateAndPrepareMock.mockResolvedValue({
+      specContent: "Implement feature",
+      specTarget: { kind: "file" },
+      baseRevisionSha: "abc123",
+      agents: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+      effectiveMaxParallel: 1,
+      environment: {},
+    });
+    prepareRunWorkspaceMock.mockResolvedValue({
+      runWorkspace: {
+        absolute: "/tmp/run-workspace",
+        relative: ".voratiq/run/sessions/run-init-fail",
+      },
+    });
+    initializeRunRecordMock.mockRejectedValue(new Error("init failed"));
+
+    await expect(
+      executeRunCommand({
+        root: "/repo",
+        runsFilePath: "/repo/runs.json",
+        specAbsolutePath: "/repo/spec.md",
+        specDisplayPath: "spec.md",
+      }),
+    ).rejects.toThrow("init failed");
+
+    expect(registerActiveRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({ runId: "run-init-fail" }),
+    );
+    expect(clearActiveRunMock).toHaveBeenCalledWith("run-init-fail");
+    expect(finalizeActiveRunMock).not.toHaveBeenCalled();
+  });
+
+  it("returns the run report when post-run cleanup fails after success", async () => {
+    generateRunIdMock.mockReturnValue("run-cleanup-warn");
+    const validationResult: ValidationResult = {
+      specContent: "Implement feature",
+      specTarget: { kind: "file" },
+      baseRevisionSha: "abc123",
+      agents: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+      effectiveMaxParallel: 1,
+      environment: {},
+    };
+    validateAndPrepareMock.mockResolvedValue(validationResult);
+    prepareRunWorkspaceMock.mockResolvedValue({
+      runWorkspace: {
+        absolute: "/tmp/run-workspace",
+        relative: ".voratiq/run/sessions/run-cleanup-warn",
+      },
+    });
+    initializeRunRecordMock.mockResolvedValue({
+      initialRecord: {
+        runId: "run-cleanup-warn",
+        baseRevisionSha: "abc123",
+        rootPath: ".",
+        spec: { path: "spec.md" },
+        status: "running",
+        createdAt: "2025-11-10T00:00:00.000Z",
+        startedAt: "2025-11-10T00:00:00.000Z",
+        agents: [],
+      },
+      recordPersisted: true,
+    });
+    createAgentRecordMutatorsMock.mockReturnValue({
+      recordAgentQueued: jest.fn(() => Promise.resolve()),
+      recordAgentSnapshot: jest.fn(() => Promise.resolve()),
+    });
+    executeAgentsMock.mockResolvedValue({
+      agentRecords: [],
+      agentReports: [],
+      hadAgentFailure: false,
+    });
+    rewriteRunRecordMock.mockResolvedValue({
+      runId: "run-cleanup-warn",
+      baseRevisionSha: "abc123",
+      rootPath: ".",
+      spec: { path: "spec.md" },
+      status: "succeeded",
+      createdAt: "2025-11-10T00:00:00.000Z",
+      agents: [],
+    });
+    const report: RunReport = {
+      runId: "run-cleanup-warn",
+      spec: { path: "spec.md" },
+      status: "succeeded",
+      createdAt: "2025-11-10T00:00:00.000Z",
+      baseRevisionSha: "abc123",
+      agents: [],
+      hadAgentFailure: false,
+    };
+    toRunReportMock.mockReturnValue(report);
+    finalizeActiveRunMock.mockRejectedValue(new Error("cleanup failed"));
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(
+      executeRunCommand({
+        root: "/repo",
+        runsFilePath: "/repo/runs.json",
+        specAbsolutePath: "/repo/spec.md",
+        specDisplayPath: "spec.md",
+      }),
+    ).resolves.toEqual(report);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("post-run cleanup failed: cleanup failed"),
+    );
+
+    warnSpy.mockRestore();
   });
 
   it("preserves richer persisted agent artifacts when finalizing the run record", async () => {
@@ -325,7 +642,6 @@ describe("executeRunCommand integration", () => {
         createdAt,
         startedAt: createdAt,
         agents: [],
-        deletedAt: null,
       },
       recordPersisted: true,
     });
@@ -386,7 +702,6 @@ describe("executeRunCommand integration", () => {
           },
         },
       ],
-      deletedAt: null,
     };
     rewriteRunRecordMock.mockImplementation(({ mutate }) => {
       currentRecord = mutate(currentRecord);
@@ -487,7 +802,6 @@ describe("executeRunCommand integration", () => {
       createdAt,
       startedAt: createdAt,
       agents: [],
-      deletedAt: null,
     };
     initializeRunRecordMock.mockResolvedValue({
       initialRecord,
@@ -646,7 +960,6 @@ describe("executeRunCommand integration", () => {
       createdAt,
       startedAt: createdAt,
       agents: [],
-      deletedAt: null,
     };
     initializeRunRecordMock.mockResolvedValue({
       initialRecord,
@@ -780,7 +1093,6 @@ describe("executeRunCommand integration", () => {
       createdAt,
       startedAt: createdAt,
       agents: [],
-      deletedAt: null,
     };
     initializeRunRecordMock.mockResolvedValue({
       initialRecord,
@@ -849,7 +1161,6 @@ describe("executeRunCommand integration", () => {
           warnings: ["Run aborted before agent completed."],
         },
       ],
-      deletedAt: null,
     };
 
     let mutatedRecord: RunRecord | undefined;
@@ -880,8 +1191,16 @@ describe("executeRunCommand integration", () => {
     expect(mutatedRecord).toBe(abortedSnapshot);
     expect(toRunReportMock).toHaveBeenCalledWith(
       abortedSnapshot,
-      executionResult.agentReports,
-      executionResult.hadAgentFailure,
+      [
+        expect.objectContaining({
+          agentId: "alpha",
+          status: "aborted",
+          warnings: ["Run aborted before agent completed."],
+          startedAt: "2025-11-10T00:00:00.000Z",
+          completedAt: "2025-11-10T00:05:00.000Z",
+        }),
+      ],
+      false,
     );
     expect(report).toEqual(runReport);
   });
@@ -919,7 +1238,6 @@ describe("executeRunCommand integration", () => {
       createdAt: "2025-11-10T00:00:00.000Z",
       startedAt: "2025-11-10T00:00:00.000Z",
       agents: [],
-      deletedAt: null,
     };
     initializeRunRecordMock.mockResolvedValue({
       initialRecord,
@@ -1042,7 +1360,6 @@ describe("executeRunCommand integration", () => {
         createdAt: "2025-11-10T00:00:00.000Z",
         startedAt: "2025-11-10T00:00:00.000Z",
         agents: [],
-        deletedAt: null,
       },
       recordPersisted: true,
     });

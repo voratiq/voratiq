@@ -1,3 +1,4 @@
+import { terminateSessionProcesses } from "../../agents/runtime/registry.js";
 import type { TeardownController } from "../../competition/shared/teardown.js";
 import { runTeardown } from "../../competition/shared/teardown.js";
 import {
@@ -26,6 +27,8 @@ interface ActiveRunContext {
   root: string;
   runsFilePath: string;
   runId: string;
+  recordPersisted?: boolean;
+  recordInitPromise?: Promise<boolean>;
   teardown?: TeardownController;
   agents?: readonly ActiveRunAgentContext[];
 }
@@ -35,6 +38,8 @@ interface ActiveRunAgentContext {
   providerId?: string;
   agentRoot: string;
 }
+
+const RUN_RECORD_INIT_TERMINATION_WAIT_MS = 250;
 
 let activeRun: ActiveRunContext | undefined;
 let terminationInFlight = false;
@@ -46,10 +51,18 @@ export function registerActiveRun(context: ActiveRunContext): void {
   clearRegisteredRunTeardown = registerActiveSessionTeardown({
     key: `run:${context.runId}`,
     label: "run",
-    terminate: async (status) => {
-      await terminateActiveRun(status);
+    terminate: async (status, reason) => {
+      await terminateActiveRun(status, reason);
     },
   });
+}
+
+export function markActiveRunRecordPersisted(runId: string): void {
+  if (!activeRun || activeRun.runId !== runId) {
+    return;
+  }
+
+  activeRun.recordPersisted = true;
 }
 
 export function clearActiveRun(runId: string): void {
@@ -68,6 +81,7 @@ export { getActiveTerminationStatus, RUN_ABORT_WARNING };
 
 export async function terminateActiveRun(
   status: Extract<RunStatus, (typeof TERMINABLE_RUN_STATUSES)[number]>,
+  detail?: string,
 ): Promise<void> {
   if (!TERMINABLE_RUN_STATUSES.includes(status)) {
     return;
@@ -82,88 +96,90 @@ export async function terminateActiveRun(
   setActiveTerminationStatus(context.runId, status);
   let finalized = false;
   const chatArtifactsByAgent: Map<string, ChatArtifactFormat> = new Map();
+  const pendingAgentIdsAtTermination =
+    await loadPendingAgentIdsForTermination(context);
   let persistenceError: Error | undefined;
 
-  if (status === "aborted") {
-    await captureChatArtifactsBeforeAbort(context, chatArtifactsByAgent);
+  try {
+    await terminateSessionProcesses(context.runId);
+  } catch (error) {
+    const processTerminationError =
+      error instanceof Error ? error : new Error(String(error));
+    console.error(
+      `[voratiq] Failed to terminate run ${context.runId} agent processes: ${toErrorMessage(error)}`,
+    );
+    clearRegisteredRunTeardown?.();
+    clearRegisteredRunTeardown = undefined;
+    terminationInFlight = false;
+    setActiveTerminationStatus(context.runId, undefined);
+    activeRun = undefined;
+    throw processTerminationError;
   }
 
+  if (status === "aborted" || status === "failed") {
+    await captureChatArtifactsBeforeTermination(
+      context,
+      chatArtifactsByAgent,
+      pendingAgentIdsAtTermination,
+    );
+  }
+
+  const recordPersisted = await resolveRunRecordPersistence(context);
+
   try {
-    await rewriteRunRecord({
-      ...context,
-      mutate: (existing) => {
-        const completedAt = new Date().toISOString();
-        const runInProgress =
-          existing.status === "running" || existing.status === "queued";
-        const runStatusNeedsUpdate =
-          runInProgress && existing.status !== status;
+    if (recordPersisted) {
+      await rewriteRunRecord({
+        ...context,
+        mutate: (existing) => {
+          const completedAt = new Date().toISOString();
+          const finalAgentStatus: "failed" | "aborted" =
+            status === "aborted" ? "aborted" : "failed";
+          const runInProgress =
+            existing.status === "running" || existing.status === "queued";
+          const runStatusNeedsUpdate =
+            runInProgress && existing.status !== status;
 
-        let agentsChanged = false;
-        let agents = existing.agents;
-
-        if (status === "aborted") {
-          const abortWarning = RUN_ABORT_WARNING;
-          agents = existing.agents.map((agent): AgentInvocationRecord => {
-            if (agent.status !== "running" && agent.status !== "queued") {
-              return agent;
+          let agentsChanged = false;
+          const agents = existing.agents.map((agent): AgentInvocationRecord => {
+            const finalizedAgent = finalizeRunAgent({
+              agent,
+              status: finalAgentStatus,
+              completedAt,
+              detail,
+              chatArtifactsByAgent,
+              pendingAgentIdsAtTermination,
+            });
+            if (finalizedAgent !== agent) {
+              agentsChanged = true;
             }
+            return finalizedAgent;
+          });
 
-            agentsChanged = true;
+          if (!runStatusNeedsUpdate && !agentsChanged) {
+            return existing;
+          }
 
-            const warnings = agent.warnings ?? [];
-            const nextWarnings = warnings.includes(abortWarning)
-              ? warnings
-              : [...warnings, abortWarning];
-
-            const chatFormat = chatArtifactsByAgent.get(agent.agentId);
-            const nextArtifacts =
-              chatFormat !== undefined
-                ? {
-                    ...(agent.artifacts ?? {}),
-                    chatCaptured: true,
-                    chatFormat,
-                  }
-                : agent.artifacts;
-
+          if (runStatusNeedsUpdate) {
             return {
-              ...agent,
-              status: "aborted",
-              ...buildOperationLifecycleCompleteFields({
-                existing: agent,
-                startedAt: agent.startedAt ?? completedAt,
+              ...existing,
+              status,
+              ...buildRecordLifecycleCompleteFields({
+                existing,
+                startedAt: existing.startedAt ?? completedAt,
                 completedAt,
               }),
-              warnings: nextWarnings,
-              artifacts: nextArtifacts,
+              agents,
             };
-          });
-        }
+          }
 
-        if (!runStatusNeedsUpdate && !agentsChanged) {
-          return existing;
-        }
-
-        if (runStatusNeedsUpdate) {
           return {
             ...existing,
-            status,
-            ...buildRecordLifecycleCompleteFields({
-              existing,
-              startedAt: existing.startedAt ?? completedAt,
-              completedAt,
-            }),
-            deletedAt: null,
             agents,
           };
-        }
-
-        return {
-          ...existing,
-          agents,
-        };
-      },
-    });
-    finalized = true;
+        },
+      });
+      finalized = true;
+    }
   } catch (error) {
     persistenceError =
       error instanceof Error ? error : new Error(String(error));
@@ -204,6 +220,43 @@ export async function terminateActiveRun(
   }
 }
 
+async function resolveRunRecordPersistence(
+  context: ActiveRunContext,
+): Promise<boolean> {
+  if (context.recordPersisted) {
+    return true;
+  }
+
+  if (!context.recordInitPromise) {
+    return true;
+  }
+
+  try {
+    const timeoutResult = Symbol("record-init-timeout");
+    const persisted = await Promise.race<boolean | typeof timeoutResult>([
+      context.recordInitPromise,
+      new Promise<typeof timeoutResult>((resolve) => {
+        setTimeout(
+          () => resolve(timeoutResult),
+          RUN_RECORD_INIT_TERMINATION_WAIT_MS,
+        );
+      }),
+    ]);
+
+    if (persisted === timeoutResult) {
+      console.warn(
+        `[voratiq] Timed out waiting for run ${context.runId} initial record persistence during termination; skipping record rewrite.`,
+      );
+      return false;
+    }
+
+    context.recordPersisted = persisted;
+    return persisted;
+  } catch {
+    return false;
+  }
+}
+
 export async function finalizeActiveRun(runId: string): Promise<void> {
   if (!activeRun || activeRun.runId !== runId) {
     clearActiveRun(runId);
@@ -222,42 +275,17 @@ export async function finalizeActiveRun(runId: string): Promise<void> {
   }
 }
 
-async function captureChatArtifactsBeforeAbort(
+async function captureChatArtifactsBeforeTermination(
   context: ActiveRunContext,
   output: Map<string, ChatArtifactFormat>,
+  pendingAgentIds: ReadonlySet<string>,
 ): Promise<void> {
   const agentContexts = context.agents ?? [];
   if (agentContexts.length === 0) {
     return;
   }
-
-  let snapshotAgents: readonly AgentInvocationRecord[] | undefined;
-  try {
-    const snapshot = await getRunRecordSnapshot({
-      runsFilePath: context.runsFilePath,
-      runId: context.runId,
-    });
-    snapshotAgents = snapshot?.agents;
-  } catch (error) {
-    console.warn(
-      `[voratiq] Failed to load run ${context.runId} before abort: ${toErrorMessage(error)}`,
-    );
-  }
-
-  const pendingAgentIds = new Set<string>();
-  if (snapshotAgents && snapshotAgents.length > 0) {
-    for (const agent of snapshotAgents) {
-      if (agent.status === "running" || agent.status === "queued") {
-        pendingAgentIds.add(agent.agentId);
-      }
-    }
-    if (pendingAgentIds.size === 0) {
-      return;
-    }
-  } else {
-    for (const agent of agentContexts) {
-      pendingAgentIds.add(agent.agentId);
-    }
+  if (pendingAgentIds.size === 0) {
+    return;
   }
 
   for (const agent of agentContexts) {
@@ -295,8 +323,114 @@ async function captureChatArtifactsBeforeAbort(
   }
 }
 
+async function loadPendingAgentIdsForTermination(
+  context: ActiveRunContext,
+): Promise<Set<string>> {
+  const pendingAgentIds = new Set<string>();
+  const agentContexts = context.agents ?? [];
+
+  try {
+    const snapshot = await getRunRecordSnapshot({
+      runsFilePath: context.runsFilePath,
+      runId: context.runId,
+    });
+    const snapshotAgents = snapshot?.agents;
+    if (snapshotAgents && snapshotAgents.length > 0) {
+      for (const agent of snapshotAgents) {
+        if (agent.status === "running" || agent.status === "queued") {
+          pendingAgentIds.add(agent.agentId);
+        }
+      }
+      return pendingAgentIds;
+    }
+  } catch (error) {
+    console.warn(
+      `[voratiq] Failed to load run ${context.runId} before abort: ${toErrorMessage(error)}`,
+    );
+  }
+
+  for (const agent of agentContexts) {
+    pendingAgentIds.add(agent.agentId);
+  }
+
+  return pendingAgentIds;
+}
+
 async function finalizeRegisteredRunTeardown(
   context: ActiveRunContext,
 ): Promise<void> {
   await runTeardown(context.teardown);
+}
+
+function finalizeRunAgent(options: {
+  agent: AgentInvocationRecord;
+  status: "failed" | "aborted";
+  completedAt: string;
+  detail?: string;
+  chatArtifactsByAgent: ReadonlyMap<string, ChatArtifactFormat>;
+  pendingAgentIdsAtTermination: ReadonlySet<string>;
+}): AgentInvocationRecord {
+  const {
+    agent,
+    status,
+    completedAt,
+    detail,
+    chatArtifactsByAgent,
+    pendingAgentIdsAtTermination,
+  } = options;
+
+  const shouldForceAbort =
+    status === "aborted" &&
+    pendingAgentIdsAtTermination.has(agent.agentId) &&
+    agent.status !== "succeeded";
+
+  if (
+    !shouldForceAbort &&
+    agent.status !== "queued" &&
+    agent.status !== "running"
+  ) {
+    return agent;
+  }
+
+  const chatFormat = chatArtifactsByAgent.get(agent.agentId);
+  const nextArtifacts =
+    chatFormat !== undefined
+      ? {
+          ...(agent.artifacts ?? {}),
+          chatCaptured: true,
+          chatFormat,
+        }
+      : agent.artifacts;
+
+  if (status === "aborted") {
+    const warnings = agent.warnings ?? [];
+    const nextWarnings = warnings.includes(RUN_ABORT_WARNING)
+      ? warnings
+      : [...warnings, RUN_ABORT_WARNING];
+
+    return {
+      ...agent,
+      status: "aborted",
+      ...buildOperationLifecycleCompleteFields({
+        existing: agent,
+        startedAt: agent.startedAt ?? completedAt,
+        completedAt,
+      }),
+      warnings: nextWarnings,
+      artifacts: nextArtifacts,
+      error: undefined,
+    };
+  }
+
+  return {
+    ...agent,
+    status: "failed",
+    ...buildOperationLifecycleCompleteFields({
+      existing: agent,
+      startedAt: agent.startedAt ?? completedAt,
+      completedAt,
+    }),
+    error: agent.error ?? detail ?? "Run failed before agent completed.",
+    artifacts: nextArtifacts,
+  };
 }

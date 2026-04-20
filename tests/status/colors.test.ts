@@ -35,14 +35,6 @@ describe("status color helpers", () => {
       (status: (typeof RUN_STATUS_VALUES)[number]) =>
         getRunStatusStyle(status).cli,
     );
-    expect(colors).toEqual([
-      "gray",
-      "cyan",
-      "green",
-      "red",
-      "red",
-      "yellow",
-      "gray",
-    ]);
+    expect(colors).toEqual(["gray", "cyan", "green", "red", "red", "yellow"]);
   });
 });

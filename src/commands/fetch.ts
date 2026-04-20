@@ -7,19 +7,17 @@ export interface FetchRunsCLIOptions {
   root: string;
   runsFilePath: string;
   runId: string;
-  onDeleted?: (runRecord: RunRecord) => Error;
 }
 
 export async function fetchRunSafely(
   options: FetchRunsCLIOptions,
 ): Promise<RunRecord> {
-  const { root, runsFilePath, runId, onDeleted } = options;
+  const { root, runsFilePath, runId } = options;
 
   const { records } = await fetchRunsSafely({
     root,
     runsFilePath,
     runId,
-    filters: { includeDeleted: true },
   }).catch((error) => {
     if (error instanceof RunRecordNotFoundError) {
       throw new RunNotFoundCliError(runId);
@@ -30,10 +28,6 @@ export async function fetchRunSafely(
   const runRecord = records[0];
   if (!runRecord) {
     throw new RunNotFoundCliError(runId);
-  }
-
-  if (runRecord.deletedAt && onDeleted) {
-    throw onDeleted(runRecord);
   }
 
   return runRecord;

@@ -8,13 +8,10 @@ import {
 } from "@jest/globals";
 
 import { checkPlatformSupport } from "../../src/agents/runtime/sandbox.js";
-import { createConfirmationWorkflow } from "../../src/cli/confirmation.js";
-import { runPruneCommand } from "../../src/cli/prune.js";
 import { runReduceCommand } from "../../src/cli/reduce.js";
 import { runRunCommand } from "../../src/cli/run.js";
 import { runSpecCommand } from "../../src/cli/spec.js";
 import { runVerifyCommand } from "../../src/cli/verify.js";
-import { executePruneAllCommand } from "../../src/commands/prune/command.js";
 import { executeReduceCommand } from "../../src/commands/reduce/command.js";
 import { executeRunCommand } from "../../src/commands/run/command.js";
 import { executeSpecCommand } from "../../src/commands/spec/command.js";
@@ -64,17 +61,8 @@ jest.mock("../../src/commands/reduce/command.js", () => ({
   executeReduceCommand: jest.fn(),
 }));
 
-jest.mock("../../src/commands/prune/command.js", () => ({
-  executePruneAllCommand: jest.fn(),
-  executePruneCommand: jest.fn(),
-}));
-
 jest.mock("../../src/domain/reduce/persistence/adapter.js", () => ({
   readReductionRecords: jest.fn(),
-}));
-
-jest.mock("../../src/cli/confirmation.js", () => ({
-  createConfirmationWorkflow: jest.fn(),
 }));
 
 const checkPlatformSupportMock = jest.mocked(checkPlatformSupport);
@@ -90,9 +78,7 @@ const loadVerificationSelectionPolicyOutputMock = jest.mocked(
   loadVerificationSelectionPolicyOutput,
 );
 const executeReduceCommandMock = jest.mocked(executeReduceCommand);
-const executePruneAllCommandMock = jest.mocked(executePruneAllCommand);
 const readReductionRecordsMock = jest.mocked(readReductionRecords);
-const createConfirmationWorkflowMock = jest.mocked(createConfirmationWorkflow);
 
 describe("json mode cleanliness", () => {
   let stdoutSpy: jest.SpiedFunction<typeof process.stdout.write>;
@@ -331,49 +317,5 @@ describe("json mode cleanliness", () => {
 
     expect(stdoutSpy).not.toHaveBeenCalled();
     expect(stderrSpy).not.toHaveBeenCalled();
-  });
-
-  it("fails prune json mode without explicit confirmation", async () => {
-    await expect(
-      runPruneCommand({
-        all: true,
-        json: true,
-      }),
-    ).rejects.toThrow("JSON-mode prune requires explicit confirmation.");
-
-    expect(createConfirmationWorkflowMock).not.toHaveBeenCalled();
-    expect(executePruneAllCommandMock).not.toHaveBeenCalled();
-    expect(stdoutSpy).not.toHaveBeenCalled();
-    expect(stderrSpy).not.toHaveBeenCalled();
-  });
-
-  it("allows prune json mode with explicit confirmation", async () => {
-    const confirm = jest.fn(() => Promise.resolve(true));
-    const prompt = jest.fn(() => Promise.resolve(""));
-    const close = jest.fn();
-    createConfirmationWorkflowMock.mockReturnValue({
-      interactive: false,
-      confirm,
-      prompt,
-      close,
-    });
-
-    executePruneAllCommandMock.mockResolvedValue({
-      status: "noop",
-      runIds: [],
-    });
-
-    await runPruneCommand({
-      all: true,
-      json: true,
-      yes: true,
-    });
-
-    expect(createConfirmationWorkflowMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        assumeYes: true,
-      }),
-    );
-    expect(executePruneAllCommandMock).toHaveBeenCalledTimes(1);
   });
 });

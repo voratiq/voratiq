@@ -140,7 +140,6 @@ async function assertRunTargetEligible(
     root,
     runsFilePath,
     runId: target.id,
-    filters: { includeDeleted: true },
   }).catch((error) => {
     if (error instanceof RunRecordNotFoundError) {
       throw new RunNotFoundCliError(target.id);
@@ -153,7 +152,7 @@ async function assertRunTargetEligible(
     throw new RunNotFoundCliError(target.id);
   }
 
-  if (!isRunStatusCompleteForReduction(record.status)) {
+  if (!hasRealTerminalRunOutcome(record.status)) {
     throw new CliError(
       `Run \`${target.id}\` is not complete.`,
       [`Status: \`${record.status}\`.`],
@@ -169,7 +168,7 @@ async function assertRunTargetEligible(
     );
   }
 
-  assertRunArtifactsPresent(record.status, target.id);
+  assertRunArtifactsPresent(record, target.id);
 
   const enhanced = await buildRunRecordView(record, { workspaceRoot: root });
   const missing = await findMissingRunArtifacts(root, enhanced);
@@ -182,20 +181,14 @@ async function assertRunTargetEligible(
   }
 }
 
-function isRunStatusCompleteForReduction(status: RunRecord["status"]): boolean {
-  return status === "pruned" || TERMINAL_RUN_STATUSES.includes(status);
+function hasRealTerminalRunOutcome(status: RunRecord["status"]): boolean {
+  return TERMINAL_RUN_STATUSES.includes(status);
 }
 
-function assertRunArtifactsPresent(
-  status: RunRecord["status"],
-  runId: string,
-): void {
-  if (
-    status === "succeeded" ||
-    status === "failed" ||
-    status === "errored" ||
-    status === "pruned"
-  ) {
+function assertRunArtifactsPresent(record: RunRecord, runId: string): void {
+  const { status } = record;
+
+  if (status === "succeeded" || status === "failed" || status === "errored") {
     return;
   }
 

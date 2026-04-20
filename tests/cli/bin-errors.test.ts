@@ -163,46 +163,6 @@ describe("CLI entrypoint error handling", () => {
     },
   );
 
-  it("emits a failed json envelope for prune without explicit confirmation", async () => {
-    const stdout: string[] = [];
-    const stderr: string[] = [];
-
-    stdoutSpy = jest
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
-
-    stderrSpy = jest
-      .spyOn(process.stderr, "write")
-      .mockImplementation((chunk: unknown) => {
-        stderr.push(String(chunk));
-        return true;
-      });
-
-    await runCli(["node", "voratiq", "prune", "--all", "--json"]);
-
-    expect(stderr.join("")).toHaveLength(0);
-    expect(process.exitCode).toBe(1);
-
-    const envelope = JSON.parse(stdout.join("").trim()) as {
-      version: number;
-      operator: string;
-      status: string;
-      error?: { message: string };
-    };
-
-    expect(envelope).toMatchObject({
-      version: 1,
-      operator: "prune",
-      status: "failed",
-      error: {
-        message: "JSON-mode prune requires explicit confirmation.",
-      },
-    });
-  });
-
   it("prints the CLI version for -v/--version", async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];

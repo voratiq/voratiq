@@ -52,6 +52,10 @@ describe("status groupings", () => {
         expect(RUN_STATUS_VALUES).toContain(status);
       }
     });
+
+    it("RUN_STATUS_VALUES excludes the legacy pruned status", () => {
+      expect(RUN_STATUS_VALUES).not.toContain("pruned");
+    });
   });
 
   describe("spec status groupings", () => {

@@ -1,7 +1,6 @@
 import { Command } from "commander";
 
 import { createApplyCommand } from "../../src/cli/apply.js";
-import { createPruneCommand } from "../../src/cli/prune.js";
 import { createReduceCommand } from "../../src/cli/reduce.js";
 import { createRunCommand } from "../../src/cli/run.js";
 import { createSpecCommand } from "../../src/cli/spec.js";
@@ -111,21 +110,6 @@ describe("operator json mode options", () => {
       ["apply", "--run", "run-123", "--agent", "agent-a", "--json"],
       { from: "user" },
     );
-
-    expect(received?.json).toBe(true);
-  });
-
-  it("parses --json for prune", async () => {
-    let received: { json?: boolean } | undefined;
-    const command = silenceCommander(createPruneCommand());
-    command.exitOverride().action((options: { json?: boolean }) => {
-      received = options;
-    });
-
-    const program = silenceCommander(new Command());
-    program.exitOverride().addCommand(command);
-
-    await program.parseAsync(["prune", "--all", "--json"], { from: "user" });
 
     expect(received?.json).toBe(true);
   });
