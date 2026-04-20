@@ -328,8 +328,8 @@ describe("voratiq spec (CLI)", () => {
       });
       expect(result.specPath).toBeDefined();
       expect(result.generatedSpecPaths).toHaveLength(1);
-      expect(result.body).toContain("SUCCEEDED");
       expect(result.body).toContain("claude-haiku-4-5-20251001");
+      expect(result.body).toContain("To run a spec:");
     } finally {
       if (originalDescriptor) {
         Object.defineProperty(process.stdin, "isTTY", originalDescriptor);
@@ -766,8 +766,8 @@ describe("voratiq spec (CLI)", () => {
     expect(runSandboxedAgentMock.mock.calls[0]?.[0]?.sandboxStageId).toBe(
       "spec",
     );
-    expect(result.body).toContain("SUCCEEDED");
     expect(result.body).toContain("claude-haiku-4-5-20251001");
+    expect(result.body).toContain("To run a spec:");
 
     expect(executeCompetitionWithAdapterMock).toHaveBeenCalledTimes(1);
     expect(executeCompetitionWithAdapterMock).toHaveBeenCalledWith(
