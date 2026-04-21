@@ -21,6 +21,7 @@ import { enforceCredentialExclusion } from "../../../../workspace/credential-gua
 import {
   cleanupWorkspaceDependencies,
   ensureWorkspaceDependencies,
+  resolveWorkspaceDependencyStrategy,
   WorkspaceDependencyCleanupError,
   type WorkspaceDependencyCleanupResult,
 } from "../../../../workspace/dependencies.js";
@@ -53,6 +54,11 @@ export async function collectAgentArtifacts(options: {
 
   const { workspacePath, artifactsPath, summaryPath, diffPath } =
     workspacePaths;
+  const dependencyStrategy = await resolveWorkspaceDependencyStrategy({
+    root,
+    environment,
+    stageId: "run",
+  });
 
   let dependenciesCleanup: WorkspaceDependencyCleanupResult = {
     nodeRemoved: false,
@@ -64,6 +70,7 @@ export async function collectAgentArtifacts(options: {
       root,
       workspacePath,
       environment,
+      stageId: "run",
     });
   } catch (error) {
     cleanupFailed = true;
@@ -153,15 +160,36 @@ export async function collectAgentArtifacts(options: {
       diffCaptured: true,
     };
   } finally {
-    const cleanupTouched =
-      dependenciesCleanup.nodeRemoved || dependenciesCleanup.pythonRemoved;
-    const shouldRestoreDependencies = cleanupTouched || cleanupFailed;
-    if (shouldRestoreDependencies) {
+    const nodeConfig =
+      environment.node && typeof environment.node === "object"
+        ? environment.node
+        : null;
+    const pythonConfig =
+      environment.python && typeof environment.python === "object"
+        ? environment.python
+        : null;
+    const shouldRestoreNode =
+      dependencyStrategy.node === "symlink" &&
+      Boolean(nodeConfig) &&
+      (cleanupFailed || dependenciesCleanup.nodeRemoved);
+    const shouldRestorePython =
+      Boolean(pythonConfig) &&
+      (cleanupFailed || dependenciesCleanup.pythonRemoved);
+
+    if (shouldRestoreNode || shouldRestorePython) {
+      const restoreEnvironment: EnvironmentConfig = {};
+      if (shouldRestoreNode && nodeConfig) {
+        restoreEnvironment.node = nodeConfig;
+      }
+      if (shouldRestorePython && pythonConfig) {
+        restoreEnvironment.python = pythonConfig;
+      }
+
       try {
         await ensureWorkspaceDependencies({
           root,
           workspacePath,
-          environment,
+          environment: restoreEnvironment,
         });
       } catch (error) {
         if (!runFailed) {
