@@ -65,6 +65,7 @@ export async function prepareStageAgentWorkspace(options: {
       root,
       workspacePath: paths.workspacePath,
       environment,
+      stageId,
     });
     await ensureWorkspaceShim({
       workspacePath: paths.workspacePath,

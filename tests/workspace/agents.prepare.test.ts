@@ -70,7 +70,7 @@ describe("prepareAgentWorkspace", () => {
     }
   });
 
-  it("links workspace dependencies after creating the worktree", async () => {
+  it("stages workspace dependencies after creating the worktree", async () => {
     const runId = "run-id";
     const agentId = "agent-id";
     const baseRevisionSha = "base-sha";
@@ -97,6 +97,7 @@ describe("prepareAgentWorkspace", () => {
       root: repoRoot,
       workspacePath: paths.workspacePath,
       environment,
+      stageId: "run",
     });
     expect(
       ensureWorkspaceDependenciesMock.mock.invocationCallOrder[0],

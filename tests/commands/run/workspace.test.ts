@@ -258,6 +258,45 @@ describe("collectAgentArtifacts", () => {
     expect(await pathExists(workspaceSummary)).toBe(false);
   });
 
+  it("does not recopy node dependencies after export for Next.js run workspaces", async () => {
+    await writeFile(
+      join(repoRoot, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          next: "15.0.0",
+        },
+      }),
+      "utf8",
+    );
+    await rm(join(workspacePath, "node_modules"), {
+      recursive: true,
+      force: true,
+    });
+    await mkdir(join(workspacePath, "node_modules", "next"), {
+      recursive: true,
+    });
+    const ensureSpy = jest.spyOn(
+      workspaceDependencies,
+      "ensureWorkspaceDependencies",
+    );
+
+    try {
+      const result = await collectAgentArtifacts({
+        baseRevisionSha: "base-sha",
+        workspacePaths,
+        root: repoRoot,
+        environment,
+        persona,
+      });
+
+      expect(result.summaryCaptured).toBe(true);
+      expect(ensureSpy).not.toHaveBeenCalled();
+      expect(await pathExists(join(workspacePath, "node_modules"))).toBe(false);
+    } finally {
+      ensureSpy.mockRestore();
+    }
+  });
+
   it("restores dependencies when cleanup fails", async () => {
     const cleanupSpy = jest
       .spyOn(workspaceDependencies, "cleanupWorkspaceDependencies")
