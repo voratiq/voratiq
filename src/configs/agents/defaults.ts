@@ -203,6 +203,23 @@ const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     extraArgs: ["--config", "model_reasoning_effort=xhigh"],
   },
   {
+    id: "gpt-5-5",
+    provider: "codex",
+    model: "gpt-5.5",
+  },
+  {
+    id: "gpt-5-5-high",
+    provider: "codex",
+    model: "gpt-5.5",
+    extraArgs: ["--config", "model_reasoning_effort=high"],
+  },
+  {
+    id: "gpt-5-5-xhigh",
+    provider: "codex",
+    model: "gpt-5.5",
+    extraArgs: ["--config", "model_reasoning_effort=xhigh"],
+  },
+  {
     id: "gemini-2-5-flash",
     provider: "gemini",
     model: "gemini-2.5-flash",
