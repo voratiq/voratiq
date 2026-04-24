@@ -25,11 +25,13 @@ export interface InteractiveTranscriptOptions {
   status: "running" | "succeeded" | "failed";
   agents: readonly InteractiveTranscriptAgentBlock[];
   isTty?: boolean;
+  includeDetailSections?: boolean;
 }
 
 export function renderInteractiveTranscript(
   options: InteractiveTranscriptOptions,
 ): string {
+  const includeDetailSections = options.includeDetailSections !== false;
   const style: TranscriptShellStyleOptions = { isTty: options.isTty };
   const resolvedStyle = resolveTranscriptShellStyle(style);
   const sections: string[][] = [];
@@ -63,7 +65,13 @@ export function renderInteractiveTranscript(
         duration: (row) => row.duration,
       }),
     );
-    sections.push(["---"]);
+    if (includeDetailSections) {
+      sections.push(["---"]);
+    }
+  }
+
+  if (!includeDetailSections) {
+    return renderTranscript({ sections });
   }
 
   options.agents.forEach((agent, index) => {

@@ -118,24 +118,25 @@ export const externalApplyExecutionInputSchema = z
 const externalListInspectionBaseSchema = z
   .object({
     operator: externalInspectionOperatorSchema,
-    verbose: z.boolean().optional(),
-    limit: positiveIntegerSchema.optional(),
   })
   .strict();
 
-export const externalListTableInputSchema =
+export const externalListSummaryInputSchema =
   externalListInspectionBaseSchema.extend({
-    mode: z.literal("table"),
+    mode: z.literal("summary"),
+    allStatuses: z.boolean().optional(),
+    limit: positiveIntegerSchema.optional(),
   });
 
 export const externalListDetailInputSchema =
   externalListInspectionBaseSchema.extend({
     mode: z.literal("detail"),
     sessionId: nonEmptyStringSchema,
+    verbose: z.boolean().optional(),
   });
 
 export const externalListInspectionInputSchema = z.discriminatedUnion("mode", [
-  externalListTableInputSchema,
+  externalListSummaryInputSchema,
   externalListDetailInputSchema,
 ]);
 
@@ -150,7 +151,7 @@ export const externalExecutionInputSchemas = {
 
 export const externalInspectionInputSchemas = {
   list: {
-    table: externalListTableInputSchema,
+    summary: externalListSummaryInputSchema,
     detail: externalListDetailInputSchema,
     union: externalListInspectionInputSchema,
   },
@@ -299,6 +300,7 @@ const listCommandActionOptionsSchema = z
     message: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
     interactive: z.union([z.literal(true), nonEmptyStringSchema]).optional(),
     limit: positiveIntegerSchema.optional(),
+    allStatuses: z.boolean().optional(),
     verbose: z.boolean().optional(),
     json: z.boolean().optional(),
   })
@@ -499,14 +501,41 @@ export function parseListInspectionCommandOptions(
     "operator flag",
   );
 
+  const mode = selected.argument ? "detail" : "summary";
+  const verbose = normalizeOptionalBoolean(parsed.verbose);
+  const allStatuses = normalizeOptionalBoolean(parsed.allStatuses);
+  const json = normalizeOptionalBoolean(parsed.json);
+
+  if (verbose && json) {
+    failCommand(command, "`--verbose` cannot be used with JSON output.");
+  }
+
+  if (mode === "summary" && verbose) {
+    failCommand(command, "`--verbose` requires detail scope.");
+  }
+
+  if (mode === "detail" && allStatuses) {
+    failCommand(command, "`--all-statuses` applies only to summary scope.");
+  }
+
+  if (mode === "detail" && parsed.limit !== undefined) {
+    failCommand(command, "`--limit` applies only to summary scope.");
+  }
+
   return parseCommandOptions(
     externalListInspectionInputSchema,
     {
       operator: selected.value,
-      mode: selected.argument ? "detail" : "table",
+      mode,
       ...(selected.argument ? { sessionId: selected.argument } : {}),
-      limit: parsed.limit,
-      verbose: normalizeOptionalBoolean(parsed.verbose),
+      ...(mode === "summary"
+        ? {
+            limit: parsed.limit,
+            allStatuses,
+          }
+        : {
+            verbose,
+          }),
     },
     command,
   );

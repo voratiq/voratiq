@@ -91,6 +91,7 @@ export interface SpecTranscriptOptions {
   nextCommandLines?: readonly string[];
   isTty?: boolean;
   includeSummarySection?: boolean;
+  includeDetailSections?: boolean;
 }
 
 function buildSpecStageShell(options: {
@@ -466,6 +467,7 @@ export function renderSpecTranscript(
     nextCommandLines,
     isTty,
     includeSummarySection = true,
+    includeDetailSections = true,
   } = input;
 
   const style: TranscriptShellStyleOptions = { isTty };
@@ -498,8 +500,12 @@ export function renderSpecTranscript(
     sections.push(...buildStageFrameSections(summaryShell));
   }
 
-  if (agents.length > 0) {
+  if (includeDetailSections && agents.length > 0) {
     sections.push(["---"]);
+  }
+
+  if (!includeDetailSections) {
+    return renderTranscript({ sections });
   }
 
   agents.forEach((agent, index) => {

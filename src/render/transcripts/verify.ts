@@ -488,6 +488,7 @@ export function renderVerifyTranscript(options: {
   hintMessage?: string;
   isTty?: boolean;
   includeSummarySection?: boolean;
+  includeDetailSections?: boolean;
 }): string {
   const {
     verificationId,
@@ -503,6 +504,7 @@ export function renderVerifyTranscript(options: {
     hintMessage,
     isTty,
     includeSummarySection = true,
+    includeDetailSections = true,
   } = options;
 
   const style: TranscriptShellStyleOptions = { isTty };
@@ -546,8 +548,12 @@ export function renderVerifyTranscript(options: {
     sections.push(...buildStageFrameSections(metadataLines));
   }
 
-  if (methods.length > 0) {
+  if (includeDetailSections && methods.length > 0) {
     sections.push(["---"]);
+  }
+
+  if (!includeDetailSections) {
+    return renderTranscript({ sections });
   }
 
   methods.forEach((method, index) => {

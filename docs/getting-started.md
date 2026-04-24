@@ -180,7 +180,7 @@ voratiq.voratiq_reduce({"target":{"id":"20260414-163422-lbjet","type":"message"}
 After `reduce`, the agent used `list` to inspect the recorded session without rerunning anything:
 
 ```text
-voratiq.voratiq_list({"operator":"reduce","mode":"detail","sessionId":"20260414-164208-kyxju","verbose":true})
+voratiq.voratiq_list({"operator":"reduce","mode":"detail","sessionId":"20260414-164208-kyxju"})
 ```
 
 <details>
@@ -385,7 +385,7 @@ The successful run session was:
 To inspect the run, the agent used `list` again:
 
 ```text
-voratiq.voratiq_list({"operator":"run","mode":"detail","sessionId":"20260414-172425-xgbhn","verbose":true})
+voratiq.voratiq_list({"operator":"run","mode":"detail","sessionId":"20260414-172425-xgbhn"})
 ```
 
 <details>

@@ -830,14 +830,14 @@ describe("external CLI JSON contract", () => {
     });
   });
 
-  it("returns stable list table json output with warnings", async () => {
+  it("returns stable list summary json output with warnings", async () => {
     executeListCommandMock.mockResolvedValue({
       warnings: ["Index contains a legacy session."],
       output: "ignored in json mode",
-      mode: "table",
+      mode: "summary",
       json: {
         operator: "run",
-        mode: "list",
+        mode: "summary",
         sessions: [
           {
             operator: "run",
@@ -860,7 +860,7 @@ describe("external CLI JSON contract", () => {
     expect(result.exitCode).toBe(0);
     expect(payload).toStrictEqual({
       operator: "run",
-      mode: "list",
+      mode: "summary",
       sessions: [
         {
           operator: "run",
@@ -925,14 +925,14 @@ describe("external CLI JSON contract", () => {
     });
   });
 
-  it("returns stable empty list table json output", async () => {
+  it("returns stable empty list summary json output", async () => {
     executeListCommandMock.mockResolvedValue({
       warnings: [],
       output: undefined,
-      mode: "table",
+      mode: "summary",
       json: {
         operator: "spec",
-        mode: "list",
+        mode: "summary",
         sessions: [],
         warnings: [],
       },
@@ -944,7 +944,7 @@ describe("external CLI JSON contract", () => {
     expect(result.exitCode).toBe(0);
     expect(payload).toStrictEqual({
       operator: "spec",
-      mode: "list",
+      mode: "summary",
       sessions: [],
       warnings: [],
     });

@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
   type ExternalApplyExecutionInput,
   externalApplyExecutionInputSchema,
+  externalInspectionOperators,
   externalInspectionOperatorSchema,
   type ExternalMessageExecutionInput,
   externalMessageExecutionInputSchema,
@@ -27,10 +28,9 @@ import {
   operatorResultEnvelopeSchema,
 } from "../cli/operator-envelope.js";
 import {
-  listJsonModes,
-  listJsonModeSchema,
   type ListJsonOutput,
   listJsonOutputSchema,
+  listModes,
 } from "../contracts/list.js";
 import {
   VORATIQ_MCP_ACK_OPERATOR_ENV,
@@ -124,18 +124,16 @@ const mcpListInspectionInputSchema = z.discriminatedUnion("mode", [
   z
     .object({
       operator: externalInspectionOperatorSchema,
-      mode: z.literal(listJsonModes[0]),
-      verbose: z.boolean().optional(),
+      mode: z.literal("summary"),
+      allStatuses: z.boolean().optional(),
       limit: z.number().int().positive().optional(),
     })
     .strict(),
   z
     .object({
       operator: externalInspectionOperatorSchema,
-      mode: z.literal(listJsonModes[1]),
+      mode: z.literal("detail"),
       sessionId: z.string().min(1),
-      verbose: z.boolean().optional(),
-      limit: z.number().int().positive().optional(),
     })
     .strict(),
 ]);
@@ -295,7 +293,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_list",
     operator: "list",
     description:
-      "List recorded Voratiq sessions for one operator (`spec`, `run`, `reduce`, `verify`, `message`, or `interactive`) in list or detail mode.",
+      "Inspect recorded Voratiq sessions for one operator (`spec`, `run`, `reduce`, `verify`, `message`, or `interactive`) in summary or detail scope.",
     inputSchemaSource: mcpListInspectionInputSchema,
     mcpInputSchema: createListMcpInputSchema(),
     buildArgs: (input) =>
@@ -797,12 +795,20 @@ async function executeToolCall(options: {
 
   const parsedInput = tool.inputSchemaSource.safeParse(rawInput);
   if (!parsedInput.success) {
+    const semanticValidationMessage =
+      tool.name === "voratiq_list"
+        ? describeListInputSemanticValidationFailure(rawInput)
+        : undefined;
     return buildTransportFailureCallResult({
       failureKind: "invalid_input",
       operator: tool.operator,
-      message: "Tool input failed schema validation.",
+      message:
+        semanticValidationMessage ?? "Tool input failed schema validation.",
       details: {
         validation: z.flattenError(parsedInput.error),
+        ...(semanticValidationMessage === undefined
+          ? {}
+          : { semanticValidationMessage }),
       },
     });
   }
@@ -991,11 +997,41 @@ function buildListInspectionArgs(input: McpListInspectionInput): string[] {
   const args = ["list", `--${input.operator}`];
   if (input.mode === "detail") {
     args.push(input.sessionId);
+  } else {
+    appendOptionalTrueFlag(args, "--all-statuses", input.allStatuses);
+    appendOptionalNumberFlag(args, "--limit", input.limit);
   }
-  appendOptionalTrueFlag(args, "--verbose", input.verbose);
-  appendOptionalNumberFlag(args, "--limit", input.limit);
   args.push("--json");
   return args;
+}
+
+function describeListInputSemanticValidationFailure(
+  rawInput: unknown,
+): string | undefined {
+  if (rawInput === null || typeof rawInput !== "object") {
+    return undefined;
+  }
+
+  const input = rawInput as Record<string, unknown>;
+  if (input.mode === "detail") {
+    if (typeof input.sessionId !== "string" || input.sessionId.length === 0) {
+      return "MCP list detail mode requires a non-empty sessionId.";
+    }
+    const detailOnlyKeys = ["allStatuses", "limit", "verbose"].filter(
+      (key) => key in input,
+    );
+    if (detailOnlyKeys.length > 0) {
+      return `MCP list detail mode only accepts operator, mode, and sessionId; unsupported field(s): ${detailOnlyKeys.join(
+        ", ",
+      )}.`;
+    }
+  }
+
+  if (input.mode === "summary" && "sessionId" in input) {
+    return 'MCP list summary mode does not accept sessionId; use mode "detail" to inspect one session.';
+  }
+
+  return undefined;
 }
 
 function appendRepeatedStringFlag(
@@ -1308,23 +1344,67 @@ function toToolInputJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
 }
 
 function createListMcpInputSchema(): Record<string, unknown> {
-  return toToolInputJsonSchema(
-    z
-      .object({
-        operator: externalInspectionOperatorSchema,
-        mode: listJsonModeSchema.describe(
-          "Use `detail` only when inspecting a specific session.",
-        ),
-        sessionId: z
-          .string()
-          .min(1)
-          .optional()
-          .describe("Required when mode is `detail`."),
-        verbose: z.boolean().optional(),
-        limit: z.number().int().positive().optional(),
-      })
-      .strict(),
-  );
+  return {
+    type: "object",
+    properties: {
+      operator: {
+        type: "string",
+        enum: [...externalInspectionOperators],
+      },
+      mode: {
+        type: "string",
+        enum: [...listModes],
+        description: "Use `summary` or `detail` scope.",
+      },
+      sessionId: {
+        type: "string",
+        minLength: 1,
+        description: "Detail-only. Required when mode is `detail`.",
+      },
+      allStatuses: {
+        type: "boolean",
+        description:
+          "Summary-only. Include sessions hidden by the default summary filter.",
+      },
+      limit: {
+        type: "integer",
+        exclusiveMinimum: 0,
+        maximum: Number.MAX_SAFE_INTEGER,
+        description:
+          "Summary-only. Show only the N most recent summary sessions.",
+      },
+    },
+    required: ["operator", "mode"],
+    additionalProperties: false,
+    allOf: [
+      {
+        if: {
+          properties: {
+            mode: { const: "summary" },
+          },
+          required: ["mode"],
+        },
+        then: {
+          not: { required: ["sessionId"] },
+        },
+      },
+      {
+        if: {
+          properties: {
+            mode: { const: "detail" },
+          },
+          required: ["mode"],
+        },
+        then: {
+          required: ["sessionId"],
+          allOf: [
+            { not: { required: ["allStatuses"] } },
+            { not: { required: ["limit"] } },
+          ],
+        },
+      },
+    ],
+  };
 }
 
 function createSuccessResponse(

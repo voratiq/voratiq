@@ -78,6 +78,7 @@ export interface MessageTranscriptOptions {
   recipients: readonly MessageTranscriptRecipientBlock[];
   isTty?: boolean;
   includeSummarySection?: boolean;
+  includeDetailSections?: boolean;
 }
 
 interface MessageRendererOptions {
@@ -376,6 +377,7 @@ export function renderMessageTranscript(
     recipients,
     isTty,
     includeSummarySection = true,
+    includeDetailSections = true,
     targetDisplay,
   } = options;
   const style: TranscriptShellStyleOptions = { isTty };
@@ -418,8 +420,12 @@ export function renderMessageTranscript(
     sections.push(...buildStageFrameSections(shell));
   }
 
-  if (recipients.length > 0) {
+  if (includeDetailSections && recipients.length > 0) {
     sections.push(["---"]);
+  }
+
+  if (!includeDetailSections) {
+    return renderTranscript({ sections });
   }
 
   recipients.forEach((recipient, index) => {

@@ -8,12 +8,10 @@ export const listOperators = [
   "message",
   "interactive",
 ] as const;
-export const listModes = ["table", "detail"] as const;
-export const listJsonModes = ["list", "detail"] as const;
+export const listModes = ["summary", "detail"] as const;
 
 export type ListOperator = (typeof listOperators)[number];
 export type ListMode = (typeof listModes)[number];
-export type ListJsonMode = (typeof listJsonModes)[number];
 
 export type SessionListJsonTargetRef = {
   kind: ListOperator;
@@ -72,9 +70,9 @@ export interface ListJsonDetailSession extends ListJsonSessionBase {
   agents: ListJsonAgent[];
 }
 
-export interface ListJsonListOutput {
+export interface ListJsonSummaryOutput {
   operator: ListOperator;
-  mode: "list";
+  mode: "summary";
   sessions: ListJsonSummarySession[];
   warnings: string[];
 }
@@ -86,11 +84,10 @@ export interface ListJsonDetailOutput {
   warnings: string[];
 }
 
-export type ListJsonOutput = ListJsonListOutput | ListJsonDetailOutput;
+export type ListJsonOutput = ListJsonSummaryOutput | ListJsonDetailOutput;
 
 export const listOperatorSchema = z.enum(listOperators);
 export const listModeSchema = z.enum(listModes);
-export const listJsonModeSchema = z.enum(listJsonModes);
 
 const listJsonSessionTargetRefSchema = z
   .object({
@@ -166,10 +163,10 @@ const listJsonDetailSessionSchema = listJsonSessionBaseSchema
   })
   .passthrough();
 
-const listJsonListOutputSchema = z
+const listJsonSummaryOutputSchema = z
   .object({
     operator: listOperatorSchema,
-    mode: z.literal("list"),
+    mode: z.literal("summary"),
     sessions: z.array(listJsonSummarySessionSchema),
     warnings: z.array(z.string()),
   })
@@ -185,7 +182,7 @@ const listJsonDetailOutputSchema = z
   .passthrough();
 
 export const listJsonOutputSchema = z.discriminatedUnion("mode", [
-  listJsonListOutputSchema,
+  listJsonSummaryOutputSchema,
   listJsonDetailOutputSchema,
 ]);
 

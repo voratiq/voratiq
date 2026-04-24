@@ -18,6 +18,7 @@ export interface ListCommandOptions {
   operator: ListOperator;
   sessionId?: string;
   limit?: number;
+  allStatuses?: boolean;
   verbose?: boolean;
 }
 
@@ -53,12 +54,13 @@ export async function runListCommand(
     operator: options.operator,
     sessionId: options.sessionId,
     limit: options.limit,
+    allStatuses: options.allStatuses,
     verbose: options.verbose,
   });
 
   const body =
     execution.output ??
-    (execution.mode === "table"
+    (execution.mode === "summary"
       ? `No ${options.operator} sessions recorded.`
       : `${options.operator} session \`${options.sessionId}\` not found.`);
   const alerts: Alert[] = execution.warnings.map((warning) => ({
@@ -77,6 +79,7 @@ interface ListCommandActionOptions {
   message?: string | boolean;
   interactive?: string | boolean;
   limit?: number;
+  allStatuses?: boolean;
   verbose?: boolean;
   json?: boolean;
 }
@@ -91,36 +94,45 @@ function parseLimitOption(value: string): number {
 
 export function createListCommand(): Command {
   return new Command("list")
-    .description("List recorded sessions for an operator")
+    .description(
+      "Inspect recorded sessions for an operator in summary or detail scope",
+    )
     .option(
       "--spec [session-id]",
-      "List spec sessions or show one spec session",
+      "Inspect spec sessions in summary scope or one spec session in detail scope",
     )
-    .option("--run [session-id]", "List run sessions or show one run session")
+    .option(
+      "--run [session-id]",
+      "Inspect run sessions in summary scope or one run session in detail scope",
+    )
     .option(
       "--reduce [session-id]",
-      "List reduction sessions or show one reduction session",
+      "Inspect reduction sessions in summary scope or one reduction session in detail scope",
     )
     .option(
       "--verify [session-id]",
-      "List verification sessions or show one verification session",
+      "Inspect verification sessions in summary scope or one verification session in detail scope",
     )
     .option(
       "--message [session-id]",
-      "List message sessions or show one message session",
+      "Inspect message sessions in summary scope or one message session in detail scope",
     )
     .option(
       "--interactive [session-id]",
-      "List interactive sessions or show one interactive session",
+      "Inspect interactive sessions in summary scope or one interactive session in detail scope",
     )
     .option(
       "--limit <count>",
-      "Show only the N most recent sessions (default: 10)",
+      "Show only the N most recent summary sessions (default: 10)",
       parseLimitOption,
     )
     .option(
+      "--all-statuses",
+      "Include sessions normally hidden by the default summary filter",
+    )
+    .option(
       "--verbose",
-      "Show all statuses for the selected operator in table mode",
+      "Show expanded human detail output (requires detail scope)",
     )
     .option("--json", "Emit machine-readable list output")
     .allowExcessArguments(false)
@@ -130,8 +142,11 @@ export function createListCommand(): Command {
         operator: selection.operator,
         sessionId:
           selection.mode === "detail" ? selection.sessionId : undefined,
-        limit: selection.limit,
-        verbose: selection.verbose ?? false,
+        limit: selection.mode === "summary" ? selection.limit : undefined,
+        allStatuses:
+          selection.mode === "summary" ? selection.allStatuses : undefined,
+        verbose:
+          selection.mode === "detail" ? (selection.verbose ?? false) : false,
       });
 
       if (options.json) {
