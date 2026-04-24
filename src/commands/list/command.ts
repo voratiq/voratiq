@@ -97,6 +97,7 @@ export interface ListCommandInput {
   operator: ListOperator;
   sessionId?: string;
   limit?: number;
+  allStatuses?: boolean;
   verbose?: boolean;
 }
 
@@ -110,27 +111,27 @@ export interface ListCommandResult {
 export async function executeListCommand(
   input: ListCommandInput,
 ): Promise<ListCommandResult> {
-  const mode: ListMode = input.sessionId ? "detail" : "table";
+  const mode: ListMode = input.sessionId ? "detail" : "summary";
   const limit = input.limit ?? DEFAULT_LIMIT;
 
   if (mode === "detail") {
     return await executeDetailMode(input);
   }
 
-  return await executeTableMode({
+  return await executeSummaryMode({
     ...input,
     limit,
   });
 }
 
-async function executeTableMode(
+async function executeSummaryMode(
   input: ListCommandInput & { limit: number },
 ): Promise<ListCommandResult> {
-  const { operator, limit, verbose = false } = input;
-  const predicate = verbose
+  const { operator, limit, allStatuses = false } = input;
+  const predicate = allStatuses
     ? undefined
     : (record: OperatorRecord) =>
-        shouldIncludeInDefaultTable(operator, getRecordStatus(record));
+        shouldIncludeInDefaultSummary(operator, getRecordStatus(record));
   const query = await readOperatorRecords({ ...input, limit, predicate });
   const records = query.records;
   const sessions = records.map((record) =>
@@ -142,10 +143,10 @@ async function executeTableMode(
   return {
     warnings,
     output,
-    mode: "table",
+    mode: "summary",
     json: {
       operator,
-      mode: "list",
+      mode: "summary",
       sessions: sessions.map(toJsonSummarySession),
       warnings,
     },
@@ -187,7 +188,9 @@ async function executeDetailMode(
 
   return {
     warnings,
-    output: renderDetailOutput(operator, detailSession),
+    output: renderDetailOutput(operator, detailSession, {
+      expanded: input.verbose === true,
+    }),
     mode: "detail",
     json: {
       operator,
@@ -277,6 +280,7 @@ function renderTableOutput(
 function renderDetailOutput(
   operator: ListOperator,
   session: NormalizedListDetailSession,
+  options: { expanded: boolean },
 ) {
   if (operator === "run") {
     return renderRunTranscript({
@@ -299,6 +303,7 @@ function renderDetailOutput(
         errorLine: agent.errorLine,
       })),
       isTty: process.stdout.isTTY,
+      includeDetailSections: options.expanded,
     });
   }
 
@@ -328,6 +333,7 @@ function renderDetailOutput(
           errorLine: agent.errorLine,
         })),
         isTty: process.stdout.isTTY,
+        includeDetailSections: options.expanded,
       },
       { suppressHint: true },
     );
@@ -362,6 +368,7 @@ function renderDetailOutput(
       })),
       suppressHint: true,
       isTty: process.stdout.isTTY,
+      includeDetailSections: options.expanded,
     });
   }
 
@@ -392,6 +399,7 @@ function renderDetailOutput(
         errorLine: agent.errorLine,
       })),
       isTty: process.stdout.isTTY,
+      includeDetailSections: options.expanded,
     });
   }
 
@@ -419,6 +427,7 @@ function renderDetailOutput(
         },
       ],
       isTty: process.stdout.isTTY,
+      includeDetailSections: options.expanded,
     });
   }
 
@@ -446,6 +455,7 @@ function renderDetailOutput(
     })),
     suppressHint: true,
     isTty: process.stdout.isTTY,
+    includeDetailSections: options.expanded,
   });
 }
 
@@ -493,7 +503,7 @@ function toJsonAgent(agent: NormalizedListAgent) {
   };
 }
 
-function shouldIncludeInDefaultTable(
+function shouldIncludeInDefaultSummary(
   _operator: ListOperator,
   status: string,
 ): boolean {

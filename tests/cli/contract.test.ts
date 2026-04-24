@@ -80,13 +80,13 @@ describe("external adapter contract definitions", () => {
     ).toBe(true);
   });
 
-  it("defines table and detail list inspection schemas", () => {
+  it("defines summary and detail list inspection schemas", () => {
     expect(
-      externalInspectionInputSchemas.list.table.safeParse({
+      externalInspectionInputSchemas.list.summary.safeParse({
         operator: "run",
-        mode: "table",
+        mode: "summary",
         limit: 10,
-        verbose: true,
+        allStatuses: true,
       }).success,
     ).toBe(true);
 
@@ -95,6 +95,7 @@ describe("external adapter contract definitions", () => {
         operator: "interactive",
         mode: "detail",
         sessionId: "interactive-123",
+        verbose: true,
       }).success,
     ).toBe(true);
 

@@ -91,6 +91,7 @@ export interface ReduceTranscriptOptions {
   suppressHint?: boolean;
   isTty?: boolean;
   includeSummarySection?: boolean;
+  includeDetailSections?: boolean;
 }
 
 function buildReduceStageShell(options: {
@@ -441,6 +442,7 @@ export function renderReduceTranscript(
     suppressHint,
     isTty,
     includeSummarySection = true,
+    includeDetailSections = true,
   } = options;
 
   const style: TranscriptShellStyleOptions = { isTty };
@@ -476,8 +478,12 @@ export function renderReduceTranscript(
     sections.push(...buildStageFrameSections(summaryShell));
   }
 
-  if (reducers.length > 0) {
+  if (includeDetailSections && reducers.length > 0) {
     sections.push(["---"]);
+  }
+
+  if (!includeDetailSections) {
+    return renderTranscript({ sections });
   }
 
   reducers.forEach((reducer, index) => {

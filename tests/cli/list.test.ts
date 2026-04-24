@@ -48,10 +48,10 @@ describe("voratiq list command options", () => {
     executeListCommandMock.mockResolvedValue({
       warnings: [],
       output: "table output",
-      mode: "table",
+      mode: "summary",
       json: {
         operator: "run",
-        mode: "list",
+        mode: "summary",
         sessions: [],
         warnings: [],
       },
@@ -96,7 +96,7 @@ describe("voratiq list command options", () => {
     );
   });
 
-  it("dispatches table mode when operator flag has no session id", async () => {
+  it("dispatches summary scope when operator flag has no session id", async () => {
     const listCommand = silenceCommander(createListCommand());
     listCommand.exitOverride();
     const program = silenceCommander(new Command());
@@ -115,11 +115,42 @@ describe("voratiq list command options", () => {
       operator: "run",
       sessionId: undefined,
       limit: undefined,
+      allStatuses: undefined,
       verbose: false,
     });
     expect(writeCommandOutputMock).toHaveBeenCalledWith({
       body: "table output",
       alerts: [],
+    });
+  });
+
+  it("dispatches summary scope with --all-statuses", async () => {
+    const listCommand = silenceCommander(createListCommand());
+    listCommand.exitOverride();
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(listCommand);
+
+    await program.parseAsync([
+      "node",
+      "voratiq",
+      "list",
+      "--run",
+      "--all-statuses",
+    ]);
+
+    expect(executeListCommandMock).toHaveBeenCalledWith({
+      root: "/repo",
+      specsFilePath: "/repo/.voratiq/spec/index.json",
+      runsFilePath: "/repo/.voratiq/run/index.json",
+      messagesFilePath: "/repo/.voratiq/message/index.json",
+      reductionsFilePath: "/repo/.voratiq/reduce/index.json",
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
+      interactiveFilePath: "/repo/.voratiq/interactive/index.json",
+      operator: "run",
+      sessionId: undefined,
+      limit: undefined,
+      allStatuses: true,
+      verbose: false,
     });
   });
 
@@ -168,6 +199,7 @@ describe("voratiq list command options", () => {
       operator: "verify",
       sessionId: "verify-123",
       limit: undefined,
+      allStatuses: undefined,
       verbose: false,
     });
     expect(writeCommandOutputMock).toHaveBeenCalledWith({
@@ -187,7 +219,7 @@ describe("voratiq list command options", () => {
     });
   });
 
-  it("dispatches interactive table mode when --interactive is selected", async () => {
+  it("dispatches interactive summary scope when --interactive is selected", async () => {
     const listCommand = silenceCommander(createListCommand());
     listCommand.exitOverride();
     const program = silenceCommander(new Command());
@@ -206,7 +238,75 @@ describe("voratiq list command options", () => {
       operator: "interactive",
       sessionId: undefined,
       limit: undefined,
+      allStatuses: undefined,
       verbose: false,
     });
+  });
+
+  it("rejects --verbose without detail scope", async () => {
+    const listCommand = silenceCommander(createListCommand());
+    listCommand.exitOverride();
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(listCommand);
+
+    await expect(
+      program.parseAsync(["node", "voratiq", "list", "--run", "--verbose"]),
+    ).rejects.toThrow(/`--verbose` requires detail scope\./u);
+  });
+
+  it("rejects --verbose with --json", async () => {
+    const listCommand = silenceCommander(createListCommand());
+    listCommand.exitOverride();
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(listCommand);
+
+    await expect(
+      program.parseAsync([
+        "node",
+        "voratiq",
+        "list",
+        "--run",
+        "run-123",
+        "--json",
+        "--verbose",
+      ]),
+    ).rejects.toThrow(/`--verbose` cannot be used with JSON output\./u);
+  });
+
+  it("rejects --all-statuses in detail scope", async () => {
+    const listCommand = silenceCommander(createListCommand());
+    listCommand.exitOverride();
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(listCommand);
+
+    await expect(
+      program.parseAsync([
+        "node",
+        "voratiq",
+        "list",
+        "--run",
+        "run-123",
+        "--all-statuses",
+      ]),
+    ).rejects.toThrow(/`--all-statuses` applies only to summary scope\./u);
+  });
+
+  it("rejects --limit in detail scope", async () => {
+    const listCommand = silenceCommander(createListCommand());
+    listCommand.exitOverride();
+    const program = silenceCommander(new Command());
+    program.exitOverride().addCommand(listCommand);
+
+    await expect(
+      program.parseAsync([
+        "node",
+        "voratiq",
+        "list",
+        "--run",
+        "run-123",
+        "--limit",
+        "2",
+      ]),
+    ).rejects.toThrow(/`--limit` applies only to summary scope\./u);
   });
 });

@@ -18,7 +18,7 @@ import {
   externalVerifyExecutionInputSchema,
 } from "../../src/cli/contract.js";
 import type { OperatorResultEnvelope } from "../../src/cli/operator-envelope.js";
-import { listJsonModes } from "../../src/contracts/list.js";
+import { listModes } from "../../src/contracts/list.js";
 import {
   createDefaultCliJsonContractInvoker,
   createEntrypointCliTarget,
@@ -119,26 +119,57 @@ describe("bundled MCP server", () => {
           },
           mode: {
             type: "string",
-            enum: [...listJsonModes],
-            description:
-              "Use `detail` only when inspecting a specific session.",
+            enum: [...listModes],
+            description: "Use `summary` or `detail` scope.",
           },
           sessionId: {
             type: "string",
             minLength: 1,
-            description: "Required when mode is `detail`.",
+            description: "Detail-only. Required when mode is `detail`.",
           },
-          verbose: {
+          allStatuses: {
             type: "boolean",
+            description:
+              "Summary-only. Include sessions hidden by the default summary filter.",
           },
           limit: {
             type: "integer",
             exclusiveMinimum: 0,
             maximum: 9007199254740991,
+            description:
+              "Summary-only. Show only the N most recent summary sessions.",
           },
         },
         required: ["operator", "mode"],
         additionalProperties: false,
+        allOf: [
+          {
+            if: {
+              properties: {
+                mode: { const: "summary" },
+              },
+              required: ["mode"],
+            },
+            then: {
+              not: { required: ["sessionId"] },
+            },
+          },
+          {
+            if: {
+              properties: {
+                mode: { const: "detail" },
+              },
+              required: ["mode"],
+            },
+            then: {
+              required: ["sessionId"],
+              allOf: [
+                { not: { required: ["allStatuses"] } },
+                { not: { required: ["limit"] } },
+              ],
+            },
+          },
+        ],
       },
     } as const;
 
@@ -155,7 +186,7 @@ describe("bundled MCP server", () => {
     const listDefinition = definitions.find(
       (definition) => definition.name === "voratiq_list",
     );
-    expect(listDefinition?.description).toContain("list or detail mode");
+    expect(listDefinition?.description).toContain("summary or detail scope");
     expect(listDefinition?.description).not.toContain("table");
   });
 
@@ -720,10 +751,10 @@ describe("bundled MCP server", () => {
     expect(result.structuredContent).toEqual(listPayload);
   });
 
-  it("regression: routes MCP list mode through request handler and preserves ListJsonOutput payload", async () => {
+  it("regression: routes MCP summary mode through request handler and preserves ListJsonOutput payload", async () => {
     const listPayload = {
       operator: "run",
-      mode: "list",
+      mode: "summary",
       sessions: [],
       warnings: [],
     };
@@ -745,7 +776,7 @@ describe("bundled MCP server", () => {
         name: "voratiq_list",
         arguments: {
           operator: "run",
-          mode: "list",
+          mode: "summary",
         },
       },
     });
@@ -759,10 +790,10 @@ describe("bundled MCP server", () => {
     expect(result.structuredContent).toEqual(listPayload);
   });
 
-  it("routes MCP list mode with limit to the CLI summary path", async () => {
+  it("routes MCP summary mode with summary controls to the CLI summary path", async () => {
     const listPayload = {
       operator: "run",
-      mode: "list",
+      mode: "summary",
       sessions: [],
       warnings: [],
     };
@@ -784,7 +815,8 @@ describe("bundled MCP server", () => {
         name: "voratiq_list",
         arguments: {
           operator: "run",
-          mode: "list",
+          mode: "summary",
+          allStatuses: true,
           limit: 2,
         },
       },
@@ -793,7 +825,7 @@ describe("bundled MCP server", () => {
 
     expect(invokeCliJsonContractMock).toHaveBeenCalledWith({
       operator: "list",
-      args: ["list", "--run", "--limit", "2", "--json"],
+      args: ["list", "--run", "--all-statuses", "--limit", "2", "--json"],
     });
     expect(result.isError).toBe(false);
   });
@@ -860,6 +892,73 @@ describe("bundled MCP server", () => {
 
     expect(failure.failureKind).toBe("invalid_input");
     expect(failure.operator).toBe("list");
+    expect(result.isError).toBe(true);
+    expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects MCP list presentation-only input before spawning", async () => {
+    const invokeCliJsonContractMock =
+      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>;
+    const handler = await createInitializedHandler(invokeCliJsonContractMock);
+
+    const response = await handler.handleRequest({
+      jsonrpc: "2.0",
+      id: 55,
+      method: "tools/call",
+      params: {
+        name: "voratiq_list",
+        arguments: {
+          operator: "run",
+          mode: "detail",
+          sessionId: "run-123",
+          verbose: true,
+        },
+      },
+    });
+    const result = expectSuccess<CallToolResult>(response);
+    const failure = result.structuredContent as TransportFailureResult;
+
+    expect(failure.failureKind).toBe("invalid_input");
+    expect(failure.operator).toBe("list");
+    expect(failure.message).toContain("MCP list detail mode");
+    expect(failure.details).toMatchObject({
+      semanticValidationMessage:
+        "MCP list detail mode only accepts operator, mode, and sessionId; unsupported field(s): verbose.",
+    });
+    expect(result.isError).toBe(true);
+    expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
+  });
+
+  it("reports mode-aware MCP list validation errors before spawning", async () => {
+    const invokeCliJsonContractMock =
+      jest.fn() as jest.MockedFunction<InvokeCliJsonContract>;
+    const handler = await createInitializedHandler(invokeCliJsonContractMock);
+
+    const response = await handler.handleRequest({
+      jsonrpc: "2.0",
+      id: 56,
+      method: "tools/call",
+      params: {
+        name: "voratiq_list",
+        arguments: {
+          operator: "run",
+          mode: "summary",
+          sessionId: "run-123",
+        },
+      },
+    });
+    const result = expectSuccess<CallToolResult>(response);
+    const failure = result.structuredContent as TransportFailureResult;
+
+    expect(failure.failureKind).toBe("invalid_input");
+    expect(failure.operator).toBe("list");
+    expect(failure.message).toBe(
+      'MCP list summary mode does not accept sessionId; use mode "detail" to inspect one session.',
+    );
+    expect(failure.details).toMatchObject({
+      semanticValidationMessage:
+        'MCP list summary mode does not accept sessionId; use mode "detail" to inspect one session.',
+    });
     expect(result.isError).toBe(true);
     expect(invokeCliJsonContractMock).not.toHaveBeenCalled();
   });

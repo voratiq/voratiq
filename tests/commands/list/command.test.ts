@@ -57,7 +57,7 @@ describe("executeListCommand", () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  it("renders run table view with only aborted runs hidden by default", async () => {
+  it("renders run summary view with only aborted runs hidden by default", async () => {
     await appendRunRecord({
       root: testDir,
       runsFilePath,
@@ -83,7 +83,7 @@ describe("executeListCommand", () => {
       }),
     );
 
-    expect(result.mode).toBe("table");
+    expect(result.mode).toBe("summary");
     expect(result.output).toContain("RUN");
     expect(result.output).toContain("TARGET");
     expect(result.output).toContain("STATUS");
@@ -93,7 +93,7 @@ describe("executeListCommand", () => {
     expect(result.output).not.toContain("run-aborted");
     expect(result.json).toMatchObject({
       operator: "run",
-      mode: "list",
+      mode: "summary",
       sessions: [
         {
           sessionId: "run-visible",
@@ -106,7 +106,7 @@ describe("executeListCommand", () => {
     });
   });
 
-  it("includes run aborted statuses with --verbose", async () => {
+  it("includes run aborted statuses with --all-statuses", async () => {
     await appendRunRecord({
       root: testDir,
       runsFilePath,
@@ -127,7 +127,7 @@ describe("executeListCommand", () => {
     const result = await executeListCommand(
       buildInput({
         operator: "run",
-        verbose: true,
+        allStatuses: true,
       }),
     );
 
@@ -137,12 +137,12 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("ABORTED");
     expect(result.json).toMatchObject({
       operator: "run",
-      mode: "list",
+      mode: "summary",
       sessions: [{ sessionId: "run-aborted" }, { sessionId: "run-visible" }],
     });
   });
 
-  it("applies --limit after default filtering in table mode", async () => {
+  it("applies --limit after default filtering in summary mode", async () => {
     await appendRunRecord({
       root: testDir,
       runsFilePath,
@@ -183,12 +183,12 @@ describe("executeListCommand", () => {
     expect(result.output).not.toContain("run-hidden-aborted");
     expect(result.json).toMatchObject({
       operator: "run",
-      mode: "list",
+      mode: "summary",
       sessions: [{ sessionId: "run-visible-newest" }],
     });
   });
 
-  it("renders run detail view for a succeeded run", async () => {
+  it("renders compact run detail by default", async () => {
     await appendRunRecord({
       root: testDir,
       runsFilePath,
@@ -211,8 +211,12 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("Workspace");
     expect(result.output).toContain("Target");
     expect(result.output).toContain("file:specs/task.md");
-    expect(result.output).toContain("Agent: agent-a");
-    expect(result.output).toContain(
+    expect(result.output).toContain("AGENT");
+    expect(findDetailTableRow(result.output, "agent-a", "SUCCEEDED")).toContain(
+      "5m",
+    );
+    expect(result.output).not.toContain("Agent: agent-a");
+    expect(result.output).not.toContain(
       "Output: .voratiq/run/sessions/run-succeeded/agent-a/artifacts/diff.patch",
     );
     expect(result.output).not.toContain("Base Revision");
@@ -243,6 +247,30 @@ describe("executeListCommand", () => {
     });
   });
 
+  it("renders expanded run detail with --verbose", async () => {
+    await appendRunRecord({
+      root: testDir,
+      runsFilePath,
+      record: buildRunRecord({
+        runId: "run-verbose-detail",
+        status: "succeeded",
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "run",
+        sessionId: "run-verbose-detail",
+        verbose: true,
+      }),
+    );
+
+    expect(result.output).toContain("Agent: agent-a");
+    expect(result.output).toContain(
+      "Output: .voratiq/run/sessions/run-verbose-detail/agent-a/artifacts/diff.patch",
+    );
+  });
+
   it("normalizes run spec-session lineage to a session target", async () => {
     await appendRunRecord({
       root: testDir,
@@ -262,16 +290,16 @@ describe("executeListCommand", () => {
       },
     });
 
-    const tableResult = await executeListCommand(
+    const summaryResult = await executeListCommand(
       buildInput({
         operator: "run",
       }),
     );
 
-    expect(tableResult.output).toContain("spec:spec-123");
-    expect(tableResult.json).toMatchObject({
+    expect(summaryResult.output).toContain("spec:spec-123");
+    expect(summaryResult.json).toMatchObject({
       operator: "run",
-      mode: "list",
+      mode: "summary",
       sessions: [
         expect.objectContaining({
           sessionId: "run-from-spec-session",
@@ -292,7 +320,10 @@ describe("executeListCommand", () => {
 
     expect(detailResult.output).toContain("Target");
     expect(detailResult.output).toContain("spec:spec-123");
-    expect(detailResult.output).toContain(
+    expect(
+      findDetailTableRow(detailResult.output, "agent-a", "SUCCEEDED"),
+    ).toContain("5m");
+    expect(detailResult.output).not.toContain(
       "Output: .voratiq/run/sessions/run-from-spec-session/agent-a/artifacts/diff.patch",
     );
     expect(detailResult.json).toMatchObject({
@@ -320,7 +351,7 @@ describe("executeListCommand", () => {
     });
   });
 
-  it("renders missing run diff artifacts as '-' and null in detail output", async () => {
+  it("keeps compact run detail focused on metadata and the status table when diff artifacts are missing", async () => {
     await appendRunRecord({
       root: testDir,
       runsFilePath,
@@ -352,8 +383,11 @@ describe("executeListCommand", () => {
       }),
     );
 
-    expect(result.output).toContain("Agent: agent-a");
-    expect(result.output).toContain("Output: —");
+    expect(findDetailTableRow(result.output, "agent-a", "SUCCEEDED")).toContain(
+      "5m",
+    );
+    expect(result.output).not.toContain("Agent: agent-a");
+    expect(result.output).not.toContain("Output: —");
     expect(result.json).toMatchObject({
       operator: "run",
       mode: "detail",
@@ -397,7 +431,7 @@ describe("executeListCommand", () => {
     expect(result.output).not.toContain("spec:run-from-file-target");
     expect(result.json).toMatchObject({
       operator: "run",
-      mode: "list",
+      mode: "summary",
       sessions: [
         expect.objectContaining({
           sessionId: "run-from-file-target",
@@ -447,7 +481,7 @@ describe("executeListCommand", () => {
     expect(lines[1]).toContain(expectedPreview);
     expect(result.json).toMatchObject({
       operator: "run",
-      mode: "list",
+      mode: "summary",
       sessions: [
         expect.objectContaining({
           sessionId: "run-long-target",
@@ -460,7 +494,7 @@ describe("executeListCommand", () => {
     });
   });
 
-  it("renders spec table with default aborted filtering and verbose override", async () => {
+  it("renders spec summary with default aborted filtering and --all-statuses", async () => {
     await appendSpecRecord({
       root: testDir,
       specsFilePath,
@@ -489,24 +523,24 @@ describe("executeListCommand", () => {
     expect(defaultResult.output).toContain("Generate task spec");
     expect(defaultResult.output).not.toContain("spec-aborted");
 
-    const verboseResult = await executeListCommand(
+    const allStatusesResult = await executeListCommand(
       buildInput({
         operator: "spec",
-        verbose: true,
+        allStatuses: true,
       }),
     );
-    expect(verboseResult.output).toContain("spec-visible");
-    expect(verboseResult.output).toContain("spec-aborted");
-    expect(verboseResult.output).toContain("ABORTED");
-    expect(verboseResult.json).toMatchObject({
+    expect(allStatusesResult.output).toContain("spec-visible");
+    expect(allStatusesResult.output).toContain("spec-aborted");
+    expect(allStatusesResult.output).toContain("ABORTED");
+    expect(allStatusesResult.json).toMatchObject({
       operator: "spec",
-      mode: "list",
+      mode: "summary",
     });
-    expect(verboseResult.json.mode).toBe("list");
-    if (verboseResult.json.mode !== "list") {
+    expect(allStatusesResult.json.mode).toBe("summary");
+    if (allStatusesResult.json.mode !== "summary") {
       throw new Error("Expected list-mode JSON output");
     }
-    expect(verboseResult.json.sessions).toEqual(
+    expect(allStatusesResult.json.sessions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           sessionId: "spec-visible",
@@ -550,9 +584,9 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("—");
     expect(result.json).toMatchObject({
       operator: "spec",
-      mode: "list",
+      mode: "summary",
     });
-    if (result.json.mode !== "list") {
+    if (result.json.mode !== "summary") {
       throw new Error("Expected list-mode JSON output");
     }
     expect(result.json.sessions).toEqual(
@@ -595,7 +629,12 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("spec-aborted");
     expect(result.output).toContain("ABORTED");
     expect(result.output).toContain("AGENT");
+    expect(findDetailTableRow(result.output, "agent-a", "FAILED")).toContain(
+      "5m",
+    );
     expect(result.output).not.toContain("Description");
+    expect(result.output).not.toContain("Agent: agent-a");
+    expect(result.output).not.toContain("Output:");
     expect(result.json).toMatchObject({
       operator: "spec",
       mode: "detail",
@@ -668,6 +707,30 @@ describe("executeListCommand", () => {
     expect(row).toContain("5m");
   });
 
+  it("renders expanded spec detail with --verbose", async () => {
+    await appendSpecRecord({
+      root: testDir,
+      specsFilePath,
+      record: buildSpecRecord({
+        sessionId: "spec-verbose",
+        status: "succeeded",
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "spec",
+        sessionId: "spec-verbose",
+        verbose: true,
+      }),
+    );
+
+    expect(result.output).toContain("Agent: agent-a");
+    expect(result.output).toContain(
+      "Output: .voratiq/spec/sessions/spec-verbose/agent-a/artifacts/spec.md",
+    );
+  });
+
   it("normalizes spec description text in table json", async () => {
     await appendSpecRecord({
       root: testDir,
@@ -689,9 +752,9 @@ describe("executeListCommand", () => {
 
     expect(result.json).toMatchObject({
       operator: "spec",
-      mode: "list",
+      mode: "summary",
     });
-    if (result.json.mode !== "list") {
+    if (result.json.mode !== "summary") {
       throw new Error("Expected list-mode JSON output");
     }
     expect(result.json.sessions).toEqual(
@@ -748,7 +811,7 @@ describe("executeListCommand", () => {
     });
   });
 
-  it("renders a missing spec artifact as '-' in spec detail", async () => {
+  it("keeps compact spec detail focused on metadata and the status table when artifacts are missing", async () => {
     await appendSpecRecord({
       root: testDir,
       specsFilePath,
@@ -772,11 +835,14 @@ describe("executeListCommand", () => {
       }),
     );
 
-    expect(result.output).toContain("Agent: agent-a");
-    expect(result.output).toContain("Output: —");
+    expect(findDetailTableRow(result.output, "agent-a", "RUNNING")).toContain(
+      "—",
+    );
+    expect(result.output).not.toContain("Agent: agent-a");
+    expect(result.output).not.toContain("Output: —");
   });
 
-  it("renders reduce table with TARGET column and aborted filtering", async () => {
+  it("renders reduce summary with TARGET column and aborted filtering", async () => {
     await appendReductionRecord({
       root: testDir,
       reductionsFilePath,
@@ -806,13 +872,13 @@ describe("executeListCommand", () => {
     expect(defaultResult.output).toContain("reduce-visible");
     expect(defaultResult.output).not.toContain("reduce-aborted");
 
-    const verboseResult = await executeListCommand(
+    const allStatusesResult = await executeListCommand(
       buildInput({
         operator: "reduce",
-        verbose: true,
+        allStatuses: true,
       }),
     );
-    expect(verboseResult.output).toContain("reduce-aborted");
+    expect(allStatusesResult.output).toContain("reduce-aborted");
   });
 
   it("renders reduce detail with reducer status table", async () => {
@@ -837,8 +903,8 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("reduce-detail");
     expect(result.output).toContain("AGENT");
     expect(result.output).toMatch(/Target\s+run:run-123/u);
-    expect(result.output).toContain("Agent: agent-a");
-    expect(result.output).toContain("Output:");
+    expect(result.output).not.toContain("Agent: agent-a");
+    expect(result.output).not.toContain("Output:");
     expect(result.output).not.toContain("\nRun");
     expect(findDetailTableRow(result.output, "agent-a", "SUCCEEDED")).toContain(
       "5m",
@@ -905,7 +971,33 @@ describe("executeListCommand", () => {
     expect(row).toContain("—");
   });
 
-  it("renders message table with TARGET values and without a recipients column", async () => {
+  it("renders expanded reduce detail with --verbose", async () => {
+    const reduction = buildReductionRecord({
+      sessionId: "reduce-verbose",
+      status: "succeeded",
+      target: { type: "run", id: "run-123" },
+    });
+    await appendReductionRecord({
+      root: testDir,
+      reductionsFilePath,
+      record: reduction,
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "reduce",
+        sessionId: "reduce-verbose",
+        verbose: true,
+      }),
+    );
+
+    expect(result.output).toContain("Agent: agent-a");
+    expect(result.output).toContain(
+      "Output: .voratiq/reduce/sessions/reduce-verbose/agent-a/reduction.md",
+    );
+  });
+
+  it("renders message summary with TARGET values and without a recipients column", async () => {
     await appendMessageRecord({
       root: testDir,
       messagesFilePath,
@@ -958,9 +1050,9 @@ describe("executeListCommand", () => {
     expect(defaultResult.output).not.toContain("PROMPT");
     expect(defaultResult.json).toMatchObject({
       operator: "message",
-      mode: "list",
+      mode: "summary",
     });
-    if (defaultResult.json.mode !== "list") {
+    if (defaultResult.json.mode !== "summary") {
       throw new Error("Expected list-mode message json output");
     }
     const targetedRecord = defaultResult.json.sessions.find(
@@ -983,13 +1075,13 @@ describe("executeListCommand", () => {
     });
     expect(noTargetRecord).not.toHaveProperty("target");
 
-    const verboseResult = await executeListCommand(
+    const allStatusesResult = await executeListCommand(
       buildInput({
         operator: "message",
-        verbose: true,
+        allStatuses: true,
       }),
     );
-    expect(verboseResult.output).toContain("message-aborted");
+    expect(allStatusesResult.output).toContain("message-aborted");
   });
 
   it("middle-elides long message TARGET values to a 32-character preview", async () => {
@@ -1028,7 +1120,7 @@ describe("executeListCommand", () => {
     expect(lines[1]).toContain(expectedPreview);
     expect(result.json).toMatchObject({
       operator: "message",
-      mode: "list",
+      mode: "summary",
       sessions: [
         expect.objectContaining({
           sessionId: "message-long-target",
@@ -1041,7 +1133,7 @@ describe("executeListCommand", () => {
     });
   });
 
-  it("renders message detail like other operator detail views", async () => {
+  it("renders compact message detail like other operator detail views", async () => {
     await appendMessageRecord({
       root: testDir,
       messagesFilePath,
@@ -1060,16 +1152,15 @@ describe("executeListCommand", () => {
 
     expect(result.output).toContain("message-detail");
     expect(result.output).toContain("AGENT");
-    expect(result.output).toContain("Agent: agent-a");
-    expect(result.output).toContain("Output:");
+    expect(result.output).not.toContain("Agent: agent-a");
+    expect(result.output).not.toContain("Output:");
     expect(result.output).not.toContain("Request:");
     expect(result.output).not.toContain("Response:");
     expect(result.output).not.toContain("Response data:");
     expect(result.output).not.toContain("\nStatus: ");
     expect(result.output).not.toContain("\nDuration: ");
     expect(result.output).not.toContain("Target:");
-    expect(result.output).toContain("\n---\n");
-    expect(result.output?.trimEnd().endsWith("---")).toBe(false);
+    expect(result.output).not.toContain("\n---\n");
     expect(findDetailTableRow(result.output, "agent-a", "SUCCEEDED")).toContain(
       "5m",
     );
@@ -1095,6 +1186,30 @@ describe("executeListCommand", () => {
     const row = findDetailTableRow(result.output, "agent-a", "RUNNING");
     expect(result.output).toContain("Elapsed");
     expect(row).toContain("—");
+  });
+
+  it("renders expanded message detail with --verbose", async () => {
+    await appendMessageRecord({
+      root: testDir,
+      messagesFilePath,
+      record: buildMessageRecord({
+        sessionId: "message-verbose",
+        status: "succeeded",
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "message",
+        sessionId: "message-verbose",
+        verbose: true,
+      }),
+    );
+
+    expect(result.output).toContain("Agent: agent-a");
+    expect(result.output).toContain(
+      "Output: .voratiq/message/sessions/message-verbose/agent-a/artifacts/response.md",
+    );
   });
 
   it("renders persisted message targets in detail transcript and json", async () => {
@@ -1147,7 +1262,7 @@ describe("executeListCommand", () => {
       }),
     });
 
-    const tableResult = await executeListCommand(
+    const summaryResult = await executeListCommand(
       buildInput({
         operator: "message",
       }),
@@ -1159,10 +1274,10 @@ describe("executeListCommand", () => {
       }),
     );
 
-    expect(tableResult.output).toContain("run:run-123:gpt-5-4-high");
-    expect(tableResult.json).toMatchObject({
+    expect(summaryResult.output).toContain("run:run-123:gpt-5-4-high");
+    expect(summaryResult.json).toMatchObject({
       operator: "message",
-      mode: "list",
+      mode: "summary",
       sessions: [
         expect.objectContaining({
           sessionId: "message-lane-target",
@@ -1231,7 +1346,7 @@ describe("executeListCommand", () => {
     });
   });
 
-  it("renders verify table with TARGET column and aborted filtering", async () => {
+  it("renders verify summary with TARGET column and aborted filtering", async () => {
     await appendVerificationRecord({
       root: testDir,
       verificationsFilePath,
@@ -1259,13 +1374,13 @@ describe("executeListCommand", () => {
     expect(defaultResult.output).toContain("verify-visible");
     expect(defaultResult.output).not.toContain("verify-aborted");
 
-    const verboseResult = await executeListCommand(
+    const allStatusesResult = await executeListCommand(
       buildInput({
         operator: "verify",
-        verbose: true,
+        allStatuses: true,
       }),
     );
-    expect(verboseResult.output).toContain("verify-aborted");
+    expect(allStatusesResult.output).toContain("verify-aborted");
   });
 
   it("renders verify detail with method status table", async () => {
@@ -1301,9 +1416,9 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("verify-detail");
     expect(result.output).toContain("VERIFIER");
     expect(result.output).toContain("programmatic");
-    expect(result.output).toContain("Agent: —");
     expect(result.output).toMatch(/Target\s+run:run-123/u);
-    expect(result.output).toContain("Output:");
+    expect(result.output).not.toContain("Agent: —");
+    expect(result.output).not.toContain("Output:");
     expect(result.output).not.toContain("\nRun");
     expect(
       findDetailTableRow(result.output, "programmatic", "SUCCEEDED"),
@@ -1366,6 +1481,43 @@ describe("executeListCommand", () => {
     expect(row).toContain("—");
   });
 
+  it("renders expanded verify detail with --verbose", async () => {
+    const verification = buildVerificationRecord({
+      sessionId: "verify-verbose",
+      status: "succeeded",
+      methods: [
+        {
+          method: "programmatic",
+          slug: "programmatic",
+          scope: { kind: "run" },
+          status: "succeeded",
+          startedAt: "2026-03-01T00:00:00.000Z",
+          completedAt: "2026-03-01T00:01:00.000Z",
+          artifactPath:
+            ".voratiq/verify/sessions/verify-verbose/programmatic/artifacts/result.json",
+        },
+      ],
+    });
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: verification,
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-verbose",
+        verbose: true,
+      }),
+    );
+
+    expect(result.output).toContain("Agent: —");
+    expect(result.output).toContain(
+      "Output: .voratiq/verify/sessions/verify-verbose/programmatic/artifacts/result.json",
+    );
+  });
+
   it("renders message-target verify detail without mislabeling it as a reduction", async () => {
     await appendVerificationRecord({
       root: testDir,
@@ -1416,7 +1568,7 @@ describe("executeListCommand", () => {
     });
   });
 
-  it("renders interactive table output through the shared list pipeline", async () => {
+  it("renders interactive summary output through the shared list pipeline", async () => {
     await appendInteractiveSessionRecord({
       root: testDir,
       record: buildInteractiveRecord({
@@ -1448,7 +1600,7 @@ describe("executeListCommand", () => {
     expect(result.output).toContain("interactive-visible");
     expect(result.json).toEqual({
       operator: "interactive",
-      mode: "list",
+      mode: "summary",
       sessions: [
         {
           operator: "interactive",
@@ -1467,7 +1619,7 @@ describe("executeListCommand", () => {
     });
   });
 
-  it("applies interactive default filtering, verbose, and limit in table mode", async () => {
+  it("applies interactive default filtering, --all-statuses, and limit in summary mode", async () => {
     await appendInteractiveSessionRecord({
       root: testDir,
       record: buildInteractiveRecord({
@@ -1502,23 +1654,23 @@ describe("executeListCommand", () => {
 
     expect(defaultResult.json).toMatchObject({
       operator: "interactive",
-      mode: "list",
+      mode: "summary",
       sessions: [
         { sessionId: "interactive-newest" },
         { sessionId: "interactive-failed" },
       ],
     });
 
-    const verboseResult = await executeListCommand(
+    const allStatusesResult = await executeListCommand(
       buildInput({
         operator: "interactive",
-        verbose: true,
+        allStatuses: true,
       }),
     );
 
-    expect(verboseResult.output).toContain("interactive-oldest");
-    expect(verboseResult.output).toContain("interactive-failed");
-    expect(verboseResult.output).toContain("interactive-newest");
+    expect(allStatusesResult.output).toContain("interactive-oldest");
+    expect(allStatusesResult.output).toContain("interactive-failed");
+    expect(allStatusesResult.output).toContain("interactive-newest");
   });
 
   it("renders interactive detail output and json without target metadata", async () => {
@@ -1559,7 +1711,7 @@ describe("executeListCommand", () => {
     expect(result.output).not.toContain("Target");
     expect(result.output).toContain("AGENT");
     expect(result.output).toContain("agent-a");
-    expect(result.output).toContain(
+    expect(result.output).not.toContain(
       "Output: .voratiq/interactive/sessions/interactive-detail/artifacts/chat.jsonl",
     );
     expect(result.json).toEqual({
@@ -1598,7 +1750,36 @@ describe("executeListCommand", () => {
     expect(result.json.session).not.toHaveProperty("elapsed");
   });
 
-  it("renders interactive detail without a captured chat artifact as dash and null", async () => {
+  it("renders expanded interactive detail with --verbose", async () => {
+    await appendInteractiveSessionRecord({
+      root: testDir,
+      record: buildInteractiveRecord({
+        sessionId: "interactive-verbose",
+        status: "succeeded",
+        chat: {
+          captured: true,
+          format: "jsonl",
+          artifactPath:
+            ".voratiq/interactive/sessions/interactive-verbose/artifacts/chat.jsonl",
+        },
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "interactive",
+        sessionId: "interactive-verbose",
+        verbose: true,
+      }),
+    );
+
+    expect(result.output).toContain("Agent: agent-a");
+    expect(result.output).toContain(
+      "Output: .voratiq/interactive/sessions/interactive-verbose/artifacts/chat.jsonl",
+    );
+  });
+
+  it("keeps compact interactive detail focused on metadata and the status table when chat is missing", async () => {
     await appendInteractiveSessionRecord({
       root: testDir,
       record: buildInteractiveRecord({
@@ -1618,7 +1799,7 @@ describe("executeListCommand", () => {
       }),
     );
 
-    expect(result.output).toContain("Output: —");
+    expect(result.output).not.toContain("Output: —");
     expect(result.json).toMatchObject({
       operator: "interactive",
       mode: "detail",
@@ -1660,7 +1841,7 @@ describe("executeListCommand", () => {
       capturedOptions = undefined;
     });
 
-    it("passes limit and default-filter predicate to readRunRecords in default table mode", async () => {
+    it("passes limit and default-filter predicate to readRunRecords in default summary mode", async () => {
       await appendRunRecord({
         root: testDir,
         runsFilePath,
@@ -1682,7 +1863,7 @@ describe("executeListCommand", () => {
       expect(typeof capturedOptions!.predicate).toBe("function");
     });
 
-    it("passes limit without predicate in verbose table mode", async () => {
+    it("passes limit without predicate when --all-statuses disables summary filtering", async () => {
       await appendRunRecord({
         root: testDir,
         runsFilePath,
@@ -1698,7 +1879,7 @@ describe("executeListCommand", () => {
       });
 
       await executeListCommand(
-        buildInput({ operator: "run", limit: 5, verbose: true }),
+        buildInput({ operator: "run", limit: 5, allStatuses: true }),
       );
 
       expect(capturedOptions).toBeDefined();
@@ -1825,13 +2006,13 @@ describe("executeListCommand", () => {
 
       expect(result.json).toMatchObject({
         operator: "run",
-        mode: "list",
+        mode: "summary",
         sessions: [
           { sessionId: "run-visible-3" },
           { sessionId: "run-visible-2" },
         ],
       });
-      if (result.json.mode !== "list") {
+      if (result.json.mode !== "summary") {
         throw new Error("Expected list-mode JSON output");
       }
       expect(result.json.sessions).toHaveLength(2);
@@ -1842,6 +2023,7 @@ describe("executeListCommand", () => {
     operator: "spec" | "run" | "reduce" | "verify" | "message" | "interactive";
     sessionId?: string;
     limit?: number;
+    allStatuses?: boolean;
     verbose?: boolean;
   }) {
     return {
@@ -1855,6 +2037,7 @@ describe("executeListCommand", () => {
       operator: params.operator,
       sessionId: params.sessionId,
       limit: params.limit,
+      allStatuses: params.allStatuses,
       verbose: params.verbose,
     };
   }

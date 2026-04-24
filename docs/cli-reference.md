@@ -307,29 +307,36 @@ voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh
 
 ## `voratiq list`
 
-List recorded sessions for an operator.
+Inspect recorded sessions, or recover a recent `session-id`.
 
 ### Usage
 
 ```bash
-voratiq list [options]
+voratiq list --<operator> [session-id] [options]
 ```
 
 ### Options
 
-- `--spec [session-id]`: List spec sessions or show one spec session
-- `--run [session-id]`: List run sessions or show one run session
-- `--reduce [session-id]`: List reduction sessions or show one reduction session
-- `--verify [session-id]`: List verification sessions or show one verification session
-- `--message [session-id]`: List message sessions or show one message session
-- `--interactive [session-id]`: List interactive sessions or show one interactive session
-- `--limit <count>`: Show only the N most recent sessions (default: `10`)
-- `--verbose`: Show all statuses for the selected operator in table mode
-- `--json`: Emit machine-readable list output
+Pick one operator flag. Without an argument, it lists recent sessions for that operator. Pass a `session-id` to show one session in detail.
+
+- `--spec [session-id]`: Spec sessions
+- `--run [session-id]`: Run sessions
+- `--reduce [session-id]`: Reduction sessions
+- `--verify [session-id]`: Verification sessions
+- `--message [session-id]`: Message sessions
+- `--interactive [session-id]`: Interactive sessions
+- `--limit <count>`: Show the N most recent sessions in the list view (default: `10`)
+- `--all-statuses`: Include aborted sessions, which are hidden by default
+- `--verbose`: Expand the detail view with per-agent sections and artifact paths
+- `--json`: Emit machine-readable output
 
 ### Behavior
 
-Use `list` to recover recent `session-id` values or inspect a specific recorded session in detail.
+Without a `session-id`, `list` prints a compact table of recent sessions with status, target, and timing. Aborted sessions are hidden unless you pass `--all-statuses`. Use `--limit` to change how many rows you see.
+
+With a `session-id`, `list` prints that session's metadata and a per-agent status table. It is compact by default; `--verbose` expands it with per-agent sections and artifact paths.
+
+`--json` emits the same list or detail view as machine-readable output.
 
 ### Examples
 
@@ -338,7 +345,15 @@ voratiq list --run
 ```
 
 ```bash
+voratiq list --run --all-statuses
+```
+
+```bash
 voratiq list --verify 20251031-232802-abc123
+```
+
+```bash
+voratiq list --run 20251031-232802-abc123 --verbose
 ```
 
 ## `voratiq doctor`

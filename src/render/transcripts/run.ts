@@ -86,6 +86,7 @@ export interface RunTranscriptOptions {
   agents: readonly RunTranscriptAgentRecord[];
   isTty?: boolean;
   now?: number;
+  includeDetailSections?: boolean;
 }
 
 const DASH = "—";
@@ -110,6 +111,7 @@ export function formatRunElapsed(
 }
 
 export function renderRunTranscript(options: RunTranscriptOptions): string {
+  const includeDetailSections = options.includeDetailSections !== false;
   const style = resolveTranscriptShellStyle({ isTty: options.isTty });
   const shell = {
     metadataLines: buildRunMetadataSectionWithStyle(
@@ -153,7 +155,7 @@ export function renderRunTranscript(options: RunTranscriptOptions): string {
           }),
   };
 
-  if (options.agents.length === 0) {
+  if (options.agents.length === 0 || !includeDetailSections) {
     return renderStageFinalFrame({
       metadataLines: shell.metadataLines,
       statusTableLines: shell.statusTableLines,
