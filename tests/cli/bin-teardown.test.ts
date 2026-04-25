@@ -174,4 +174,124 @@ describe("CLI teardown dispatch", () => {
       processOnSpy.mockRestore();
     }
   });
+
+  it("keeps SIGINT teardown in control until abort persistence finishes", async () => {
+    jest.resetModules();
+
+    const stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+    const stderrSpy = jest
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    const processExitSpy = jest.spyOn(process, "exit").mockImplementation(((
+      code?: number,
+    ) => {
+      process.exitCode = code ?? 0;
+      return undefined as never;
+    }) as typeof process.exit);
+
+    const signalHandlers = new Map<string, () => void>();
+    const processOnceSpy = jest
+      .spyOn(process, "once")
+      .mockImplementation((event, handler) => {
+        signalHandlers.set(String(event), handler as () => void);
+        return process;
+      });
+    const processOnSpy = jest
+      .spyOn(process, "on")
+      .mockImplementation(() => process);
+
+    try {
+      const { terminateRegisteredActiveSessions } =
+        await import("../../src/commands/shared/teardown-registry.js");
+      const { flushAllSpecRecordBuffers } =
+        await import("../../src/domain/spec/persistence/adapter.js");
+      const { flushAllRunRecordBuffers } =
+        await import("../../src/domain/run/persistence/adapter.js");
+      const { flushAllReductionRecordBuffers } =
+        await import("../../src/domain/reduce/persistence/adapter.js");
+      const { flushAllVerificationRecordBuffers } =
+        await import("../../src/domain/verify/persistence/adapter.js");
+      const { flushAllMessageRecordBuffers } =
+        await import("../../src/domain/message/persistence/adapter.js");
+      const { flushAllInteractiveSessionBuffers } =
+        await import("../../src/domain/interactive/persistence/adapter.js");
+
+      const terminateRegisteredActiveSessionsMock = jest.mocked(
+        terminateRegisteredActiveSessions,
+      );
+      const flushAllSpecRecordBuffersMock = jest.mocked(
+        flushAllSpecRecordBuffers,
+      );
+      const flushAllRunRecordBuffersMock = jest.mocked(
+        flushAllRunRecordBuffers,
+      );
+      const flushAllReductionRecordBuffersMock = jest.mocked(
+        flushAllReductionRecordBuffers,
+      );
+      const flushAllVerificationRecordBuffersMock = jest.mocked(
+        flushAllVerificationRecordBuffers,
+      );
+      const flushAllMessageRecordBuffersMock = jest.mocked(
+        flushAllMessageRecordBuffers,
+      );
+      const flushAllInteractiveSessionBuffersMock = jest.mocked(
+        flushAllInteractiveSessionBuffers,
+      );
+
+      let resolveTermination!: (error: Error | null) => void;
+      const terminationPromise = new Promise<Error | null>((resolve) => {
+        resolveTermination = resolve;
+      });
+
+      terminateRegisteredActiveSessionsMock.mockReturnValue(terminationPromise);
+      flushAllSpecRecordBuffersMock.mockResolvedValue(undefined);
+      flushAllRunRecordBuffersMock.mockResolvedValue(undefined);
+      flushAllReductionRecordBuffersMock.mockResolvedValue(undefined);
+      flushAllVerificationRecordBuffersMock.mockResolvedValue(undefined);
+      flushAllMessageRecordBuffersMock.mockResolvedValue(undefined);
+      flushAllInteractiveSessionBuffersMock.mockResolvedValue(undefined);
+
+      const { runCli } = await import("../../src/bin.js");
+      await runCli(["node", "voratiq", "--version"]);
+
+      signalHandlers.get("SIGINT")?.();
+      await flushAsyncWork();
+
+      expect(terminateRegisteredActiveSessionsMock).toHaveBeenCalledTimes(1);
+      expect(terminateRegisteredActiveSessionsMock).toHaveBeenCalledWith(
+        "aborted",
+        "SIGINT",
+      );
+      expect(processExitSpy).not.toHaveBeenCalled();
+
+      signalHandlers.get("SIGINT")?.();
+      await flushAsyncWork();
+
+      expect(terminateRegisteredActiveSessionsMock).toHaveBeenCalledTimes(1);
+      expect(processExitSpy).not.toHaveBeenCalled();
+      expect(
+        processOnceSpy.mock.calls.filter(([event]) => event === "SIGINT"),
+      ).toHaveLength(3);
+
+      resolveTermination(null);
+      await flushAsyncWork();
+      await flushAsyncWork();
+
+      expect(flushAllSpecRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllRunRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllReductionRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllVerificationRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllMessageRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllInteractiveSessionBuffersMock).toHaveBeenCalledTimes(1);
+      expect(processExitSpy).toHaveBeenLastCalledWith(130);
+    } finally {
+      stdoutSpy.mockRestore();
+      stderrSpy.mockRestore();
+      processExitSpy.mockRestore();
+      processOnceSpy.mockRestore();
+      processOnSpy.mockRestore();
+    }
+  });
 });

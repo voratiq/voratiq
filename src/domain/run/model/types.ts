@@ -328,6 +328,7 @@ export type RunApplyStatus = z.infer<typeof applyStatusSchema>;
 export const AUTO_TERMINAL_STATUS_VALUES = [
   "succeeded",
   "failed",
+  "aborted",
   "action_required",
 ] as const;
 

@@ -153,6 +153,13 @@ export async function executeVerifyCommand(
       status: "queued",
     });
 
+    const mutators = createVerificationRecordMutators({
+      root,
+      verificationsFilePath,
+      verificationId,
+    });
+    await mutators.recordVerificationRunning(createdAt);
+
     renderer?.begin({
       verificationId,
       createdAt,
@@ -169,13 +176,6 @@ export async function executeVerifyCommand(
       ),
       status: "running",
     });
-
-    const mutators = createVerificationRecordMutators({
-      root,
-      verificationsFilePath,
-      verificationId,
-    });
-    await mutators.recordVerificationRunning(createdAt);
 
     const [programmaticResult, rubricResult] = await Promise.allSettled([
       executeAndPersistProgrammaticMethod({

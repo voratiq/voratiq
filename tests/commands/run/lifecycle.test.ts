@@ -87,6 +87,20 @@ function createMockChildProcess(
   return child;
 }
 
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 describe("terminateActiveRun", () => {
   it("waits for initial run record persistence before rewriting termination state", async () => {
     let resolveRecordInit!: (persisted: boolean) => void;
@@ -194,6 +208,55 @@ describe("terminateActiveRun", () => {
     );
 
     warnSpy.mockRestore();
+  });
+
+  it("keeps the run aborted when abort is requested repeatedly mid-termination", async () => {
+    const terminationGate = createDeferred<void>();
+    const terminateSessionProcessesSpy = jest
+      .spyOn(sandboxRegistry, "terminateSessionProcesses")
+      .mockImplementation(() => terminationGate.promise);
+
+    registerActiveRun({
+      root: "/repo",
+      runsFilePath: "/repo/.voratiq/run/index.json",
+      runId: RUN_ID,
+      agents: [],
+    });
+
+    const existingRecord: RunRecord = {
+      runId: RUN_ID,
+      baseRevisionSha: "abc123",
+      rootPath: ".",
+      spec: { path: "specs/demo.md" },
+      status: "running",
+      createdAt: "2025-11-04T18:00:00.000Z",
+      agents: [],
+    };
+
+    let mutatedRecord: RunRecord | undefined;
+    rewriteRunRecordMock.mockImplementation(({ mutate }) => {
+      mutatedRecord = mutate(existingRecord);
+      return Promise.resolve(mutatedRecord);
+    });
+
+    try {
+      const firstTermination = terminateActiveRun("aborted");
+      await Promise.resolve();
+
+      const repeatedTermination = terminateActiveRun("aborted");
+      await repeatedTermination;
+
+      expect(terminateSessionProcessesSpy).toHaveBeenCalledTimes(1);
+      expect(rewriteRunRecordMock).not.toHaveBeenCalled();
+
+      terminationGate.resolve(undefined);
+      await firstTermination;
+
+      expect(rewriteRunRecordMock).toHaveBeenCalledTimes(1);
+      expect(mutatedRecord?.status).toBe("aborted");
+    } finally {
+      terminateSessionProcessesSpy.mockRestore();
+    }
   });
 
   it("rewrites queued and running agents to aborted snapshots", async () => {

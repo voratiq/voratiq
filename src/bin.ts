@@ -11,10 +11,26 @@ const SIGNAL_EXIT_CODES: Partial<Record<NodeJS.Signals, number>> = {
   SIGTERM: 143,
 };
 
+const PROCESS_GUARD_SIGNALS = ["SIGHUP", "SIGINT", "SIGTERM"] as const;
+
 let activeJsonEnvelopeOperator:
   | import("./cli/operator-envelope.js").EnvelopeOperator
   | undefined;
 let processGuardsInstalled = false;
+let activeShutdownState: ProcessShutdownState | undefined;
+
+type ProcessGuardSignal = (typeof PROCESS_GUARD_SIGNALS)[number];
+
+type ProcessShutdownState =
+  | {
+      kind: "fatal";
+      promise: Promise<void>;
+    }
+  | {
+      kind: "signal";
+      exitCode: number;
+      promise: Promise<void>;
+    };
 
 function installProcessGuards(): void {
   if (processGuardsInstalled) {
@@ -22,19 +38,73 @@ function installProcessGuards(): void {
   }
   processGuardsInstalled = true;
 
-  for (const signal of ["SIGHUP", "SIGINT", "SIGTERM"] as const) {
-    process.once(signal, () => {
-      void handleSignal(signal);
-    });
+  for (const signal of PROCESS_GUARD_SIGNALS) {
+    installSignalGuard(signal);
   }
 
   process.on("uncaughtException", (error) => {
-    void handleFatalError("uncaught exception", error);
+    void beginFatalShutdown("uncaught exception", error);
   });
 
   process.on("unhandledRejection", (reason) => {
-    void handleFatalError("unhandled rejection", reason);
+    void beginFatalShutdown("unhandled rejection", reason);
   });
+}
+
+function installSignalGuard(signal: ProcessGuardSignal): void {
+  const handler = () => {
+    // Re-arm the listener before awaiting teardown so repeated interrupts stay
+    // inside the coordinated abort path instead of falling through to the
+    // process default signal exit.
+    process.once(signal, handler);
+    void beginSignalShutdown(signal);
+  };
+
+  process.once(signal, handler);
+}
+
+async function beginFatalShutdown(
+  context: string,
+  error: unknown,
+): Promise<void> {
+  if (activeShutdownState) {
+    if (activeShutdownState.kind === "signal") {
+      return;
+    }
+    await activeShutdownState.promise;
+    return;
+  }
+
+  const promise = handleFatalError(context, error).finally(() => {
+    if (activeShutdownState?.promise === promise) {
+      activeShutdownState = undefined;
+    }
+  });
+
+  activeShutdownState = { kind: "fatal", promise };
+  await promise;
+}
+
+async function beginSignalShutdown(signal: ProcessGuardSignal): Promise<void> {
+  if (activeShutdownState) {
+    if (activeShutdownState.kind === "signal") {
+      process.exitCode = activeShutdownState.exitCode;
+      await activeShutdownState.promise;
+    }
+    return;
+  }
+
+  const exitCode = SIGNAL_EXIT_CODES[signal] ?? 1;
+  process.exitCode = exitCode;
+
+  const promise = handleSignal(signal).finally(() => {
+    if (activeShutdownState?.promise === promise) {
+      activeShutdownState = undefined;
+    }
+  });
+
+  activeShutdownState = { kind: "signal", exitCode, promise };
+  await promise;
 }
 
 async function handleFatalError(

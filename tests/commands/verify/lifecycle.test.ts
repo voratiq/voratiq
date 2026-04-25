@@ -55,6 +55,20 @@ const flushVerificationRecordBufferMock = jest.mocked(
 const writeVerificationArtifactMock = jest.mocked(writeVerificationArtifact);
 const teardownSessionAuthMock = jest.mocked(teardownSessionAuth);
 
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 describe("verify lifecycle", () => {
   const VERIFICATION_ID = "verify-123";
   const tempRoots: string[] = [];
@@ -259,6 +273,69 @@ describe("verify lifecycle", () => {
       verificationsFilePath: "/repo/.voratiq/verify/index.json",
       sessionId: VERIFICATION_ID,
     });
+  });
+
+  it("still finalizes queued verification state to aborted under repeated abort pressure", async () => {
+    const readGate = createDeferred<VerificationRecord[]>();
+    const existingRecord: VerificationRecord = {
+      sessionId: VERIFICATION_ID,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      status: "queued",
+      target: {
+        kind: "run",
+        sessionId: "run-123",
+        candidateIds: ["agent-a"],
+      },
+      methods: [
+        {
+          method: "programmatic",
+          slug: "programmatic",
+          scope: { kind: "run" },
+          status: "queued",
+        },
+      ],
+    };
+
+    registerActiveVerification({
+      root: "/repo",
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
+      verificationId: VERIFICATION_ID,
+    });
+
+    let mutatedRecord: VerificationRecord | undefined;
+    readVerificationRecordsMock.mockImplementation(() => readGate.promise);
+    rewriteVerificationRecordMock.mockImplementation(({ mutate }) => {
+      mutatedRecord = mutate(existingRecord);
+      return Promise.resolve(mutatedRecord);
+    });
+
+    const firstTermination = terminateActiveVerification("aborted");
+    await Promise.resolve();
+
+    const repeatedTermination = terminateActiveVerification("aborted");
+    await repeatedTermination;
+
+    expect(readVerificationRecordsMock).toHaveBeenCalledTimes(1);
+    expect(rewriteVerificationRecordMock).not.toHaveBeenCalled();
+    expect(flushVerificationRecordBufferMock).not.toHaveBeenCalled();
+
+    readGate.resolve([existingRecord]);
+    await firstTermination;
+
+    expect(writeVerificationArtifactMock).toHaveBeenCalledTimes(1);
+    expect(rewriteVerificationRecordMock).toHaveBeenCalledTimes(1);
+    expect(flushVerificationRecordBufferMock).toHaveBeenCalledWith({
+      verificationsFilePath: "/repo/.voratiq/verify/index.json",
+      sessionId: VERIFICATION_ID,
+    });
+    expect(mutatedRecord?.status).toBe("aborted");
+    expect(mutatedRecord?.methods).toEqual([
+      expect.objectContaining({
+        method: "programmatic",
+        status: "aborted",
+        error: VERIFY_ABORT_DETAIL,
+      }),
+    ]);
   });
 
   it("prunes verify scratch state while retaining artifacts on finalization", async () => {
