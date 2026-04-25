@@ -781,6 +781,49 @@ describe("voratiq auto", () => {
     expect(process.exitCode).toBe(1);
   });
 
+  it("surfaces an aborted run as auto aborted and does not continue to verify", async () => {
+    const stdout: string[] = [];
+    stdoutSpy = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    runRunCommandMock.mockResolvedValue({
+      report: {
+        runId: "run-spec-abort",
+        spec: { path: ".voratiq/spec/existing.md" },
+        status: "aborted",
+        createdAt: new Date().toISOString(),
+        baseRevisionSha: "deadbeef",
+        agents: [{ agentId: "agent-a" } as never],
+        hadAgentFailure: false,
+      },
+      body: "run-spec-abort ABORTED",
+      exitCode: 3,
+    });
+
+    await withTempRepo(async () => {
+      const result = await runAutoCommand({
+        specPath: ".voratiq/spec/existing.md",
+        apply: true,
+      });
+
+      expect(result.auto.status).toBe("aborted");
+      expect(result.apply.status).toBe("skipped");
+      expect(result.exitCode).toBe(3);
+    });
+
+    expect(runVerifyCommandMock).not.toHaveBeenCalled();
+    expect(runApplyCommandMock).not.toHaveBeenCalled();
+
+    const output = stripAnsi(stdout.join(""));
+    expect(output).toContain("run-spec-abort ABORTED");
+    expect(output).toContain("Auto ABORTED");
+    expect(process.exitCode).toBe(3);
+  });
+
   it("keeps --spec stage order deterministic through apply", async () => {
     const stdout: string[] = [];
     stdoutSpy = jest
@@ -989,7 +1032,7 @@ describe("voratiq auto", () => {
     expect(output).not.toMatch(cursorUpPattern);
   });
 
-  it("runs verification even when run reports agent failure", async () => {
+  it("does not continue to verification when the run stage fails", async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];
 
@@ -1021,13 +1064,6 @@ describe("voratiq auto", () => {
       exitCode: 1,
     });
 
-    mockRunVerifyResolvedValue(
-      buildVerifyResult({
-        verificationId: "verify-456",
-        outputPath: ".voratiq/verify/sessions/verify-456",
-      }),
-    );
-
     await runAutoCommand({
       specPath: ".voratiq/spec/existing.md",
       verifyAgentIds: ["verifier"],
@@ -1039,13 +1075,7 @@ describe("voratiq auto", () => {
         agentOverrideFlag: "--run-agent",
       }),
     );
-    expect(runVerifyCommandMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        target: { kind: "run", sessionId: "run-123" },
-        agentIds: ["verifier"],
-        agentOverrideFlag: "--verify-agent",
-      }),
-    );
+    expect(runVerifyCommandMock).not.toHaveBeenCalled();
     expect(runApplyCommandMock).not.toHaveBeenCalled();
 
     expect(stripAnsi(stdout.join(""))).toContain("Auto FAILED");

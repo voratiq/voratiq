@@ -124,7 +124,7 @@ export type AutoCommandEvent =
     };
 
 export interface AutoPhaseSummary {
-  status: "succeeded" | "failed" | "skipped";
+  status: "succeeded" | "failed" | "aborted" | "skipped";
   durationMs?: number;
   detail?: string;
 }
@@ -195,17 +195,18 @@ export async function executeAutoCommand(
   };
 
   let hardFailure = false;
+  let hardAbort = false;
   let actionRequired = false;
   let actionRequiredDetail: string | undefined;
 
   let specStartedAt: number | undefined;
-  let specStatus: "succeeded" | "failed" | "skipped" = "skipped";
+  let specStatus: "succeeded" | "failed" | "aborted" | "skipped" = "skipped";
   let specPath: string | undefined;
   let specDetail: string | undefined;
   let specSessionId: string | undefined;
 
   let runStartedAt: number | undefined;
-  let runStatus: "succeeded" | "failed" | "skipped" = "skipped";
+  let runStatus: "succeeded" | "failed" | "aborted" | "skipped" = "skipped";
   let runId: string | undefined;
   let runDetail: string | undefined;
   let runRecordStatus: RunStatus | undefined;
@@ -214,7 +215,7 @@ export async function executeAutoCommand(
   let runBaseRevisionSha: string | undefined;
 
   let verifyStartedAt: number | undefined;
-  let verifyStatus: "succeeded" | "failed" | "skipped" = "skipped";
+  let verifyStatus: "succeeded" | "failed" | "aborted" | "skipped" = "skipped";
   let verifyDetail: string | undefined;
   let verifySelection: SelectionDecision | undefined;
 
@@ -257,7 +258,7 @@ export async function executeAutoCommand(
     }
   }
 
-  if (!hardFailure && !actionRequired && hasDescription) {
+  if (!hardFailure && !hardAbort && !actionRequired && hasDescription) {
     if (!specSessionId) {
       specStatus = "failed";
       specDetail = "Spec stage did not return a session id.";
@@ -323,13 +324,19 @@ export async function executeAutoCommand(
     }
   }
 
-  if (!resolvedSpecPath && !hardFailure && !actionRequired && hasDescription) {
+  if (
+    !resolvedSpecPath &&
+    !hardFailure &&
+    !hardAbort &&
+    !actionRequired &&
+    hasDescription
+  ) {
     specStatus = "failed";
     specDetail = "Spec verification did not select a spec path.";
     hardFailure = true;
   }
 
-  if (!hardFailure && !actionRequired && resolvedSpecPath) {
+  if (!hardFailure && !hardAbort && !actionRequired && resolvedSpecPath) {
     runStartedAt = now();
 
     try {
@@ -363,21 +370,30 @@ export async function executeAutoCommand(
         });
       }
 
-      runStatus = resolvedRunExitCode === 0 ? "succeeded" : "failed";
+      runStatus =
+        resolvedRunExitCode === 0
+          ? "succeeded"
+          : runResult.report.status === "aborted"
+            ? "aborted"
+            : "failed";
       runId = runResult.report.runId;
       runRecordStatus = runResult.report.status;
       runCreatedAt = runResult.report.createdAt;
       runSpecPath = runResult.report.spec?.path;
       runBaseRevisionSha = runResult.report.baseRevisionSha;
 
-      if (runStatus === "failed") {
+      if (runStatus !== "succeeded") {
         const statusDetail = runRecordStatus
           ? `status \`${runRecordStatus}\``
           : "a non-success status";
         runDetail =
           runDetail ??
           `Run completed with ${statusDetail} (exit code ${resolvedRunExitCode}).`;
-        hardFailure = true;
+        if (runStatus === "aborted") {
+          hardAbort = true;
+        } else {
+          hardFailure = true;
+        }
       }
 
       recordEvent({
@@ -395,7 +411,10 @@ export async function executeAutoCommand(
 
   const shouldAttemptVerifyRun =
     runId !== undefined &&
-    (!hardFailure || (!hasDescription && runStatus !== "skipped"));
+    runStatus === "succeeded" &&
+    !hardFailure &&
+    !hardAbort &&
+    !actionRequired;
 
   if (shouldAttemptVerifyRun && runId) {
     verifyStartedAt = now();
@@ -544,6 +563,7 @@ export async function executeAutoCommand(
 
   const autoStatus = resolveAutoTerminalStatus({
     hardFailure,
+    hardAbort,
     actionRequired,
   });
   const autoDetail = resolveAutoTerminalDetail({
@@ -618,8 +638,12 @@ function assertAutoOptionCompatibility(options: ExecuteAutoCommandInput): void {
 
 function resolveAutoTerminalStatus(options: {
   hardFailure: boolean;
+  hardAbort: boolean;
   actionRequired: boolean;
 }): AutoTerminalStatus {
+  if (options.hardAbort) {
+    return "aborted";
+  }
   if (options.hardFailure) {
     return "failed";
   }
@@ -630,7 +654,13 @@ function resolveAutoTerminalStatus(options: {
 }
 
 function mapAutoTerminalStatusToExitCode(status: AutoTerminalStatus): number {
-  return status === "succeeded" ? 0 : 1;
+  if (status === "succeeded") {
+    return 0;
+  }
+  if (status === "aborted") {
+    return 3;
+  }
+  return 1;
 }
 
 function truncateOutcomeDetail(detail?: string): string | undefined {
@@ -665,6 +695,10 @@ function resolveAutoTerminalDetail(options: {
         options.runDetail ??
         options.specDetail,
     );
+  }
+
+  if (options.status === "aborted") {
+    return truncateOutcomeDetail(options.runDetail ?? options.verifyDetail);
   }
 
   return undefined;

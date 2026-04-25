@@ -78,6 +78,35 @@ function findEventIndex(
 }
 
 describe("executeAutoCommand", () => {
+  it("does not continue past a failed spec stage", async () => {
+    const runRunStage = jest.fn<AutoCommandDependencies["runRunStage"]>();
+    const runVerifyStage = jest.fn<AutoCommandDependencies["runVerifyStage"]>();
+    const runApplyStage = jest.fn<AutoCommandDependencies["runApplyStage"]>();
+    const dependencies = createDependencies({
+      now: () => 0,
+      runSpecStage: jest
+        .fn<AutoCommandDependencies["runSpecStage"]>()
+        .mockRejectedValue(new Error("Spec stage exploded")),
+      runRunStage,
+      runVerifyStage,
+      runApplyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        description: "Define the task",
+        apply: true,
+      },
+      dependencies,
+    );
+
+    expect(runVerifyStage).not.toHaveBeenCalled();
+    expect(runRunStage).not.toHaveBeenCalled();
+    expect(runApplyStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("failed");
+    expect(result.auto.detail).toBe("Spec stage exploded");
+  });
+
   it("continues through spec verification when spec generation produces multiple drafts", async () => {
     const runRunStage = jest
       .fn<AutoCommandDependencies["runRunStage"]>()
@@ -420,6 +449,45 @@ describe("executeAutoCommand", () => {
     expect(result.exitCode).toBe(1);
   });
 
+  it("does not continue past a failed spec verification stage", async () => {
+    const runRunStage = jest.fn<AutoCommandDependencies["runRunStage"]>();
+    const runApplyStage = jest.fn<AutoCommandDependencies["runApplyStage"]>();
+    const runVerifyStage = jest
+      .fn<AutoCommandDependencies["runVerifyStage"]>()
+      .mockResolvedValueOnce(
+        createVerifyStageResult({
+          body: "spec verify body",
+          exitCode: 1,
+        }),
+      );
+    const dependencies = createDependencies({
+      now: () => 0,
+      runSpecStage: jest
+        .fn<AutoCommandDependencies["runSpecStage"]>()
+        .mockResolvedValue({
+          sessionId: "spec-session-no-success",
+          body: "spec body",
+          generatedSpecPaths: ["specs/a.md"],
+        }),
+      runRunStage,
+      runVerifyStage,
+      runApplyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        description: "Define the task",
+        apply: true,
+      },
+      dependencies,
+    );
+
+    expect(runVerifyStage).toHaveBeenCalledTimes(1);
+    expect(runRunStage).not.toHaveBeenCalled();
+    expect(runApplyStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("failed");
+  });
+
   it("returns action required when verify(spec) is unresolved", async () => {
     const runRunStage = jest.fn<AutoCommandDependencies["runRunStage"]>();
     const runVerifyStage = jest
@@ -645,6 +713,112 @@ describe("executeAutoCommand", () => {
         "Verification reported warnings for the selected candidate; automatic apply halted. Review the verify output and apply manually if appropriate.",
       separateWithDivider: true,
     });
+  });
+
+  it("does not verify after a failed run", async () => {
+    const runVerifyStage = jest.fn<AutoCommandDependencies["runVerifyStage"]>();
+    const runApplyStage = jest.fn<AutoCommandDependencies["runApplyStage"]>();
+    const dependencies = createDependencies({
+      now: () => 0,
+      runRunStage: jest
+        .fn<AutoCommandDependencies["runRunStage"]>()
+        .mockResolvedValue(
+          createRunStageResult({
+            report: {
+              ...createRunStageResult().report,
+              status: "failed",
+            },
+          }),
+        ),
+      runVerifyStage,
+      runApplyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        specPath: "specs/task.md",
+        apply: true,
+      },
+      dependencies,
+    );
+
+    expect(runVerifyStage).not.toHaveBeenCalled();
+    expect(runApplyStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("failed");
+    expect(result.summary.run.detail).toBe(
+      "Run completed with status `failed` (exit code 1).",
+    );
+  });
+
+  it("does not verify after an aborted run", async () => {
+    const runVerifyStage = jest.fn<AutoCommandDependencies["runVerifyStage"]>();
+    const runApplyStage = jest.fn<AutoCommandDependencies["runApplyStage"]>();
+    const dependencies = createDependencies({
+      now: () => 0,
+      runRunStage: jest
+        .fn<AutoCommandDependencies["runRunStage"]>()
+        .mockResolvedValue(
+          createRunStageResult({
+            report: {
+              ...createRunStageResult().report,
+              status: "aborted",
+            },
+          }),
+        ),
+      runVerifyStage,
+      runApplyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        specPath: "specs/task.md",
+        apply: true,
+      },
+      dependencies,
+    );
+
+    expect(runVerifyStage).not.toHaveBeenCalled();
+    expect(runApplyStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("aborted");
+    expect(result.exitCode).toBe(3);
+    expect(result.summary.status).toBe("aborted");
+    expect(result.summary.run.status).toBe("aborted");
+    expect(result.summary.run.detail).toBe(
+      "Run completed with status `aborted` (exit code 3).",
+    );
+  });
+
+  it("does not apply after a failed verify stage", async () => {
+    const runApplyStage = jest.fn<AutoCommandDependencies["runApplyStage"]>();
+    const dependencies = createDependencies({
+      now: () => 0,
+      runRunStage: jest
+        .fn<AutoCommandDependencies["runRunStage"]>()
+        .mockResolvedValue(createRunStageResult()),
+      runVerifyStage: jest
+        .fn<AutoCommandDependencies["runVerifyStage"]>()
+        .mockResolvedValue(
+          createVerifyStageResult({
+            body: "run verify body",
+            exitCode: 1,
+          }),
+        ),
+      runApplyStage,
+    });
+
+    const result = await executeAutoCommand(
+      {
+        specPath: "specs/task.md",
+        apply: true,
+      },
+      dependencies,
+    );
+
+    expect(runApplyStage).not.toHaveBeenCalled();
+    expect(result.auto.status).toBe("failed");
+    expect(result.summary.verify.detail).toBe(
+      "Verification did not produce any successful verifier results.",
+    );
   });
 
   it("uses the generic unresolved fallback for verify(run)", async () => {

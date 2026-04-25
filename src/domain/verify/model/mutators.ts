@@ -50,6 +50,7 @@ export function createVerificationRecordMutators(
             }),
           };
         },
+        forceFlush: true,
       });
     },
     recordMethodSnapshot: async (method) => {

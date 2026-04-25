@@ -5,7 +5,7 @@ import { colorize } from "../../utils/colors.js";
 import { formatDurationLabel } from "../utils/duration.js";
 import { renderTranscript } from "../utils/transcript.js";
 
-export type AutoPhaseStatus = "succeeded" | "failed" | "skipped";
+export type AutoPhaseStatus = "succeeded" | "failed" | "aborted" | "skipped";
 
 export interface AutoPhaseSummary {
   status: AutoPhaseStatus;
@@ -35,14 +35,18 @@ export function renderAutoSummaryTranscript(input: AutoSummaryInput): string {
       ? "ACTION_REQUIRED"
       : input.status === "succeeded"
         ? "SUCCEEDED"
-        : "FAILED";
+        : input.status === "aborted"
+          ? "ABORTED"
+          : "FAILED";
   const statusStyle =
     input.status === "action_required"
       ? { cli: "yellow" as const }
       : getRunStatusStyle(
           (input.status === "succeeded"
             ? "succeeded"
-            : "failed") satisfies RunStatus,
+            : input.status === "aborted"
+              ? "aborted"
+              : "failed") satisfies RunStatus,
         );
   const lines: string[] = [
     `Auto ${colorize(statusLabel, statusStyle.cli)} (${totalDuration})`,
