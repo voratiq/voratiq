@@ -258,7 +258,7 @@ describe("collectAgentArtifacts", () => {
     expect(await pathExists(workspaceSummary)).toBe(false);
   });
 
-  it("does not recopy node dependencies after export for Next.js run workspaces", async () => {
+  it("restores copied node dependencies after export for Next.js run workspaces", async () => {
     await writeFile(
       join(repoRoot, "package.json"),
       JSON.stringify({
@@ -272,6 +272,12 @@ describe("collectAgentArtifacts", () => {
       recursive: true,
       force: true,
     });
+    await mkdir(join(repoRoot, "node_modules", "next"), { recursive: true });
+    await writeFile(
+      join(repoRoot, "node_modules", "next", "package.json"),
+      '{"name":"next"}',
+      "utf8",
+    );
     await mkdir(join(workspacePath, "node_modules", "next"), {
       recursive: true,
     });
@@ -290,8 +296,20 @@ describe("collectAgentArtifacts", () => {
       });
 
       expect(result.summaryCaptured).toBe(true);
-      expect(ensureSpy).not.toHaveBeenCalled();
-      expect(await pathExists(join(workspacePath, "node_modules"))).toBe(false);
+      expect(ensureSpy).toHaveBeenCalledWith({
+        root: repoRoot,
+        workspacePath,
+        environment,
+        stageId: "run",
+      });
+      const restoredStats = await lstat(join(workspacePath, "node_modules"));
+      expect(restoredStats.isSymbolicLink()).toBe(false);
+      expect(
+        await readFile(
+          join(workspacePath, "node_modules", "next", "package.json"),
+          "utf8",
+        ),
+      ).toBe('{"name":"next"}');
     } finally {
       ensureSpy.mockRestore();
     }
@@ -354,6 +372,53 @@ describe("collectAgentArtifacts", () => {
       ).rejects.toThrow(
         "Failed to restore workspace dependencies after export: relink boom",
       );
+    } finally {
+      ensureSpy.mockRestore();
+    }
+  });
+
+  it("fails when copied dependency restoration does not succeed", async () => {
+    await writeFile(
+      join(repoRoot, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          next: "15.0.0",
+        },
+      }),
+      "utf8",
+    );
+    await rm(join(workspacePath, "node_modules"), {
+      recursive: true,
+      force: true,
+    });
+    await mkdir(join(workspacePath, "node_modules", "next"), {
+      recursive: true,
+    });
+
+    const ensureSpy = jest
+      .spyOn(workspaceDependencies, "ensureWorkspaceDependencies")
+      .mockRejectedValue(new Error("recopy boom"));
+
+    try {
+      await expect(
+        collectAgentArtifacts({
+          baseRevisionSha: "base-sha",
+          workspacePaths,
+          root: repoRoot,
+          environment,
+          persona,
+        }),
+      ).rejects.toThrow(
+        "Failed to restore workspace dependencies after export: recopy boom",
+      );
+
+      expect(await pathExists(join(workspacePath, "node_modules"))).toBe(false);
+      expect(ensureSpy).toHaveBeenCalledWith({
+        root: repoRoot,
+        workspacePath,
+        environment,
+        stageId: "run",
+      });
     } finally {
       ensureSpy.mockRestore();
     }

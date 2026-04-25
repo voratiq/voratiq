@@ -21,7 +21,6 @@ import { enforceCredentialExclusion } from "../../../../workspace/credential-gua
 import {
   cleanupWorkspaceDependencies,
   ensureWorkspaceDependencies,
-  resolveWorkspaceDependencyStrategy,
   WorkspaceDependencyCleanupError,
   type WorkspaceDependencyCleanupResult,
 } from "../../../../workspace/dependencies.js";
@@ -54,17 +53,11 @@ export async function collectAgentArtifacts(options: {
 
   const { workspacePath, artifactsPath, summaryPath, diffPath } =
     workspacePaths;
-  const dependencyStrategy = await resolveWorkspaceDependencyStrategy({
-    root,
-    environment,
-    stageId: "run",
-  });
 
   let dependenciesCleanup: WorkspaceDependencyCleanupResult = {
     nodeRemoved: false,
     pythonRemoved: false,
   };
-  let cleanupFailed = false;
   try {
     dependenciesCleanup = await cleanupWorkspaceDependencies({
       root,
@@ -73,7 +66,6 @@ export async function collectAgentArtifacts(options: {
       stageId: "run",
     });
   } catch (error) {
-    cleanupFailed = true;
     if (error instanceof WorkspaceDependencyCleanupError) {
       dependenciesCleanup = error.cleanup;
     }
@@ -169,12 +161,9 @@ export async function collectAgentArtifacts(options: {
         ? environment.python
         : null;
     const shouldRestoreNode =
-      dependencyStrategy.node === "symlink" &&
-      Boolean(nodeConfig) &&
-      (cleanupFailed || dependenciesCleanup.nodeRemoved);
+      Boolean(nodeConfig) && dependenciesCleanup.nodeRemoved;
     const shouldRestorePython =
-      Boolean(pythonConfig) &&
-      (cleanupFailed || dependenciesCleanup.pythonRemoved);
+      Boolean(pythonConfig) && dependenciesCleanup.pythonRemoved;
 
     if (shouldRestoreNode || shouldRestorePython) {
       const restoreEnvironment: EnvironmentConfig = {};
@@ -190,6 +179,7 @@ export async function collectAgentArtifacts(options: {
           root,
           workspacePath,
           environment: restoreEnvironment,
+          stageId: "run",
         });
       } catch (error) {
         if (!runFailed) {

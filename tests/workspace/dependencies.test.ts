@@ -1,4 +1,6 @@
+import { execFile } from "node:child_process";
 import {
+  chmod,
   lstat,
   mkdir,
   mkdtemp,
@@ -10,6 +12,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve as resolveAbsolute } from "node:path";
+import { promisify } from "node:util";
 
 import type { EnvironmentConfig } from "../../src/configs/environment/types.js";
 import { pathExists } from "../../src/utils/fs.js";
@@ -19,6 +22,8 @@ import {
   WorkspaceDependencyCleanupError,
 } from "../../src/workspace/dependencies.js";
 import { WorkspaceSetupError } from "../../src/workspace/errors.js";
+
+const execFileAsync = promisify(execFile);
 
 describe("workspace dependency staging", () => {
   let repoRoot: string;
@@ -122,7 +127,112 @@ describe("workspace dependency staging", () => {
     ).toContain("next");
   });
 
-  it("dereferences nested symlinks when copying run workspace node dependencies", async () => {
+  it("preserves internal symlinks when copying run workspace node dependencies", async () => {
+    const environment: EnvironmentConfig = {
+      node: { dependencyRoots: ["node_modules"] },
+    };
+    const repoNodeModules = join(repoRoot, "node_modules");
+    const packageEntryPath = join(repoNodeModules, "dep", "index.js");
+    await writeFile(
+      join(repoRoot, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          next: "15.0.0",
+        },
+      }),
+      "utf8",
+    );
+    await mkdir(dirname(packageEntryPath), { recursive: true });
+    await writeFile(packageEntryPath, "module.exports = 'dep';\n", "utf8");
+    await symlink(packageEntryPath, join(repoNodeModules, "dep-entry"), "file");
+
+    await ensureForRun(environment);
+
+    const workspaceNodeModules = join(workspacePath, "node_modules");
+    const copiedLinkPath = join(workspaceNodeModules, "dep-entry");
+    const stats = await lstat(copiedLinkPath);
+    expect(stats.isSymbolicLink()).toBe(true);
+    const copiedTarget = await readlink(copiedLinkPath);
+    const resolvedCopiedTarget = resolveAbsolute(
+      dirname(copiedLinkPath),
+      copiedTarget,
+    );
+    expect(resolvedCopiedTarget).toBe(
+      join(workspaceNodeModules, "dep", "index.js"),
+    );
+    expect(resolvedCopiedTarget).not.toBe(packageEntryPath);
+    expect(await readFile(resolvedCopiedTarget, "utf8")).toBe(
+      "module.exports = 'dep';\n",
+    );
+  });
+
+  it("preserves npm-style .bin symlinks as runnable package entry points", async () => {
+    const environment: EnvironmentConfig = {
+      node: { dependencyRoots: ["node_modules"] },
+    };
+    const repoNodeModules = join(repoRoot, "node_modules");
+    const binPath = join(repoNodeModules, ".bin");
+    const tscEntryPath = join(repoNodeModules, "typescript", "bin", "tsc");
+    const tscLibPath = join(repoNodeModules, "typescript", "lib", "tsc.js");
+    const eslintEntryPath = join(repoNodeModules, "eslint", "bin", "eslint.js");
+    await writeFile(
+      join(repoRoot, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          next: "15.0.0",
+        },
+      }),
+      "utf8",
+    );
+    await mkdir(binPath, { recursive: true });
+    await mkdir(dirname(tscEntryPath), { recursive: true });
+    await mkdir(dirname(tscLibPath), { recursive: true });
+    await mkdir(dirname(eslintEntryPath), { recursive: true });
+    await writeFile(
+      tscEntryPath,
+      "#!/usr/bin/env node\nrequire('../lib/tsc.js');\n",
+      "utf8",
+    );
+    await writeFile(tscLibPath, "process.stdout.write('tsc-ok\\n');\n", "utf8");
+    await writeFile(
+      join(repoNodeModules, "eslint", "package.json"),
+      JSON.stringify({ name: "eslint" }),
+      "utf8",
+    );
+    await writeFile(
+      eslintEntryPath,
+      "#!/usr/bin/env node\nconst pkg = require('../package.json');\nprocess.stdout.write(`${pkg.name}-ok\\n`);\n",
+      "utf8",
+    );
+    await chmod(tscEntryPath, 0o755);
+    await chmod(eslintEntryPath, 0o755);
+    await symlink("../typescript/bin/tsc", join(binPath, "tsc"), "file");
+    await symlink("../eslint/bin/eslint.js", join(binPath, "eslint"), "file");
+
+    await ensureForRun(environment);
+
+    const workspaceBinPath = join(workspacePath, "node_modules", ".bin");
+    const tscStats = await lstat(join(workspaceBinPath, "tsc"));
+    expect(tscStats.isSymbolicLink()).toBe(true);
+    expect(
+      (await lstat(join(workspaceBinPath, "eslint"))).isSymbolicLink(),
+    ).toBe(true);
+
+    await expect(
+      execFileAsync(join(workspaceBinPath, "tsc"), [], {
+        cwd: workspacePath,
+        encoding: "utf8",
+      }),
+    ).resolves.toMatchObject({ stdout: "tsc-ok\n" });
+    await expect(
+      execFileAsync(join(workspaceBinPath, "eslint"), [], {
+        cwd: workspacePath,
+        encoding: "utf8",
+      }),
+    ).resolves.toMatchObject({ stdout: "eslint-ok\n" });
+  });
+
+  it("materializes repo-local linked packages when copying run workspace node dependencies", async () => {
     const environment: EnvironmentConfig = {
       node: { dependencyRoots: ["node_modules"] },
     };
