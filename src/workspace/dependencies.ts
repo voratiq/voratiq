@@ -1,5 +1,6 @@
 import {
-  cp,
+  chmod,
+  copyFile,
   lstat,
   mkdir,
   readdir,
@@ -8,7 +9,7 @@ import {
   rm,
   symlink,
 } from "node:fs/promises";
-import { dirname, resolve as resolveAbsolute } from "node:path";
+import { dirname, relative, resolve as resolveAbsolute } from "node:path";
 
 import type { SandboxStageId } from "../agents/runtime/policy.js";
 import {
@@ -74,6 +75,14 @@ interface DirectoryLinkOptions {
   context: EnvironmentPathContext;
   targetRoot: string;
   linkRoot: string;
+}
+
+interface DependencyCopyOptions {
+  context: EnvironmentPathContext;
+  repoRoot: string;
+  workspaceRoot: string;
+  sourceRoot: string;
+  destinationRoot: string;
 }
 
 interface PackageJson {
@@ -417,17 +426,22 @@ async function ensureDirectoryCopy(
     WORKSPACE_BOUNDARY_DESCRIPTION,
   );
 
-  await assertDereferencedTreeWithinRoot({
+  const copyOptions: DependencyCopyOptions = {
     context: options.context,
-    root: options.targetRoot,
-    sourcePath: safeSourcePath,
-  });
+    repoRoot: options.targetRoot,
+    workspaceRoot: options.linkRoot,
+    sourceRoot: safeSourcePath,
+    destinationRoot: safeDestinationPath,
+  };
+
   await rm(safeDestinationPath, { recursive: true, force: true });
   await mkdir(dirname(safeDestinationPath), { recursive: true });
-  await cp(safeSourcePath, safeDestinationPath, {
-    recursive: true,
-    dereference: true,
-  });
+  await copyDependencyEntry(
+    copyOptions,
+    safeSourcePath,
+    safeDestinationPath,
+    new Set<string>(),
+  );
 }
 
 async function removeWorkspaceNodeDependency(
@@ -459,74 +473,149 @@ async function removeWorkspaceNodeDependency(
   }
 }
 
-async function assertDereferencedTreeWithinRoot(options: {
-  context: EnvironmentPathContext;
-  root: string;
-  sourcePath: string;
-}): Promise<void> {
-  await assertDereferencedPathWithinRoot(
-    options.context,
-    options.root,
-    options.sourcePath,
-    new Set<string>(),
-  );
-}
-
-async function assertDereferencedPathWithinRoot(
-  context: EnvironmentPathContext,
-  root: string,
-  currentPath: string,
+async function copyDependencyEntry(
+  options: DependencyCopyOptions,
+  sourcePath: string,
+  destinationPath: string,
   activePaths: Set<string>,
 ): Promise<void> {
-  const safeCurrentPath = guardResolvedPath(
-    context,
-    root,
-    currentPath,
+  const safeSourcePath = guardResolvedPath(
+    options.context,
+    options.repoRoot,
+    sourcePath,
     REPO_BOUNDARY_DESCRIPTION,
   );
-  if (activePaths.has(safeCurrentPath)) {
+  const safeDestinationPath = guardResolvedPath(
+    options.context,
+    options.workspaceRoot,
+    destinationPath,
+    WORKSPACE_BOUNDARY_DESCRIPTION,
+  );
+
+  if (activePaths.has(safeSourcePath)) {
     throw new WorkspaceSetupError(
       formatEnvironmentPathRuntimeError(
-        context,
-        `dependency tree contains a recursive symlink at \`${safeCurrentPath}\``,
+        options.context,
+        `dependency tree contains a recursive symlink at \`${safeSourcePath}\``,
       ),
     );
   }
 
-  const stats = await lstat(safeCurrentPath);
-  activePaths.add(safeCurrentPath);
+  const stats = await lstat(safeSourcePath);
+  if (stats.isSymbolicLink()) {
+    await copyDependencySymlink(
+      options,
+      safeSourcePath,
+      safeDestinationPath,
+      activePaths,
+    );
+    return;
+  }
+
+  if (stats.isFile()) {
+    await mkdir(dirname(safeDestinationPath), { recursive: true });
+    await copyFile(safeSourcePath, safeDestinationPath);
+    await chmod(safeDestinationPath, stats.mode);
+    return;
+  }
+
+  if (!stats.isDirectory()) {
+    throw new WorkspaceSetupError(
+      formatEnvironmentPathRuntimeError(
+        options.context,
+        `dependency tree contains unsupported file type at \`${safeSourcePath}\``,
+      ),
+    );
+  }
+
+  activePaths.add(safeSourcePath);
   try {
-    if (stats.isSymbolicLink()) {
-      const linkTarget = await readlink(safeCurrentPath);
-      const resolvedTarget = guardResolvedPath(
-        context,
-        root,
-        resolveAbsolute(dirname(safeCurrentPath), linkTarget),
-        REPO_BOUNDARY_DESCRIPTION,
-      );
-      await assertDereferencedPathWithinRoot(
-        context,
-        root,
-        resolvedTarget,
-        activePaths,
-      );
-      return;
-    }
-
-    if (!stats.isDirectory()) {
-      return;
-    }
-
-    for (const child of await readdir(safeCurrentPath)) {
-      await assertDereferencedPathWithinRoot(
-        context,
-        root,
-        resolveAbsolute(safeCurrentPath, child),
+    await mkdir(safeDestinationPath, { recursive: true });
+    for (const child of await readdir(safeSourcePath)) {
+      await copyDependencyEntry(
+        options,
+        resolveAbsolute(safeSourcePath, child),
+        resolveAbsolute(safeDestinationPath, child),
         activePaths,
       );
     }
+    await chmod(safeDestinationPath, stats.mode);
   } finally {
-    activePaths.delete(safeCurrentPath);
+    activePaths.delete(safeSourcePath);
+  }
+}
+
+async function copyDependencySymlink(
+  options: DependencyCopyOptions,
+  sourcePath: string,
+  destinationPath: string,
+  activePaths: Set<string>,
+): Promise<void> {
+  const linkTarget = await readlink(sourcePath);
+  const resolvedTarget = guardResolvedPath(
+    options.context,
+    options.repoRoot,
+    resolveAbsolute(dirname(sourcePath), linkTarget),
+    REPO_BOUNDARY_DESCRIPTION,
+  );
+  const dependencyRootTarget = tryPathWithinRoot(
+    options.sourceRoot,
+    resolvedTarget,
+  );
+
+  if (dependencyRootTarget) {
+    const copiedTargetPath = mapDependencySourcePathToDestination(
+      options,
+      dependencyRootTarget,
+    );
+    const rebasedTarget =
+      relative(dirname(destinationPath), copiedTargetPath) || ".";
+    const targetType = await inferSymlinkType(dependencyRootTarget);
+    await mkdir(dirname(destinationPath), { recursive: true });
+    await symlink(rebasedTarget, destinationPath, targetType);
+    return;
+  }
+
+  activePaths.add(sourcePath);
+  try {
+    await copyDependencyEntry(
+      options,
+      resolvedTarget,
+      destinationPath,
+      activePaths,
+    );
+  } finally {
+    activePaths.delete(sourcePath);
+  }
+}
+
+function tryPathWithinRoot(root: string, targetPath: string): string | null {
+  try {
+    return assertPathWithinRoot(root, targetPath);
+  } catch {
+    return null;
+  }
+}
+
+function mapDependencySourcePathToDestination(
+  options: DependencyCopyOptions,
+  sourcePath: string,
+): string {
+  const relativePath = relative(options.sourceRoot, sourcePath);
+  return relativePath
+    ? resolveAbsolute(options.destinationRoot, relativePath)
+    : options.destinationRoot;
+}
+
+async function inferSymlinkType(targetPath: string): Promise<"dir" | "file"> {
+  try {
+    const stats = await lstat(targetPath);
+    return stats.isDirectory() ? "dir" : "file";
+  } catch (error) {
+    if (isFileSystemError(error) && error.code === "ENOENT") {
+      return "file";
+    }
+    throw error;
   }
 }
 
