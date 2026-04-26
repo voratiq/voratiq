@@ -55,6 +55,7 @@ import { buildPersistedExtraContextFields } from "../../../extra-context/contrac
 import type { ReduceProgressRenderer } from "../../../render/transcripts/reduce.js";
 import { emitStageProgressEvent } from "../../../render/transcripts/stage-progress.js";
 import { toErrorMessage } from "../../../utils/errors.js";
+import { pathExists } from "../../../utils/fs.js";
 import {
   normalizePathForDisplay,
   relativeToRoot,
@@ -763,7 +764,10 @@ async function prepareRunTargetContext(options: {
       entry.diffArtifactId = `run-agent:${agent.agentId}:diff`;
     }
 
-    if (agent.assets.summaryPath) {
+    if (
+      agent.assets.summaryPath &&
+      (await pathExists(resolvePath(root, agent.assets.summaryPath)))
+    ) {
       stagedFiles.push({
         sourceAbsolutePath: resolvePath(root, agent.assets.summaryPath),
         stagedRelativePath: `inputs/agents/${agent.agentId}/summary.txt`,

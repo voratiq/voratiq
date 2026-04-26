@@ -1,5 +1,5 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { relative } from "node:path";
+import { readFile, rm, writeFile } from "node:fs/promises";
+import { join, relative } from "node:path";
 
 import type { EnvironmentConfig } from "../../../../configs/environment/types.js";
 import {
@@ -35,11 +35,16 @@ const EXPORT_EXCLUDED_PATHS = [WORKSPACE_SHIM_RELATIVE_PATH.join("/")];
 
 export interface ArtifactCollectionResult {
   summaryCaptured: boolean;
+  warnings?: string[];
   diffStatistics?: string;
   commitSha?: string;
   diffAttempted: boolean;
   diffCaptured: boolean;
 }
+
+const MISSING_SUMMARY_WARNING =
+  "Agent did not produce a change summary." as const;
+const INTERNAL_EXPORT_COMMIT_MESSAGE = "voratiq internal export" as const;
 
 export async function collectAgentArtifacts(options: {
   baseRevisionSha: string;
@@ -87,7 +92,7 @@ export async function collectAgentArtifacts(options: {
       });
     }
 
-    const { summary } = await harvestSummary({
+    const summaryResult = await harvestSummary({
       workspacePath,
       artifactsPath,
       summaryPath,
@@ -111,7 +116,7 @@ export async function collectAgentArtifacts(options: {
     await runGitStep("Git commit failed", async () =>
       gitCommitAll({
         cwd: workspacePath,
-        message: summary,
+        message: summaryResult.commitMessage,
         authorName: persona.authorName,
         authorEmail: persona.authorEmail,
         bypassHooks: true,
@@ -145,7 +150,8 @@ export async function collectAgentArtifacts(options: {
 
     runFailed = false;
     artifactResult = {
-      summaryCaptured: true,
+      summaryCaptured: summaryResult.summaryCaptured,
+      ...(summaryResult.warnings ? { warnings: summaryResult.warnings } : {}),
       diffStatistics,
       commitSha,
       diffAttempted: true,
@@ -211,62 +217,93 @@ interface HarvestSummaryOptions {
 }
 
 interface HarvestSummaryResult {
-  summary: string;
+  summaryCaptured: boolean;
+  commitMessage: string;
+  warnings?: string[];
 }
-
-const NO_CHANGE_SUMMARY_DETAIL =
-  "Agent process failed. No change summary detected." as const;
 
 async function harvestSummary(
   options: HarvestSummaryOptions,
 ): Promise<HarvestSummaryResult> {
-  const { workspacePath, artifactsPath, summaryPath } = options;
   try {
-    const { summary } = await promoteSummary({
-      workspacePath,
-      artifactsPath,
-      summaryPath,
-    });
-    return { summary };
+    const promoted = await promoteSummary(options);
+    if (promoted.kind === "captured") {
+      return {
+        summaryCaptured: true,
+        commitMessage: promoted.summary,
+      };
+    }
+
+    return {
+      summaryCaptured: false,
+      commitMessage: INTERNAL_EXPORT_COMMIT_MESSAGE,
+      warnings: [MISSING_SUMMARY_WARNING],
+    };
   } catch (error) {
     if (error instanceof AgentProcessError) {
       throw error;
-    }
-    if (isFileSystemError(error) && error.code === "ENOENT") {
-      throw new AgentProcessError({ detail: NO_CHANGE_SUMMARY_DETAIL });
     }
     throw new AgentProcessError({ detail: toErrorMessage(error) });
   }
 }
 
+type PromoteSummaryResult =
+  | { kind: "captured"; summary: string }
+  | { kind: "missing" }
+  | { kind: "empty" };
+
 async function promoteSummary(options: {
   workspacePath: string;
   artifactsPath: string;
   summaryPath: string;
-}): Promise<{ summary: string }> {
+}): Promise<PromoteSummaryResult> {
   const { workspacePath, artifactsPath, summaryPath } = options;
-  let trimmed: string | undefined;
-  const promoteResult = await promoteWorkspaceFile({
+  const stagedSummaryPath = join(workspacePath, WORKSPACE_SUMMARY_FILENAME);
+
+  let rawSummary: string;
+  try {
+    rawSummary = await readFile(stagedSummaryPath, "utf8");
+  } catch (error) {
+    if (isFileSystemError(error) && error.code === "ENOENT") {
+      await discardSummaryArtifacts({
+        stagedSummaryPath,
+        summaryPath,
+      });
+      return { kind: "missing" };
+    }
+    throw error;
+  }
+
+  const trimmed = rawSummary.trim();
+  if (!trimmed) {
+    await discardSummaryArtifacts({
+      stagedSummaryPath,
+      summaryPath,
+    });
+    return { kind: "empty" };
+  }
+
+  await promoteWorkspaceFile({
     workspacePath,
     artifactsPath,
     stagedRelativePath: WORKSPACE_SUMMARY_FILENAME,
     artifactRelativePath: relative(artifactsPath, summaryPath),
-    transform: (raw) => {
-      const candidate = raw.toString("utf8").trim();
-      if (!candidate) {
-        throw new AgentProcessError({
-          detail: NO_CHANGE_SUMMARY_DETAIL,
-        });
-      }
-      trimmed = candidate;
-      return `${candidate}\n`;
-    },
+    transform: () => `${trimmed}\n`,
   });
 
   return {
-    summary:
-      trimmed ?? (await readFile(promoteResult.artifactPath, "utf8")).trim(),
+    kind: "captured",
+    summary: trimmed,
   };
+}
+
+async function discardSummaryArtifacts(options: {
+  stagedSummaryPath: string;
+  summaryPath: string;
+}): Promise<void> {
+  const { stagedSummaryPath, summaryPath } = options;
+  await rm(stagedSummaryPath, { force: true }).catch(() => {});
+  await rm(summaryPath, { force: true }).catch(() => {});
 }
 
 async function runGitStep<T>(

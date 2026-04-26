@@ -471,15 +471,13 @@ async function findMissingRunArtifacts(
   }
 
   for (const agent of run.agents) {
-    const candidatePaths = [agent.assets.diffPath, agent.assets.summaryPath];
-    for (const candidatePath of candidatePaths) {
-      if (!candidatePath) {
-        continue;
-      }
-      const absolute = resolvePath(root, candidatePath);
-      if (!(await pathExists(absolute))) {
-        registerMissing(missing, seen, normalizePathForDisplay(candidatePath));
-      }
+    const diffPath = agent.assets.diffPath;
+    if (!diffPath) {
+      continue;
+    }
+    const absolute = resolvePath(root, diffPath);
+    if (!(await pathExists(absolute))) {
+      registerMissing(missing, seen, normalizePathForDisplay(diffPath));
     }
   }
 

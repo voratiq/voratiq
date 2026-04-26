@@ -990,7 +990,7 @@ suite("voratiq run (integration)", () => {
     RUN_INTEGRATION_TIMEOUT_MS,
   );
 
-  it("surfaces summary violations with clear messaging", async () => {
+  it("warns when an agent omits the summary but still produces durable changes", async () => {
     await createWorkspace(repoRoot);
     const summarylessScriptPath = await createSummarylessAgentScript(repoRoot);
     await writeAgentsConfig(workspace, agentScriptPath, {
@@ -1012,11 +1012,29 @@ suite("voratiq run (integration)", () => {
       (agent) => agent.agentId === "codex",
     );
     expect(summarylessAgent).toBeDefined();
-    expect(summarylessAgent?.status).toBe("failed");
-    expect(summarylessAgent?.error).toBe(
-      "Agent process failed. No change summary detected.",
-    );
-    expect(summarylessAgent?.diffAttempted).toBe(false);
+    expect(summarylessAgent?.status).toBe("succeeded");
+    expect(summarylessAgent?.error).toBeUndefined();
+    expect(summarylessAgent?.warnings).toEqual([
+      "Agent did not produce a change summary.",
+    ]);
+    expect(summarylessAgent?.diffAttempted).toBe(true);
+    expect(summarylessAgent?.diffCaptured).toBe(true);
+    expect(summarylessAgent?.assets.summaryPath).toBeUndefined();
+
+    await expect(
+      access(
+        join(
+          repoRoot,
+          ".voratiq",
+          "run",
+          "sessions",
+          runReport.runId,
+          "codex",
+          "artifacts",
+          "summary.txt",
+        ),
+      ),
+    ).rejects.toThrow();
   });
 
   it(

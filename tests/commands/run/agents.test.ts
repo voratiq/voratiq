@@ -180,6 +180,31 @@ describe("executeAgentLifecycle integration", () => {
     expect(result.report.diffStatistics).toBe(diffStatistics);
   });
 
+  it("threads artifact warnings into the final agent record and report", async () => {
+    const { execution } = await createPreparedExecution();
+    runSandboxedAgentMock.mockResolvedValue({
+      exitCode: 0,
+      signal: null,
+      sandboxSettings: minimalSandboxSettings(),
+      manifestEnv: {},
+    });
+    runPostProcessingAndCollectArtifactsMock.mockResolvedValue({
+      summaryCaptured: false,
+      warnings: ["Agent did not produce a change summary."],
+      diffAttempted: true,
+      diffCaptured: true,
+    });
+
+    const [result] = await runPreparedExecutionsWithLimit([execution], 1);
+
+    expect(result.record.warnings).toEqual([
+      "Agent did not produce a change summary.",
+    ]);
+    expect(result.report.warnings).toEqual([
+      "Agent did not produce a change summary.",
+    ]);
+  });
+
   it("records fail-fast metadata and continues running other agents", async () => {
     const { execution: first } = await createPreparedExecution("agent-1");
     const { execution: second, progress } =

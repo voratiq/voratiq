@@ -5,9 +5,14 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { createReduceCompetitionAdapter } from "../../../../src/domain/reduce/competition/adapter.js";
+import { appendRunRecord } from "../../../../src/domain/run/persistence/adapter.js";
 import { readSpecRecords } from "../../../../src/domain/spec/persistence/adapter.js";
 import { pathExists } from "../../../../src/utils/fs.js";
 import { createWorkspace } from "../../../../src/workspace/setup.js";
+import {
+  createAgentInvocationRecord,
+  createRunRecord,
+} from "../../../support/factories/run-records.js";
 
 jest.mock("../../../../src/domain/spec/persistence/adapter.js", () => ({
   readSpecRecords: jest.fn(),
@@ -205,6 +210,101 @@ describe("reduce competition teardown", () => {
       );
       await expect(readFile(alphaData, "utf8")).resolves.toContain("alpha");
       await expect(pathExists(betaMarkdown)).resolves.toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("skips missing run summaries while staging reduction inputs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "voratiq-reduce-run-summary-"));
+
+    try {
+      await createWorkspace(root);
+
+      const runId = "run-optional-summary";
+      const agentId = "agent-1";
+      const specPath = "specs/run-optional-summary.md";
+      await mkdir(join(root, "specs"), { recursive: true });
+      await writeFile(join(root, specPath), "# Spec\n", "utf8");
+
+      const artifactsDir = join(
+        root,
+        ".voratiq",
+        "run",
+        "sessions",
+        runId,
+        agentId,
+        "artifacts",
+      );
+      await mkdir(artifactsDir, { recursive: true });
+      await writeFile(join(artifactsDir, "diff.patch"), "diff --git\n", "utf8");
+
+      await appendRunRecord({
+        root,
+        runsFilePath: join(root, ".voratiq", "run", "index.json"),
+        record: createRunRecord({
+          runId,
+          status: "succeeded",
+          spec: { path: specPath },
+          agents: [
+            createAgentInvocationRecord({
+              agentId,
+              status: "succeeded",
+              artifacts: {
+                diffCaptured: true,
+                summaryCaptured: true,
+                stdoutCaptured: true,
+                stderrCaptured: true,
+              },
+            }),
+          ],
+        }),
+      });
+
+      const adapter = createReduceCompetitionAdapter({
+        root,
+        reductionId: "reduce-run-summary",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        reductionsFilePath: join(root, ".voratiq", "reduce", "index.json"),
+        specsFilePath: join(root, ".voratiq", "specs", "index.json"),
+        runsFilePath: join(root, ".voratiq", "run", "index.json"),
+        messagesFilePath: join(root, ".voratiq", "message", "index.json"),
+        verificationsFilePath: join(root, ".voratiq", "verify", "index.json"),
+        target: { type: "run", id: runId },
+        environment: {},
+      });
+
+      const preparation = await adapter.prepareCandidates([
+        {
+          id: "reducer",
+          provider: "codex",
+          model: "gpt-5",
+          binary: "node",
+          argv: [],
+        },
+      ]);
+      const prepared = preparation.ready[0];
+      expect(prepared).toBeDefined();
+
+      const diffInput = join(
+        prepared.workspacePaths.workspacePath,
+        "inputs",
+        "agents",
+        agentId,
+        "diff.patch",
+      );
+      const summaryInput = join(
+        prepared.workspacePaths.workspacePath,
+        "inputs",
+        "agents",
+        agentId,
+        "summary.txt",
+      );
+
+      await expect(readFile(diffInput, "utf8")).resolves.toContain(
+        "diff --git",
+      );
+      await expect(pathExists(summaryInput)).resolves.toBe(false);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

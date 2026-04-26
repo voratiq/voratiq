@@ -198,45 +198,59 @@ describe("collectAgentArtifacts", () => {
     ).rejects.toThrow(/Credential files must stay inside the sandbox/i);
   });
 
-  it("throws a summary error when staged changes exist but the summary is missing", async () => {
+  it("warns and exports the diff when staged changes exist but the summary is missing", async () => {
     const workspaceSummary = join(workspacePath, WORKSPACE_SUMMARY_FILENAME);
     await rm(workspaceSummary, { force: true });
     mockedGitHasStagedChanges.mockResolvedValue(true);
 
-    let caught: unknown;
-    try {
-      await collectAgentArtifacts({
-        baseRevisionSha: "base-sha",
-        workspacePaths,
-        root: repoRoot,
-        environment,
-        persona,
-      });
-    } catch (error) {
-      caught = error;
-    }
+    const result = await collectAgentArtifacts({
+      baseRevisionSha: "base-sha",
+      workspacePaths,
+      root: repoRoot,
+      environment,
+      persona,
+    });
 
-    expect(caught).toBeInstanceOf(Error);
-    expect((caught as Error).message).toBe(
-      "Agent process failed. No change summary detected.",
-    );
-    expect((caught as Error).message).not.toContain(workspacePath);
+    expect(result.summaryCaptured).toBe(false);
+    expect(result.warnings).toEqual([
+      "Agent did not produce a change summary.",
+    ]);
+    expect(await pathExists(summaryPath)).toBe(false);
+    expect(mockedGitCommitAll).toHaveBeenCalledWith({
+      cwd: workspacePath,
+      message: "voratiq internal export",
+      authorName: persona.authorName,
+      authorEmail: persona.authorEmail,
+      bypassHooks: true,
+    });
   });
 
-  it("throws a summary error when staged changes exist but the summary is empty", async () => {
+  it("warns and exports the diff when staged changes exist but the summary is empty", async () => {
     const workspaceSummary = join(workspacePath, WORKSPACE_SUMMARY_FILENAME);
     await writeFile(workspaceSummary, "   \n", "utf8");
     mockedGitHasStagedChanges.mockResolvedValue(true);
 
-    await expect(
-      collectAgentArtifacts({
-        baseRevisionSha: "base-sha",
-        workspacePaths,
-        root: repoRoot,
-        environment,
-        persona,
-      }),
-    ).rejects.toThrow("Agent process failed. No change summary detected.");
+    const result = await collectAgentArtifacts({
+      baseRevisionSha: "base-sha",
+      workspacePaths,
+      root: repoRoot,
+      environment,
+      persona,
+    });
+
+    expect(result.summaryCaptured).toBe(false);
+    expect(result.warnings).toEqual([
+      "Agent did not produce a change summary.",
+    ]);
+    expect(await pathExists(workspaceSummary)).toBe(false);
+    expect(await pathExists(summaryPath)).toBe(false);
+    expect(mockedGitCommitAll).toHaveBeenCalledWith({
+      cwd: workspacePath,
+      message: "voratiq internal export",
+      authorName: persona.authorName,
+      authorEmail: persona.authorEmail,
+      bypassHooks: true,
+    });
   });
 
   it("fails with no-workspace-changes when the summary is missing and nothing was staged", async () => {
@@ -256,6 +270,28 @@ describe("collectAgentArtifacts", () => {
 
     expect(mockedGitAddAll).toHaveBeenCalledTimes(1);
     expect(await pathExists(workspaceSummary)).toBe(false);
+  });
+
+  it("fails with no-workspace-changes when the only staged change was the summary", async () => {
+    mockedGitHasStagedChanges
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    await expect(
+      collectAgentArtifacts({
+        baseRevisionSha: "base-sha",
+        workspacePaths,
+        root: repoRoot,
+        environment,
+        persona,
+      }),
+    ).rejects.toThrow("Agent process failed. No workspace changes detected.");
+
+    expect(
+      await pathExists(join(workspacePath, WORKSPACE_SUMMARY_FILENAME)),
+    ).toBe(false);
+    expect(await readFile(summaryPath, "utf8")).toBe("summary line\n");
+    expect(mockedGitCommitAll).not.toHaveBeenCalled();
   });
 
   it("restores copied node dependencies after export for Next.js run workspaces", async () => {

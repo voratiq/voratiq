@@ -29,6 +29,7 @@ export class AgentRunContext {
   public commitSha: string | undefined;
   public errorMessage: string | undefined;
   public watchdogMetadata: WatchdogMetadata | undefined;
+  private warnings: string[] = [];
   private failFast: SandboxFailFastInfo | undefined;
   private completedAt: string | undefined;
   private startedAt: string;
@@ -96,6 +97,9 @@ export class AgentRunContext {
     if (result.summaryCaptured) {
       this.artifactState.summaryCaptured = true;
     }
+    if (result.warnings && result.warnings.length > 0) {
+      this.warnings = [...new Set([...this.warnings, ...result.warnings])];
+    }
     if (result.diffAttempted) {
       this.artifactState.diffAttempted = true;
     }
@@ -144,6 +148,7 @@ export class AgentRunContext {
       diffStatistics: this.state.diffStatistics,
       tokenUsage: this.state.tokenUsage,
       watchdog: this.watchdogMetadata,
+      warnings: this.warnings,
       failFast: this.failFast,
     });
 
@@ -165,6 +170,7 @@ export class AgentRunContext {
       diffStatistics: undefined,
       tokenUsage: this.state.tokenUsage,
       watchdog: this.watchdogMetadata,
+      warnings: this.warnings,
       failFast: this.failFast,
     });
   }
@@ -181,6 +187,7 @@ function buildAgentRecord(options: {
   diffStatistics?: string;
   tokenUsage?: ExtractedTokenUsage;
   watchdog?: WatchdogMetadata;
+  warnings?: string[];
   failFast?: SandboxFailFastInfo;
 }): AgentInvocationRecord {
   const {
@@ -194,6 +201,7 @@ function buildAgentRecord(options: {
     diffStatistics,
     tokenUsage,
     watchdog,
+    warnings,
     failFast,
   } = options;
 
@@ -212,6 +220,7 @@ function buildAgentRecord(options: {
     error: errorMessage,
     tokenUsage,
     watchdog,
+    ...(warnings && warnings.length > 0 ? { warnings: [...warnings] } : {}),
     ...(failFast
       ? {
           failFastTriggered: true,
