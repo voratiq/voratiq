@@ -15,7 +15,7 @@ import {
 } from "../../support/factories/run-records.js";
 
 describe("assertReductionTargetEligible (run target)", () => {
-  it("allows succeeded runs when durable artifacts are still present", async () => {
+  it("allows succeeded runs when the durable diff is present even if summary.txt is missing", async () => {
     const root = await mkdtemp(join(tmpdir(), "voratiq-reduce-run-"));
 
     try {
@@ -31,7 +31,7 @@ describe("assertReductionTargetEligible (run target)", () => {
         agentId,
         specPath,
         includeDiff: true,
-        includeSummary: true,
+        includeSummary: false,
       });
 
       const runsFilePath = join(root, ".voratiq", "run", "index.json");
