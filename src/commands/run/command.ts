@@ -47,6 +47,7 @@ import {
   registerActiveRun,
 } from "./lifecycle.js";
 import { initializeRunRecord } from "./record-init.js";
+import { normalizeRunSpecPath } from "./spec-path.js";
 import { validateAndPrepare } from "./validation.js";
 
 export interface RunCommandInput {
@@ -92,10 +93,19 @@ export async function executeRunCommand(
     includeDefinitions: false,
   });
 
-  const validation = await validateAndPrepare({
+  const {
+    specAbsolutePath: effectiveSpecAbsolutePath,
+    specDisplayPath: effectiveSpecDisplayPath,
+  } = await normalizeRunSpecPath({
     root,
     specAbsolutePath,
     specDisplayPath,
+  });
+
+  const validation = await validateAndPrepare({
+    root,
+    specAbsolutePath: effectiveSpecAbsolutePath,
+    specDisplayPath: effectiveSpecDisplayPath,
     specsFilePath,
     resolvedAgentIds: resolution.agentIds,
     maxParallel: requestedMaxParallel,
@@ -162,7 +172,7 @@ export async function executeRunCommand(
       root,
       runsFilePath,
       runId,
-      specDisplayPath,
+      specDisplayPath: effectiveSpecDisplayPath,
       specTarget: validation.specTarget,
       baseRevisionSha: validation.baseRevisionSha,
       repoDisplayPath,

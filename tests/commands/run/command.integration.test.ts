@@ -37,7 +37,10 @@ import {
   flushRunRecordBuffer,
   rewriteRunRecord,
 } from "../../../src/domain/run/persistence/adapter.js";
-import { prepareRunWorkspace } from "../../../src/workspace/run.js";
+import {
+  prepareRunWorkspace,
+  stageExternalSpecCopy,
+} from "../../../src/workspace/run.js";
 
 jest.mock("../../../src/commands/run/validation.js", () => ({
   validateAndPrepare: jest.fn(),
@@ -45,6 +48,7 @@ jest.mock("../../../src/commands/run/validation.js", () => ({
 
 jest.mock("../../../src/workspace/run.js", () => ({
   prepareRunWorkspace: jest.fn(),
+  stageExternalSpecCopy: jest.fn(),
 }));
 
 jest.mock("../../../src/commands/run/record-init.js", () => ({
@@ -96,6 +100,7 @@ jest.mock("../../../src/domain/run/model/id.js", () => ({
 
 const validateAndPrepareMock = jest.mocked(validateAndPrepare);
 const prepareRunWorkspaceMock = jest.mocked(prepareRunWorkspace);
+const stageExternalSpecCopyMock = jest.mocked(stageExternalSpecCopy);
 const initializeRunRecordMock = jest.mocked(initializeRunRecord);
 const createAgentRecordMutatorsMock = jest.mocked(createAgentRecordMutators);
 const mergeAgentRecordsMock = jest.mocked(mergeAgentRecords);
@@ -375,6 +380,100 @@ describe("executeRunCommand integration", () => {
       Number.NEGATIVE_INFINITY;
     expect(flushOrder).toBeLessThan(finalizeOrder);
     expect(report).toEqual(runReport);
+  });
+
+  it("normalizes external specs into the retained spec directory", async () => {
+    generateRunIdMock.mockReturnValue("run-external");
+    stageExternalSpecCopyMock.mockResolvedValue({
+      absolutePath: "/repo/.voratiq/spec/external-spec.md",
+      relativePath: ".voratiq/spec/external-spec.md",
+    });
+    validateAndPrepareMock.mockResolvedValue({
+      specContent: "Implement feature",
+      specTarget: { kind: "file" },
+      baseRevisionSha: "abc123",
+      agents: [
+        {
+          id: "alpha",
+          provider: "claude",
+          model: "claude-3",
+          binary: "node",
+          argv: ["index.mjs"],
+        },
+      ],
+      effectiveMaxParallel: 1,
+      environment: {},
+    });
+    prepareRunWorkspaceMock.mockResolvedValue({
+      runWorkspace: {
+        absolute: "/tmp/run-workspace",
+        relative: ".voratiq/run/sessions/run-external",
+      },
+    });
+    initializeRunRecordMock.mockResolvedValue({
+      initialRecord: {
+        runId: "run-external",
+        baseRevisionSha: "abc123",
+        rootPath: ".",
+        spec: { path: ".voratiq/spec/external-spec.md" },
+        status: "running",
+        createdAt: "2025-11-10T00:00:00.000Z",
+        startedAt: "2025-11-10T00:00:00.000Z",
+        agents: [],
+      },
+      recordPersisted: true,
+    });
+    createAgentRecordMutatorsMock.mockReturnValue({
+      recordAgentQueued: jest.fn(() => Promise.resolve()),
+      recordAgentSnapshot: jest.fn(() => Promise.resolve()),
+    });
+    executeAgentsMock.mockResolvedValue({
+      agentRecords: [],
+      agentReports: [],
+      hadAgentFailure: false,
+    });
+    rewriteRunRecordMock.mockResolvedValue({
+      runId: "run-external",
+      baseRevisionSha: "abc123",
+      rootPath: ".",
+      spec: { path: ".voratiq/spec/external-spec.md" },
+      status: "succeeded",
+      createdAt: "2025-11-10T00:00:00.000Z",
+      agents: [],
+    });
+    toRunReportMock.mockReturnValue({
+      runId: "run-external",
+      spec: { path: ".voratiq/spec/external-spec.md" },
+      status: "succeeded",
+      createdAt: "2025-11-10T00:00:00.000Z",
+      baseRevisionSha: "abc123",
+      agents: [],
+      hadAgentFailure: false,
+    });
+
+    const report = await executeRunCommand({
+      root: "/repo",
+      runsFilePath: "/repo/runs.json",
+      specAbsolutePath: "/tmp/external-spec.md",
+      specDisplayPath: "../../tmp/external-spec.md",
+    });
+
+    expect(stageExternalSpecCopyMock).toHaveBeenCalledWith({
+      root: "/repo",
+      sourceAbsolutePath: "/tmp/external-spec.md",
+    });
+    expect(validateAndPrepareMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specAbsolutePath: "/repo/.voratiq/spec/external-spec.md",
+        specDisplayPath: ".voratiq/spec/external-spec.md",
+      }),
+    );
+    expect(initializeRunRecordMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specDisplayPath: ".voratiq/spec/external-spec.md",
+      }),
+    );
+    expect(report.spec.path).toBe(".voratiq/spec/external-spec.md");
   });
 
   it("still finalizes teardown when flushing the run record buffer fails", async () => {
