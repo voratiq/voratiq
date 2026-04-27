@@ -12,7 +12,10 @@ import {
   removeWorkspaceEntry,
 } from "../../src/workspace/cleanup.js";
 import { WorkspaceSetupError } from "../../src/workspace/errors.js";
-import { prepareRunWorkspace } from "../../src/workspace/run.js";
+import {
+  prepareRunWorkspace,
+  stageExternalSpecCopy,
+} from "../../src/workspace/run.js";
 
 jest.mock("node:fs/promises", () => {
   const actual =
@@ -69,6 +72,52 @@ describe("prepareRunWorkspace", () => {
         runId: "existing-run",
       }),
     ).rejects.toThrow(RunDirectoryExistsError);
+  });
+
+  it("copies external specs into the retained spec directory", async () => {
+    const root = await createTempRoot("voratiq-run-");
+    const externalRoot = await createTempRoot("voratiq-external-spec-");
+    const sourceSpecPath = join(externalRoot, "external-spec.md");
+    await writeFile(sourceSpecPath, "# External Spec\n", "utf8");
+
+    const staged = await stageExternalSpecCopy({
+      root,
+      sourceAbsolutePath: sourceSpecPath,
+    });
+
+    expect(staged.relativePath).toBe(".voratiq/spec/external-spec.md");
+    await expect(fs.readFile(staged.absolutePath, "utf8")).resolves.toBe(
+      "# External Spec\n",
+    );
+  });
+
+  it("appends numeric suffixes when retained external spec basenames collide", async () => {
+    const root = await createTempRoot("voratiq-run-");
+    const externalRoot = await createTempRoot("voratiq-external-spec-");
+    const firstSpecPath = join(externalRoot, "hello-world.md");
+    const secondSpecDir = join(externalRoot, "nested");
+    const secondSpecPath = join(secondSpecDir, "hello-world.md");
+    await fs.mkdir(secondSpecDir, { recursive: true });
+    await writeFile(firstSpecPath, "# First\n", "utf8");
+    await writeFile(secondSpecPath, "# Second\n", "utf8");
+
+    const first = await stageExternalSpecCopy({
+      root,
+      sourceAbsolutePath: firstSpecPath,
+    });
+    const second = await stageExternalSpecCopy({
+      root,
+      sourceAbsolutePath: secondSpecPath,
+    });
+
+    expect(first.relativePath).toBe(".voratiq/spec/hello-world.md");
+    expect(second.relativePath).toBe(".voratiq/spec/hello-world-2.md");
+    await expect(fs.readFile(first.absolutePath, "utf8")).resolves.toBe(
+      "# First\n",
+    );
+    await expect(fs.readFile(second.absolutePath, "utf8")).resolves.toBe(
+      "# Second\n",
+    );
   });
 });
 
