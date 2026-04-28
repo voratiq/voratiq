@@ -1,6 +1,6 @@
 {
   "name": "voratiq",
-  "version": "0.1.0-beta.24",
+  "version": "0.1.0-beta.25",
   "description": "Run workflows, delegate to swarms, and verify outputs before you apply them.",
   "keywords": [
     "agent-ensembles",
