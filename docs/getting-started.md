@@ -121,9 +121,9 @@ Bias toward pragmatic options that a solo developer can build quickly. Keep each
     },
     {
       "kind": "output",
-      "path": ".voratiq/message/sessions/20260414-163422-lbjet/claude-opus-4-6/artifacts/response.md",
+      "path": ".voratiq/message/sessions/20260414-163422-lbjet/claude-opus-4-7-xhigh/artifacts/response.md",
       "role": "output",
-      "agentId": "claude-opus-4-6"
+      "agentId": "claude-opus-4-7-xhigh"
     },
     {
       "kind": "output",
@@ -267,9 +267,9 @@ Open implementation choice the spec should address explicitly:
     },
     {
       "kind": "spec",
-      "path": ".voratiq/spec/sessions/20260414-164551-utbtk/claude-opus-4-6/artifacts/spec.md",
+      "path": ".voratiq/spec/sessions/20260414-164551-utbtk/claude-opus-4-7-xhigh/artifacts/spec.md",
       "role": "candidate",
-      "agentId": "claude-opus-4-6"
+      "agentId": "claude-opus-4-7-xhigh"
     },
     {
       "kind": "spec",
@@ -309,14 +309,14 @@ That produced verify session `20260414-164824-bbxsy`, which ran multiple indepen
   "blinded": {
     "enabled": true,
     "aliasMap": {
-      "v_hys9tn7qsedh": "claude-opus-4-6",
+      "v_hys9tn7qsedh": "claude-opus-4-7-xhigh",
       "v_autl2x5aaeub": "gpt-5-4-high"
     }
   },
   "methods": [
     {
       "method": "rubric",
-      "verifierId": "claude-opus-4-6",
+      "verifierId": "claude-opus-4-7-xhigh",
       "template": "spec-verification",
       "status": "succeeded"
     },
@@ -347,7 +347,7 @@ This is the double-blind part of the workflow: verification compares the work, n
 
 The agent then summarized the result for the user:
 
-> Verification ranked the `claude-opus-4-6` draft first and marked it `execute_now` with `high` quality. Its strength is that it makes the transport decision explicitly in the frame you asked for: `httpx` over the OpenAI SDK, justified on minimalism, dependency weight, and testability, with a tighter acceptance contract and exact file layout.
+> Verification ranked the `claude-opus-4-7-xhigh` draft first and marked it `execute_now` with `high` quality. Its strength is that it makes the transport decision explicitly in the frame you asked for: `httpx` over the OpenAI SDK, justified on minimalism, dependency weight, and testability, with a tighter acceptance contract and exact file layout.
 >
 > The `gpt-5-4-high` draft was also viable, but verify rated it lower because it leaves more implementation guesswork, keeps the file layout partly illustrative, and recommends the OpenAI SDK without engaging the dependency-weight tradeoff strongly enough.
 
@@ -370,10 +370,10 @@ flowchart LR
 
 ### Run the verified spec
 
-Verification preferred the draft behind alias `v_hys9tn7qsedh`, which mapped back to the `claude-opus-4-6` spec artifact. The agent then ran that artifact directly:
+Verification preferred the draft behind alias `v_hys9tn7qsedh`, which mapped back to the `claude-opus-4-7-xhigh` spec artifact. The agent then ran that artifact directly:
 
 ```text
-voratiq.voratiq_run({"specPath":".voratiq/spec/sessions/20260414-164551-utbtk/claude-opus-4-6/artifacts/spec.md"})
+voratiq.voratiq_run({"specPath":".voratiq/spec/sessions/20260414-164551-utbtk/claude-opus-4-7-xhigh/artifacts/spec.md"})
 ```
 
 The successful run session was:
@@ -406,7 +406,7 @@ voratiq.voratiq_list({"operator":"run","mode":"detail","sessionId":"20260414-172
     "workspacePath": ".voratiq/run/sessions/20260414-172425-xgbhn",
     "agents": [
       {
-        "agentId": "claude-opus-4-6",
+        "agentId": "claude-opus-4-7-xhigh",
         "status": "succeeded",
         "changes": {
           "filesChanged": 3,

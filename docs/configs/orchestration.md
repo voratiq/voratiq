@@ -37,62 +37,77 @@ profiles:
   default:
     spec:
       agents:
-        - id: claude-opus-4-6
+        - id: claude-opus-4-7-xhigh
+        - id: gpt-5-4-high
     run:
       agents:
-        - id: claude-opus-4-6
-        - id: gpt-5-3-codex-high
+        - id: claude-opus-4-7-xhigh
+        - id: gpt-5-4-high
         - id: gemini-3-1-pro-preview
     reduce:
       agents:
-        - id: gpt-5-3-codex-high
+        - id: claude-opus-4-7-xhigh
+        - id: gpt-5-4-high
     verify:
       agents:
-        - id: gpt-5-3-codex-high
+        - id: claude-opus-4-7-xhigh
+        - id: gpt-5-4-high
     message:
       agents:
-        - id: gpt-5-3-codex-high
+        - id: claude-opus-4-7-xhigh
+        - id: gpt-5-4-high
 
   expanded:
     spec:
       agents:
-        - id: claude-opus-4-6
+        - id: claude-opus-4-7-high
+        - id: claude-opus-4-7-xhigh
+        - id: gpt-5-4-high
+        - id: gpt-5-4-xhigh
     run:
       agents:
-        - id: claude-opus-4-5-20251101
-        - id: claude-opus-4-6
-        - id: gpt-5-2-high
-        - id: gpt-5-3-codex-high
-        - id: gpt-5-3-codex-xhigh
+        - id: claude-opus-4-7-high
+        - id: claude-opus-4-7-xhigh
+        - id: gpt-5-4-mini
+        - id: gpt-5-4-high
+        - id: gpt-5-4-xhigh
         - id: gemini-3-1-flash-lite-preview
         - id: gemini-3-flash-preview
         - id: gemini-3-1-pro-preview
     reduce:
       agents:
-        - id: gpt-5-3-codex-high
+        - id: claude-opus-4-7-xhigh
+        - id: gpt-5-4-high
     verify:
       agents:
-        - id: gpt-5-3-codex-high
+        - id: claude-opus-4-7-xhigh
+        - id: gpt-5-4-high
     message:
       agents:
-        - id: gpt-5-3-codex-high
+        - id: claude-opus-4-7-xhigh
+        - id: gpt-5-4-high
 
   test:
     spec:
       agents:
         - id: claude-haiku-4-5-20251001
+        - id: gpt-5-4-mini
     run:
       agents:
         - id: claude-haiku-4-5-20251001
         - id: gpt-5-4-mini
+        - id: gemini-3-1-flash-lite-preview
     reduce:
       agents:
+        - id: claude-haiku-4-5-20251001
         - id: gpt-5-4-mini
     verify:
       agents:
+        - id: claude-haiku-4-5-20251001
         - id: gpt-5-4-mini
     message:
       agents:
+        - id: claude-haiku-4-5-20251001
         - id: gpt-5-4-mini
 ```
 
