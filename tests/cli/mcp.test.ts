@@ -187,7 +187,25 @@ describe("bundled MCP server", () => {
       (definition) => definition.name === "voratiq_list",
     );
     expect(listDefinition?.description).toContain("summary or detail scope");
+    expect(listDefinition?.description).toContain("poll recorded");
     expect(listDefinition?.description).not.toContain("table");
+
+    const descriptionsByName = new Map(
+      definitions.map((definition) => [
+        definition.name,
+        definition.description,
+      ]),
+    );
+    expect(descriptionsByName.get("voratiq_run")).toContain(
+      "recorded run session",
+    );
+    expect(descriptionsByName.get("voratiq_reduce")).toContain(
+      "reduced output",
+    );
+    expect(descriptionsByName.get("voratiq_verify")).toContain(
+      "structured verdict",
+    );
+    expect(descriptionsByName.get("voratiq_apply")).toContain("applyStatus");
   });
 
   it("initializes for MCP protocol 2025-11-25 and lists tool capabilities", async () => {
@@ -214,7 +232,37 @@ describe("bundled MCP server", () => {
       },
       resources: {},
     });
-    expect(initialized.instructions).toContain("Use voratiq_list");
+    expect(initialized.instructions).toContain("durable workflow state");
+    expect(initialized.instructions).toContain("voratiq_list");
+    expect(initialized.instructions).toContain("agentIds");
+    expect(initialized.instructions).toContain("profile");
+    expect(initialized.instructions).toContain("maxParallel");
+    expect(initialized.instructions).toContain("applyStatus");
+    expect(initialized.instructions).toContain("accepted agent");
+    expect(initialized.instructions).toContain(VORATIQ_GUIDE_RESOURCE_URI);
+    expect(initialized.instructions).toContain(
+      "Unless explicitly instructed otherwise",
+    );
+    expect(initialized.instructions).toContain(
+      "Your role is to orchestrate Voratiq workflows for the user through Voratiq MCP tools",
+    );
+    expect(initialized.instructions).toContain("explicit user request");
+    expect(initialized.instructions).toContain(
+      "keep workflow actions in Voratiq",
+    );
+    expect(initialized.instructions).toContain(
+      "wait for terminal stage state and bring unresolved decisions back to the user",
+    );
+    expect(initialized.instructions).toContain(
+      "do not launch replacement stages for queued/running work",
+    );
+    expect(initialized.instructions).toContain(
+      "do not pass agentIds, profile, or maxParallel without an explicit user request",
+    );
+    expect(initialized.instructions).toContain(
+      "surface blockers instead of bypassing",
+    );
+    expect(wordCount(initialized.instructions ?? "")).toBeLessThanOrEqual(110);
     expect(initialized.serverInfo).toEqual({
       name: "voratiq",
       version: "0.1.0-test",
@@ -1233,9 +1281,10 @@ describe("bundled MCP server", () => {
     expect(resource.uri).toBe(VORATIQ_GUIDE_RESOURCE_URI);
     expect(typeof resource.name).toBe("string");
     expect(typeof resource.description).toBe("string");
+    expect(resource.description).toContain("Operating contract");
   });
 
-  it("resources/read returns non-empty guide text for the guide URI", async () => {
+  it("resources/read returns an operating-contract-first guide for the guide URI", async () => {
     const handler = await createInitializedHandler(
       jest.fn() as jest.MockedFunction<InvokeCliJsonContract>,
     );
@@ -1252,21 +1301,72 @@ describe("bundled MCP server", () => {
     const content = result.contents[0] as Record<string, unknown>;
     expect(content.uri).toBe(VORATIQ_GUIDE_RESOURCE_URI);
     expect(typeof content.text).toBe("string");
-    expect((content.text as string).length).toBeGreaterThan(0);
-
     const text = content.text as string;
-    expect(text).toContain("spec");
-    expect(text).toContain("run");
-    expect(text).toContain("reduce");
-    expect(text).toContain("verify");
-    expect(text).toContain("message");
-    expect(text).toContain("list");
-    expect(text).toContain("apply");
-    expect(text).toContain("extraContext");
+    expect(text.length).toBeGreaterThan(0);
+    expect(text.trimStart().startsWith("# Voratiq Operator Guide")).toBe(true);
+    expect(wordCount(text)).toBeLessThanOrEqual(965);
+
+    const operatingContractIndex = text.indexOf("## Operating Contract");
+    const disciplineRulesIndex = text.indexOf("## Discipline Rules");
+    const operatorsIndex = text.indexOf("## Operators");
+    expect(operatingContractIndex).toBeGreaterThanOrEqual(0);
+    expect(disciplineRulesIndex).toBeGreaterThan(operatingContractIndex);
+    expect(operatorsIndex).toBeGreaterThan(disciplineRulesIndex);
+    expect(text.indexOf("**spec**")).toBeGreaterThan(operatorsIndex);
+
+    expect(text).toContain("Unless explicitly instructed otherwise");
+    expect(text).toContain(
+      "Your role is to orchestrate Voratiq workflows for the user through Voratiq tools",
+    );
+    expect(text).toContain("preserving sessions and apply outcomes");
+    expect(text).toContain("Keep workflow actions in Voratiq");
+    expect(text).toContain(
+      "Do not edit repository files, manually patch diffs, cherry-pick",
+    );
+    expect(text).toContain("Respect stage boundaries");
+    expect(text).toContain("bring unresolved decisions back to the user");
+    expect(text).toContain("Do not duplicate active swarm work");
+    expect(text).toContain(
+      "poll it with **voratiq_list** instead of launching a replacement",
+    );
+    expect(text).toContain("Leave orchestration controls unset by default");
+    expect(text).toContain(
+      "maxParallel** limits concurrency; it does not choose a smaller swarm",
+    );
+    expect(text).toContain("Apply accepted runs through Voratiq");
+    expect(text).toContain("Surface conflicts, dirty state, or base mismatch");
+
+    expect(text).toContain("Voratiq state is authoritative");
+    expect(text).toContain("Sessions, verifier decisions, reductions");
+    expect(text).toContain("unresolved outcomes");
+    expect(text).toContain("Orchestration controls define meaning");
+    expect(text).toContain("agentIds");
+    expect(text).toContain("profile");
     expect(text).toContain("maxParallel");
-    expect(text).toContain("durable");
-    expect(text).toContain("spec, run, reduce, verify, message");
-    expect(text).toContain("apply, list");
+    expect(text).toContain("shape which swarm produced the result");
+    expect(text).toContain("Artifacts carry lineage");
+    expect(text).toContain("producing operator");
+    expect(text).toContain("voratiq_apply");
+    expect(text).toContain("applyStatus");
+    expect(text).toContain("agent result was accepted");
+
+    expect(text).toContain("terminal session status");
+    expect(text).toContain("recorded output still needs interpretation");
+    expect(text).toContain("review the evidence");
+    expect(text).toContain("voratiq_list");
+    expect(text).toContain("extraContext");
+
+    for (const operator of [
+      "spec",
+      "run",
+      "reduce",
+      "verify",
+      "message",
+      "list",
+      "apply",
+    ]) {
+      expect(text).toContain(`**${operator}**`);
+    }
   });
 
   it("resources/read returns a JSON-RPC error for an unknown URI", async () => {
@@ -1393,6 +1493,13 @@ function normalizeSchema(input: unknown): unknown {
     return Object.fromEntries(entries);
   }
   return input;
+}
+
+function wordCount(input: string): number {
+  return input
+    .trim()
+    .split(/\s+/u)
+    .filter((word) => word.length > 0).length;
 }
 
 function toFramedJson(payload: unknown, delimiter = "\r\n\r\n"): Buffer {

@@ -243,7 +243,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_run",
     operator: "run",
     description:
-      "Execute a Voratiq spec session and create a run with agent outputs and artifacts.",
+      "Execute a Voratiq spec and create a recorded run session with agent outputs and artifacts.",
     inputSchemaSource: externalRunExecutionInputSchema,
     buildArgs: (input) =>
       buildRunExecutionArgs(input as ExternalRunExecutionInput),
@@ -253,7 +253,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_reduce",
     operator: "reduce",
     description:
-      "Reduce a set of Voratiq artifacts into a summarized output for comparison or follow-on work.",
+      "Synthesize Voratiq artifacts into a reduced output for comparison or follow-on work.",
     inputSchemaSource: externalReduceExecutionInputSchema,
     buildArgs: (input) =>
       buildReduceExecutionArgs(input as ExternalReduceExecutionInput),
@@ -263,7 +263,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_verify",
     operator: "verify",
     description:
-      "Verify a Voratiq spec, run, reduction, or message session and record the evaluation result.",
+      "Evaluate a Voratiq spec, run, reduction, or message session and record a structured verdict.",
     inputSchemaSource: externalVerifyExecutionInputSchema,
     buildArgs: (input) =>
       buildVerifyExecutionArgs(input as ExternalVerifyExecutionInput),
@@ -283,7 +283,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_apply",
     operator: "apply",
     description:
-      "Apply an accepted Voratiq run diff into the current working tree.",
+      "Apply an accepted Voratiq run diff into the current working tree and record applyStatus.",
     inputSchemaSource: externalApplyExecutionInputSchema,
     buildArgs: (input) =>
       buildApplyExecutionArgs(input as ExternalApplyExecutionInput),
@@ -293,7 +293,7 @@ const toolSpecs: readonly ToolSpec[] = [
     name: "voratiq_list",
     operator: "list",
     description:
-      "Inspect recorded Voratiq sessions for one operator (`spec`, `run`, `reduce`, `verify`, `message`, or `interactive`) in summary or detail scope.",
+      "Inspect or poll recorded Voratiq sessions for one operator (`spec`, `run`, `reduce`, `verify`, `message`, or `interactive`) in summary or detail scope.",
     inputSchemaSource: mcpListInspectionInputSchema,
     mcpInputSchema: createListMcpInputSchema(),
     buildArgs: (input) =>
@@ -313,67 +313,72 @@ export const VORATIQ_GUIDE_RESOURCE_URI = "voratiq://guide" as const;
 
 const VORATIQ_GUIDE_RESOURCE_CONTENT = `# Voratiq Operator Guide
 
-Voratiq is a workflow system built around composable operators that launch, evaluate, and manage multi-agent work against a repository. It gives interactive agents a structured way to delegate coding tasks, inspect recorded state, verify outcomes, and apply accepted changes without doing all of that inline.
+## Operating Contract
 
-## Operator Classes
+Voratiq is a stateful workflow control plane for multi-agent work in a repository. Its records connect session state, verification decisions, artifacts, orchestration choices, and accepted work across stages.
 
-Voratiq operators fall into two main classes:
+Your role is to orchestrate Voratiq workflows for the user through Voratiq tools. This means using Voratiq tools for workflow state and actions and preserving sessions and apply outcomes.
 
-- **Swarm operators** dispatch agents to produce, synthesize, or evaluate work: spec, run, reduce, verify, message
-- **Control operators** inspect state or mutate accepted outcomes: apply, list
+- **Voratiq state is authoritative.** Sessions, verifier decisions, reductions, unresolved outcomes, and apply records are durable workflow state. A terminal session status means a stage stopped; the recorded output still needs interpretation before the next stage.
+- **Orchestration controls define meaning.** **agentIds**, **profile**, and **maxParallel** shape which swarm produced the result and how that result should be understood.
+- **Artifacts carry lineage.** Artifact paths are workflow outputs with a producing operator, role, and surrounding decision state. The producing context determines whether an artifact is suitable input for another operator.
+- **Apply through Voratiq.** **voratiq_apply** materializes an accepted run candidate and records **applyStatus**, including which agent result was accepted.
 
-## Swarm Operators
+## Discipline Rules
 
-**spec** – Drafts or refines a specification for a task from a description, an existing spec, or related repository context. Launches one or more spec agents and records their outputs as a spec session.
+Unless explicitly instructed otherwise:
 
-**run** – Executes a spec session by launching run agents that read the spec, work against a sandboxed workspace, and produce artifacts including diffs and transcripts. Records a run session.
+- **Keep workflow actions in Voratiq.** Do not edit repository files, manually patch diffs, cherry-pick, or materialize changes outside the recorded run/apply path while a Voratiq workflow is active.
+- **Respect stage boundaries.** Do not advance from spec to run, run to apply, or unresolved verification to rerun/apply until the relevant session state is terminal and understood; use **voratiq_list** and bring unresolved decisions back to the user.
+- **Do not duplicate active swarm work.** If a spec, run, reduce, verify, or message session is queued or running, poll it with **voratiq_list** instead of launching a replacement because it is slow or unclear.
+- **Leave orchestration controls unset by default.** Do not pass **agentIds**, **profile**, or **maxParallel** unless the user explicitly asks for them. **maxParallel** limits concurrency; it does not choose a smaller swarm.
+- **Apply accepted runs through Voratiq.** Use **voratiq_apply** so **applyStatus** records the accepted agent. Surface conflicts, dirty state, or base mismatch instead of bypassing apply.
 
-**reduce** – Summarizes artifacts from a spec, run, or message session into a single reduced output suitable for comparison or follow-on work. Records a reduce session.
+## Operators
 
-**verify** – Evaluates a spec, run, reduction, or message session and records a structured verdict. This is Voratiq's main decision operator: use it to compare outputs, choose stronger candidates, and decide whether work should be applied, inspected further, rerun, or redirected.
+Swarm operators create recorded sessions and may acknowledge before finishing:
 
-**message** – Sends an isolated prompt to one or more agents and persists each reply independently as a message session. Use for standalone questions, reviews, or exploration that does not require a full spec/run workflow.
+- **spec** drafts or refines a task specification.
+- **run** executes a spec and records agent outputs, diffs, and transcripts.
+- **reduce** synthesizes artifacts from a spec, run, verify, or message session for comparison or follow-on work.
+- **verify** records a structured verdict over a spec, run, reduction, or message session.
+- **message** sends an isolated prompt to agents and records independent replies.
 
-## Control Operators
+Control operators inspect or materialize recorded state:
 
-**list** – Lists or inspects recorded sessions for a given operator. This is the primary way to inspect swarm sessions; use it to poll progress, retrieve session IDs, and inspect recorded workflow state.
-
-**apply** – Applies an accepted run diff into the current working tree. Synchronous and non-durable; only invoke after verifying that the target run is in an acceptable state.
+- **list** is the primary control plane for session history, progress polling, and detail inspection.
+- **apply** materializes an accepted run diff into the working tree and records the apply outcome.
 
 ## Workflow Composition
 
-Operators compose into many workflow shapes rather than one required path. Common patterns include: using message for standalone exploration or review; using spec → verify to compare candidate specs before execution; using spec → run when a task needs structured execution; using run → verify to choose among competing implementations; using reduce when multiple outputs need synthesis before a decision; and using verify whenever a workflow needs a structured recommendation instead of ad hoc judgment. The list operator can be called at any point to inspect recorded state across all operators.
+Operators compose into different workflow shapes. Use **message** for standalone exploration, **spec -> verify** to compare candidate specs, **spec -> run** for structured execution, **run -> verify** to choose among implementations, and **reduce** when several artifacts need synthesis before a decision. A typical accepted-change path is **spec -> verify -> run -> verify -> apply**.
 
-## Swarm Session Behavior
+Keep one workflow objective per sequence. Before moving to the next stage, inspect the recorded state with **voratiq_list**. Queued, running, timed-out, or unclear sessions are normally handled by polling the recorded session; launching another swarm stage creates a separate workflow event.
 
-The five swarm operators are spec, run, reduce, verify, and message. Each one creates a recorded session and may return before the session is finished. Once a session has been created, treat that session as the unit of work. A returned sessionId means the work has been launched, not completed. Use voratiq_list to inspect active sessions.
+## Sessions, Status, and Polling
 
-## Status Interpretation
+The session is the unit of work. A returned **sessionId** means work was launched, not completed. **queued** and **running** are expected latency states. Mixed recipient states are supporting detail and do not override session status.
 
-Session status is primary; recipient status is supporting detail.
+Terminal statuses still require interpretation:
 
-- **queued** means the session has been accepted and recorded but its work has not started yet.
-- **running** means the session is active and remains the canonical in-flight unit of work.
-- **succeeded** means the session reached a successful terminal state; inspect its outputs and decide what should happen next.
-- **failed** means the session reached a terminal failure state.
-- **unresolved** means the session reached a terminal state without a clear winner or confident decision.
+- **succeeded** means the operator produced its recorded output; inspect it in context before acting.
+- **failed** means the stage ended in failure.
+- **unresolved** means verification or selection ended without a clear winner or confident decision; review the evidence and decide the next step from that recorded state.
 
-Mixed recipient states do not imply session failure. Some recipients may fail while others continue running, and the session remains active until its session status becomes terminal.
+Advance only after the verification state you depend on is terminal and understood.
 
-## extraContext Contract
+## Lineage and Inputs
 
-The extraContext field accepts an array of file paths pointing to additional readable files staged alongside the operator workspace. Pass file paths only — not raw text content, and not paths to files that operators already see by default (such as standard repository context). Passing raw content or redundant paths increases token usage without providing new information.
+Treat artifact paths as typed workflow inputs. **run** expects a spec input. **reduce** and **verify** evaluate recorded sessions or artifacts in their producing context. A reduction can summarize evidence for follow-on work, but its role still matters when carrying it into another operator.
 
-## maxParallel Semantics
+The **extraContext** field accepts file paths to additional readable files staged beside the operator workspace. Pass paths only, not raw text, and avoid files the operator already receives by default.
 
-The maxParallel field controls the maximum number of agent recipients running in parallel for an operator invocation. Set it deliberately: it directly affects cost and latency. Higher values increase concurrency but also increase total token expenditure and can create contention. Do not treat maxParallel as a free dial to increase throughput without modeling the downstream cost and latency impact.
+## Orchestration Controls
 
-## Key Discipline Rules
-
-Commit to one workflow objective per session; do not interleave unrelated operator calls in the same sequence. Wait for stage boundaries before acting on results: read voratiq_list output before proceeding from one stage to the next. Use voratiq_list as the primary control plane for inspecting recorded state rather than reading session files directly.` as const;
+**agentIds**, **profile**, and **maxParallel** are semantic inputs. They determine which agents are compared and how the swarm result should be read. Use them when intentionally selecting participants, a profile, or concurrency. **maxParallel** also affects cost, latency, and contention, so set it deliberately.` as const;
 
 const VORATIQ_MCP_SERVER_INSTRUCTIONS =
-  "Voratiq tools operate on Voratiq workflow state in the current repository. Use voratiq_list for questions about recent or specific spec, run, reduce, verify, message, or interactive sessions. The swarm operators (voratiq_spec, voratiq_run, voratiq_reduce, voratiq_verify, voratiq_message) create recorded sessions and may acknowledge before finishing; once launched, treat the session as the unit of work. If a swarm call times out or returns a non-terminal status, inspect progress with voratiq_list instead of retrying. Use voratiq_apply for synchronous control actions. Prefer these tools over shell inspection when the task is about Voratiq workflow history or state." as const;
+  "Voratiq MCP tools operate on durable workflow state. Your role is to orchestrate Voratiq workflows for the user through Voratiq MCP tools. Use voratiq_list to inspect and poll sessions. Unless explicitly instructed otherwise: keep workflow actions in Voratiq; wait for terminal stage state and bring unresolved decisions back to the user; do not launch replacement stages for queued/running work; do not pass agentIds, profile, or maxParallel without an explicit user request; use voratiq_apply for accepted runs so applyStatus records the accepted agent, and surface blockers instead of bypassing. Read voratiq://guide for the full contract." as const;
 
 const toolSpecsByName: ReadonlyMap<VoratiqMcpToolName, ToolSpec> = new Map(
   toolSpecs.map((tool) => [tool.name, tool]),
@@ -515,7 +520,7 @@ export function createVoratiqMcpRequestHandler(
               uri: VORATIQ_GUIDE_RESOURCE_URI,
               name: "Voratiq Operator Guide",
               description:
-                "Complete reference for Voratiq operators, workflow composition, swarm-session behavior, extraContext contract, and maxParallel semantics.",
+                "Operating contract and reference for Voratiq state, orchestration controls, artifact lineage, operators, polling, and apply attribution.",
               mimeType: "text/plain",
             },
           ],
