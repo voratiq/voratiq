@@ -22,7 +22,7 @@ describe("orchestration bootstrap generator", () => {
         {
           id: "alpha",
           provider: "gemini",
-          model: "gemini-2.5-pro",
+          model: "gemini-3.1-pro-preview",
           enabled: true,
           binary: "/usr/local/bin/gemini",
         },
@@ -86,7 +86,7 @@ describe("orchestration bootstrap generator", () => {
         {
           id: "gemini",
           provider: "gemini",
-          model: "gemini-2.5-pro",
+          model: "gemini-3.1-pro-preview",
           enabled: true,
           binary: "/usr/local/bin/gemini",
         },
@@ -123,7 +123,7 @@ describe("orchestration bootstrap generator", () => {
         {
           id: "gemini",
           provider: "gemini",
-          model: "gemini-2.5-pro",
+          model: "gemini-3.1-pro-preview",
           enabled: true,
           binary: "/usr/local/bin/gemini",
         },

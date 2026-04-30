@@ -208,6 +208,14 @@ suite("agent integrations", () => {
         repoRoot,
         scenario,
       }) => {
+        expect(executionSnapshot.argv.slice(0, 6)).toEqual([
+          "--model",
+          "gemini-model",
+          "--output-format",
+          "json",
+          "--approval-mode",
+          "yolo",
+        ]);
         const homeEnv = executionSnapshot.env.HOME;
         expect(homeEnv).toContain(
           `.voratiq/run/sessions/${runReport.runId}/${scenario.agentId}/sandbox`,
@@ -217,6 +225,7 @@ suite("agent integrations", () => {
         );
         expect(executionSnapshot.env.TEMP).toBe(executionSnapshot.env.TMPDIR);
         expect(executionSnapshot.env.TMP).toBe(executionSnapshot.env.TMPDIR);
+        expect(executionSnapshot.env.GEMINI_CLI_TRUST_WORKSPACE).toBe("true");
         expect(executionSnapshot.env.GEMINI_HOME).toBeUndefined();
 
         const stagedGeminiDir = join(

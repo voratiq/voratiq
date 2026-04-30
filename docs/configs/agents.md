@@ -22,7 +22,7 @@ Each agent entry:
 
 - `id` (required) - unique identifier (max 64 chars); lowercase letters, digits, `_`, `-`.
 - `provider` (required) - `claude`, `codex`, or `gemini`.
-- `model` (required) - model identifier, e.g. `claude-opus-4-6`, `gpt-5.3-codex`, `gemini-2.5-pro`.
+- `model` (required) - model identifier, e.g. `claude-opus-4-6`, `gpt-5.3-codex`, `gemini-3.1-pro-preview`.
 - `enabled` (optional, default `true`) - set `false` to disable.
 - `binary` (optional) - absolute path to the provider CLI executable.
 - `extraArgs` (optional) - additional CLI arguments; cannot include `--model` or `{{MODEL}}`.
@@ -41,9 +41,9 @@ agents:
     model: gpt-5.3-codex
     binary: /usr/local/bin/codex
 
-  - id: gemini-2-5-pro
+  - id: gemini-3-1-pro-preview
     provider: gemini
-    model: gemini-2.5-pro
+    model: gemini-3.1-pro-preview
     enabled: false
     binary: /usr/local/bin/gemini
 ```

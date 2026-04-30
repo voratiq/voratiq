@@ -4,7 +4,10 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 
-import { resolveFirstPartyMcpStatus } from "../../src/interactive/providers.js";
+import {
+  prepareProviderNativeLaunch,
+  resolveFirstPartyMcpStatus,
+} from "../../src/interactive/providers.js";
 import type {
   NativeToolDeclaration,
   ProviderMcpCommandRunner,
@@ -173,6 +176,38 @@ describe("interactive providers", () => {
       args: ["mcp", "get", "--json", "voratiq"],
       cwd: root,
     });
+  });
+
+  it("strips Gemini run-only approval flags from interactive launches", async () => {
+    const result = await prepareProviderNativeLaunch({
+      providerId: "gemini",
+      agent: {
+        id: "gemini-test",
+        provider: "gemini",
+        model: "gemini-3-flash-preview",
+        binary: "gemini",
+        argv: [
+          "--model",
+          "gemini-3-flash-preview",
+          "--output-format",
+          "json",
+          "--approval-mode",
+          "yolo",
+        ],
+      },
+      root: "/repo",
+      toolDeclarations: [],
+      prompt: "Inspect the current workspace.",
+    });
+
+    expect(result.args).toContain("--model");
+    expect(result.args).toContain("gemini-3-flash-preview");
+    expect(result.args).toContain("Inspect the current workspace.");
+    expect(result.args).not.toContain("--output-format");
+    expect(result.args).not.toContain("json");
+    expect(result.args).not.toContain("--approval-mode");
+    expect(result.args).not.toContain("yolo");
+    expect(result.toolAttachmentStatus).toBe("not-requested");
   });
 
   it("treats codex 'No MCP server named' output as missing and prompts for install", async () => {

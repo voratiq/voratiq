@@ -86,7 +86,7 @@ agents:
     binary: /usr/local/bin/codex
   - id: gemini
     provider: gemini
-    model: gemini-2.5-pro
+    model: gemini-3.1-pro-preview
     enabled: true
     binary: /usr/local/bin/gemini
 `;

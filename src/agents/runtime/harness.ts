@@ -86,7 +86,7 @@ export async function runSandboxedAgent(
       runtimeManifestPath: paths.runtimeManifestPath,
       promptPath,
       workspacePath: paths.workspacePath,
-      env: staged.env,
+      env: applyProviderRunEnvironmentOverrides(providerId, staged.env),
       environment,
     });
 
@@ -164,6 +164,20 @@ export async function runSandboxedAgent(
       ).catch(() => {});
     }
   }
+}
+
+function applyProviderRunEnvironmentOverrides(
+  providerId: string,
+  env: Record<string, string>,
+): Record<string, string> {
+  if (providerId !== "gemini") {
+    return env;
+  }
+
+  return {
+    ...env,
+    GEMINI_CLI_TRUST_WORKSPACE: "true",
+  };
 }
 
 function resolveDenialBackoff(options: {
