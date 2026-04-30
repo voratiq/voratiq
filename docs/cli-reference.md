@@ -302,7 +302,7 @@ voratiq apply --run <run-id> --agent <agent-id> [options]
 ### Examples
 
 ```bash
-voratiq apply --run 20251031-232802-abc123 --agent gpt-5-2-xhigh
+voratiq apply --run 20251031-232802-abc123 --agent gpt-5-4-high
 ```
 
 ## `voratiq list`

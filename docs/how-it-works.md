@@ -134,7 +134,7 @@ Example run session:
 ```text
 .voratiq/run/sessions/20260113-235501-hhkox/
 ├── record.json
-├── claude-opus-4-6/
+├── claude-opus-4-7-xhigh/
 │   ├── artifacts/
 │   │   ├── diff.patch
 │   │   ├── summary.txt

@@ -22,7 +22,7 @@ Each agent entry:
 
 - `id` (required) - unique identifier (max 64 chars); lowercase letters, digits, `_`, `-`.
 - `provider` (required) - `claude`, `codex`, or `gemini`.
-- `model` (required) - model identifier, e.g. `claude-opus-4-6`, `gpt-5.3-codex`, `gemini-3.1-pro-preview`.
+- `model` (required) - model identifier, e.g. `claude-opus-4-7`, `gpt-5.4`, `gemini-3.1-pro-preview`.
 - `enabled` (optional, default `true`) - set `false` to disable.
 - `binary` (optional) - absolute path to the provider CLI executable.
 - `extraArgs` (optional) - additional CLI arguments; cannot include `--model` or `{{MODEL}}`.
@@ -31,15 +31,21 @@ Each agent entry:
 
 ```yaml
 agents:
-  - id: claude-opus-4-6
+  - id: claude-opus-4-7-xhigh
     provider: claude
-    model: claude-opus-4-6
+    model: claude-opus-4-7
     binary: /usr/local/bin/claude
+    extraArgs:
+      - --effort
+      - xhigh
 
-  - id: gpt-5-3-codex
+  - id: gpt-5-4-high
     provider: codex
-    model: gpt-5.3-codex
+    model: gpt-5.4
     binary: /usr/local/bin/codex
+    extraArgs:
+      - --config
+      - model_reasoning_effort=high
 
   - id: gemini-3-1-pro-preview
     provider: gemini
