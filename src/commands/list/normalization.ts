@@ -2,6 +2,7 @@ import type {
   ListJsonArtifact,
   ListJsonChanges,
   ListJsonTargetRef,
+  ListJsonVerificationSelection,
   ListOperator,
 } from "../../contracts/list.js";
 import type { InteractiveSessionRecord } from "../../domain/interactive/model/types.js";
@@ -81,6 +82,7 @@ export interface NormalizedListDetailSession extends NormalizedListSession {
   completedAt?: string;
   workspacePath: string;
   agents: NormalizedListAgent[];
+  selection?: ListJsonVerificationSelection;
 }
 
 export function normalizeListSession(

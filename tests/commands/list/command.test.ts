@@ -1,12 +1,13 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { executeListCommand } from "../../../src/commands/list/command.js";
 import {
   formatTargetTablePreview,
   TARGET_TABLE_PREVIEW_LENGTH,
 } from "../../../src/commands/list/normalization.js";
+import { parseListJsonOutput } from "../../../src/contracts/list.js";
 import type { InteractiveSessionRecord } from "../../../src/domain/interactive/model/types.js";
 import { appendInteractiveSessionRecord } from "../../../src/domain/interactive/persistence/adapter.js";
 import type { MessageRecord } from "../../../src/domain/message/model/types.js";
@@ -1344,6 +1345,7 @@ describe("executeListCommand", () => {
         },
       ],
     });
+    expect(result.json.session).not.toHaveProperty("selection");
   });
 
   it("renders verify summary with TARGET column and aborted filtering", async () => {
@@ -1450,6 +1452,952 @@ describe("executeListCommand", () => {
     });
   });
 
+  it("exposes a decision-only resolvable run verification selection", async () => {
+    const artifactPath =
+      ".voratiq/verify/sessions/verify-select-run/verifier-a/run-verification/artifacts/result.json";
+    await writeVerificationArtifact(testDir, artifactPath, {
+      method: "rubric",
+      template: "run-verification",
+      verifierId: "verifier-a",
+      generatedAt: "2026-03-01T00:05:00.000Z",
+      status: "succeeded",
+      result: {
+        preferred: "v_aaaaaaaaaa",
+        ranking: ["v_aaaaaaaaaa", "v_bbbbbbbbbb"],
+      },
+    });
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: {
+        ...buildVerificationRecord({
+          sessionId: "verify-select-run",
+          status: "succeeded",
+          methods: [
+            {
+              method: "rubric",
+              template: "run-verification",
+              verifierId: "verifier-a",
+              scope: { kind: "run" },
+              status: "succeeded",
+              artifactPath,
+              startedAt: "2026-03-01T00:00:00.000Z",
+              completedAt: "2026-03-01T00:01:00.000Z",
+            },
+          ],
+        }),
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+          candidateIds: ["agent-a", "agent-b"],
+        },
+        blinded: {
+          enabled: true,
+          aliasMap: {
+            v_aaaaaaaaaa: "agent-a",
+            v_bbbbbbbbbb: "agent-b",
+          },
+        },
+      },
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-select-run",
+      }),
+    );
+    const parsed = parseListJsonOutput(result.json);
+
+    expect(parsed).toMatchObject({
+      operator: "verify",
+      mode: "detail",
+      session: {
+        status: "succeeded",
+      },
+    });
+    if (parsed.mode !== "detail" || !parsed.session) {
+      throw new Error("Expected detail output");
+    }
+    expect(parsed.session.selection).toEqual({
+      state: "resolvable",
+      selectedCanonicalAgentId: "agent-a",
+    });
+  });
+
+  it("rejects resolved verification selection fields outside the decision payload", () => {
+    const baseOutput = {
+      operator: "verify",
+      mode: "detail",
+      session: {
+        operator: "verify",
+        sessionId: "verify-legacy-selection",
+        status: "succeeded",
+        createdAt: "2026-03-01T00:00:00.000Z",
+        workspacePath: ".voratiq/verify/sessions/verify-legacy-selection",
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+        },
+        agents: [],
+      },
+      warnings: [],
+    };
+    const extraFields = [
+      { unresolvedReasons: [] },
+      { runId: "run-123" },
+      { agentId: "agent-a" },
+      {
+        specPath: ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md",
+      },
+    ];
+
+    for (const extraField of extraFields) {
+      expect(() =>
+        parseListJsonOutput({
+          ...baseOutput,
+          session: {
+            ...baseOutput.session,
+            selection: {
+              state: "resolvable",
+              selectedCanonicalAgentId: "agent-a",
+              ...extraField,
+            },
+          },
+        }),
+      ).toThrow();
+    }
+  });
+
+  it("requires unresolved reasons only for unresolved verification selections", () => {
+    expect(() =>
+      parseListJsonOutput({
+        operator: "verify",
+        mode: "detail",
+        session: {
+          operator: "verify",
+          sessionId: "verify-missing-unresolved-reasons",
+          status: "succeeded",
+          createdAt: "2026-03-01T00:00:00.000Z",
+          workspacePath:
+            ".voratiq/verify/sessions/verify-missing-unresolved-reasons",
+          target: {
+            kind: "run",
+            sessionId: "run-123",
+          },
+          agents: [],
+          selection: {
+            state: "unresolved",
+          },
+        },
+        warnings: [],
+      }),
+    ).toThrow();
+  });
+
+  it("exposes a decision-only resolvable spec verification selection", async () => {
+    const artifactPath =
+      ".voratiq/verify/sessions/verify-select-spec/verifier-a/spec-verification/artifacts/result.json";
+    const specPath =
+      ".voratiq/spec/sessions/spec-123/agent-a/artifacts/spec.md";
+    await writeVerificationArtifact(testDir, artifactPath, {
+      method: "rubric",
+      template: "spec-verification",
+      verifierId: "verifier-a",
+      generatedAt: "2026-03-01T00:05:00.000Z",
+      status: "succeeded",
+      result: {
+        preferred: "v_aaaaaaaaaa",
+        ranking: ["v_aaaaaaaaaa", "v_bbbbbbbbbb"],
+      },
+    });
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: {
+        ...buildVerificationRecord({
+          sessionId: "verify-select-spec",
+          status: "succeeded",
+          methods: [
+            {
+              method: "rubric",
+              template: "spec-verification",
+              verifierId: "verifier-a",
+              scope: { kind: "target" },
+              status: "succeeded",
+              artifactPath,
+              startedAt: "2026-03-01T00:00:00.000Z",
+              completedAt: "2026-03-01T00:01:00.000Z",
+            },
+          ],
+        }),
+        target: {
+          kind: "spec",
+          sessionId: "spec-123",
+          specPath,
+        },
+        blinded: {
+          enabled: true,
+          aliasMap: {
+            v_aaaaaaaaaa: "agent-a",
+            v_bbbbbbbbbb: "agent-b",
+          },
+        },
+      },
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-select-spec",
+      }),
+    );
+
+    if (result.json.mode !== "detail" || !result.json.session) {
+      throw new Error("Expected detail output");
+    }
+    expect(result.json.session.selection).toEqual({
+      state: "resolvable",
+      selectedCanonicalAgentId: "agent-a",
+    });
+  });
+
+  it("exposes generic resolvable verification selections across target kinds", async () => {
+    const cases = [
+      {
+        name: "spec",
+        target: {
+          kind: "spec",
+          sessionId: "spec-generic-target",
+        },
+        template: "spec-verification",
+        scope: { kind: "target" },
+      },
+      {
+        name: "run",
+        target: {
+          kind: "run",
+          sessionId: "run-generic-target",
+          candidateIds: ["agent-a", "agent-b"],
+        },
+        template: "run-verification",
+        scope: { kind: "run" },
+      },
+      {
+        name: "reduce",
+        target: {
+          kind: "reduce",
+          sessionId: "reduce-generic-target",
+        },
+        template: "reduce-verification",
+        scope: { kind: "target" },
+      },
+      {
+        name: "message",
+        target: {
+          kind: "message",
+          sessionId: "message-generic-target",
+        },
+        template: "message-verification",
+        scope: { kind: "target" },
+      },
+    ] satisfies ReadonlyArray<{
+      name: string;
+      target: VerificationRecord["target"];
+      template: string;
+      scope: VerificationRecord["methods"][number]["scope"];
+    }>;
+
+    for (const selectionCase of cases) {
+      const artifactPath = `.voratiq/verify/sessions/verify-generic-${selectionCase.name}/verifier-a/${selectionCase.template}/artifacts/result.json`;
+      await writeVerificationArtifact(testDir, artifactPath, {
+        method: "rubric",
+        template: selectionCase.template,
+        verifierId: "verifier-a",
+        generatedAt: "2026-03-01T00:05:00.000Z",
+        status: "succeeded",
+        result: {
+          preferred: "v_aaaaaaaaaa",
+          ranking: ["v_aaaaaaaaaa", "v_bbbbbbbbbb"],
+        },
+      });
+      await appendVerificationRecord({
+        root: testDir,
+        verificationsFilePath,
+        record: {
+          ...buildVerificationRecord({
+            sessionId: `verify-generic-${selectionCase.name}`,
+            status: "succeeded",
+            methods: [
+              {
+                method: "rubric",
+                template: selectionCase.template,
+                verifierId: "verifier-a",
+                scope: selectionCase.scope,
+                status: "succeeded",
+                artifactPath,
+                startedAt: "2026-03-01T00:00:00.000Z",
+                completedAt: "2026-03-01T00:01:00.000Z",
+              },
+            ],
+          }),
+          target: selectionCase.target,
+          blinded: {
+            enabled: true,
+            aliasMap: {
+              v_aaaaaaaaaa: "agent-a",
+              v_bbbbbbbbbb: "agent-b",
+            },
+          },
+        },
+      });
+
+      const result = await executeListCommand(
+        buildInput({
+          operator: "verify",
+          sessionId: `verify-generic-${selectionCase.name}`,
+        }),
+      );
+
+      expect(result.json).toMatchObject({
+        operator: "verify",
+        mode: "detail",
+        session: {
+          target: {
+            kind: selectionCase.target.kind,
+            sessionId: selectionCase.target.sessionId,
+          },
+        },
+      });
+      if (result.json.mode !== "detail" || !result.json.session) {
+        throw new Error("Expected detail output");
+      }
+      expect(result.json.session.selection).toEqual({
+        state: "resolvable",
+        selectedCanonicalAgentId: "agent-a",
+      });
+    }
+  });
+
+  it("does not include recoverable spec paths in resolvable selections", async () => {
+    const artifactPath =
+      ".voratiq/verify/sessions/verify-recover-spec/verifier-a/spec-verification/artifacts/result.json";
+    const selectedSpecPath =
+      ".voratiq/spec/sessions/spec-recover/agent-a/artifacts/spec.md";
+    await appendSpecRecord({
+      root: testDir,
+      specsFilePath,
+      record: buildSpecRecord({
+        sessionId: "spec-recover",
+        status: "succeeded",
+        agents: [
+          {
+            agentId: "agent-a",
+            status: "succeeded",
+            startedAt: "2026-03-01T00:00:00.000Z",
+            completedAt: "2026-03-01T00:01:00.000Z",
+            outputPath: selectedSpecPath,
+            dataPath:
+              ".voratiq/spec/sessions/spec-recover/agent-a/artifacts/spec.json",
+          },
+          {
+            agentId: "agent-b",
+            status: "succeeded",
+            startedAt: "2026-03-01T00:00:00.000Z",
+            completedAt: "2026-03-01T00:01:00.000Z",
+            outputPath:
+              ".voratiq/spec/sessions/spec-recover/agent-b/artifacts/spec.md",
+            dataPath:
+              ".voratiq/spec/sessions/spec-recover/agent-b/artifacts/spec.json",
+          },
+        ],
+      }),
+    });
+    await writeVerificationArtifact(testDir, artifactPath, {
+      method: "rubric",
+      template: "spec-verification",
+      verifierId: "verifier-a",
+      generatedAt: "2026-03-01T00:05:00.000Z",
+      status: "succeeded",
+      result: {
+        preferred: "v_aaaaaaaaaa",
+        ranking: ["v_aaaaaaaaaa", "v_bbbbbbbbbb"],
+      },
+    });
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: {
+        ...buildVerificationRecord({
+          sessionId: "verify-recover-spec",
+          status: "succeeded",
+          methods: [
+            {
+              method: "rubric",
+              template: "spec-verification",
+              verifierId: "verifier-a",
+              scope: { kind: "target" },
+              status: "succeeded",
+              artifactPath,
+              startedAt: "2026-03-01T00:00:00.000Z",
+              completedAt: "2026-03-01T00:01:00.000Z",
+            },
+          ],
+        }),
+        target: {
+          kind: "spec",
+          sessionId: "spec-recover",
+        },
+        blinded: {
+          enabled: true,
+          aliasMap: {
+            v_aaaaaaaaaa: "agent-a",
+            v_bbbbbbbbbb: "agent-b",
+          },
+        },
+      },
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-recover-spec",
+      }),
+    );
+
+    expect(result.json).toMatchObject({
+      operator: "verify",
+      mode: "detail",
+      session: {
+        status: "succeeded",
+      },
+    });
+    if (result.json.mode !== "detail" || !result.json.session) {
+      throw new Error("Expected detail output");
+    }
+    expect(result.json.session.selection).toEqual({
+      state: "resolvable",
+      selectedCanonicalAgentId: "agent-a",
+    });
+  });
+
+  it("keeps resolved spec selections generic when the selected spec path is unavailable", async () => {
+    const artifactPath =
+      ".voratiq/verify/sessions/verify-spec-missing-path/verifier-a/spec-verification/artifacts/result.json";
+    await writeVerificationArtifact(testDir, artifactPath, {
+      method: "rubric",
+      template: "spec-verification",
+      verifierId: "verifier-a",
+      generatedAt: "2026-03-01T00:05:00.000Z",
+      status: "succeeded",
+      result: {
+        preferred: "v_aaaaaaaaaa",
+        ranking: ["v_aaaaaaaaaa", "v_bbbbbbbbbb"],
+      },
+    });
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: {
+        ...buildVerificationRecord({
+          sessionId: "verify-spec-missing-path",
+          status: "succeeded",
+          methods: [
+            {
+              method: "rubric",
+              template: "spec-verification",
+              verifierId: "verifier-a",
+              scope: { kind: "target" },
+              status: "succeeded",
+              artifactPath,
+              startedAt: "2026-03-01T00:00:00.000Z",
+              completedAt: "2026-03-01T00:01:00.000Z",
+            },
+          ],
+        }),
+        target: {
+          kind: "spec",
+          sessionId: "spec-missing-path",
+        },
+        blinded: {
+          enabled: true,
+          aliasMap: {
+            v_aaaaaaaaaa: "agent-a",
+            v_bbbbbbbbbb: "agent-b",
+          },
+        },
+      },
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-spec-missing-path",
+      }),
+    );
+
+    expect(result.json).toMatchObject({
+      operator: "verify",
+      mode: "detail",
+      session: {
+        status: "succeeded",
+      },
+    });
+    if (result.json.mode !== "detail" || !result.json.session) {
+      throw new Error("Expected detail output");
+    }
+    expect(result.json.session.selection).toEqual({
+      state: "resolvable",
+      selectedCanonicalAgentId: "agent-a",
+    });
+  });
+
+  it("keeps verifier disagreement as an unresolved selection while status stays succeeded", async () => {
+    const verifierAPath =
+      ".voratiq/verify/sessions/verify-disagreement/verifier-a/run-verification/artifacts/result.json";
+    const verifierBPath =
+      ".voratiq/verify/sessions/verify-disagreement/verifier-b/run-verification/artifacts/result.json";
+    await writeVerificationArtifact(testDir, verifierAPath, {
+      method: "rubric",
+      template: "run-verification",
+      verifierId: "verifier-a",
+      generatedAt: "2026-03-01T00:05:00.000Z",
+      status: "succeeded",
+      result: {
+        preferred: "v_aaaaaaaaaa",
+        ranking: ["v_aaaaaaaaaa", "v_bbbbbbbbbb"],
+      },
+    });
+    await writeVerificationArtifact(testDir, verifierBPath, {
+      method: "rubric",
+      template: "run-verification",
+      verifierId: "verifier-b",
+      generatedAt: "2026-03-01T00:05:00.000Z",
+      status: "succeeded",
+      result: {
+        preferred: "v_bbbbbbbbbb",
+        ranking: ["v_bbbbbbbbbb", "v_aaaaaaaaaa"],
+      },
+    });
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: {
+        ...buildVerificationRecord({
+          sessionId: "verify-disagreement",
+          status: "succeeded",
+          methods: [
+            {
+              method: "rubric",
+              template: "run-verification",
+              verifierId: "verifier-a",
+              scope: { kind: "run" },
+              status: "succeeded",
+              artifactPath: verifierAPath,
+              startedAt: "2026-03-01T00:00:00.000Z",
+              completedAt: "2026-03-01T00:01:00.000Z",
+            },
+            {
+              method: "rubric",
+              template: "run-verification",
+              verifierId: "verifier-b",
+              scope: { kind: "run" },
+              status: "succeeded",
+              artifactPath: verifierBPath,
+              startedAt: "2026-03-01T00:00:00.000Z",
+              completedAt: "2026-03-01T00:01:00.000Z",
+            },
+          ],
+        }),
+        target: {
+          kind: "run",
+          sessionId: "run-123",
+          candidateIds: ["agent-a", "agent-b"],
+        },
+        blinded: {
+          enabled: true,
+          aliasMap: {
+            v_aaaaaaaaaa: "agent-a",
+            v_bbbbbbbbbb: "agent-b",
+          },
+        },
+      },
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-disagreement",
+      }),
+    );
+    const parsed = parseListJsonOutput(result.json);
+
+    expect(parsed).toMatchObject({
+      operator: "verify",
+      mode: "detail",
+      session: {
+        status: "succeeded",
+        selection: {
+          state: "unresolved",
+          unresolvedReasons: [
+            {
+              code: "verifier_disagreement",
+              selections: [
+                {
+                  verifierAgentId: "verifier-a",
+                  selectedCanonicalAgentId: "agent-a",
+                },
+                {
+                  verifierAgentId: "verifier-b",
+                  selectedCanonicalAgentId: "agent-b",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it("exposes generic unresolved verification selections across non-run target kinds", async () => {
+    const cases = [
+      {
+        name: "spec",
+        target: {
+          kind: "spec",
+          sessionId: "spec-unresolved-target",
+        },
+        template: "spec-verification",
+      },
+      {
+        name: "reduce",
+        target: {
+          kind: "reduce",
+          sessionId: "reduce-unresolved-target",
+        },
+        template: "reduce-verification",
+      },
+      {
+        name: "message",
+        target: {
+          kind: "message",
+          sessionId: "message-unresolved-target",
+        },
+        template: "message-verification",
+      },
+    ] satisfies ReadonlyArray<{
+      name: string;
+      target: VerificationRecord["target"];
+      template: string;
+    }>;
+
+    for (const selectionCase of cases) {
+      const verifierAPath = `.voratiq/verify/sessions/verify-unresolved-${selectionCase.name}/verifier-a/${selectionCase.template}/artifacts/result.json`;
+      const verifierBPath = `.voratiq/verify/sessions/verify-unresolved-${selectionCase.name}/verifier-b/${selectionCase.template}/artifacts/result.json`;
+      await writeVerificationArtifact(testDir, verifierAPath, {
+        method: "rubric",
+        template: selectionCase.template,
+        verifierId: "verifier-a",
+        generatedAt: "2026-03-01T00:05:00.000Z",
+        status: "succeeded",
+        result: {
+          preferred: "v_aaaaaaaaaa",
+          ranking: ["v_aaaaaaaaaa", "v_bbbbbbbbbb"],
+        },
+      });
+      await writeVerificationArtifact(testDir, verifierBPath, {
+        method: "rubric",
+        template: selectionCase.template,
+        verifierId: "verifier-b",
+        generatedAt: "2026-03-01T00:05:00.000Z",
+        status: "succeeded",
+        result: {
+          preferred: "v_bbbbbbbbbb",
+          ranking: ["v_bbbbbbbbbb", "v_aaaaaaaaaa"],
+        },
+      });
+      await appendVerificationRecord({
+        root: testDir,
+        verificationsFilePath,
+        record: {
+          ...buildVerificationRecord({
+            sessionId: `verify-unresolved-${selectionCase.name}`,
+            status: "succeeded",
+            methods: [
+              {
+                method: "rubric",
+                template: selectionCase.template,
+                verifierId: "verifier-a",
+                scope: { kind: "target" },
+                status: "succeeded",
+                artifactPath: verifierAPath,
+                startedAt: "2026-03-01T00:00:00.000Z",
+                completedAt: "2026-03-01T00:01:00.000Z",
+              },
+              {
+                method: "rubric",
+                template: selectionCase.template,
+                verifierId: "verifier-b",
+                scope: { kind: "target" },
+                status: "succeeded",
+                artifactPath: verifierBPath,
+                startedAt: "2026-03-01T00:00:00.000Z",
+                completedAt: "2026-03-01T00:01:00.000Z",
+              },
+            ],
+          }),
+          target: selectionCase.target,
+          blinded: {
+            enabled: true,
+            aliasMap: {
+              v_aaaaaaaaaa: "agent-a",
+              v_bbbbbbbbbb: "agent-b",
+            },
+          },
+        },
+      });
+
+      const result = await executeListCommand(
+        buildInput({
+          operator: "verify",
+          sessionId: `verify-unresolved-${selectionCase.name}`,
+        }),
+      );
+
+      expect(result.json).toMatchObject({
+        operator: "verify",
+        mode: "detail",
+        session: {
+          target: {
+            kind: selectionCase.target.kind,
+            sessionId: selectionCase.target.sessionId,
+          },
+          selection: {
+            state: "unresolved",
+            unresolvedReasons: [
+              {
+                code: "verifier_disagreement",
+                selections: [
+                  {
+                    verifierAgentId: "verifier-a",
+                    selectedCanonicalAgentId: "agent-a",
+                  },
+                  {
+                    verifierAgentId: "verifier-b",
+                    selectedCanonicalAgentId: "agent-b",
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+    }
+  });
+
+  it("exposes no-successful-verifiers when all selection verifiers failed", async () => {
+    const programmaticPath =
+      ".voratiq/verify/sessions/verify-no-successful/programmatic/artifacts/result.json";
+    const rubricPath =
+      ".voratiq/verify/sessions/verify-no-successful/verifier-a/run-verification/artifacts/result.json";
+    await writeVerificationArtifact(testDir, programmaticPath, {
+      method: "programmatic",
+      generatedAt: "2026-03-01T00:05:00.000Z",
+      target: {
+        kind: "run",
+        sessionId: "run-123",
+        candidateIds: ["agent-a"],
+      },
+      scope: "run",
+      candidates: [
+        {
+          candidateId: "agent-a",
+          results: [
+            {
+              slug: "tests",
+              status: "succeeded",
+              exitCode: 0,
+            },
+          ],
+        },
+      ],
+    });
+    await writeVerificationArtifact(testDir, rubricPath, {
+      method: "rubric",
+      template: "run-verification",
+      verifierId: "verifier-a",
+      generatedAt: "2026-03-01T00:05:00.000Z",
+      status: "failed",
+      result: {
+        preferred: "agent-a",
+        ranking: ["agent-a"],
+      },
+    });
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: buildVerificationRecord({
+        sessionId: "verify-no-successful",
+        status: "succeeded",
+        methods: [
+          {
+            method: "programmatic",
+            slug: "programmatic",
+            scope: { kind: "run" },
+            status: "succeeded",
+            artifactPath: programmaticPath,
+            startedAt: "2026-03-01T00:00:00.000Z",
+            completedAt: "2026-03-01T00:01:00.000Z",
+          },
+          {
+            method: "rubric",
+            template: "run-verification",
+            verifierId: "verifier-a",
+            scope: { kind: "run" },
+            status: "failed",
+            artifactPath: rubricPath,
+            startedAt: "2026-03-01T00:00:00.000Z",
+            completedAt: "2026-03-01T00:01:00.000Z",
+          },
+        ],
+      }),
+    });
+
+    const result = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-no-successful",
+      }),
+    );
+
+    expect(result.json).toMatchObject({
+      operator: "verify",
+      mode: "detail",
+      session: {
+        status: "succeeded",
+        selection: {
+          state: "unresolved",
+          unresolvedReasons: [
+            {
+              code: "no_successful_verifiers",
+              failedVerifierAgentIds: ["verifier-a"],
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it("exposes unresolved lifecycle state for terminal verify sessions without a resolvable selection", async () => {
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: buildVerificationRecord({
+        sessionId: "verify-no-methods",
+        status: "succeeded",
+        methods: [],
+      }),
+    });
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: buildVerificationRecord({
+        sessionId: "verify-running-no-methods",
+        status: "running",
+        methods: [],
+      }),
+    });
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: buildVerificationRecord({
+        sessionId: "verify-failed-no-methods",
+        status: "failed",
+        methods: [],
+      }),
+    });
+    await appendVerificationRecord({
+      root: testDir,
+      verificationsFilePath,
+      record: buildVerificationRecord({
+        sessionId: "verify-aborted-no-methods",
+        status: "aborted",
+        methods: [],
+      }),
+    });
+
+    const succeededResult = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-no-methods",
+      }),
+    );
+    const runningResult = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-running-no-methods",
+      }),
+    );
+    const failedResult = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-failed-no-methods",
+      }),
+    );
+    const abortedResult = await executeListCommand(
+      buildInput({
+        operator: "verify",
+        sessionId: "verify-aborted-no-methods",
+      }),
+    );
+
+    expect(succeededResult.json).toMatchObject({
+      operator: "verify",
+      mode: "detail",
+      session: {
+        status: "succeeded",
+        selection: {
+          state: "unresolved",
+          unresolvedReasons: [
+            {
+              code: "no_successful_verifiers",
+              failedVerifierAgentIds: [],
+            },
+          ],
+        },
+      },
+    });
+    if (
+      runningResult.json.mode !== "detail" ||
+      !runningResult.json.session ||
+      failedResult.json.mode !== "detail" ||
+      !failedResult.json.session ||
+      abortedResult.json.mode !== "detail" ||
+      !abortedResult.json.session
+    ) {
+      throw new Error("Expected detail-mode verify json output");
+    }
+    expect(runningResult.json.session).not.toHaveProperty("selection");
+    expect(failedResult.json.session.selection).toEqual({
+      state: "unresolved",
+      unresolvedReasons: [
+        {
+          code: "verification_not_succeeded",
+          status: "failed",
+        },
+      ],
+    });
+    expect(abortedResult.json.session.selection).toEqual({
+      state: "unresolved",
+      unresolvedReasons: [
+        {
+          code: "verification_not_succeeded",
+          status: "aborted",
+        },
+      ],
+    });
+  });
+
   it("renders verify detail running rows with suppressed duration", async () => {
     await appendVerificationRecord({
       root: testDir,
@@ -1549,6 +2497,15 @@ describe("executeListCommand", () => {
     expect(result.json.session.target).toEqual({
       kind: "message",
       sessionId: "message-123",
+    });
+    expect(result.json.session.selection).toEqual({
+      state: "unresolved",
+      unresolvedReasons: [
+        {
+          code: "no_successful_verifiers",
+          failedVerifierAgentIds: [],
+        },
+      ],
     });
   });
 
@@ -2248,6 +3205,16 @@ function buildVerificationRecord(params: {
     methods: params.methods ?? [],
     error: params.status === "failed" ? "failed" : null,
   };
+}
+
+async function writeVerificationArtifact(
+  root: string,
+  artifactPath: string,
+  value: unknown,
+): Promise<void> {
+  const absolutePath = join(root, artifactPath);
+  await mkdir(dirname(absolutePath), { recursive: true });
+  await writeFile(absolutePath, JSON.stringify(value, null, 2), "utf8");
 }
 
 function findDetailTableRow(
