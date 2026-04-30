@@ -49,7 +49,7 @@ describe("assertAgentCatalogGuardrails", () => {
         presetCatalogs: [
           {
             presetName: "pro",
-            catalog: [{ provider: "gemini", model: "gemini-2.5-pro" }],
+            catalog: [{ provider: "gemini", model: "gemini-3.1-pro-preview" }],
           },
         ],
       }),
@@ -83,10 +83,8 @@ describe("getSupportedAgentDefaults", () => {
       "gpt-5-5",
       "gpt-5-5-high",
       "gpt-5-5-xhigh",
-      "gemini-2-5-flash",
-      "gemini-2-5-flash-lite",
+      "gemini-3-1-flash-lite-preview",
       "gemini-3-flash-preview",
-      "gemini-2-5-pro",
       "gemini-3-1-pro-preview",
     ]);
   });

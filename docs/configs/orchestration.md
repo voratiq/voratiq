@@ -42,7 +42,7 @@ profiles:
       agents:
         - id: claude-opus-4-6
         - id: gpt-5-3-codex-high
-        - id: gemini-2-5-pro
+        - id: gemini-3-1-pro-preview
     reduce:
       agents:
         - id: gpt-5-3-codex-high
@@ -64,8 +64,9 @@ profiles:
         - id: gpt-5-2-high
         - id: gpt-5-3-codex-high
         - id: gpt-5-3-codex-xhigh
-        - id: gemini-2-5-pro
-        - id: gemini-3-pro-preview
+        - id: gemini-3-1-flash-lite-preview
+        - id: gemini-3-flash-preview
+        - id: gemini-3-1-pro-preview
     reduce:
       agents:
         - id: gpt-5-3-codex-high

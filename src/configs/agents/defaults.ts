@@ -46,7 +46,8 @@ const GEMINI_DEFAULT_ARGV = [
   MODEL_PLACEHOLDER,
   "--output-format",
   "json",
-  "--yolo",
+  "--approval-mode",
+  "yolo",
 ] as const;
 
 const DEFAULT_ARGV_BY_PROVIDER: Record<
@@ -220,24 +221,14 @@ const DEFAULT_AGENT_CATALOG_ENTRIES: readonly AgentCatalogEntry[] = [
     extraArgs: ["--config", "model_reasoning_effort=xhigh"],
   },
   {
-    id: "gemini-2-5-flash",
+    id: "gemini-3-1-flash-lite-preview",
     provider: "gemini",
-    model: "gemini-2.5-flash",
-  },
-  {
-    id: "gemini-2-5-flash-lite",
-    provider: "gemini",
-    model: "gemini-2.5-flash-lite",
+    model: "gemini-3.1-flash-lite-preview",
   },
   {
     id: "gemini-3-flash-preview",
     provider: "gemini",
     model: "gemini-3-flash-preview",
-  },
-  {
-    id: "gemini-2-5-pro",
-    provider: "gemini",
-    model: "gemini-2.5-pro",
   },
   {
     id: "gemini-3-1-pro-preview",
@@ -280,9 +271,9 @@ const LITE_AGENT_PRESET_ENTRIES: readonly AgentCatalogEntry[] = [
     model: "gpt-5.4-mini",
   },
   {
-    id: "gemini-3-flash-preview",
+    id: "gemini-3-1-flash-lite-preview",
     provider: "gemini",
-    model: "gemini-3-flash-preview",
+    model: "gemini-3.1-flash-lite-preview",
     runOnly: true,
   },
 ] as const;

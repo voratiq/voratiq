@@ -223,8 +223,12 @@ function sanitizeGeminiArgs(agent: AgentDefinition): string[] {
       index += 1;
       continue;
     }
-    if (token === "--yolo") {
-      continue;
+    if (token === "--approval-mode") {
+      const next = agent.argv[index + 1] ?? "";
+      if (next === "yolo") {
+        index += 1;
+        continue;
+      }
     }
     sanitized.push(token);
   }
