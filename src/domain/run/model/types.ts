@@ -203,6 +203,8 @@ export const claudeExtractedTokenUsageSchema = withAtLeastOneUsageField({
   output_tokens: billingTokenCountSchema.optional(),
   cache_read_input_tokens: billingTokenCountSchema.optional(),
   cache_creation_input_tokens: billingTokenCountSchema.optional(),
+  cache_creation_ephemeral_5m_input_tokens: billingTokenCountSchema.optional(),
+  cache_creation_ephemeral_1h_input_tokens: billingTokenCountSchema.optional(),
 });
 
 export type ClaudeExtractedTokenUsage = z.infer<

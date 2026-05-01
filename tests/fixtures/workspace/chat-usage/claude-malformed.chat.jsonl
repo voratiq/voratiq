@@ -1,1 +1,1 @@
-{"type":"message_start","message":{"id":"msg-1","model":"claude-opus-4-6","usage":{"service_tier":"standard","cache_creation":{"ephemeral_5m_input_tokens":10}}}}
+{"type":"message_start","message":{"id":"msg-1","model":"claude-opus-4-6","usage":{"service_tier":"standard","cache_creation":{"ignored_input_tokens":10}}}}

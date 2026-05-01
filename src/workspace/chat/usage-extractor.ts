@@ -36,7 +36,7 @@ interface ExtractClaudeChatUsageFromJsonlOptions {
   modelId: string;
 }
 
-interface ExtractGeminiChatUsageOptions {
+interface ExtractGeminiChatUsageFromJsonlOptions {
   artifactPath: string;
   content: string;
   modelId: string;
@@ -48,6 +48,7 @@ interface ParsedCodexTokenCountEvent {
 
 interface ParsedClaudeUsageMessage {
   lineNumber: number;
+  responseKey?: string;
   usage: unknown;
 }
 
@@ -124,14 +125,11 @@ export async function extractChatUsageFromArtifact(
         modelId,
       });
     case "gemini":
-      if (format === "jsonl") {
-        return extractGeminiChatUsageFromJsonl({
-          artifactPath,
-          content,
-          modelId,
-        });
-      }
-      return extractGeminiChatUsageFromJson({ artifactPath, content, modelId });
+      return extractGeminiChatUsageFromJsonl({
+        artifactPath,
+        content,
+        modelId,
+      });
   }
 }
 
@@ -182,17 +180,7 @@ export function extractCodexChatUsageFromJsonl(
     });
   }
 
-  const latestTokenCountEvent = tokenCountEvents.at(-1);
-  if (!latestTokenCountEvent) {
-    return buildUnavailableResult({
-      reason: "missing",
-      artifactPath,
-      format: "jsonl",
-      providerId: "codex",
-      modelId,
-      message: "No Codex token_count usage events were found in chat.jsonl.",
-    });
-  }
+  const latestTokenCountEvent = tokenCountEvents.at(-1)!;
 
   const totalTokenUsage = asRecord(
     latestTokenCountEvent.info.total_token_usage,
@@ -281,7 +269,15 @@ export function extractClaudeChatUsageFromJsonl(
   }
 
   const normalizedUsage: ExtractedTokenUsage[] = [];
+  const seenResponseKeys = new Set<string>();
   for (const usageMessage of usageMessages) {
+    if (usageMessage.responseKey) {
+      if (seenResponseKeys.has(usageMessage.responseKey)) {
+        continue;
+      }
+      seenResponseKeys.add(usageMessage.responseKey);
+    }
+
     const usageRecord = asRecord(usageMessage.usage);
     if (!usageRecord) {
       return buildUnavailableResult({
@@ -335,61 +331,8 @@ export function extractClaudeChatUsageFromJsonl(
   };
 }
 
-export function extractGeminiChatUsageFromJson(
-  options: ExtractGeminiChatUsageOptions,
-): ChatUsageExtractionResult {
-  const { artifactPath, content, modelId } = options;
-  let parsedRoot: unknown;
-
-  try {
-    parsedRoot = JSON.parse(content) as unknown;
-  } catch (error) {
-    return buildUnavailableResult({
-      reason: "malformed",
-      artifactPath,
-      format: "json",
-      providerId: "gemini",
-      modelId,
-      message: `Invalid JSON: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    });
-  }
-
-  const root = asRecord(parsedRoot);
-  if (!root) {
-    return buildUnavailableResult({
-      reason: "malformed",
-      artifactPath,
-      format: "json",
-      providerId: "gemini",
-      modelId,
-      message: "Gemini chat artifact must be a JSON object.",
-    });
-  }
-
-  const tokensPayloads = parseGeminiTokensPayloads(root);
-  if (tokensPayloads.length === 0) {
-    return buildUnavailableResult({
-      reason: "missing",
-      artifactPath,
-      format: "json",
-      providerId: "gemini",
-      modelId,
-      message: "No Gemini tokens payloads were found in chat.json.",
-    });
-  }
-
-  return extractGeminiTokenUsageFromPayloads({
-    artifactPath,
-    format: "json",
-    modelId,
-    tokensPayloads,
-  });
-}
-
 export function extractGeminiChatUsageFromJsonl(
-  options: ExtractGeminiChatUsageOptions,
+  options: ExtractGeminiChatUsageFromJsonlOptions,
 ): ChatUsageExtractionResult {
   const { artifactPath, content, modelId } = options;
   const tokensPayloadsByResponseId = new Map<
@@ -551,40 +494,20 @@ function parseCodexTokenCountEvent(
   value: unknown,
 ): ParsedCodexTokenCountEvent | undefined {
   const root = asRecord(value);
-  const eventMsg = parseCodexEnvelope(root);
-  if (eventMsg) {
-    const info = asRecord(eventMsg.info);
-    if (info) {
-      return { info };
-    }
-  }
-
-  const legacyEventMsg = asRecord(root?.event_msg);
-  if (legacyEventMsg?.type !== "token_count") {
-    return undefined;
-  }
-
-  const info = asRecord(legacyEventMsg.info);
-  if (!info) {
-    return undefined;
-  }
-
-  return { info };
-}
-
-function parseCodexEnvelope(
-  root: Record<string, unknown> | undefined,
-): Record<string, unknown> | undefined {
   if (root?.type !== "event_msg") {
     return undefined;
   }
-
   const payload = asRecord(root.payload);
   if (payload?.type !== "token_count") {
     return undefined;
   }
 
-  return payload;
+  const info = asRecord(payload.info);
+  if (!info) {
+    return undefined;
+  }
+
+  return { info };
 }
 
 function parseClaudeUsageMessage(
@@ -593,66 +516,31 @@ function parseClaudeUsageMessage(
 ): ParsedClaudeUsageMessage | undefined {
   const root = asRecord(value);
   const message = asRecord(root?.message);
-  if (!message || !("usage" in message)) {
+  if (!root || !message || !("usage" in message)) {
     return undefined;
   }
 
   return {
     lineNumber,
+    responseKey: buildClaudeResponseKey(root, message),
     usage: message.usage,
   };
 }
 
-function parseGeminiTokensPayloads(
+function buildClaudeResponseKey(
   root: Record<string, unknown>,
-): ParsedGeminiTokensPayload[] {
-  const tokensPayloads: ParsedGeminiTokensPayload[] = [];
-
-  if ("tokens" in root) {
-    tokensPayloads.push({
-      location: "tokens",
-      tokens: root.tokens,
-    });
+  message: Record<string, unknown>,
+): string | undefined {
+  const messageId = typeof message.id === "string" ? message.id.trim() : "";
+  if (messageId.length === 0) {
+    return undefined;
   }
 
-  if ("transcripts" in root) {
-    if (!Array.isArray(root.transcripts)) {
-      return [{ location: "transcripts", tokens: undefined }];
-    }
-
-    for (const [index, transcript] of root.transcripts.entries()) {
-      const transcriptRecord = asRecord(transcript);
-      const payload = asRecord(transcriptRecord?.payload);
-      if (!payload) {
-        continue;
-      }
-
-      if ("tokens" in payload) {
-        tokensPayloads.push({
-          location: `transcripts[${index}].payload.tokens`,
-          tokens: payload.tokens,
-        });
-      }
-
-      if (!Array.isArray(payload.messages)) {
-        continue;
-      }
-
-      for (const [messageIndex, message] of payload.messages.entries()) {
-        const messageRecord = asRecord(message);
-        if (!messageRecord || !("tokens" in messageRecord)) {
-          continue;
-        }
-
-        tokensPayloads.push({
-          location: `transcripts[${index}].payload.messages[${messageIndex}].tokens`,
-          tokens: messageRecord.tokens,
-        });
-      }
-    }
-  }
-
-  return tokensPayloads;
+  const requestId =
+    typeof root.requestId === "string" ? root.requestId.trim() : "";
+  return requestId.length > 0
+    ? `request:${requestId}:message:${messageId}`
+    : `message:${messageId}`;
 }
 
 function isProviderArtifactFormatSupported(
@@ -660,11 +548,7 @@ function isProviderArtifactFormatSupported(
   format: ChatArtifactFormat,
 ): boolean {
   const providerShape = PROVIDER_USAGE_SHAPE_MAPPINGS[providerId];
-  if (format === providerShape.artifactFormat) {
-    return true;
-  }
-
-  return providerId === "gemini" && format === "json";
+  return format === providerShape.artifactFormat;
 }
 
 function formatProviderLabel(providerId: ChatUsageProviderId): string {
