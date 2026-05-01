@@ -321,6 +321,71 @@ describe("executeAgentLifecycle integration", () => {
     });
   });
 
+  it("persists Gemini token usage from captured JSONL chat artifacts", async () => {
+    const { execution } = await createPreparedExecution();
+    execution.agent.provider = "gemini";
+    execution.agent.model = "gemini-3-flash-preview";
+
+    runSandboxedAgentMock.mockResolvedValue({
+      exitCode: 0,
+      signal: null,
+      sandboxSettings: minimalSandboxSettings(),
+      manifestEnv: {},
+      chat: {
+        captured: true,
+        format: "jsonl",
+        artifactPath: "/tmp/gemini.chat.jsonl",
+      },
+    });
+    runPostProcessingAndCollectArtifactsMock.mockResolvedValue({
+      summaryCaptured: false,
+      diffAttempted: false,
+      diffCaptured: false,
+    });
+    extractProviderNativeTokenUsageForSessionMock.mockResolvedValue({
+      status: "available",
+      provider: "gemini",
+      modelId: "gemini-3-flash-preview",
+      tokenUsage: {
+        input: 28_037,
+        output: 225,
+        cached: 11_605,
+        thoughts: 865,
+        tool: 0,
+        total: 29_127,
+      },
+    });
+
+    const [result] = await runPreparedExecutionsWithLimit([execution], 1);
+
+    expect(extractProviderNativeTokenUsageForSessionMock).toHaveBeenCalledWith({
+      root: execution.root,
+      domain: "run",
+      sessionId: execution.runId,
+      agentId: execution.agent.id,
+      provider: "gemini",
+      modelId: "gemini-3-flash-preview",
+      chatCaptured: true,
+      format: "jsonl",
+      artifactPath: "/tmp/gemini.chat.jsonl",
+    });
+    expect(result.record.tokenUsage).toEqual({
+      input: 28_037,
+      output: 225,
+      cached: 11_605,
+      thoughts: 865,
+      tool: 0,
+      total: 29_127,
+    });
+    expect(result.report.tokenUsage).toEqual(result.record.tokenUsage);
+    expect(result.report.tokenUsageResult).toEqual({
+      status: "available",
+      provider: "gemini",
+      modelId: "gemini-3-flash-preview",
+      tokenUsage: result.record.tokenUsage,
+    });
+  });
+
   it("extracts token usage on failed terminal paths when chat artifacts exist", async () => {
     const { execution } = await createPreparedExecution();
     execution.agent.provider = "claude";
@@ -385,8 +450,8 @@ describe("executeAgentLifecycle integration", () => {
       manifestEnv: {},
       chat: {
         captured: true,
-        format: "json",
-        artifactPath: "/tmp/gemini.chat.json",
+        format: "jsonl",
+        artifactPath: "/tmp/gemini.chat.jsonl",
       },
     });
     runPostProcessingAndCollectArtifactsMock.mockResolvedValue({

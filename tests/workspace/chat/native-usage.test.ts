@@ -136,8 +136,8 @@ describe("extractProviderNativeTokenUsageForSession", () => {
       provider: "gemini",
       modelId: "gemini-2.5-pro",
       chatCaptured: true,
-      format: "json",
-      artifactPath: "/tmp/chat.json",
+      format: "jsonl",
+      artifactPath: "/tmp/chat.jsonl",
     });
 
     expect(result).toEqual({
@@ -145,8 +145,8 @@ describe("extractProviderNativeTokenUsageForSession", () => {
       reason: "extractor_error",
       provider: "gemini",
       modelId: "gemini-2.5-pro",
-      artifactPath: "/tmp/chat.json",
-      format: "json",
+      artifactPath: "/tmp/chat.jsonl",
+      format: "jsonl",
       message: "Chat usage extraction failed: boom",
     });
   });

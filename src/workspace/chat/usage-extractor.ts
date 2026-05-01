@@ -36,7 +36,7 @@ interface ExtractClaudeChatUsageFromJsonlOptions {
   modelId: string;
 }
 
-interface ExtractGeminiChatUsageFromJsonOptions {
+interface ExtractGeminiChatUsageOptions {
   artifactPath: string;
   content: string;
   modelId: string;
@@ -98,7 +98,7 @@ export async function extractChatUsageFromArtifact(
     });
   }
 
-  if (format !== providerShape.artifactFormat) {
+  if (!isProviderArtifactFormatSupported(providerId, format)) {
     const providerLabel = formatProviderLabel(providerId);
     return buildUnavailableResult({
       reason: "unsupported_provider",
@@ -124,11 +124,14 @@ export async function extractChatUsageFromArtifact(
         modelId,
       });
     case "gemini":
-      return extractGeminiChatUsageFromJson({
-        artifactPath,
-        content,
-        modelId,
-      });
+      if (format === "jsonl") {
+        return extractGeminiChatUsageFromJsonl({
+          artifactPath,
+          content,
+          modelId,
+        });
+      }
+      return extractGeminiChatUsageFromJson({ artifactPath, content, modelId });
   }
 }
 
@@ -333,7 +336,7 @@ export function extractClaudeChatUsageFromJsonl(
 }
 
 export function extractGeminiChatUsageFromJson(
-  options: ExtractGeminiChatUsageFromJsonOptions,
+  options: ExtractGeminiChatUsageOptions,
 ): ChatUsageExtractionResult {
   const { artifactPath, content, modelId } = options;
   let parsedRoot: unknown;
@@ -377,6 +380,94 @@ export function extractGeminiChatUsageFromJson(
     });
   }
 
+  return extractGeminiTokenUsageFromPayloads({
+    artifactPath,
+    format: "json",
+    modelId,
+    tokensPayloads,
+  });
+}
+
+export function extractGeminiChatUsageFromJsonl(
+  options: ExtractGeminiChatUsageOptions,
+): ChatUsageExtractionResult {
+  const { artifactPath, content, modelId } = options;
+  const tokensPayloadsByResponseId = new Map<
+    string,
+    ParsedGeminiTokensPayload
+  >();
+  const tokensPayloadsWithoutResponseId: ParsedGeminiTokensPayload[] = [];
+  const lines = content.split(/\r?\n/u);
+
+  for (const [index, rawLine] of lines.entries()) {
+    const trimmed = rawLine.trim();
+    if (trimmed.length === 0) {
+      continue;
+    }
+
+    let parsedLine: unknown;
+    try {
+      parsedLine = JSON.parse(trimmed) as unknown;
+    } catch (error) {
+      return buildUnavailableResult({
+        reason: "malformed",
+        artifactPath,
+        format: "jsonl",
+        providerId: "gemini",
+        modelId,
+        message: `Invalid JSONL at line ${index + 1}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+    }
+
+    const root = asRecord(parsedLine);
+    if (!root || !("tokens" in root)) {
+      continue;
+    }
+
+    const tokensPayload = {
+      location: `line ${index + 1}.tokens`,
+      tokens: root.tokens,
+    };
+    const responseId = typeof root.id === "string" ? root.id.trim() : "";
+    if (responseId.length > 0) {
+      tokensPayloadsByResponseId.set(responseId, tokensPayload);
+    } else {
+      tokensPayloadsWithoutResponseId.push(tokensPayload);
+    }
+  }
+
+  const tokensPayloads = [
+    ...tokensPayloadsWithoutResponseId,
+    ...tokensPayloadsByResponseId.values(),
+  ];
+  if (tokensPayloads.length === 0) {
+    return buildUnavailableResult({
+      reason: "missing",
+      artifactPath,
+      format: "jsonl",
+      providerId: "gemini",
+      modelId,
+      message: "No Gemini tokens payloads were found in chat.jsonl.",
+    });
+  }
+
+  return extractGeminiTokenUsageFromPayloads({
+    artifactPath,
+    format: "jsonl",
+    modelId,
+    tokensPayloads,
+  });
+}
+
+function extractGeminiTokenUsageFromPayloads(options: {
+  artifactPath: string;
+  format: ChatArtifactFormat;
+  modelId: string;
+  tokensPayloads: readonly ParsedGeminiTokensPayload[];
+}): ChatUsageExtractionResult {
+  const { artifactPath, format, modelId, tokensPayloads } = options;
   const normalizedUsage: ExtractedTokenUsage[] = [];
   for (const tokensPayload of tokensPayloads) {
     const tokensRecord = asRecord(tokensPayload.tokens);
@@ -384,7 +475,7 @@ export function extractGeminiChatUsageFromJson(
       return buildUnavailableResult({
         reason: "malformed",
         artifactPath,
-        format: "json",
+        format,
         providerId: "gemini",
         modelId,
         message: `Gemini ${tokensPayload.location} is not an object.`,
@@ -399,7 +490,7 @@ export function extractGeminiChatUsageFromJson(
       return buildUnavailableResult({
         reason: "malformed",
         artifactPath,
-        format: "json",
+        format,
         providerId: "gemini",
         modelId,
         message: `Gemini ${tokensPayload.location} did not contain any valid token usage fields.`,
@@ -414,7 +505,7 @@ export function extractGeminiChatUsageFromJson(
     return buildUnavailableResult({
       reason: "malformed",
       artifactPath,
-      format: "json",
+      format,
       providerId: "gemini",
       modelId,
       message:
@@ -426,7 +517,7 @@ export function extractGeminiChatUsageFromJson(
     status: "available",
     provider: "gemini",
     artifactPath,
-    format: "json",
+    format,
     modelId,
     tokenUsage: usage,
   };
@@ -562,6 +653,18 @@ function parseGeminiTokensPayloads(
   }
 
   return tokensPayloads;
+}
+
+function isProviderArtifactFormatSupported(
+  providerId: ChatUsageProviderId,
+  format: ChatArtifactFormat,
+): boolean {
+  const providerShape = PROVIDER_USAGE_SHAPE_MAPPINGS[providerId];
+  if (format === providerShape.artifactFormat) {
+    return true;
+  }
+
+  return providerId === "gemini" && format === "json";
 }
 
 function formatProviderLabel(providerId: ChatUsageProviderId): string {

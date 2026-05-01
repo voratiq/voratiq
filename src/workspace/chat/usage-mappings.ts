@@ -78,8 +78,8 @@ export const PROVIDER_USAGE_SHAPE_MAPPINGS: Record<
   },
   gemini: {
     providerId: "gemini",
-    artifactFormat: "json",
-    artifactShape: "transcript.tokens",
+    artifactFormat: "jsonl",
+    artifactShape: "message.tokens",
     usageRootPath: "tokens",
     billingRelevantFields: [
       {
