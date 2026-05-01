@@ -480,6 +480,35 @@ describe("extractChatUsageFromArtifact", () => {
     expect(available.tokenUsage).not.toHaveProperty("ignored_bucket");
   });
 
+  it("extracts native-only Gemini token usage from JSONL rows and deduplicates response updates", async () => {
+    const artifactPath = resolve(FIXTURES_DIR, "gemini-valid.chat.jsonl");
+
+    const result = await extractChatUsageFromArtifact({
+      artifactPath,
+      format: "jsonl",
+      providerId: "gemini",
+      modelId: "gemini-3-flash-preview",
+    });
+
+    expect(result).toEqual({
+      status: "available",
+      artifactPath,
+      format: "jsonl",
+      provider: "gemini",
+      modelId: "gemini-3-flash-preview",
+      tokenUsage: {
+        input: 28037,
+        output: 225,
+        cached: 11605,
+        thoughts: 865,
+        tool: 0,
+        total: 29127,
+      },
+    });
+    const available = expectAvailable(result);
+    expect(available.tokenUsage).not.toHaveProperty("ignored_bucket");
+  });
+
   it("returns an empty result when the Gemini artifact has no tokens payloads", async () => {
     const artifactPath = resolve(FIXTURES_DIR, "gemini-empty.chat.json");
 
@@ -664,14 +693,6 @@ describe("extractChatUsageFromArtifact", () => {
       format: "json" as const,
       expectedMessage:
         "Claude usage extraction expects a jsonl artifact, received `json`.",
-    },
-    {
-      providerId: "gemini" as const,
-      modelId: "gemini-2-5-pro",
-      artifactPath: resolve(FIXTURES_DIR, "gemini-valid.chat.json"),
-      format: "jsonl" as const,
-      expectedMessage:
-        "Gemini usage extraction expects a json artifact, received `jsonl`.",
     },
     {
       providerId: "codex" as const,
