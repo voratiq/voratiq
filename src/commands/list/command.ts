@@ -1,5 +1,6 @@
 import type {
   ListJsonOutput,
+  ListJsonVerificationSelection,
   ListMode,
   ListOperator,
 } from "../../contracts/list.js";
@@ -34,6 +35,7 @@ import {
   readVerificationRecords,
   type VerificationRecordWarning,
 } from "../../domain/verify/persistence/adapter.js";
+import { loadVerificationSelectionPolicyOutput } from "../../policy/index.js";
 import { renderInteractiveTranscript } from "../../render/transcripts/interactive.js";
 import {
   renderInteractiveListTable,
@@ -69,6 +71,7 @@ import {
   formatRenderLifecycleRowDuration,
 } from "../../render/utils/duration.js";
 import type { RunStatus } from "../../status/index.js";
+import { toErrorMessage } from "../../utils/errors.js";
 import { pathExists } from "../../utils/fs.js";
 import {
   formatTargetDisplay,
@@ -167,7 +170,7 @@ async function executeDetailMode(
     limit: 1,
     predicate: (record) => getRecordId(operator, record) === sessionId,
   });
-  const warnings = query.warnings;
+  const warnings = [...query.warnings];
   const record = query.records[0];
 
   if (!record) {
@@ -185,6 +188,15 @@ async function executeDetailMode(
   }
 
   const detailSession = normalizeListDetailSession(operator, record);
+  const selection = await resolveListDetailVerificationSelection({
+    root: input.root,
+    operator,
+    record,
+    warnings,
+  });
+  const jsonSession: NormalizedListDetailSession = selection
+    ? { ...detailSession, selection }
+    : detailSession;
 
   return {
     warnings,
@@ -195,7 +207,7 @@ async function executeDetailMode(
     json: {
       operator,
       mode: "detail",
-      session: toJsonDetailSession(detailSession),
+      session: toJsonDetailSession(jsonSession),
       warnings,
     },
   };
@@ -488,6 +500,7 @@ function toJsonDetailSession(
       ? { description: session.description }
       : {}),
     agents: session.agents.map(toJsonAgent),
+    ...(session.selection ? { selection: session.selection } : {}),
   };
 }
 
@@ -683,6 +696,69 @@ function getRecordId(operator: ListOperator, record: OperatorRecord): string {
 
 function formatSessionWarning(warning: { displayPath: string }): string {
   return `Ignoring corrupt session ${warning.displayPath}`;
+}
+
+async function resolveListDetailVerificationSelection(options: {
+  root: string;
+  operator: ListOperator;
+  record: OperatorRecord;
+  warnings: string[];
+}): Promise<ListJsonVerificationSelection | undefined> {
+  const { root, operator, record, warnings } = options;
+  if (operator !== "verify") {
+    return undefined;
+  }
+
+  const verificationRecord = record as VerificationRecord;
+
+  if (!TERMINAL_VERIFICATION_STATUSES.includes(verificationRecord.status)) {
+    return undefined;
+  }
+
+  if (
+    verificationRecord.status === "failed" ||
+    verificationRecord.status === "aborted"
+  ) {
+    return {
+      state: "unresolved",
+      unresolvedReasons: [
+        {
+          code: "verification_not_succeeded",
+          status: verificationRecord.status,
+        },
+      ],
+    };
+  }
+
+  const output = await loadVerificationSelectionPolicyOutput({
+    root,
+    record: verificationRecord,
+  }).catch((error: unknown) => {
+    warnings.push(
+      `Verification selection unavailable: ${toErrorMessage(error)}`,
+    );
+    return undefined;
+  });
+  if (!output) {
+    return undefined;
+  }
+
+  if (output.warnings) {
+    warnings.push(...output.warnings);
+  }
+
+  const decision = output.decision;
+  if (decision.state === "resolvable") {
+    return {
+      state: "resolvable",
+      selectedCanonicalAgentId: decision.selectedCanonicalAgentId,
+    };
+  }
+
+  return {
+    state: "unresolved",
+    unresolvedReasons: decision.unresolvedReasons,
+  };
 }
 
 function formatVerifyAgentDuration(agent: NormalizedListAgent): string {
