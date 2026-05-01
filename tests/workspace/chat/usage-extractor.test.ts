@@ -52,6 +52,8 @@ describe("chat usage contract", () => {
     expect(() =>
       extractedTokenUsageSchemaByProvider.claude.parse({
         input_tokens: 10,
+        cache_creation_ephemeral_5m_input_tokens: 6,
+        cache_creation_ephemeral_1h_input_tokens: 4,
       }),
     ).not.toThrow();
 
@@ -94,28 +96,33 @@ describe("chat usage contract", () => {
 });
 
 describe("PROVIDER_USAGE_SHAPE_MAPPINGS", () => {
-  it("documents native billing fields for Codex plus future Claude and Gemini coverage", () => {
+  it("documents current native billing fields for each provider", () => {
+    expect(PROVIDER_USAGE_SHAPE_MAPPINGS.codex.artifactShape).toBe(
+      "event_msg(type=token_count).payload.info.total_token_usage",
+    );
+    expect(PROVIDER_USAGE_SHAPE_MAPPINGS.codex.usageRootPath).toBe(
+      "payload.info.total_token_usage",
+    );
     expect(PROVIDER_USAGE_SHAPE_MAPPINGS.codex.billingRelevantFields).toEqual([
       expect.objectContaining({
-        artifactFieldPath: "event_msg.info.total_token_usage.input_tokens",
+        artifactFieldPath: "payload.info.total_token_usage.input_tokens",
         usageFieldPath: "input_tokens",
       }),
       expect.objectContaining({
-        artifactFieldPath:
-          "event_msg.info.total_token_usage.cached_input_tokens",
+        artifactFieldPath: "payload.info.total_token_usage.cached_input_tokens",
         usageFieldPath: "cached_input_tokens",
       }),
       expect.objectContaining({
-        artifactFieldPath: "event_msg.info.total_token_usage.output_tokens",
+        artifactFieldPath: "payload.info.total_token_usage.output_tokens",
         usageFieldPath: "output_tokens",
       }),
       expect.objectContaining({
         artifactFieldPath:
-          "event_msg.info.total_token_usage.reasoning_output_tokens",
+          "payload.info.total_token_usage.reasoning_output_tokens",
         usageFieldPath: "reasoning_output_tokens",
       }),
       expect.objectContaining({
-        artifactFieldPath: "event_msg.info.total_token_usage.total_tokens",
+        artifactFieldPath: "payload.info.total_token_usage.total_tokens",
         usageFieldPath: "total_tokens",
       }),
     ]);
@@ -141,8 +148,20 @@ describe("PROVIDER_USAGE_SHAPE_MAPPINGS", () => {
         artifactFieldPath: "usage.cache_creation_input_tokens",
         usageFieldPath: "cache_creation_input_tokens",
       }),
+      expect.objectContaining({
+        artifactFieldPath: "usage.cache_creation.ephemeral_5m_input_tokens",
+        usageFieldPath: "cache_creation_ephemeral_5m_input_tokens",
+      }),
+      expect.objectContaining({
+        artifactFieldPath: "usage.cache_creation.ephemeral_1h_input_tokens",
+        usageFieldPath: "cache_creation_ephemeral_1h_input_tokens",
+      }),
     ]);
 
+    expect(PROVIDER_USAGE_SHAPE_MAPPINGS.gemini.artifactShape).toBe(
+      "jsonl row tokens",
+    );
+    expect(PROVIDER_USAGE_SHAPE_MAPPINGS.gemini.usageRootPath).toBe("tokens");
     expect(PROVIDER_USAGE_SHAPE_MAPPINGS.gemini.billingRelevantFields).toEqual([
       expect.objectContaining({
         artifactFieldPath: "tokens.input",
@@ -181,7 +200,10 @@ describe("extractObservedProviderNativeUsage", () => {
         output_tokens: 50,
         cache_read_input_tokens: 25,
         cache_creation_input_tokens: 10,
-        cache_creation: { ephemeral_5m_input_tokens: 10 },
+        cache_creation: {
+          ephemeral_5m_input_tokens: 10,
+          ephemeral_1h_input_tokens: 0,
+        },
         service_tier: "standard",
         inference_geo: "not_available",
         server_tool_use: {
@@ -199,6 +221,8 @@ describe("extractObservedProviderNativeUsage", () => {
       output_tokens: 50,
       cache_read_input_tokens: 25,
       cache_creation_input_tokens: 10,
+      cache_creation_ephemeral_5m_input_tokens: 10,
+      cache_creation_ephemeral_1h_input_tokens: 0,
     });
   });
 
@@ -248,38 +272,6 @@ describe("extractChatUsageFromArtifact", () => {
     const artifactPath = resolve(
       FIXTURES_DIR,
       "codex-valid-envelope-a.chat.jsonl",
-    );
-
-    const result = await extractChatUsageFromArtifact({
-      artifactPath,
-      format: "jsonl",
-      providerId: "codex",
-      modelId: "gpt-5-3-codex-spark",
-    });
-
-    expect(result).toEqual({
-      status: "available",
-      artifactPath,
-      format: "jsonl",
-      provider: "codex",
-      modelId: "gpt-5-3-codex-spark",
-      tokenUsage: {
-        input_tokens: 120,
-        cached_input_tokens: 30,
-        output_tokens: 45,
-        reasoning_output_tokens: 7,
-        total_tokens: 202,
-      },
-    });
-    const available = expectAvailable(result);
-    expect(available.tokenUsage).not.toHaveProperty("last_token_usage");
-    expect(available.tokenUsage).not.toHaveProperty("model_context_window");
-  });
-
-  it("extracts native-only Codex token usage from the legacy nested event_msg envelope", async () => {
-    const artifactPath = resolve(
-      FIXTURES_DIR,
-      "codex-valid-envelope-b.chat.jsonl",
     );
 
     const result = await extractChatUsageFromArtifact({
@@ -376,6 +368,8 @@ describe("extractChatUsageFromArtifact", () => {
         output_tokens: 65,
         cache_read_input_tokens: 41,
         cache_creation_input_tokens: 11,
+        cache_creation_ephemeral_5m_input_tokens: 7,
+        cache_creation_ephemeral_1h_input_tokens: 0,
       },
     });
     const available = expectAvailable(result);
@@ -385,6 +379,36 @@ describe("extractChatUsageFromArtifact", () => {
     expect(available.tokenUsage).not.toHaveProperty("server_tool_use");
     expect(available.tokenUsage).not.toHaveProperty("iterations");
     expect(available.tokenUsage).not.toHaveProperty("speed");
+  });
+
+  it("deduplicates Claude JSONL fragments for the same assistant response", async () => {
+    const artifactPath = resolve(
+      FIXTURES_DIR,
+      "claude-duplicate-fragments-20260501.chat.jsonl",
+    );
+
+    const result = await extractChatUsageFromArtifact({
+      artifactPath,
+      format: "jsonl",
+      providerId: "claude",
+      modelId: "claude-haiku-4-5-20251001",
+    });
+
+    expect(result).toEqual({
+      status: "available",
+      artifactPath,
+      format: "jsonl",
+      provider: "claude",
+      modelId: "claude-haiku-4-5-20251001",
+      tokenUsage: {
+        input_tokens: 14,
+        output_tokens: 513,
+        cache_read_input_tokens: 28046,
+        cache_creation_input_tokens: 28645,
+        cache_creation_ephemeral_5m_input_tokens: 0,
+        cache_creation_ephemeral_1h_input_tokens: 28645,
+      },
+    });
   });
 
   it("ignores Codex token_count events with null info and strips non-billing fields", async () => {
@@ -451,35 +475,6 @@ describe("extractChatUsageFromArtifact", () => {
     );
   });
 
-  it("extracts native-only Gemini token usage from bundled transcript tokens payloads", async () => {
-    const artifactPath = resolve(FIXTURES_DIR, "gemini-valid.chat.json");
-
-    const result = await extractChatUsageFromArtifact({
-      artifactPath,
-      format: "json",
-      providerId: "gemini",
-      modelId: "gemini-2-5-pro",
-    });
-
-    expect(result).toEqual({
-      status: "available",
-      artifactPath,
-      format: "json",
-      provider: "gemini",
-      modelId: "gemini-2-5-pro",
-      tokenUsage: {
-        input: 210,
-        output: 66,
-        cached: 34,
-        thoughts: 14,
-        tool: 18,
-        total: 342,
-      },
-    });
-    const available = expectAvailable(result);
-    expect(available.tokenUsage).not.toHaveProperty("ignored_bucket");
-  });
-
   it("extracts native-only Gemini token usage from JSONL rows and deduplicates response updates", async () => {
     const artifactPath = resolve(FIXTURES_DIR, "gemini-valid.chat.jsonl");
 
@@ -510,13 +505,13 @@ describe("extractChatUsageFromArtifact", () => {
   });
 
   it("returns an empty result when the Gemini artifact has no tokens payloads", async () => {
-    const artifactPath = resolve(FIXTURES_DIR, "gemini-empty.chat.json");
+    const artifactPath = resolve(FIXTURES_DIR, "gemini-empty.chat.jsonl");
 
     const result = await extractChatUsageFromArtifact({
       artifactPath,
-      format: "json",
+      format: "jsonl",
       providerId: "gemini",
-      modelId: "gemini-2-5-pro",
+      modelId: "gemini-3.1-flash-lite-preview",
     });
 
     const unavailable = expectUnavailable(result);
@@ -526,22 +521,84 @@ describe("extractChatUsageFromArtifact", () => {
   });
 
   it("returns a malformed result when Gemini tokens lack billing fields", async () => {
-    const artifactPath = resolve(FIXTURES_DIR, "gemini-malformed.chat.json");
+    const artifactPath = resolve(FIXTURES_DIR, "gemini-malformed.chat.jsonl");
 
     const result = await extractChatUsageFromArtifact({
       artifactPath,
-      format: "json",
+      format: "jsonl",
       providerId: "gemini",
-      modelId: "gemini-2-5-pro",
+      modelId: "gemini-3.1-flash-lite-preview",
     });
 
     const unavailable = expectUnavailable(result);
     expect(unavailable.reason).toBe("malformed");
     expect(unavailable.tokenUsage).toBeUndefined();
     expect(unavailable.message).toContain(
-      "Gemini transcripts[0].payload.tokens did not contain any valid token usage fields.",
+      "Gemini line 1.tokens did not contain any valid token usage fields.",
     );
   });
+
+  it.each([
+    {
+      fixtureName: "gemini-reference-20260501.chat.jsonl",
+      providerId: "gemini" as const,
+      modelId: "gemini-3.1-flash-lite-preview",
+      expected: {
+        input: 60914,
+        output: 277,
+        cached: 22958,
+        thoughts: 0,
+        tool: 0,
+        total: 61191,
+      },
+    },
+    {
+      fixtureName: "claude-duplicate-fragments-20260501.chat.jsonl",
+      providerId: "claude" as const,
+      modelId: "claude-haiku-4-5-20251001",
+      expected: {
+        input_tokens: 14,
+        output_tokens: 513,
+        cache_read_input_tokens: 28046,
+        cache_creation_input_tokens: 28645,
+        cache_creation_ephemeral_5m_input_tokens: 0,
+        cache_creation_ephemeral_1h_input_tokens: 28645,
+      },
+    },
+    {
+      fixtureName: "codex-reference-20260501.chat.jsonl",
+      providerId: "codex" as const,
+      modelId: "gpt-5.4-mini",
+      expected: {
+        input_tokens: 48624,
+        cached_input_tokens: 45056,
+        output_tokens: 871,
+        reasoning_output_tokens: 143,
+        total_tokens: 49495,
+      },
+    },
+  ])(
+    "matches current manual QA reference usage for $providerId",
+    async ({ expected, fixtureName, modelId, providerId }) => {
+      const artifactPath = resolve(FIXTURES_DIR, fixtureName);
+
+      const result = await extractChatUsageFromArtifact({
+        artifactPath,
+        format: "jsonl",
+        providerId,
+        modelId,
+      });
+
+      expect(result).toEqual({
+        status: "available",
+        artifactPath,
+        format: "jsonl",
+        provider: providerId,
+        modelId,
+        tokenUsage: expected,
+      });
+    },
+  );
 
   it.each([
     {
@@ -602,6 +659,8 @@ describe("extractChatUsageFromArtifact", () => {
         output_tokens: 1268,
         cache_read_input_tokens: 206258,
         cache_creation_input_tokens: 31539,
+        cache_creation_ephemeral_5m_input_tokens: 31539,
+        cache_creation_ephemeral_1h_input_tokens: 0,
       },
     },
     {
@@ -612,6 +671,8 @@ describe("extractChatUsageFromArtifact", () => {
         output_tokens: 46083,
         cache_read_input_tokens: 14515557,
         cache_creation_input_tokens: 364110,
+        cache_creation_ephemeral_5m_input_tokens: 364110,
+        cache_creation_ephemeral_1h_input_tokens: 0,
       },
     },
   ])(
@@ -639,37 +700,25 @@ describe("extractChatUsageFromArtifact", () => {
 
   it.each([
     {
-      fixtureName: "gemini-real-20260113.chat.json",
-      modelId: "gemini-2.5-pro",
+      fixtureName: "gemini-valid.chat.jsonl",
+      modelId: "gemini-3-flash-preview",
       expected: {
-        input: 586065,
-        output: 2438,
-        cached: 497672,
-        thoughts: 3087,
+        input: 28037,
+        output: 225,
+        cached: 11605,
+        thoughts: 865,
         tool: 0,
-        total: 591590,
-      },
-    },
-    {
-      fixtureName: "gemini-real-20260303.chat.json",
-      modelId: "gemini-3.1-pro-preview",
-      expected: {
-        input: 1044266,
-        output: 2431,
-        cached: 861396,
-        thoughts: 6589,
-        tool: 0,
-        total: 1053286,
+        total: 29127,
       },
     },
   ])(
-    "extracts Gemini usage from messages[].tokens for $fixtureName",
+    "extracts Gemini usage from current JSONL token rows for $fixtureName",
     async ({ expected, fixtureName, modelId }) => {
       const artifactPath = resolve(FIXTURES_DIR, fixtureName);
 
       const result = await extractChatUsageFromArtifact({
         artifactPath,
-        format: "json",
+        format: "jsonl",
         providerId: "gemini",
         modelId,
       });
@@ -677,7 +726,7 @@ describe("extractChatUsageFromArtifact", () => {
       expect(result).toEqual({
         status: "available",
         artifactPath,
-        format: "json",
+        format: "jsonl",
         provider: "gemini",
         modelId,
         tokenUsage: expected,
@@ -701,6 +750,14 @@ describe("extractChatUsageFromArtifact", () => {
       format: "json" as const,
       expectedMessage:
         "Codex usage extraction expects a jsonl artifact, received `json`.",
+    },
+    {
+      providerId: "gemini" as const,
+      modelId: "gemini-3.1-flash-lite-preview",
+      artifactPath: resolve(FIXTURES_DIR, "gemini-unsupported.chat.json"),
+      format: "json" as const,
+      expectedMessage:
+        "Gemini usage extraction expects a jsonl artifact, received `json`.",
     },
   ])(
     "returns unsupported for $providerId artifact extraction when the artifact format does not match the provider contract",
@@ -751,7 +808,7 @@ describe("extractChatUsageFromArtifact", () => {
 
   it("keeps provider-native extraction self-contained at the extractor boundary", async () => {
     const claudeArtifactPath = resolve(FIXTURES_DIR, "claude-valid.chat.jsonl");
-    const geminiArtifactPath = resolve(FIXTURES_DIR, "gemini-valid.chat.json");
+    const geminiArtifactPath = resolve(FIXTURES_DIR, "gemini-valid.chat.jsonl");
 
     const claudeResult = await extractChatUsageFromArtifact({
       artifactPath: claudeArtifactPath,
@@ -761,9 +818,9 @@ describe("extractChatUsageFromArtifact", () => {
     });
     const geminiResult = await extractChatUsageFromArtifact({
       artifactPath: geminiArtifactPath,
-      format: "json",
+      format: "jsonl",
       providerId: "gemini",
-      modelId: "gemini-2-5-pro",
+      modelId: "gemini-3-flash-preview",
     });
 
     expect(claudeResult).toEqual({
@@ -777,21 +834,23 @@ describe("extractChatUsageFromArtifact", () => {
         output_tokens: 65,
         cache_read_input_tokens: 41,
         cache_creation_input_tokens: 11,
+        cache_creation_ephemeral_5m_input_tokens: 7,
+        cache_creation_ephemeral_1h_input_tokens: 0,
       },
     });
     expect(geminiResult).toEqual({
       status: "available",
       artifactPath: geminiArtifactPath,
-      format: "json",
+      format: "jsonl",
       provider: "gemini",
-      modelId: "gemini-2-5-pro",
+      modelId: "gemini-3-flash-preview",
       tokenUsage: {
-        input: 210,
-        output: 66,
-        cached: 34,
-        thoughts: 14,
-        tool: 18,
-        total: 342,
+        input: 28037,
+        output: 225,
+        cached: 11605,
+        thoughts: 865,
+        tool: 0,
+        total: 29127,
       },
     });
   });

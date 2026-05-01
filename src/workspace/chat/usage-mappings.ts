@@ -7,6 +7,7 @@ import type { ChatArtifactFormat } from "./types.js";
 
 export interface ProviderUsageFieldMapping {
   artifactFieldPath: string;
+  usagePayloadFieldPath?: string;
   usageFieldPath: string;
 }
 
@@ -44,34 +45,43 @@ export const PROVIDER_USAGE_SHAPE_MAPPINGS: Record<
         artifactFieldPath: "usage.cache_creation_input_tokens",
         usageFieldPath: "cache_creation_input_tokens",
       },
+      {
+        artifactFieldPath: "usage.cache_creation.ephemeral_5m_input_tokens",
+        usagePayloadFieldPath: "cache_creation.ephemeral_5m_input_tokens",
+        usageFieldPath: "cache_creation_ephemeral_5m_input_tokens",
+      },
+      {
+        artifactFieldPath: "usage.cache_creation.ephemeral_1h_input_tokens",
+        usagePayloadFieldPath: "cache_creation.ephemeral_1h_input_tokens",
+        usageFieldPath: "cache_creation_ephemeral_1h_input_tokens",
+      },
     ],
   },
   codex: {
     providerId: "codex",
     artifactFormat: "jsonl",
-    artifactShape: "event_msg(type=token_count).info.total_token_usage",
-    usageRootPath: "event_msg.info.total_token_usage",
+    artifactShape: "event_msg(type=token_count).payload.info.total_token_usage",
+    usageRootPath: "payload.info.total_token_usage",
     billingRelevantFields: [
       {
-        artifactFieldPath: "event_msg.info.total_token_usage.input_tokens",
+        artifactFieldPath: "payload.info.total_token_usage.input_tokens",
         usageFieldPath: "input_tokens",
       },
       {
-        artifactFieldPath:
-          "event_msg.info.total_token_usage.cached_input_tokens",
+        artifactFieldPath: "payload.info.total_token_usage.cached_input_tokens",
         usageFieldPath: "cached_input_tokens",
       },
       {
-        artifactFieldPath: "event_msg.info.total_token_usage.output_tokens",
+        artifactFieldPath: "payload.info.total_token_usage.output_tokens",
         usageFieldPath: "output_tokens",
       },
       {
         artifactFieldPath:
-          "event_msg.info.total_token_usage.reasoning_output_tokens",
+          "payload.info.total_token_usage.reasoning_output_tokens",
         usageFieldPath: "reasoning_output_tokens",
       },
       {
-        artifactFieldPath: "event_msg.info.total_token_usage.total_tokens",
+        artifactFieldPath: "payload.info.total_token_usage.total_tokens",
         usageFieldPath: "total_tokens",
       },
     ],
@@ -79,7 +89,7 @@ export const PROVIDER_USAGE_SHAPE_MAPPINGS: Record<
   gemini: {
     providerId: "gemini",
     artifactFormat: "jsonl",
-    artifactShape: "message.tokens",
+    artifactShape: "jsonl row tokens",
     usageRootPath: "tokens",
     billingRelevantFields: [
       {
@@ -126,7 +136,11 @@ export function extractObservedProviderNativeUsage(
 
   const nativeUsage: Record<string, number> = {};
   for (const fieldMapping of mapping.billingRelevantFields) {
-    const value = getPathValue(usageRecord, fieldMapping.usageFieldPath);
+    const value =
+      getPathValue(
+        usageRecord,
+        fieldMapping.usagePayloadFieldPath ?? fieldMapping.usageFieldPath,
+      ) ?? getPathValue(usageRecord, fieldMapping.usageFieldPath);
     const tokenCount = normalizeTokenCount(value);
     if (tokenCount !== undefined) {
       nativeUsage[fieldMapping.usageFieldPath] = tokenCount;
