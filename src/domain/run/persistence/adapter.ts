@@ -10,6 +10,7 @@ import {
 } from "../../../persistence/session-store.js";
 import { assertTestHookRegistrationEnabled } from "../../../testing/test-hooks.js";
 import { isFileSystemError } from "../../../utils/fs.js";
+import { emitPersistedWorkflowRecordEvent } from "../../shared/workflow-record-events.js";
 import {
   RunRecordNotFoundError,
   RunRecordParseError,
@@ -62,6 +63,7 @@ export interface RewriteRunRecordOptions {
    * persist state before the process exits.
    */
   forceFlush?: boolean;
+  suppressAppUpload?: boolean;
 }
 
 export interface RunQueryFilters {
@@ -87,6 +89,7 @@ export interface AppendRunRecordOptions {
   root: string;
   runsFilePath: string;
   record: RunRecord;
+  suppressAppUpload?: boolean;
 }
 
 type ReadRunRecordsFn = (
@@ -143,6 +146,14 @@ const runPersistence = createSessionStore<
     const payload = parsed as { sessions?: RunIndexEntry[] };
     return Array.isArray(payload.sessions) ? payload.sessions : [];
   },
+  afterRecordPersisted: ({ paths, record, persistedAt }) => {
+    return emitPersistedWorkflowRecordEvent({
+      operator: "run",
+      root: paths.root,
+      record,
+      recordUpdatedAt: persistedAt,
+    });
+  },
 });
 
 const readRunRecordsInternal: ReadRunRecordsFn = async (
@@ -186,11 +197,15 @@ export async function readRunRecords(
 export async function appendRunRecord(
   options: AppendRunRecordOptions,
 ): Promise<void> {
-  const { root, runsFilePath, record } = options;
+  const { root, runsFilePath, record, suppressAppUpload = false } = options;
   const paths = buildRunPaths(root, runsFilePath);
 
   try {
-    await runPersistence.appendRecord({ paths, record });
+    await runPersistence.appendRecord({
+      paths,
+      record,
+      skipAfterPersistHook: suppressAppUpload,
+    });
   } catch (error) {
     throw mapSessionStoreError(error, runStoreErrorMapper);
   }
@@ -199,7 +214,14 @@ export async function appendRunRecord(
 export async function rewriteRunRecord(
   options: RewriteRunRecordOptions,
 ): Promise<RunRecord> {
-  const { root, runsFilePath, runId, mutate, forceFlush = false } = options;
+  const {
+    root,
+    runsFilePath,
+    runId,
+    mutate,
+    forceFlush = false,
+    suppressAppUpload = false,
+  } = options;
   const paths = buildRunPaths(root, runsFilePath);
 
   try {
@@ -208,6 +230,7 @@ export async function rewriteRunRecord(
       sessionId: runId,
       mutate,
       forceFlush,
+      skipAfterPersistHook: suppressAppUpload,
     });
   } catch (error) {
     throw mapSessionStoreError(error, runStoreErrorMapper);

@@ -221,6 +221,10 @@ describe("CLI entrypoint error handling", () => {
     );
     expect(help).toContain("auto [options]");
     expect(help).toContain("doctor [options]");
+    expect(help).toContain("login              Sign in to Voratiq App");
+    expect(help).toContain(
+      "status [options]   Show Voratiq App sign-in and repository link status",
+    );
     expect(help).not.toContain("init [options]");
     expect(help).not.toContain("sync [options]");
     expect(stderr.join("")).toHaveLength(0);

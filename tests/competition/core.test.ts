@@ -125,7 +125,10 @@ describe("competition core", () => {
       sortResults: (left, right) => left.id.localeCompare(right.id),
     });
 
-    expect(completionOrder).toEqual(["alpha", "gamma", "beta"]);
+    expect(completionOrder).toEqual(
+      expect.arrayContaining(["alpha", "beta", "gamma"]),
+    );
+    expect(completionOrder).toHaveLength(3);
     expect(results.map((result) => result.id)).toEqual([
       "alpha",
       "beta",

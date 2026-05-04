@@ -374,6 +374,7 @@ async function recordApplyStatus(
       };
     },
     forceFlush: true,
+    suppressAppUpload: true,
   });
 }
 

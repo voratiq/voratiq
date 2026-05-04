@@ -33,6 +33,7 @@ import {
   parseMaxParallelOption,
 } from "./option-parsers.js";
 import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
+import { promptForRepositoryLinkIfNeeded } from "./repository-link.js";
 
 export interface MessageCommandOptions {
   prompt: string;
@@ -81,6 +82,7 @@ export async function runMessageCommand(
     await resolveCliContext({
       workspaceAutoInitMode: "when-missing",
     });
+  await promptForRepositoryLinkIfNeeded({ root, json });
 
   const workspaceNotice = workspaceAutoInitialized
     ? renderWorkspaceAutoInitializedNotice()

@@ -12,6 +12,7 @@ import {
   type SessionStorePaths,
 } from "../../../persistence/session-store.js";
 import { buildRecordLifecycleCompleteFields } from "../../shared/lifecycle.js";
+import { emitPersistedWorkflowRecordEvent } from "../../shared/workflow-record-events.js";
 import {
   type SpecAgentEntry,
   type SpecIndexEntry,
@@ -99,6 +100,14 @@ const specPersistence = createSessionStore<
   readIndexEntries: (parsed) => {
     const payload = parsed as { sessions?: SpecIndexEntry[] };
     return Array.isArray(payload.sessions) ? payload.sessions : [];
+  },
+  afterRecordPersisted: ({ paths, record, persistedAt }) => {
+    return emitPersistedWorkflowRecordEvent({
+      operator: "spec",
+      root: paths.root,
+      record,
+      recordUpdatedAt: persistedAt,
+    });
   },
 });
 

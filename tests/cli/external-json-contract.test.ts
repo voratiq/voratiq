@@ -77,6 +77,7 @@ jest.mock("../../src/commands/reduce/command.js", () => ({
 }));
 
 jest.mock("../../src/domain/reduce/persistence/adapter.js", () => ({
+  flushAllReductionRecordBuffers: jest.fn(),
   readReductionRecords: jest.fn(),
 }));
 

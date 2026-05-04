@@ -13,6 +13,7 @@ import {
   writeOperatorResultEnvelope,
 } from "./operator-envelope.js";
 import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
+import { promptForRepositoryLinkIfNeeded } from "./repository-link.js";
 
 export interface ApplyCommandOptions {
   runId: string;
@@ -40,6 +41,10 @@ export async function runApplyCommand(
   } = options;
 
   const { root, workspacePaths } = await resolveCliContext();
+  await promptForRepositoryLinkIfNeeded({
+    root,
+    json: options.json ?? false,
+  });
 
   await ensureCleanWorkingTree(root);
 

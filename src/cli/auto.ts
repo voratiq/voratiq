@@ -29,6 +29,7 @@ import {
   parseMaxParallelOption,
 } from "./option-parsers.js";
 import { beginChainedCommandOutput, writeCommandOutput } from "./output.js";
+import { promptForRepositoryLinkIfNeeded } from "./repository-link.js";
 import { runRunCommand } from "./run.js";
 import { runSpecCommand } from "./spec.js";
 import { runVerifyCommand } from "./verify.js";
@@ -107,6 +108,7 @@ async function persistAutoOutcome(options: {
         auto: outcome,
       }),
       forceFlush: true,
+      suppressAppUpload: true,
     });
   } catch {
     // Keep auto command behavior resilient in unit tests and non-standard
@@ -124,6 +126,7 @@ export async function runAutoCommand(
     workspaceAutoInitMode: "when-missing",
     restoreShippedVerificationTemplates: false,
   });
+  await promptForRepositoryLinkIfNeeded({ root });
   const workspaceNotice = workspaceAutoInitialized
     ? renderWorkspaceAutoInitializedNotice()
     : undefined;

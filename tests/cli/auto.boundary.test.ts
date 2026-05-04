@@ -2,9 +2,11 @@ import { jest } from "@jest/globals";
 
 import * as applyCli from "../../src/cli/apply.js";
 import { runAutoCommand } from "../../src/cli/auto.js";
+import * as repositoryLinkCli from "../../src/cli/repository-link.js";
 import * as runCli from "../../src/cli/run.js";
 import * as specCli from "../../src/cli/spec.js";
 import * as verifyCli from "../../src/cli/verify.js";
+import type { AutoCommandDependencies } from "../../src/commands/auto/command.js";
 import * as autoCommandModule from "../../src/commands/auto/command.js";
 
 jest.mock("../../src/commands/auto/command.js", () => ({
@@ -27,9 +29,16 @@ jest.mock("../../src/cli/apply.js", () => ({
   runApplyCommand: jest.fn(),
 }));
 
+jest.mock("../../src/cli/repository-link.js", () => ({
+  promptForRepositoryLinkIfNeeded: jest.fn(),
+}));
+
 describe("runAutoCommand boundary", () => {
   const executeAutoCommandMock = jest.mocked(
     autoCommandModule.executeAutoCommand,
+  );
+  const promptForRepositoryLinkIfNeededMock = jest.mocked(
+    repositoryLinkCli.promptForRepositoryLinkIfNeeded,
   );
 
   let stdoutSpy: jest.SpiedFunction<typeof process.stdout.write> | undefined;
@@ -43,6 +52,8 @@ describe("runAutoCommand boundary", () => {
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
     executeAutoCommandMock.mockReset();
+    promptForRepositoryLinkIfNeededMock.mockReset();
+    promptForRepositoryLinkIfNeededMock.mockResolvedValue(undefined);
     jest.mocked(runCli.runRunCommand).mockReset();
     jest.mocked(specCli.runSpecCommand).mockReset();
     jest.mocked(verifyCli.runVerifyCommand).mockReset();
@@ -75,11 +86,17 @@ describe("runAutoCommand boundary", () => {
       specPath: "specs/task.md",
     });
 
+    const repositoryLinkInput =
+      promptForRepositoryLinkIfNeededMock.mock.calls[0]?.[0];
+    expect(repositoryLinkInput).toBeDefined();
+    expect(typeof repositoryLinkInput?.root).toBe("string");
     expect(executeAutoCommandMock).toHaveBeenCalledWith(
       { specPath: "specs/task.md" },
       expect.any(Object),
     );
-    const dependencies = executeAutoCommandMock.mock.calls[0]?.[1];
+    const dependencies = executeAutoCommandMock.mock.calls[0]?.[1] as
+      | AutoCommandDependencies
+      | undefined;
     expect(dependencies).toBeDefined();
     expect(typeof dependencies?.runSpecStage).toBe("function");
     expect(typeof dependencies?.runRunStage).toBe("function");
