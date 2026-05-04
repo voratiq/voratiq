@@ -1,5 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 
+import type { EnsureAppRepositoryConnectionOptions } from "../../src/app-session/repository-connections.js";
+import type { RepositoryLinkStateSnapshot } from "../../src/app-session/state.js";
 import type { ConfirmationWorkflow } from "../../src/cli/confirmation.js";
 import type { CommandOutputPayload } from "../../src/cli/output.js";
 import {
@@ -16,6 +18,11 @@ import type {
   PreparedInteractiveSession,
 } from "../../src/interactive/index.js";
 import { colorize } from "../../src/utils/colors.js";
+import {
+  buildRepositoryEnsureRequest,
+  buildRepositoryEnsureResponse,
+  signedInAppSessionState,
+} from "../support/factories/app-session.js";
 
 describe("root interactive launcher", () => {
   it("starts only for bare root invocation in an interactive shell", () => {
@@ -194,6 +201,192 @@ describe("root interactive launcher", () => {
       }),
     );
     expect(spawnedWith).toEqual([preparedSession, { stdio: "inherit" }]);
+  });
+
+  it("prompts to link this repository on first app use and persists acceptance", async () => {
+    const confirm = jest.fn<ConfirmationWorkflow["confirm"]>(() =>
+      Promise.resolve(true),
+    );
+    const readRepositoryLinkState = jest.fn(
+      (repoRoot: string, _env?: NodeJS.ProcessEnv, _accountId?: string) => {
+        void _env;
+        void _accountId;
+        return Promise.resolve({
+          repoRoot,
+          path: "/Users/test/.voratiq/repositories.json",
+          exists: false,
+          linked: null,
+          raw: null,
+        });
+      },
+    );
+    const writeRepositoryLinkState = jest.fn(
+      (input: {
+        repoRoot: string;
+        accountId: string;
+        linked: boolean;
+        env?: NodeJS.ProcessEnv;
+      }): Promise<RepositoryLinkStateSnapshot> =>
+        Promise.resolve({
+          repoRoot: input.repoRoot,
+          path: "/Users/test/.voratiq/repositories.json",
+          exists: true,
+          linked: input.linked,
+          raw: {
+            repoRoot: input.repoRoot,
+            accountId: input.accountId,
+            linked: input.linked,
+            createdAt: "2026-04-23T22:10:00.000Z",
+            updatedAt: "2026-04-23T22:10:00.000Z",
+          },
+        }),
+    );
+    const buildRepositoryConnectionEnsureRequest = jest.fn(
+      (_repoRoot: string) => {
+        void _repoRoot;
+        return Promise.resolve(buildRepositoryEnsureRequest());
+      },
+    );
+    const ensureAppRepositoryConnection = jest.fn(
+      (_input: EnsureAppRepositoryConnectionOptions) => {
+        void _input;
+        return Promise.resolve(buildRepositoryEnsureResponse());
+      },
+    );
+
+    await runInteractiveRootLauncher({
+      promptForRepositoryLink: true,
+      readAppSessionState: () => Promise.resolve(signedInAppSessionState()),
+      readRepositoryLinkStateForRepoRoot: readRepositoryLinkState,
+      writeRepositoryLinkStateForRepoRoot: writeRepositoryLinkState,
+      buildRepositoryConnectionEnsureRequest,
+      ensureAppRepositoryConnection,
+      resolveContext: resolveCliContextMock("/repo"),
+      loadDiagnostics: () =>
+        buildDiagnostics({
+          enabledAgents: [buildAgentEntry("codex-main")],
+          catalog: [buildAgentDefinition("codex-main")],
+        }),
+      createWorkflow: () => ({
+        interactive: true,
+        confirm,
+        prompt: () => Promise.resolve(""),
+        close: jest.fn(),
+      }),
+      prepareSession: () =>
+        Promise.resolve({
+          ok: true as const,
+          prepared: buildPreparedInteractiveSession(),
+        }),
+      spawnSession: () =>
+        Promise.resolve(buildSuccessfulLaunchResult("succeeded")),
+      writeOutput: () => {},
+    });
+
+    expect(readRepositoryLinkState).toHaveBeenCalledWith(
+      "/repo",
+      process.env,
+      "user-123",
+    );
+    expect(confirm).toHaveBeenCalledWith({
+      message: "Link this repository to Voratiq App?",
+      defaultValue: true,
+      prefaceLines: [""],
+    });
+    expect(ensureAppRepositoryConnection).toHaveBeenCalledWith({
+      env: process.env,
+      payload: buildRepositoryEnsureRequest(),
+    });
+    expect(writeRepositoryLinkState.mock.calls[0]?.[0]).toEqual({
+      repoRoot: "/repo",
+      accountId: "user-123",
+      linked: true,
+      env: process.env,
+    });
+  });
+
+  it("persists a declined repository link decision from the first-use prompt", async () => {
+    const confirm = jest.fn<ConfirmationWorkflow["confirm"]>(() =>
+      Promise.resolve(false),
+    );
+    const readRepositoryLinkState = jest.fn(
+      (repoRoot: string, _env?: NodeJS.ProcessEnv, _accountId?: string) => {
+        void _env;
+        void _accountId;
+        return Promise.resolve({
+          repoRoot,
+          path: "/Users/test/.voratiq/repositories.json",
+          exists: false,
+          linked: null,
+          raw: null,
+        });
+      },
+    );
+    const writeRepositoryLinkState = jest.fn(
+      (input: {
+        repoRoot: string;
+        accountId: string;
+        linked: boolean;
+        env?: NodeJS.ProcessEnv;
+      }): Promise<RepositoryLinkStateSnapshot> =>
+        Promise.resolve({
+          repoRoot: input.repoRoot,
+          path: "/Users/test/.voratiq/repositories.json",
+          exists: true,
+          linked: input.linked,
+          raw: {
+            repoRoot: input.repoRoot,
+            accountId: input.accountId,
+            linked: input.linked,
+            createdAt: "2026-04-23T22:10:00.000Z",
+            updatedAt: "2026-04-23T22:10:00.000Z",
+          },
+        }),
+    );
+
+    await runInteractiveRootLauncher({
+      promptForRepositoryLink: true,
+      readAppSessionState: () => Promise.resolve(signedInAppSessionState()),
+      readRepositoryLinkStateForRepoRoot: readRepositoryLinkState,
+      writeRepositoryLinkStateForRepoRoot: writeRepositoryLinkState,
+      resolveContext: resolveCliContextMock("/repo"),
+      loadDiagnostics: () =>
+        buildDiagnostics({
+          enabledAgents: [buildAgentEntry("codex-main")],
+          catalog: [buildAgentDefinition("codex-main")],
+        }),
+      createWorkflow: () => ({
+        interactive: true,
+        confirm,
+        prompt: () => Promise.resolve(""),
+        close: jest.fn(),
+      }),
+      prepareSession: () =>
+        Promise.resolve({
+          ok: true as const,
+          prepared: buildPreparedInteractiveSession(),
+        }),
+      spawnSession: () =>
+        Promise.resolve(buildSuccessfulLaunchResult("succeeded")),
+      writeOutput: () => {},
+    });
+
+    expect(readRepositoryLinkState).toHaveBeenCalledWith(
+      "/repo",
+      process.env,
+      "user-123",
+    );
+    expect(confirm).toHaveBeenCalledWith({
+      message: "Link this repository to Voratiq App?",
+      defaultValue: true,
+      prefaceLines: [""],
+    });
+    expect(writeRepositoryLinkState.mock.calls[0]?.[0]).toEqual({
+      repoRoot: "/repo",
+      accountId: "user-123",
+      linked: false,
+      env: process.env,
+    });
   });
 
   it("keeps confirmation workflow open for MCP prompts and closes before spawning", async () => {

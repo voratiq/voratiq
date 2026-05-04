@@ -54,6 +54,10 @@ export interface RootLauncherCommandOptions {
   createWorkflow?: (
     options: RootLauncherWorkflowFactoryOptions,
   ) => RootLauncherWorkflow;
+  ensureRepositoryLink?: (options: {
+    root: string;
+    confirm: RootLauncherWorkflow["confirm"];
+  }) => Promise<void>;
   prepareSession?: (
     options: Parameters<typeof prepareNativeInteractiveSession>[0],
   ) => ReturnType<typeof prepareNativeInteractiveSession>;
@@ -100,6 +104,7 @@ export async function runRootLauncherCommand(
     resolveContext = resolveCliContext,
     loadDiagnostics = loadAgentCatalogDiagnostics,
     createWorkflow,
+    ensureRepositoryLink,
     prepareSession = prepareNativeInteractiveSession,
     spawnSession = spawnPreparedInteractiveSession,
     selfCliTarget = createEntrypointVoratiqCliTarget({
@@ -140,6 +145,13 @@ export async function runRootLauncherCommand(
   };
 
   try {
+    if (ensureRepositoryLink) {
+      await ensureRepositoryLink({
+        root: setup.root,
+        confirm: (confirmOptions) => workflow.confirm(confirmOptions),
+      });
+    }
+
     const promptResult = await promptForLaunchPlan({
       availability: setup.availability,
       prompt: (promptOptions) => workflow.prompt(promptOptions),

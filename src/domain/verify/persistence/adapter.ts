@@ -11,6 +11,7 @@ import {
   type SessionRecordWarning,
   type SessionStorePaths,
 } from "../../../persistence/session-store.js";
+import { emitPersistedWorkflowRecordEvent } from "../../shared/workflow-record-events.js";
 import type {
   VerificationIndexEntry,
   VerificationRecord,
@@ -104,6 +105,14 @@ const verificationPersistence = createSessionStore<
   readIndexEntries: (parsed) => {
     const payload = parsed as { sessions?: VerificationIndexEntry[] };
     return Array.isArray(payload.sessions) ? payload.sessions : [];
+  },
+  afterRecordPersisted: ({ paths, record, persistedAt }) => {
+    return emitPersistedWorkflowRecordEvent({
+      operator: "verify",
+      root: paths.root,
+      record,
+      recordUpdatedAt: persistedAt,
+    });
   },
 });
 

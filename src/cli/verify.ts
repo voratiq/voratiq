@@ -63,6 +63,7 @@ import {
 } from "./option-parsers.js";
 import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
+import { promptForRepositoryLinkIfNeeded } from "./repository-link.js";
 
 export interface VerifyCommandOptions {
   target: VerifyTargetSelection;
@@ -138,6 +139,7 @@ export async function runVerifyCommand(
   const rendererStderr = json ? createSilentCliWriter() : stderr;
 
   const { root, workspacePaths } = await resolveCliContext();
+  await promptForRepositoryLinkIfNeeded({ root, json });
 
   checkPlatformSupport();
   ensureSandboxDependencies();

@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import { Command, Option } from "commander";
 
 import { checkPlatformSupport } from "../agents/runtime/sandbox.js";
+import { createAppWorkflowUploadWarningBuffer } from "../app-session/workflow-upload.js";
 import { executeRunCommand } from "../commands/run/command.js";
 import { resolveExtraContextFiles } from "../competition/shared/extra-context.js";
 import type { RunReport } from "../domain/run/model/types.js";
@@ -29,6 +30,7 @@ import {
 } from "./option-parsers.js";
 import type { CommandOutputWriter } from "./output.js";
 import { writeCommandOutput } from "./output.js";
+import { promptForRepositoryLinkIfNeeded } from "./repository-link.js";
 
 export interface RunCommandOptions {
   specPath: string;
@@ -77,11 +79,14 @@ export async function runRunCommand(
     : (writeOutput ?? writeCommandOutput);
   const rendererStdout = json ? createSilentCliWriter() : stdout;
   const rendererStderr = json ? createSilentCliWriter() : stderr;
+  const renderTargetStdout = rendererStdout ?? process.stdout;
+  const renderTargetStderr = rendererStderr ?? process.stderr;
 
   const { root, workspacePaths, workspaceAutoInitialized } =
     await resolveCliContext({
       workspaceAutoInitMode: "when-missing",
     });
+  await promptForRepositoryLinkIfNeeded({ root, json });
 
   const workspaceNotice = workspaceAutoInitialized
     ? renderWorkspaceAutoInitializedNotice()
@@ -118,27 +123,46 @@ export async function runRunCommand(
   }
 
   const renderer = createRunRenderer({
-    stdout: rendererStdout,
-    stderr: rendererStderr,
+    stdout: renderTargetStdout,
+    stderr: renderTargetStderr,
     suppressLeadingBlankLine,
     suppressTrailingBlankLine,
   });
+  const appWorkflowWarningBuffer = renderTargetStdout.isTTY
+    ? createAppWorkflowUploadWarningBuffer()
+    : undefined;
+  const restoreAppWorkflowWarningBuffer = appWorkflowWarningBuffer?.install();
 
-  const report = await executeRunCommand({
-    root,
-    runsFilePath: workspacePaths.runsFile,
-    specsFilePath: workspacePaths.specsFile,
-    specAbsolutePath: absolutePath,
-    specDisplayPath: displayPath,
-    agentIds,
-    agentOverrideFlag,
-    profileName: profile,
-    maxParallel,
-    extraContextFiles,
-    renderer,
-  });
+  let report: RunReport;
+  try {
+    report = await executeRunCommand({
+      root,
+      runsFilePath: workspacePaths.runsFile,
+      specsFilePath: workspacePaths.specsFile,
+      specAbsolutePath: absolutePath,
+      specDisplayPath: displayPath,
+      agentIds,
+      agentOverrideFlag,
+      profileName: profile,
+      maxParallel,
+      extraContextFiles,
+      renderer,
+    });
+  } catch (error) {
+    flushAppWorkflowUploadWarnings(
+      renderTargetStderr,
+      appWorkflowWarningBuffer?.closeAndDrain() ?? [],
+    );
+    restoreAppWorkflowWarningBuffer?.();
+    throw error;
+  }
 
   const body = renderer.complete(report, { suppressHint });
+  flushAppWorkflowUploadWarnings(
+    renderTargetStderr,
+    appWorkflowWarningBuffer?.closeAndDrain() ?? [],
+  );
+  restoreAppWorkflowWarningBuffer?.();
 
   const exitCode = mapRunStatusToExitCode(report.status);
 
@@ -160,6 +184,17 @@ export function deriveBranchNameFromSpecPath(specPath: string): string {
     return base;
   }
   return base.slice(0, lastDotIndex);
+}
+
+function flushAppWorkflowUploadWarnings(
+  stderr: Pick<NodeJS.WriteStream, "write">,
+  warnings: readonly string[],
+): void {
+  if (warnings.length === 0) {
+    return;
+  }
+
+  stderr.write(`${warnings.join("\n")}\n`);
 }
 
 interface RunCommandActionOptions {

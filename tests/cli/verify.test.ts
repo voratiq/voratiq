@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { Command } from "commander";
 
 import { checkPlatformSupport } from "../../src/agents/runtime/sandbox.js";
+import { promptForRepositoryLinkIfNeeded } from "../../src/cli/repository-link.js";
 import {
   createVerifyCommand,
   runVerifyCommand,
@@ -23,6 +24,9 @@ const executeVerifyCommandMock = jest.mocked(executeVerifyCommand);
 const checkPlatformSupportMock = jest.mocked(checkPlatformSupport);
 const ensureSandboxDependenciesMock = jest.mocked(ensureSandboxDependencies);
 const resolveCliContextMock = jest.mocked(resolveCliContext);
+const promptForRepositoryLinkIfNeededMock = jest.mocked(
+  promptForRepositoryLinkIfNeeded,
+);
 const readFileMock = jest.mocked(readFile);
 
 jest.mock("../../src/commands/verify/command.js", () => {
@@ -56,6 +60,10 @@ jest.mock("../../src/agents/runtime/sandbox.js", () => {
   };
 });
 
+jest.mock("../../src/cli/repository-link.js", () => ({
+  promptForRepositoryLinkIfNeeded: jest.fn(),
+}));
+
 jest.mock("node:fs/promises", () => {
   const actual =
     jest.requireActual<typeof import("node:fs/promises")>("node:fs/promises");
@@ -85,6 +93,7 @@ describe("voratiq verify", () => {
         verificationsFile: "/repo/.voratiq/verify/index.json",
       },
     });
+    promptForRepositoryLinkIfNeededMock.mockResolvedValue(undefined);
     readFileMock.mockRejectedValue(new Error("missing"));
   });
 

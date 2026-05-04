@@ -28,10 +28,44 @@ jest.mock("../../src/domain/interactive/persistence/adapter.js", () => ({
   flushAllInteractiveSessionBuffers: jest.fn(),
 }));
 
+jest.mock("../../src/app-session/workflow-upload.js", () => ({
+  drainPendingAppWorkflowSessionUploads: jest.fn(),
+  registerAppWorkflowSessionUploadHandler: jest.fn(),
+}));
+
 async function flushAsyncWork(): Promise<void> {
   await new Promise<void>((resolve) => {
     setImmediate(resolve);
   });
+}
+
+async function configureWorkflowUploadMocks() {
+  const {
+    drainPendingAppWorkflowSessionUploads,
+    registerAppWorkflowSessionUploadHandler,
+  } = await import("../../src/app-session/workflow-upload.js");
+  const drainPendingAppWorkflowSessionUploadsMock = jest.mocked(
+    drainPendingAppWorkflowSessionUploads,
+  );
+  const registerAppWorkflowSessionUploadHandlerMock = jest.mocked(
+    registerAppWorkflowSessionUploadHandler,
+  );
+  const unregisterAppWorkflowSessionUploadHandlerMock = jest.fn();
+
+  drainPendingAppWorkflowSessionUploadsMock.mockResolvedValue({
+    kind: "drained",
+    startedPendingCount: 0,
+    remainingPendingCount: 0,
+  });
+  registerAppWorkflowSessionUploadHandlerMock.mockReturnValue(
+    unregisterAppWorkflowSessionUploadHandlerMock,
+  );
+
+  return {
+    drainPendingAppWorkflowSessionUploadsMock,
+    registerAppWorkflowSessionUploadHandlerMock,
+    unregisterAppWorkflowSessionUploadHandlerMock,
+  };
 }
 
 describe("CLI teardown dispatch", () => {
@@ -84,6 +118,11 @@ describe("CLI teardown dispatch", () => {
         await import("../../src/domain/message/persistence/adapter.js");
       const { flushAllInteractiveSessionBuffers } =
         await import("../../src/domain/interactive/persistence/adapter.js");
+      const {
+        drainPendingAppWorkflowSessionUploadsMock,
+        registerAppWorkflowSessionUploadHandlerMock,
+        unregisterAppWorkflowSessionUploadHandlerMock,
+      } = await configureWorkflowUploadMocks();
 
       const terminateRegisteredActiveSessionsMock = jest.mocked(
         terminateRegisteredActiveSessions,
@@ -117,6 +156,34 @@ describe("CLI teardown dispatch", () => {
 
       const { runCli } = await import("../../src/bin.js");
       await runCli(["node", "voratiq", "--version"]);
+
+      expect(registerAppWorkflowSessionUploadHandlerMock).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(drainPendingAppWorkflowSessionUploadsMock).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(
+        unregisterAppWorkflowSessionUploadHandlerMock,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        drainPendingAppWorkflowSessionUploadsMock.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        unregisterAppWorkflowSessionUploadHandlerMock.mock
+          .invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+      );
+      expect(flushAllSpecRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllRunRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllReductionRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllVerificationRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllMessageRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllInteractiveSessionBuffersMock).toHaveBeenCalledTimes(1);
+      flushAllSpecRecordBuffersMock.mockClear();
+      flushAllRunRecordBuffersMock.mockClear();
+      flushAllReductionRecordBuffersMock.mockClear();
+      flushAllVerificationRecordBuffersMock.mockClear();
+      flushAllMessageRecordBuffersMock.mockClear();
+      flushAllInteractiveSessionBuffersMock.mockClear();
 
       signalHandlers.get("SIGINT")?.();
       await flushAsyncWork();
@@ -217,6 +284,11 @@ describe("CLI teardown dispatch", () => {
         await import("../../src/domain/message/persistence/adapter.js");
       const { flushAllInteractiveSessionBuffers } =
         await import("../../src/domain/interactive/persistence/adapter.js");
+      const {
+        drainPendingAppWorkflowSessionUploadsMock,
+        registerAppWorkflowSessionUploadHandlerMock,
+        unregisterAppWorkflowSessionUploadHandlerMock,
+      } = await configureWorkflowUploadMocks();
 
       const terminateRegisteredActiveSessionsMock = jest.mocked(
         terminateRegisteredActiveSessions,
@@ -255,6 +327,28 @@ describe("CLI teardown dispatch", () => {
 
       const { runCli } = await import("../../src/bin.js");
       await runCli(["node", "voratiq", "--version"]);
+
+      expect(registerAppWorkflowSessionUploadHandlerMock).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(drainPendingAppWorkflowSessionUploadsMock).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(
+        unregisterAppWorkflowSessionUploadHandlerMock,
+      ).toHaveBeenCalledTimes(1);
+      expect(flushAllSpecRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllRunRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllReductionRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllVerificationRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllMessageRecordBuffersMock).toHaveBeenCalledTimes(1);
+      expect(flushAllInteractiveSessionBuffersMock).toHaveBeenCalledTimes(1);
+      flushAllSpecRecordBuffersMock.mockClear();
+      flushAllRunRecordBuffersMock.mockClear();
+      flushAllReductionRecordBuffersMock.mockClear();
+      flushAllVerificationRecordBuffersMock.mockClear();
+      flushAllMessageRecordBuffersMock.mockClear();
+      flushAllInteractiveSessionBuffersMock.mockClear();
 
       signalHandlers.get("SIGINT")?.();
       await flushAsyncWork();

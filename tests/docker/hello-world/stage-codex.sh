@@ -37,5 +37,5 @@ if ! grep -q "binary: /usr/local/bin/codex" .voratiq/agents.yaml; then
   die "Codex binary was not resolved to /usr/local/bin/codex"
 fi
 
-log "Running spec: tests/fixtures/specs/hello-world.md..."
-voratiq run --spec tests/fixtures/specs/hello-world.md
+log "Running spec: tests/fixtures/specs/hello-world.md (profile: lite)..."
+voratiq run --spec tests/fixtures/specs/hello-world.md --profile lite

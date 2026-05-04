@@ -44,6 +44,11 @@ describe("CLI root launcher wiring", () => {
       "voratiq",
     ]);
     expect(runInteractiveRootLauncherMock).toHaveBeenCalledTimes(1);
+    expect(runInteractiveRootLauncherMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        promptForRepositoryLink: true,
+      }),
+    );
   });
 
   it("renders launcher failures through the normal CLI error path", async () => {

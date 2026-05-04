@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { checkPlatformSupport } from "../../src/agents/runtime/sandbox.js";
 import { runMessageCommand } from "../../src/cli/message.js";
+import { promptForRepositoryLinkIfNeeded } from "../../src/cli/repository-link.js";
 import { executeMessageCommand } from "../../src/commands/message/command.js";
 import { resolveExtraContextFiles } from "../../src/competition/shared/extra-context.js";
 import { resolveInteractiveSessionEnvLineage } from "../../src/domain/interactive/session-env.js";
@@ -37,11 +38,18 @@ jest.mock("../../src/preflight/index.js", () => {
   };
 });
 
+jest.mock("../../src/cli/repository-link.js", () => ({
+  promptForRepositoryLinkIfNeeded: jest.fn(),
+}));
+
 const checkPlatformSupportMock = jest.mocked(checkPlatformSupport);
 const executeMessageCommandMock = jest.mocked(executeMessageCommand);
 const resolveExtraContextFilesMock = jest.mocked(resolveExtraContextFiles);
 const ensureSandboxDependenciesMock = jest.mocked(ensureSandboxDependencies);
 const resolveCliContextMock = jest.mocked(resolveCliContext);
+const promptForRepositoryLinkIfNeededMock = jest.mocked(
+  promptForRepositoryLinkIfNeeded,
+);
 const resolveInteractiveSessionEnvLineageMock = jest.mocked(
   resolveInteractiveSessionEnvLineage,
 );
@@ -51,6 +59,7 @@ describe("voratiq message", () => {
     jest.resetAllMocks();
     checkPlatformSupportMock.mockReturnValue(undefined);
     ensureSandboxDependenciesMock.mockReturnValue(undefined);
+    promptForRepositoryLinkIfNeededMock.mockResolvedValue(undefined);
     resolveExtraContextFilesMock.mockResolvedValue([]);
     resolveInteractiveSessionEnvLineageMock.mockResolvedValue({
       kind: "ignore",
@@ -114,6 +123,29 @@ describe("voratiq message", () => {
         messagesFilePath: "/repo/.voratiq/message/index.json",
       }),
     );
+  });
+
+  it("checks repository link prompting after resolving repo context", async () => {
+    await runMessageCommand({
+      prompt: "Review this change.",
+    });
+
+    expect(promptForRepositoryLinkIfNeededMock).toHaveBeenCalledWith({
+      root: "/repo",
+      json: false,
+    });
+  });
+
+  it("passes json mode through to repository link prompting", async () => {
+    await runMessageCommand({
+      prompt: "Review this change.",
+      json: true,
+    });
+
+    expect(promptForRepositoryLinkIfNeededMock).toHaveBeenCalledWith({
+      root: "/repo",
+      json: true,
+    });
   });
 
   it("returns output artifacts for json envelope construction", async () => {

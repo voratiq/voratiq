@@ -11,6 +11,7 @@ import {
   type SessionRecordWarning,
   type SessionStorePaths,
 } from "../../../persistence/session-store.js";
+import { emitPersistedWorkflowRecordEvent } from "../../shared/workflow-record-events.js";
 import type {
   ReductionIndexEntry,
   ReductionRecord,
@@ -100,6 +101,14 @@ const reductionPersistence = createSessionStore<
   readIndexEntries: (parsed) => {
     const payload = parsed as { sessions?: ReductionIndexEntry[] };
     return Array.isArray(payload.sessions) ? payload.sessions : [];
+  },
+  afterRecordPersisted: ({ paths, record, persistedAt }) => {
+    return emitPersistedWorkflowRecordEvent({
+      operator: "reduce",
+      root: paths.root,
+      record,
+      recordUpdatedAt: persistedAt,
+    });
   },
 });
 

@@ -47,6 +47,7 @@ export interface ReadSessionRecordsOptions<RecordType> {
 export interface AppendSessionRecordOptions<RecordType> {
   paths: SessionStorePaths;
   record: RecordType;
+  skipAfterPersistHook?: boolean;
 }
 
 export interface RewriteSessionRecordOptions<RecordType> {
@@ -54,11 +55,20 @@ export interface RewriteSessionRecordOptions<RecordType> {
   sessionId: string;
   mutate: (record: RecordType) => RecordType;
   forceFlush?: boolean;
+  skipAfterPersistHook?: boolean;
 }
 
 export interface SessionIndexPayload<Entry> {
   version: number;
   sessions: Entry[];
+}
+
+export interface SessionAfterPersistEvent<RecordType> {
+  paths: SessionStorePaths;
+  sessionId: string;
+  recordPath: string;
+  record: RecordType;
+  persistedAt: string;
 }
 
 export type SessionRecordBufferSnapshotEntry = {
@@ -92,6 +102,9 @@ export interface SessionStoreConfig<RecordType, IndexEntry, StatusType> {
   readIndexEntries?: (parsed: unknown) => IndexEntry[];
   buildIndexPayload?: (entries: IndexEntry[], version: number) => unknown;
   extractIdFromRecordPath?: (path: string) => string;
+  afterRecordPersisted?: (
+    event: SessionAfterPersistEvent<RecordType>,
+  ) => void | Promise<void>;
 }
 
 interface SessionRecordBufferEntry<RecordType, StatusType> {
@@ -105,6 +118,7 @@ interface SessionRecordBufferEntry<RecordType, StatusType> {
   record: RecordType;
   lastPersistedStatus: StatusType;
   dirty: boolean;
+  pendingAfterPersistHook: boolean;
   flushTimer?: NodeJS.Timeout;
   flushPromise?: Promise<void>;
 }
@@ -214,11 +228,12 @@ export function createSessionStore<RecordType, IndexEntry, StatusType>(
   async function appendRecord(
     options: AppendSessionRecordOptions<RecordType>,
   ): Promise<void> {
-    const { paths, record } = options;
+    const { paths, record, skipAfterPersistHook = false } = options;
     const sessionId = config.getRecordId(record);
     const recordDir = join(paths.sessionsDir, sessionId);
     const recordPath = join(recordDir, config.recordFilename);
     const displayPath = relativeToRoot(paths.root, recordPath);
+    let afterPersistEvent: SessionAfterPersistEvent<RecordType> | undefined;
 
     await mkdir(recordDir, { recursive: true });
     const releaseLock = await config.acquireLock(paths.lockPath);
@@ -232,6 +247,7 @@ export function createSessionStore<RecordType, IndexEntry, StatusType>(
 
       await atomicWriteRecord(recordPath, record);
       await upsertIndexEntry(paths.indexPath, config.buildIndexEntry(record));
+      const persistedAt = new Date().toISOString();
 
       registerBufferEntry({
         key: recordPath,
@@ -244,7 +260,17 @@ export function createSessionStore<RecordType, IndexEntry, StatusType>(
         record,
         lastPersistedStatus: config.getRecordStatus(record),
         dirty: false,
+        pendingAfterPersistHook: false,
       });
+      if (!skipAfterPersistHook) {
+        afterPersistEvent = {
+          paths,
+          sessionId,
+          recordPath,
+          record,
+          persistedAt,
+        };
+      }
     } catch (error) {
       if (error instanceof SessionRecordMutationError) {
         throw error;
@@ -259,12 +285,22 @@ export function createSessionStore<RecordType, IndexEntry, StatusType>(
     } finally {
       await releaseLock();
     }
+
+    if (afterPersistEvent) {
+      await runAfterPersistHook(afterPersistEvent);
+    }
   }
 
   async function rewriteRecord(
     options: RewriteSessionRecordOptions<RecordType>,
   ): Promise<RecordType> {
-    const { paths, sessionId, mutate, forceFlush = false } = options;
+    const {
+      paths,
+      sessionId,
+      mutate,
+      forceFlush = false,
+      skipAfterPersistHook = false,
+    } = options;
     const recordPath = join(
       paths.sessionsDir,
       sessionId,
@@ -290,6 +326,8 @@ export function createSessionStore<RecordType, IndexEntry, StatusType>(
 
     entry.record = mutated;
     entry.dirty = true;
+    entry.pendingAfterPersistHook =
+      entry.pendingAfterPersistHook || !skipAfterPersistHook;
 
     if (forceFlush || config.shouldForceFlush(entry.record)) {
       await flushBufferEntry(entry, { force: true });
@@ -386,7 +424,7 @@ export function createSessionStore<RecordType, IndexEntry, StatusType>(
   async function getOrLoadBufferEntry(
     template: Omit<
       SessionRecordBufferEntry<RecordType, StatusType>,
-      "record" | "lastPersistedStatus" | "dirty"
+      "record" | "lastPersistedStatus" | "dirty" | "pendingAfterPersistHook"
     >,
   ): Promise<SessionRecordBufferEntry<RecordType, StatusType>> {
     const existing = buffer.get(template.key);
@@ -400,6 +438,7 @@ export function createSessionStore<RecordType, IndexEntry, StatusType>(
       record,
       lastPersistedStatus: config.getRecordStatus(record),
       dirty: false,
+      pendingAfterPersistHook: false,
     };
     buffer.set(template.key, entry);
     return entry;
@@ -447,6 +486,7 @@ export function createSessionStore<RecordType, IndexEntry, StatusType>(
     await mkdir(dirname(entry.recordPath), { recursive: true });
 
     const promise = (async () => {
+      let afterPersistEvent: SessionAfterPersistEvent<RecordType> | undefined;
       const release = await config.acquireLock(entry.lockPath);
       try {
         let recordToPersist = entry.record;
@@ -468,6 +508,7 @@ export function createSessionStore<RecordType, IndexEntry, StatusType>(
 
         await atomicWriteRecord(entry.recordPath, recordToPersist);
         entry.dirty = false;
+        const persistedAt = new Date().toISOString();
 
         const currentStatus = config.getRecordStatus(recordToPersist);
         if (entry.lastPersistedStatus !== currentStatus) {
@@ -477,8 +518,28 @@ export function createSessionStore<RecordType, IndexEntry, StatusType>(
           );
           entry.lastPersistedStatus = currentStatus;
         }
+
+        if (entry.pendingAfterPersistHook) {
+          entry.pendingAfterPersistHook = false;
+          afterPersistEvent = {
+            paths: {
+              root: entry.root,
+              indexPath: entry.indexPath,
+              sessionsDir: entry.sessionsDir,
+              lockPath: entry.lockPath,
+            },
+            sessionId: entry.sessionId,
+            recordPath: entry.recordPath,
+            record: recordToPersist,
+            persistedAt,
+          };
+        }
       } finally {
         await release();
+      }
+
+      if (afterPersistEvent) {
+        await runAfterPersistHook(afterPersistEvent);
       }
     })();
 
@@ -640,6 +701,28 @@ export function createSessionStore<RecordType, IndexEntry, StatusType>(
     const serialized = `${JSON.stringify(payload, null, 2)}\n`;
     await writeFile(tempPath, serialized, { encoding: "utf8" });
     await rename(tempPath, path);
+  }
+
+  async function runAfterPersistHook(
+    event: SessionAfterPersistEvent<RecordType>,
+  ): Promise<void> {
+    if (!config.afterRecordPersisted) {
+      return;
+    }
+
+    try {
+      await config.afterRecordPersisted(event);
+    } catch (error) {
+      const detail =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "unknown error";
+      console.warn(
+        `[voratiq] Failed post-persist hook for session ${event.sessionId}: ${detail}`,
+      );
+    }
   }
 
   return {

@@ -11,6 +11,7 @@ import {
   type SessionRecordWarning,
   type SessionStorePaths,
 } from "../../../persistence/session-store.js";
+import { emitPersistedWorkflowRecordEvent } from "../../shared/workflow-record-events.js";
 import type {
   MessageIndexEntry,
   MessageRecord,
@@ -100,6 +101,14 @@ const messagePersistence = createSessionStore<
   readIndexEntries: (parsed) => {
     const payload = parsed as { sessions?: MessageIndexEntry[] };
     return Array.isArray(payload.sessions) ? payload.sessions : [];
+  },
+  afterRecordPersisted: ({ paths, record, persistedAt }) => {
+    return emitPersistedWorkflowRecordEvent({
+      operator: "message",
+      root: paths.root,
+      record,
+      recordUpdatedAt: persistedAt,
+    });
   },
 });
 

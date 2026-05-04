@@ -52,7 +52,9 @@ export async function assertGitRepository(root: string): Promise<void> {
  * Attempts to find the root of a git repository by running `git rev-parse --show-toplevel`.
  * Returns the repository root path if inside a git repo, or null if not.
  */
-async function getGitRepositoryRoot(cwd: string): Promise<string | null> {
+export async function getGitRepositoryRoot(
+  cwd: string,
+): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync(
       "git",

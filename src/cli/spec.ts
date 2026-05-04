@@ -30,6 +30,7 @@ import {
   parseMaxParallelOption,
 } from "./option-parsers.js";
 import { type CommandOutputWriter, writeCommandOutput } from "./output.js";
+import { promptForRepositoryLinkIfNeeded } from "./repository-link.js";
 
 export interface SpecCommandOptions {
   description: string;
@@ -84,6 +85,7 @@ export async function runSpecCommand(
     await resolveCliContext({
       workspaceAutoInitMode: "when-missing",
     });
+  await promptForRepositoryLinkIfNeeded({ root, json });
 
   const workspaceNotice = workspaceAutoInitialized
     ? renderWorkspaceAutoInitializedNotice()

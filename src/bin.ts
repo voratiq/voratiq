@@ -113,6 +113,7 @@ async function handleFatalError(
 ): Promise<void> {
   await terminateActiveSessionsSafe("failed", context);
   await flushPendingHistory();
+  await drainPendingAppWorkflowUploads();
   if (activeJsonEnvelopeOperator) {
     const { buildFailedOperatorEnvelope, writeOperatorResultEnvelope } =
       await import("./cli/operator-envelope.js");
@@ -145,11 +146,13 @@ async function handleSignal(signal: NodeJS.Signals): Promise<void> {
   const teardownError = await terminateActiveSessionsSafe("aborted", signal);
   if (teardownError) {
     await flushPendingHistory();
+    await drainPendingAppWorkflowUploads();
     process.exit(1);
     return;
   }
 
   await flushPendingHistory();
+  await drainPendingAppWorkflowUploads();
   if (activeJsonEnvelopeOperator) {
     const { buildFailedOperatorEnvelope, writeOperatorResultEnvelope } =
       await import("./cli/operator-envelope.js");
@@ -230,6 +233,24 @@ async function terminateActiveSessionsSafe(
   return await terminateRegisteredActiveSessions(status, context);
 }
 
+async function drainPendingAppWorkflowUploads(): Promise<void> {
+  try {
+    const { drainPendingAppWorkflowSessionUploads } =
+      await import("./app-session/workflow-upload.js");
+    const outcome = await drainPendingAppWorkflowSessionUploads();
+    if (outcome.kind === "timeout" && outcome.remainingPendingCount > 0) {
+      const noun = outcome.remainingPendingCount === 1 ? "upload" : "uploads";
+      console.warn(
+        `[voratiq] Timed out waiting for ${outcome.remainingPendingCount} app workflow ${noun} to finish.`,
+      );
+    }
+  } catch (error) {
+    console.warn(
+      `[voratiq] Failed to drain app workflow uploads: ${(error as Error).message}`,
+    );
+  }
+}
+
 function renderRootLauncherGitGuidance(options: {
   cwd: string;
   reason: "no_repository" | "not_repository_root";
@@ -274,6 +295,10 @@ export async function runCli(
   argv: readonly string[] = process.argv,
 ): Promise<void> {
   installProcessGuards();
+  const { registerAppWorkflowSessionUploadHandler } =
+    await import("./app-session/workflow-upload.js");
+  const unregisterAppWorkflowSessionUploadHandler =
+    registerAppWorkflowSessionUploadHandler();
 
   const { Command, CommanderError } = await import("commander");
   const program = new Command();
@@ -361,6 +386,7 @@ export async function runCli(
           selfCliTarget: createEntrypointVoratiqCliTarget({
             cliEntrypoint: effectiveArgv[1],
           }),
+          promptForRepositoryLink: true,
         });
       } catch (error) {
         const { GitRepositoryError } = await import("./utils/errors.js");
@@ -457,6 +483,9 @@ export async function runCli(
   } finally {
     activeJsonEnvelopeOperator = undefined;
     updateHandle?.finish();
+    await flushPendingHistory();
+    await drainPendingAppWorkflowUploads();
+    unregisterAppWorkflowSessionUploadHandler();
   }
 }
 
@@ -476,6 +505,8 @@ async function registerCommands(
     "auto",
     "apply",
     "list",
+    "login",
+    "status",
     "doctor",
     "mcp",
   ]);
@@ -500,6 +531,8 @@ async function registerCommands(
     program.addCommand((await import("./cli/auto.js")).createAutoCommand());
     program.addCommand((await import("./cli/apply.js")).createApplyCommand());
     program.addCommand((await import("./cli/list.js")).createListCommand());
+    program.addCommand((await import("./cli/login.js")).createLoginCommand());
+    program.addCommand((await import("./cli/status.js")).createStatusCommand());
     program.addCommand((await import("./cli/doctor.js")).createDoctorCommand());
     program.addCommand((await import("./cli/mcp.js")).createMcpCommand());
     return;
@@ -535,6 +568,14 @@ async function registerCommands(
       break;
     case "list":
       program.addCommand((await import("./cli/list.js")).createListCommand());
+      break;
+    case "login":
+      program.addCommand((await import("./cli/login.js")).createLoginCommand());
+      break;
+    case "status":
+      program.addCommand(
+        (await import("./cli/status.js")).createStatusCommand(),
+      );
       break;
     case "doctor":
       program.addCommand(
